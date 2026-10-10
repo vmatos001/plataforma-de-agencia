@@ -30,9 +30,11 @@ import {
   Trash2,
   FileText,
   Briefcase,
-  Layout
+  Layout,
+  Kanban
 } from 'lucide-react';
 import PresupuestosModule from './components/PresupuestosModule';
+import CrmPortalModule from './components/CrmPortalModule';
 import ContratosOnboardingModule from './components/ContratosOnboardingModule';
 import WireframesStoryBrandModule from './components/WireframesStoryBrandModule';
 import SeoLaunchQaModule from './components/SeoLaunchQaModule';
@@ -403,7 +405,11 @@ export default function App() {
                 Goglite
               </span>
               <span className="text-xs font-mono text-orange-400/90 font-semibold px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20">
-                {activeModule === 'lead_scrapper' ? 'Módulo 1 · Lead Scrapper' : 'Módulo 2 · Presupuestos'}
+                {activeModule === 'lead_scrapper' ? 'Módulo 1 · Lead Scrapper' :
+                 activeModule === 'presupuestos' ? 'Módulo 2 · Presupuestos' :
+                 activeModule === 'crm_portal' ? 'Módulo 3 · CRM & Portal' :
+                 activeModule === 'contratos_onboarding' ? 'Contratos & SOW' :
+                 activeModule === 'wireframes_storybrand' ? 'StoryBrand & UX' : 'SEO & Launch QA'}
               </span>
             </div>
           </div>
@@ -454,11 +460,26 @@ export default function App() {
                     <FileText className="w-3.5 h-3.5 text-orange-400" />
                     <span>2. Presupuestos & Propuestas</span>
                   </div>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Listo</span>
+                </button>
+
+                {/* Módulo 3 */}
+                <button
+                  onClick={() => { setActiveModule('crm_portal'); setToolsDropdownOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
+                    activeModule === 'crm_portal' 
+                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
+                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Kanban className="w-3.5 h-3.5 text-orange-400" />
+                    <span>3. CRM & Portal de Cliente</span>
+                  </div>
                   <span className="text-[10px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">Activo</span>
                 </button>
 
                 {[
-                  { title: "3. CRM & Portal de Cliente", tag: "Fase 3" },
                   { title: "4. Gestión & Rentabilidad (Holded)", tag: "Fase 4" },
                   { title: "5. SEO & GEO Tools (Rank Math)", tag: "Fase 5" },
                   { title: "6. Hub de Proyectos (Headless CMS)", tag: "Fase 6" },
@@ -546,8 +567,27 @@ export default function App() {
                   <FileText className="w-3.5 h-3.5" />
                   <span>Presupuestos</span>
                 </div>
-                <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">2</span>
+                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">2</span>
               </button>
+
+              <button
+                onClick={() => setActiveModule('crm_portal')}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeModule === 'crm_portal'
+                    ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Kanban className="w-3.5 h-3.5" />
+                  <span>CRM & Portal</span>
+                </div>
+                <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">3</span>
+              </button>
+
+              <div className="pt-2 pb-1 text-[9px] uppercase font-mono tracking-wider text-slate-500 px-1">
+                Herramientas de Entrega
+              </div>
 
               <button
                 onClick={() => setActiveModule('contratos_onboarding')}
@@ -559,9 +599,9 @@ export default function App() {
               >
                 <div className="flex items-center gap-2">
                   <Briefcase className="w-3.5 h-3.5" />
-                  <span>Contratos & Proy.</span>
+                  <span>Contratos & SOW</span>
                 </div>
-                <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">3</span>
+                <span className="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">SOW</span>
               </button>
 
               <button
@@ -576,7 +616,7 @@ export default function App() {
                   <Layout className="w-3.5 h-3.5" />
                   <span>StoryBrand & UX</span>
                 </div>
-                <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">4</span>
+                <span className="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">UX</span>
               </button>
 
               <button
@@ -591,7 +631,7 @@ export default function App() {
                   <ShieldCheck className="w-3.5 h-3.5" />
                   <span>SEO & Launch QA</span>
                 </div>
-                <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">5</span>
+                <span className="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">QA</span>
               </button>
             </div>
 
@@ -668,6 +708,18 @@ export default function App() {
             </div>
           )}
 
+          {activeModule === 'crm_portal' && (
+            <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-xs text-orange-300">
+              <div className="font-bold flex items-center gap-1.5 mb-1">
+                <Kanban className="w-3.5 h-3.5" />
+                <span>CRM & Portal</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-snug">
+                Pipeline Kanban de 6 etapas, bitácora de interacciones y portal privado para clientes $0.
+              </p>
+            </div>
+          )}
+
           {activeModule === 'contratos_onboarding' && (
             <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-xs text-orange-300">
               <div className="font-bold flex items-center gap-1.5 mb-1">
@@ -725,6 +777,22 @@ export default function App() {
               leadToConvert={leadForPresupuesto}
               onClearLeadConvert={() => setLeadForPresupuesto(null)}
               onNavigateToContratos={() => setActiveModule('contratos_onboarding')}
+            />
+          ) : activeModule === 'crm_portal' ? (
+            <CrmPortalModule
+              onConvertToPresupuesto={(lead) => {
+                setLeadForPresupuesto({
+                  nombreEmpresa: lead.empresa,
+                  responsable: lead.contacto,
+                  cargo: lead.cargo,
+                  email: lead.email,
+                  telefono: lead.telefono,
+                  dominio: lead.dominio,
+                  pais: lead.pais
+                });
+                setActiveModule('presupuestos');
+              }}
+              onOpenContrato={() => setActiveModule('contratos_onboarding')}
             />
           ) : activeModule === 'contratos_onboarding' ? (
             <ContratosOnboardingModule

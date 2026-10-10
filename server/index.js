@@ -10,6 +10,15 @@ import { getPresupuestos, savePresupuestos, getPlantillas } from './services/pre
 import { getProyectos, saveProyectos, crearProyectoDesdePresupuesto } from './services/proyectosStorage.js';
 import { getWireframes, saveWireframes, getWireframeByProyectoId, generarStoryBrandAuto } from './services/wireframesStorage.js';
 import { getSeoAudits, saveSeoAudits, getSeoAuditByProyectoId, generarSeoAuto } from './services/seoStorage.js';
+import { 
+  getCrmLeads, 
+  saveCrmLeads, 
+  getCrmLeadById, 
+  getCrmLeadByToken, 
+  updateCrmLeadStage, 
+  addCrmInteraction, 
+  addClientUploadedAsset 
+} from './services/crmStorage.js';
 
 import path from 'path';
 import fs from 'fs';
@@ -698,6 +707,125 @@ app.post('/api/seo/:proyectoId/checklist', (req, res) => {
 
   saveSeoAudits(list);
   res.json({ success: true, seo });
+});
+
+// ==========================================
+// 8. CRM COMERCIAL & PORTAL DE CLIENTES API
+// ==========================================
+app.get('/api/crm/leads', (req, res) => {
+  const leads = getCrmLeads();
+  res.json(leads);
+});
+
+app.post('/api/crm/leads', (req, res) => {
+  const leads = getCrmLeads();
+  const nuevo = {
+    id: 'crm-' + Date.now(),
+    leadId: req.body.leadId || null,
+    empresa: req.body.empresa || 'Nueva Empresa',
+    contacto: req.body.contacto || 'Contacto Principal',
+    cargo: req.body.cargo || 'Director / Dueño',
+    email: req.body.email || '',
+    telefono: req.body.telefono || '',
+    pais: req.body.pais || 'SV',
+    dominio: req.body.dominio || '',
+    etapa: req.body.etapa || 'nuevo',
+    valorEstimado: Number(req.body.valorEstimado) || 1500,
+    probabilidad: 15,
+    fuente: req.body.fuente || 'Manual',
+    portalToken: 'portal-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+    interacciones: [
+      {
+        id: 'int-' + Date.now(),
+        tipo: 'nota',
+        fecha: new Date().toISOString().split('T')[0],
+        titulo: 'Lead Creado en CRM',
+        detalle: req.body.notasIniciales || 'Lead ingresado al pipeline comercial.',
+        proximoPaso: 'Realizar primer contacto',
+        fechaProximoPaso: ''
+      }
+    ],
+    portalConfig: {
+      portalActivo: true,
+      faseActual: 'Diagnóstico Comercial',
+      progresoPorcentaje: 10,
+      archivosSubidos: [],
+      notasCliente: ''
+    },
+    creadoEn: new Date().toISOString().split('T')[0],
+    actualizadoEn: new Date().toISOString().split('T')[0]
+  };
+
+  leads.unshift(nuevo);
+  saveCrmLeads(leads);
+  res.status(201).json(nuevo);
+});
+
+app.patch('/api/crm/leads/:id/stage', (req, res) => {
+  const { id } = req.params;
+  const { etapa } = req.body;
+  if (!etapa) return res.status(400).json({ error: 'La etapa es requerida' });
+
+  const updated = updateCrmLeadStage(id, etapa);
+  if (!updated) return res.status(404).json({ error: 'Lead no encontrado' });
+  res.json(updated);
+});
+
+app.post('/api/crm/leads/:id/interactions', (req, res) => {
+  const { id } = req.params;
+  const updated = addCrmInteraction(id, req.body);
+  if (!updated) return res.status(404).json({ error: 'Lead no encontrado' });
+  res.json(updated);
+});
+
+app.patch('/api/crm/leads/:id', (req, res) => {
+  const { id } = req.params;
+  const leads = getCrmLeads();
+  const idx = leads.findIndex(l => l.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'Lead no encontrado' });
+
+  leads[idx] = { ...leads[idx], ...req.body, actualizadoEn: new Date().toISOString().split('T')[0] };
+  saveCrmLeads(leads);
+  res.json(leads[idx]);
+});
+
+app.delete('/api/crm/leads/:id', (req, res) => {
+  const { id } = req.params;
+  let leads = getCrmLeads();
+  const len = leads.length;
+  leads = leads.filter(l => l.id !== id);
+  if (leads.length === len) return res.status(404).json({ error: 'Lead no encontrado' });
+  saveCrmLeads(leads);
+  res.json({ success: true });
+});
+
+// Endpoint público del Portal de Cliente
+app.get('/api/portal/:token', (req, res) => {
+  const { token } = req.params;
+  const lead = getCrmLeadByToken(token);
+  if (!lead) return res.status(404).json({ error: 'Portal no encontrado o enlace inválido' });
+
+  // Buscar si tiene presupuesto vinculado
+  const presupuestos = getPresupuestos();
+  const presupuesto = presupuestos.find(p => p.cliente?.empresa?.toLowerCase() === lead.empresa.toLowerCase() || p.id === lead.portalConfig?.presupuestoId) || null;
+
+  // Buscar si tiene contrato/proyecto vinculado
+  const proyectos = getProyectos();
+  const proyecto = proyectos.find(p => p.cliente?.empresa?.toLowerCase() === lead.empresa.toLowerCase() || p.id === lead.portalConfig?.proyectoId) || null;
+
+  res.json({
+    lead,
+    presupuesto,
+    proyecto,
+    portalConfig: lead.portalConfig
+  });
+});
+
+app.post('/api/portal/:token/upload-assets', (req, res) => {
+  const { token } = req.params;
+  const updated = addClientUploadedAsset(token, req.body);
+  if (!updated) return res.status(404).json({ error: 'Portal no encontrado' });
+  res.json({ success: true, lead: updated });
 });
 
 // Serve assets directly from public/assets and dist
