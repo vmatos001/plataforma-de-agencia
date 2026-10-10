@@ -1,0 +1,204 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const dataDir = path.join(__dirname, '../data');
+
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
+const presupuestosFile = path.join(dataDir, 'presupuestos.json');
+const plantillasFile = path.join(dataDir, 'plantillas_presupuestos.json');
+
+// Plantilla oficial extraída directamente del presupuesto real de hoy en Google Drive:
+// "GruasAndrea_PropuestaSistemaDigital_2026-10"
+const realProposalSample = {
+  id: "prop-2026-001",
+  codigo: "P-2026-001",
+  titulo: "PROPUESTA DE DESARROLLO DIGITAL VIP",
+  subtitulo: "(SISTEMA INTEGRAL WEB, PLAN GOOGLE ADS, REPUTACIÓN LOCAL & CÓDIGOS QR)",
+  fecha: "Octubre 2026",
+  vigenciaDias: 15,
+  estado: "enviado", // 'borrador' | 'sin_abrir' | 'visto' | 'aceptado' | 'rechazado' | 'enviado'
+  moneda: "USD",
+  simboloMoneda: "$",
+  pais: "SV",
+
+  // Datos Emisor (Goglite - Portada Fija)
+  emisor: {
+    empresa: "Goglite",
+    ubicacion: "Santa Ana. El Salvador",
+    telefono: "(503)7756-9828",
+    email: "info@goglite.com",
+    responsable: "Victor Matos",
+    cargo: "Director & Estratega Digital"
+  },
+
+  // Datos Cliente
+  cliente: {
+    nombre: "Brayan Muñoz (Bryan Muñoz)",
+    empresa: "Grúas Andrea / Grúas Andrés",
+    telefono: "+1 (323) 901-3886",
+    email: "contacto@gruasandrea.com",
+    actividad: "Servicio de Grúas 24/7",
+    ubicacion: "Los Ángeles / Cobertura Regional"
+  },
+
+  // Portada - Bloques Estratégicos Fijos
+  portada: {
+    proyecto: "Implementación de un Sistema Digital Integral de Captación Inmediata y Posicionamiento para Grúas Andrea, transformando su presencia comercial en un canal activo que atrae llamadas y solicitudes de auxilio vial las 24 horas del día.",
+    enfoqueEstrategico: "Los servicios de grúa operan bajo una necesidad de urgencia extrema. El conductor accidentado necesita auxilio en segundos. Por ello, la plataforma web está estructurada con botones directos de llamada instantánea (Click-to-Call), botón flotante de WhatsApp y formularios ágiles.",
+    tecnologiaMobileFirst: "Arquitectura ultra-rápida optimizada al 100% para teléfonos inteligentes (velocidad de carga inferior a 1.2 segundos). Más del 95% de las solicitudes de grúas se realizan desde un teléfono celular en la carretera.",
+    geoSeoLocal: "Estructura semántica avanzada (Schema.org LocalBusiness / EmergencyService) para asegurar máxima visibilidad en Google Maps y motores de búsqueda cuando las personas busquen auxilio vial urgente en su zona de cobertura."
+  },
+
+  // Componentes / Módulos de la Propuesta
+  modulos: [
+    {
+      id: "mod-1",
+      numero: "MÓDULO 1",
+      titulo: "Plataforma Web Corporativa de Alta Conversión (Mobile-First)",
+      descripcion: "Arquitectura responsive optimizada al 100% para teléfonos inteligentes. Incluye secciones clave: Inicio (Home) con llamada de emergencia en cabecera, Servicios de Remolque (liviano/pesado, auxilio vial), Cobertura y Zona de Servicio, Por Qué Elegirnos y Contacto con mapa interactivo.",
+      tipo: "precio_cerrado",
+      horas: 18,
+      precio: 100
+    },
+    {
+      id: "mod-2",
+      numero: "MÓDULO 2",
+      titulo: "Canales de Cierre y Contacto de Urgencia Inmediata",
+      descripcion: "Botón flotante inteligente de WhatsApp Business con mensaje predeterminado ('Hola Grúas Andrea, necesito una grúa urgente en [Ubicación]') y botón de marcado directo Click-to-Call de un solo toque.",
+      tipo: "precio_cerrado",
+      horas: 6,
+      precio: 35
+    },
+    {
+      id: "mod-3",
+      numero: "MÓDULO 3",
+      titulo: "Optimización del Perfil de Google Negocio (Google Maps)",
+      descripcion: "Configuración y categorización precisa en Google Maps (Towing service), fotos de la flota, horarios 24/7 y optimización para destacar en el Local Pack cuando conductores busquen auxilio vial en su zona.",
+      tipo: "precio_cerrado",
+      horas: 5,
+      precio: 35
+    },
+    {
+      id: "mod-4",
+      numero: "MÓDULO 4",
+      titulo: "Alineación del Ecosistema de Redes Sociales",
+      descripcion: "Optimización de perfiles en Facebook e Instagram con biografía enfocada en servicio de auxilio 24/7, botón directo de WhatsApp y unificación de la identidad visual de marca.",
+      tipo: "precio_cerrado",
+      horas: 4,
+      precio: 25
+    },
+    {
+      id: "mod-5",
+      numero: "MÓDULO 5",
+      titulo: "Documento & Plan Estratégico para Futuras Campañas en Google Ads",
+      descripcion: "Documento de planificación estratégica con listado de keywords de urgencia vial, lista de palabras negativas para evitar clics basura, textos persuasivos de muestra y delimitación geográfica. (Delimitación: documento de planificación, no incluye presupuesto ni ejecución activa).",
+      tipo: "precio_cerrado",
+      horas: 6,
+      precio: 35
+    },
+    {
+      id: "mod-6",
+      numero: "MÓDULO 6",
+      titulo: "Ecosistema de Códigos QR Inteligentes (Para la Grúa y Reseñas)",
+      descripcion: "Código QR #1 rotulable para la carrocería de la grúa y tarjetas con llamada directa a WhatsApp; y Código QR #2 para captación acelerada de reseñas 5 estrellas de Google Maps.",
+      tipo: "precio_cerrado",
+      horas: 4,
+      precio: 20
+    }
+  ],
+
+  // Hoja de Ruta y Fases
+  fases: [
+    {
+      fase: "Fase 1",
+      plazo: "Días 1 a 4",
+      detalle: "Configuración de activos digitales, optimización de la ficha de Google Negocio (Google Maps), redes sociales y diseño de los Códigos QR vectoriales."
+    },
+    {
+      fase: "Fase 2",
+      plazo: "Días 5 a 10",
+      detalle: "Desarrollo de la plataforma web, integración de botones de llamada directa y WhatsApp, formularios y elaboración del documento de planificación estratégica para Google Ads."
+    },
+    {
+      fase: "Fase 3",
+      plazo: "Días 11 a 15",
+      detalle: "Pruebas de velocidad móvil, revisión conjunta con el cliente, ajustes finales, publicación y entrega oficial del sistema con accesos y credenciales."
+    }
+  ],
+
+  // Inversión y Condiciones Comerciales
+  inversion: {
+    precioMercadoReferencial: 750,
+    precioTotal: 250,
+    descuentoEspecial: 500,
+    anticipo: 100,
+    contraEntrega: 150,
+    beneficioExclusivo: "1 mes de soporte técnico, mantenimiento y supervisión gratuita tras el lanzamiento oficial, garantizando que su sistema opere a su máximo potencial desde el primer día.",
+    revisiones: "Dos (2) rondas completas de ajustes de diseño y contenido.",
+    requisitosInicio: "Fotografías de la grúa/flota, logotipo (si dispone de él), número de teléfono oficial, zonas de cobertura y datos de contacto."
+  }
+};
+
+export const getPresupuestos = () => {
+  if (!fs.existsSync(presupuestosFile)) {
+    fs.writeFileSync(presupuestosFile, JSON.stringify([realProposalSample], null, 2));
+    return [realProposalSample];
+  }
+  try {
+    return JSON.parse(fs.readFileSync(presupuestosFile, 'utf8'));
+  } catch {
+    return [realProposalSample];
+  }
+};
+
+export const savePresupuestos = (list) => {
+  fs.writeFileSync(presupuestosFile, JSON.stringify(list, null, 2));
+  return list;
+};
+
+export const getPlantillas = () => {
+  const defaultPlantillas = [
+    {
+      id: "plantilla-vip-gruas",
+      nombre: "Sistema Integral VIP (Web + Google Ads Plan + Maps + QR)",
+      descripcion: "Plantilla oficial de alta conversión para negocios de servicio urgente y atención local.",
+      datos: realProposalSample
+    },
+    {
+      id: "plantilla-ultra-motion",
+      nombre: "Landing Page Ultra-Motion (Astro 5 + Motor Cinético)",
+      descripcion: "Ideal para empresas B2B, marcas premium y startups tecnológicas.",
+      datos: {
+        ...realProposalSample,
+        titulo: "PROPUESTA DE DESARROLLO WEB ULTRA-MOTION & EXPERIENCIA CINÉTICA",
+        subtitulo: "(ARQUITECTURA ASTRO 5, MOTOR VANILLA DE ALTO RENDIMIENTO & GEO)",
+        inversion: {
+          precioMercadoReferencial: 1200,
+          precioTotal: 650,
+          descuentoEspecial: 550,
+          anticipo: 350,
+          contraEntrega: 300,
+          beneficioExclusivo: "1 mes de optimización de Core Web Vitals y hosting en CDN a costo $0.",
+          revisiones: "Dos (2) rondas completas de ajustes.",
+          requisitosInicio: "Manual de marca, textos base y accesos a dominio."
+        }
+      }
+    }
+  ];
+
+  if (!fs.existsSync(plantillasFile)) {
+    fs.writeFileSync(plantillasFile, JSON.stringify(defaultPlantillas, null, 2));
+    return defaultPlantillas;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(plantillasFile, 'utf8'));
+  } catch {
+    return defaultPlantillas;
+  }
+};

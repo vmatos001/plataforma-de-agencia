@@ -1,0 +1,1416 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Search, 
+  Sparkles, 
+  Users, 
+  Settings as SettingsIcon, 
+  Zap, 
+  Play, 
+  Download, 
+  ChevronRight, 
+  ExternalLink, 
+  CheckCircle2, 
+  AlertCircle, 
+  Clock, 
+  Mail, 
+  Phone, 
+  Building2, 
+  Globe, 
+  Send, 
+  Copy, 
+  Check, 
+  X, 
+  Filter, 
+  Layers, 
+  ShieldCheck, 
+  TrendingUp, 
+  Bot, 
+  ArrowUpRight,
+  RefreshCw,
+  Trash2,
+  FileText,
+  Briefcase,
+  Layout
+} from 'lucide-react';
+import PresupuestosModule from './components/PresupuestosModule';
+import ContratosOnboardingModule from './components/ContratosOnboardingModule';
+import WireframesStoryBrandModule from './components/WireframesStoryBrandModule';
+import SeoLaunchQaModule from './components/SeoLaunchQaModule';
+
+export default function App() {
+  const [activeModule, setActiveModule] = useState('presupuestos'); // 'lead_scrapper' | 'presupuestos'
+  const [activeTab, setActiveTab] = useState('buscar'); // 'buscar' | 'sugerencias' | 'leads' | 'ajustes'
+  const [selectedCountry, setSelectedCountry] = useState('SV'); // 'SV' | 'DO'
+  const [pipelineInput, setPipelineInput] = useState('');
+  const [manualSearchInput, setManualSearchInput] = useState('');
+  const [leadForPresupuesto, setLeadForPresupuesto] = useState(null);
+  
+  // State for SERP Results
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedResults, setSelectedResults] = useState(new Set());
+  const [isSearching, setIsSearching] = useState(false);
+  const [isPipelineRunning, setIsPipelineRunning] = useState(false);
+  const [pipelineProgress, setPipelineProgress] = useState('');
+
+  // State for Leads
+  const [leads, setLeads] = useState([]);
+  const [leadFilter, setLeadFilter] = useState('todos');
+  const [leadSearchTerm, setLeadSearchTerm] = useState('');
+  
+  // State for Modal
+  const [selectedLeadModal, setSelectedLeadModal] = useState(null);
+  const [modalTab, setModalTab] = useState('auditoria'); // 'auditoria' | 'pitch'
+  const [copiedPitch, setCopiedPitch] = useState(false);
+
+  // State for Settings
+  const [settings, setSettings] = useState({
+    geminiApiKey: '',
+    serperApiKey: '',
+    apolloApiKey: '',
+    instantlyApiKey: '',
+    defaultCountry: 'SV'
+  });
+  const [settingsSaved, setSettingsSaved] = useState(false);
+  const [toolsDropdownOpen, setToolsDropdownOpen] = useState(false);
+
+  // Fetch initial data
+  useEffect(() => {
+    fetchLeads();
+    fetchSettings();
+  }, []);
+
+  const fetchLeads = async () => {
+    try {
+      const res = await fetch('/api/leads');
+      if (res.ok) {
+        const data = await res.json();
+        setLeads(data);
+      }
+    } catch (err) {
+      console.error('Error fetching leads:', err);
+    }
+  };
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/settings');
+      if (res.ok) {
+        const data = await res.json();
+        setSettings(data);
+        if (data.defaultCountry) setSelectedCountry(data.defaultCountry);
+      }
+    } catch (err) {
+      console.error('Error fetching settings:', err);
+    }
+  };
+
+  // Run Manual Search
+  const handleManualSearch = async (queryText) => {
+    const q = queryText || manualSearchInput;
+    if (!q.trim()) return;
+
+    setIsSearching(true);
+    setSearchResults([]);
+    setSelectedResults(new Set());
+
+    try {
+      const res = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q, country: selectedCountry })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSearchResults(data.results);
+        // Pre-select recommended positions 4 to 20
+        const recommended = new Set(
+          data.results
+            .filter(r => r.recomendadoOutbound)
+            .map(r => r.dominio)
+        );
+        setSelectedResults(recommended);
+      }
+    } catch (err) {
+      alert('Error al realizar búsqueda: ' + err.message);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Run 1-Click Pipeline
+  const handleRunPipeline = async (queryText) => {
+    const q = queryText || pipelineInput;
+    if (!q.trim()) return;
+
+    setIsPipelineRunning(true);
+    setPipelineProgress('Buscando empresas en Google (posiciones 4-20)...');
+
+    try {
+      setPipelineProgress('Extrayendo decisores en Apollo y auditando sitios con IA...');
+      const res = await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q, country: selectedCountry, limit: 10 })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPipelineProgress(`¡Completado! Se generaron ${data.nuevosGuardados} leads nuevos.`);
+        await fetchLeads();
+        setTimeout(() => {
+          setIsPipelineRunning(false);
+          setActiveTab('leads');
+        }, 1500);
+      } else {
+        alert('Error en pipeline: ' + (data.error || 'Desconocido'));
+        setIsPipelineRunning(false);
+      }
+    } catch (err) {
+      alert('Error al ejecutar pipeline: ' + err.message);
+      setIsPipelineRunning(false);
+    }
+  };
+
+  // Toggle Single Result Selection
+  const toggleSelectResult = (domain) => {
+    const next = new Set(selectedResults);
+    if (next.has(domain)) next.delete(domain);
+    else next.add(domain);
+    setSelectedResults(next);
+  };
+
+  // Select all / recommended
+  const selectAllResults = () => {
+    setSelectedResults(new Set(searchResults.map(r => r.dominio)));
+  };
+
+  const selectRecommendedResults = () => {
+    setSelectedResults(new Set(searchResults.filter(r => r.recomendadoOutbound).map(r => r.dominio)));
+  };
+
+  // Extract contacts and audit for selected
+  const handleExtractSelected = async () => {
+    if (selectedResults.size === 0) return;
+    setIsSearching(true);
+
+    const itemsToProcess = searchResults.filter(r => selectedResults.has(r.dominio));
+    let addedCount = 0;
+
+    for (const item of itemsToProcess) {
+      try {
+        const enrichRes = await fetch('/api/enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain: item.dominio, companyName: item.titulo, country: selectedCountry })
+        });
+        const enrichData = await enrichRes.json();
+        const contact = enrichData.contact || {};
+
+        const auditRes = await fetch('/api/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain: item.dominio, query: manualSearchInput, country: selectedCountry })
+        });
+        const auditData = await auditRes.json();
+        const audit = auditData.audit;
+
+        const newLeadPayload = {
+          dominio: item.dominio,
+          nombreEmpresa: item.titulo.split('|')[0].trim(),
+          pais: selectedCountry,
+          email: contact.email,
+          responsable: contact.responsable,
+          cargo: contact.cargo,
+          telefono: contact.telefono,
+          posicionGoogle: item.posicion,
+          auditoria: audit,
+          pitch: null
+        };
+
+        const pitchRes = await fetch('/api/pitch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lead: newLeadPayload, audit, country: selectedCountry })
+        });
+        const pitchData = await pitchRes.json();
+        newLeadPayload.pitch = pitchData.pitch;
+
+        await fetch('/api/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newLeadPayload)
+        });
+
+        addedCount++;
+      } catch (err) {
+        console.error('Error procesando lead individual:', err);
+      }
+    }
+
+    await fetchLeads();
+    setIsSearching(false);
+    setActiveTab('leads');
+  };
+
+  // Change lead status
+  const handleUpdateLeadStatus = async (leadId, newStatus) => {
+    try {
+      await fetch(`/api/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: newStatus })
+      });
+      fetchLeads();
+      if (selectedLeadModal && selectedLeadModal.id === leadId) {
+        setSelectedLeadModal(prev => ({ ...prev, estado: newStatus }));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Send to instantly
+  const handleSendInstantly = async (leadId) => {
+    try {
+      await fetch('/api/send-instantly', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId })
+      });
+      fetchLeads();
+      alert('Lead enviado a la cola de Instantly con éxito.');
+    } catch (err) {
+      alert('Error al enviar: ' + err.message);
+    }
+  };
+
+  // Delete lead
+  const handleDeleteLead = async (leadId) => {
+    if (!confirm('¿Eliminar este lead?')) return;
+    try {
+      await fetch(`/api/leads/${leadId}`, { method: 'DELETE' });
+      fetchLeads();
+      if (selectedLeadModal?.id === leadId) setSelectedLeadModal(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Save Settings
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      });
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 3000);
+    } catch (err) {
+      alert('Error guardando ajustes: ' + err.message);
+    }
+  };
+
+  // Filter leads
+  const filteredLeads = leads.filter(l => {
+    const matchesFilter = 
+      leadFilter === 'todos' ? true :
+      leadFilter === 'sin_email' ? (!l.email || l.email.includes('contacto@')) :
+      l.estado === leadFilter;
+
+    const term = leadSearchTerm.toLowerCase();
+    const matchesSearch = !term || 
+      l.dominio?.toLowerCase().includes(term) ||
+      l.responsable?.toLowerCase().includes(term) ||
+      l.email?.toLowerCase().includes(term) ||
+      l.nombreEmpresa?.toLowerCase().includes(term);
+
+    return matchesFilter && matchesSearch;
+  });
+
+  // Copy Pitch
+  const handleCopyPitch = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopiedPitch(true);
+    setTimeout(() => setCopiedPitch(false), 2000);
+  };
+
+  // Niche Suggestions Data
+  const nicheSuggestions = [
+    {
+      title: "Clínicas Dentales & Estéticas",
+      country: "SV",
+      flag: "🇸🇻",
+      query: "clínicas dentales San Salvador",
+      desc: "Negocios con alto valor por paciente (\$1,500+ en implantes/ortodoncia) con webs lentas y sin presencia en IA.",
+      roi: "Alto"
+    },
+    {
+      title: "Inmobiliarias & Villas de Lujo",
+      country: "DO",
+      flag: "🇩🇴",
+      query: "inmobiliarias Punta Cana villas de lujo",
+      desc: "Inversionistas extranjeros buscan con ChatGPT. Las inmobiliarias locales pierden clientes por falta de GEO.",
+      roi: "Muy Alto"
+    },
+    {
+      title: "Cirugía Plástica & Medicina Estética",
+      country: "DO",
+      flag: "🇩🇴",
+      query: "cirugía plástica Santo Domingo",
+      desc: "Turismo médico con alta facturación. Requieren máxima velocidad móvil y reserva directa por WhatsApp.",
+      roi: "Extremo"
+    },
+    {
+      title: "Bufetes de Abogados Corporativos",
+      country: "SV",
+      flag: "🇸🇻",
+      query: "abogados corporativos San Salvador",
+      desc: "Firmas tradicionales con webs de hace 10 años, nula optimización SEO y nula citación en modelos de IA.",
+      roi: "Alto"
+    },
+    {
+      title: "Logística y Carga Internacional",
+      country: "SV",
+      flag: "🇸🇻",
+      query: "empresas de logística El Salvador transporte de carga",
+      desc: "Servicios B2B con contratos de retención mensual (\$2,000+). Buscan proveedores con alta autoridad digital.",
+      roi: "Muy Alto"
+    },
+    {
+      title: "Hoteles Boutique & Ecoturismo",
+      country: "DO",
+      flag: "🇩🇴",
+      query: "hoteles boutique Las Terrenas Samaná",
+      desc: "Dependen de comisiones del 20% en Booking/Expedia. Necesitan web propia de alta conversión y SEO local.",
+      roi: "Alto"
+    }
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#080b11] text-slate-100 flex flex-col selection:bg-orange-600 selection:text-white">
+      
+      {/* 1. TOP NAVIGATION BAR */}
+      <header className="no-print h-16 border-b border-slate-800/80 bg-[#0c1017]/90 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-40">
+        <div className="flex items-center gap-4">
+          {/* Logo Badge */}
+          <div className="flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center font-black text-white text-base shadow-glow-sm">
+              G
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                Goglite
+              </span>
+              <span className="text-xs font-mono text-orange-400/90 font-semibold px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20">
+                {activeModule === 'lead_scrapper' ? 'Módulo 1 · Lead Scrapper' : 'Módulo 2 · Presupuestos'}
+              </span>
+            </div>
+          </div>
+
+          <span className="text-slate-700">|</span>
+
+          {/* Tools Menu Dropdown */}
+          <div className="relative">
+            <button 
+              onClick={() => setToolsDropdownOpen(!toolsDropdownOpen)}
+              className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1.5 px-2.5 py-1 rounded-md hover:bg-slate-800/60 transition-colors"
+            >
+              <Layers className="w-3.5 h-3.5 text-slate-500" />
+              <span>Módulos de Agencia</span>
+              <ChevronRight className={`w-3 h-3 text-slate-500 transition-transform ${toolsDropdownOpen ? 'rotate-90' : ''}`} />
+            </button>
+
+            {toolsDropdownOpen && (
+              <div className="absolute left-0 mt-2 w-72 rounded-xl bg-[#0f1422] border border-slate-800 shadow-2xl p-2 z-50">
+                <div className="text-[10px] uppercase font-mono tracking-wider text-slate-500 px-2 py-1">Plataforma Goglite</div>
+                
+                {/* Módulo 1 */}
+                <button
+                  onClick={() => { setActiveModule('lead_scrapper'); setToolsDropdownOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
+                    activeModule === 'lead_scrapper' 
+                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
+                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-3.5 h-3.5 text-orange-400" />
+                    <span>1. Lead Scrapper (Outbound)</span>
+                  </div>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Listo</span>
+                </button>
+
+                {/* Módulo 2 */}
+                <button
+                  onClick={() => { setActiveModule('presupuestos'); setToolsDropdownOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
+                    activeModule === 'presupuestos' 
+                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
+                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5 text-orange-400" />
+                    <span>2. Presupuestos & Propuestas</span>
+                  </div>
+                  <span className="text-[10px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">Activo</span>
+                </button>
+
+                {[
+                  { title: "3. CRM & Portal de Cliente", tag: "Fase 3" },
+                  { title: "4. Gestión & Rentabilidad (Holded)", tag: "Fase 4" },
+                  { title: "5. SEO & GEO Tools (Rank Math)", tag: "Fase 5" },
+                  { title: "6. Hub de Proyectos (Headless CMS)", tag: "Fase 6" },
+                ].map((m, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg text-slate-400 text-xs hover:bg-slate-800/40 opacity-70">
+                    <span>{m.title}</span>
+                    <span className="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">{m.tag}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Header Options */}
+        <div className="flex items-center gap-3">
+          {/* Country Selector */}
+          <div className="flex items-center bg-[#131926] border border-slate-800 rounded-lg p-0.5 text-xs">
+            <button
+              onClick={() => setSelectedCountry('SV')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-medium transition-all ${
+                selectedCountry === 'SV' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>🇸🇻</span>
+              <span>El Salvador</span>
+            </button>
+            <button
+              onClick={() => setSelectedCountry('DO')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-medium transition-all ${
+                selectedCountry === 'DO' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>🇩🇴</span>
+              <span>Rep. Dominicana</span>
+            </button>
+          </div>
+
+          {/* User Profile */}
+          <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
+            <div className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-orange-400">
+              VM
+            </div>
+            <div className="text-left hidden sm:block">
+              <div className="text-xs font-semibold leading-tight text-slate-200">Víctor Matos</div>
+              <div className="text-[10px] text-slate-500 leading-tight">Admin · Goglite</div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* 2. BODY LAYOUT: SIDEBAR + MAIN CONTENT */}
+      <div className="flex flex-1 overflow-hidden">
+        
+        {/* SIDEBAR */}
+        <aside className="no-print w-56 border-r border-slate-800/80 bg-[#0b0e16] p-3 flex flex-col justify-between shrink-0">
+          <div className="space-y-3">
+            {/* Module Selector */}
+            <div className="space-y-1 pb-3 border-b border-slate-800/80">
+              <div className="text-[10px] uppercase font-mono tracking-wider text-slate-500 px-1 mb-1">Módulos</div>
+              <button
+                onClick={() => setActiveModule('lead_scrapper')}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeModule === 'lead_scrapper'
+                    ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Lead Scrapper</span>
+                </div>
+                <span className="text-[9px] bg-slate-800 px-1.5 py-0.5 rounded font-mono">1</span>
+              </button>
+
+              <button
+                onClick={() => setActiveModule('presupuestos')}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeModule === 'presupuestos'
+                    ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Presupuestos</span>
+                </div>
+                <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">2</span>
+              </button>
+
+              <button
+                onClick={() => setActiveModule('contratos_onboarding')}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeModule === 'contratos_onboarding'
+                    ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-3.5 h-3.5" />
+                  <span>Contratos & Proy.</span>
+                </div>
+                <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">3</span>
+              </button>
+
+              <button
+                onClick={() => setActiveModule('wireframes_storybrand')}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeModule === 'wireframes_storybrand'
+                    ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Layout className="w-3.5 h-3.5" />
+                  <span>StoryBrand & UX</span>
+                </div>
+                <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">4</span>
+              </button>
+
+              <button
+                onClick={() => setActiveModule('seo_qa')}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeModule === 'seo_qa'
+                    ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>SEO & Launch QA</span>
+                </div>
+                <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">5</span>
+              </button>
+            </div>
+
+            {/* Sub-nav for Lead Scrapper */}
+            {activeModule === 'lead_scrapper' && (
+              <nav className="space-y-1">
+                <div className="text-[10px] uppercase font-mono tracking-wider text-slate-500 px-1 mb-1">Scrapper Nav</div>
+                <button
+                  onClick={() => setActiveTab('buscar')}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                    activeTab === 'buscar' 
+                      ? 'bg-orange-600/15 text-orange-400 border border-orange-500/30' 
+                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                  }`}
+                >
+                  <Search className="w-4 h-4" />
+                  <span>Buscar</span>
+                </button>
+
+            <button
+              onClick={() => setActiveTab('sugerencias')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                activeTab === 'sugerencias' 
+                  ? 'bg-orange-600/15 text-orange-400 border border-orange-500/30' 
+                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Sugerencias Nichos</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('leads')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                activeTab === 'leads' 
+                  ? 'bg-orange-600/15 text-orange-400 border border-orange-500/30' 
+                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Users className="w-4 h-4" />
+                <span>Leads</span>
+              </div>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                activeTab === 'leads' ? 'bg-orange-500 text-white' : 'bg-slate-800 text-slate-400'
+              }`}>
+                {leads.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('ajustes')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                activeTab === 'ajustes' 
+                  ? 'bg-orange-600/15 text-orange-400 border border-orange-500/30' 
+                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+              }`}
+            >
+              <SettingsIcon className="w-4 h-4" />
+              <span>Ajustes & APIs</span>
+            </button>
+          </nav>
+          )}
+
+          {activeModule === 'presupuestos' && (
+            <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-xs text-orange-300">
+              <div className="font-bold flex items-center gap-1.5 mb-1">
+                <FileText className="w-3.5 h-3.5" />
+                <span>Propuestas VIP</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-snug">
+                Plantilla oficial con portada corporativa Goglite, 6 módulos técnicos y exportación PDF $0.
+              </p>
+            </div>
+          )}
+
+          {activeModule === 'contratos_onboarding' && (
+            <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-xs text-orange-300">
+              <div className="font-bold flex items-center gap-1.5 mb-1">
+                <Briefcase className="w-3.5 h-3.5" />
+                <span>Contratos & Legal</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-snug">
+                Firma electrónica digital $0, intake de activos y seguimiento de hitos de entrega.
+              </p>
+            </div>
+          )}
+
+          {activeModule === 'wireframes_storybrand' && (
+            <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-xs text-orange-300">
+              <div className="font-bold flex items-center gap-1.5 mb-1">
+                <Layout className="w-3.5 h-3.5" />
+                <span>StoryBrand & UX</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-snug">
+                BrandScript de 7 partes, prueba de 5 segundos y maquetación de alambre responsiva $0.
+              </p>
+            </div>
+          )}
+
+          {activeModule === 'seo_qa' && (
+            <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-xs text-orange-300">
+              <div className="font-bold flex items-center gap-1.5 mb-1">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>SEO & Lanzamiento</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-snug">
+                Schema.org JSON-LD, eventos de tracking y auditoría técnica de 15 puntos.
+              </p>
+            </div>
+          )}
+          </div>
+
+          {/* Bottom Sidebar Box */}
+          <div className="p-2.5 rounded-lg bg-[#111622] border border-slate-800/80 text-[11px] space-y-1.5">
+            <div className="flex items-center gap-1.5 font-semibold text-slate-300">
+              <Bot className="w-3.5 h-3.5 text-orange-400" />
+              <span>Motor Goglite AI</span>
+            </div>
+            <p className="text-slate-400 text-[10px] leading-tight">
+              Región activa: {selectedCountry === 'DO' ? 'República Dominicana 🇩🇴' : 'El Salvador 🇸🇻'}.
+            </p>
+          </div>
+        </aside>
+
+        {/* MAIN CONTENT AREA */}
+        <main className="flex-1 overflow-y-auto p-6 bg-[#080b11]">
+          {activeModule === 'presupuestos' ? (
+            <PresupuestosModule 
+              selectedCountry={selectedCountry}
+              leadToConvert={leadForPresupuesto}
+              onClearLeadConvert={() => setLeadForPresupuesto(null)}
+              onNavigateToContratos={() => setActiveModule('contratos_onboarding')}
+            />
+          ) : activeModule === 'contratos_onboarding' ? (
+            <ContratosOnboardingModule
+              selectedCountry={selectedCountry}
+              onNavigateToPresupuestos={() => setActiveModule('presupuestos')}
+            />
+          ) : activeModule === 'wireframes_storybrand' ? (
+            <WireframesStoryBrandModule
+              selectedCountry={selectedCountry}
+            />
+          ) : activeModule === 'seo_qa' ? (
+            <SeoLaunchQaModule
+              selectedCountry={selectedCountry}
+            />
+          ) : (
+            <>
+          
+          {/* TAB 1: BUSCAR */}
+          {activeTab === 'buscar' && (
+            <div className="max-w-5xl mx-auto space-y-6">
+              
+              {/* 1-Click Pipeline Card */}
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-[#121826] to-[#0d121c] border border-orange-500/30 shadow-glow-sm relative overflow-hidden">
+                <div className="flex items-center gap-2 text-xs font-semibold text-orange-400 mb-1">
+                  <Zap className="w-4 h-4 fill-orange-400" />
+                  <span>Pipeline Automático 1-Click</span>
+                </div>
+                <p className="text-xs text-slate-400 mb-3.5">
+                  Busca en Google · Extrae posiciones #4-#20 · Enriquece emails directos (Apollo) · Audita fallos GEO/SEO con IA · Redacta email pitch.
+                </p>
+
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={pipelineInput}
+                      onChange={(e) => setPipelineInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleRunPipeline()}
+                      placeholder={selectedCountry === 'DO' ? 'ej: inmobiliarias en Punta Cana' : 'ej: clínicas dentales en San Salvador'}
+                      className="w-full bg-[#090c13] border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                  <button
+                    disabled={isPipelineRunning || !pipelineInput.trim()}
+                    onClick={() => handleRunPipeline()}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-semibold text-xs transition-all shadow-md shrink-0"
+                  >
+                    {isPipelineRunning ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Procesando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3.5 h-3.5 fill-white" />
+                        <span>Lanzar pipeline</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {isPipelineRunning && (
+                  <div className="mt-3 text-xs text-orange-300/90 font-mono flex items-center gap-2 bg-orange-500/10 px-3 py-2 rounded-lg border border-orange-500/20">
+                    <RefreshCw className="w-3 h-3 animate-spin text-orange-400" />
+                    <span>{pipelineProgress}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Manual Search Box */}
+              <div className="p-5 rounded-2xl bg-[#0e131d] border border-slate-800">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                  Intención de Búsqueda Manual
+                </div>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={manualSearchInput}
+                      onChange={(e) => setManualSearchInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleManualSearch()}
+                      placeholder={selectedCountry === 'DO' ? 'ej: cirujanos plásticos Santo Domingo' : 'ej: bufetes de abogados San Salvador'}
+                      className="w-full bg-[#080b11] border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                  <button
+                    disabled={isSearching || !manualSearchInput.trim()}
+                    onClick={() => handleManualSearch()}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-100 font-semibold text-xs transition-all shrink-0"
+                  >
+                    {isSearching ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                    <span>Buscar</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* SERP Search Results View */}
+              {searchResults.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-bold text-slate-200">
+                      Resultados de Google ({searchResults.length})
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      <button 
+                        onClick={selectRecommendedResults}
+                        className="text-orange-400 hover:text-orange-300 font-medium"
+                      >
+                        Seleccionar recomendados (#4 a #20)
+                      </button>
+                      <span className="text-slate-700">•</span>
+                      <button 
+                        onClick={selectAllResults}
+                        className="text-slate-400 hover:text-slate-200"
+                      >
+                        Seleccionar todos
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* List of SERP Cards */}
+                  <div className="space-y-2 pb-20">
+                    {searchResults.map((item) => {
+                      const isSelected = selectedResults.has(item.dominio);
+                      return (
+                        <div
+                          key={item.dominio}
+                          onClick={() => toggleSelectResult(item.dominio)}
+                          className={`p-4 rounded-xl cursor-pointer transition-all border ${
+                            isSelected 
+                              ? 'bg-orange-500/[0.04] border-orange-500/60 shadow-sm' 
+                              : 'bg-[#0e131d]/70 hover:bg-[#121824] border-slate-800/80'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {}} // handled by parent div click
+                              className="mt-1 w-4 h-4 rounded text-orange-600 focus:ring-0 bg-slate-900 border-slate-700"
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                                  item.posicion <= 3 
+                                    ? 'bg-slate-800 text-slate-400' 
+                                    : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                }`}>
+                                  #{item.posicion}
+                                </span>
+                                <span className="font-mono text-xs text-orange-400/90 font-medium">{item.dominio}</span>
+                                {item.recomendadoOutbound && (
+                                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/40">
+                                    ★ Ideal para Outbound
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-sm font-semibold text-slate-100">{item.titulo}</div>
+                              <div className="text-xs text-slate-400 mt-0.5 line-clamp-2">{item.snippet}</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Floating Action Bar */}
+                  {selectedResults.size > 0 && (
+                    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#121824] border border-orange-500/50 shadow-glow rounded-2xl px-6 py-3 flex items-center gap-4 z-30">
+                      <div className="text-xs font-semibold text-slate-200">
+                        <span className="text-orange-400 font-mono font-bold">{selectedResults.size}</span> prospectos seleccionados
+                      </div>
+                      <button
+                        disabled={isSearching}
+                        onClick={handleExtractSelected}
+                        className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs flex items-center gap-2 shadow-md transition-all"
+                      >
+                        {isSearching ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        <span>Extraer contactos y auditar ({selectedResults.size})</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: SUGERENCIAS NICHOS */}
+          {activeTab === 'sugerencias' && (
+            <div className="max-w-5xl mx-auto space-y-4">
+              <div>
+                <h2 className="text-base font-bold text-slate-100">Nichos de Alta Rentabilidad para Goglite</h2>
+                <p className="text-xs text-slate-400">
+                  Sectores con alto ticket y presupuestos validados en El Salvador y República Dominicana.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {nicheSuggestions.map((n, i) => (
+                  <div key={i} className="p-4 rounded-xl bg-[#0e131d] border border-slate-800 hover:border-slate-700 transition-all flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                          <span>{n.flag}</span>
+                          <span>{n.title}</span>
+                        </span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20 font-semibold">
+                          ROI: {n.roi}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mb-3">{n.desc}</p>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80">
+                      <button
+                        onClick={() => {
+                          setSelectedCountry(n.country);
+                          setManualSearchInput(n.query);
+                          setActiveTab('buscar');
+                          handleManualSearch(n.query);
+                        }}
+                        className="flex-1 py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
+                      >
+                        Ver en Google
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedCountry(n.country);
+                          setPipelineInput(n.query);
+                          setActiveTab('buscar');
+                          handleRunPipeline(n.query);
+                        }}
+                        className="py-1.5 px-3 rounded-lg bg-orange-600/90 hover:bg-orange-500 text-white text-xs font-semibold flex items-center gap-1 transition-colors"
+                      >
+                        <Zap className="w-3 h-3 fill-white" />
+                        <span>Lanzar 1-Click</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: LEADS GUARDADOS */}
+          {activeTab === 'leads' && (
+            <div className="space-y-4">
+              
+              {/* Header and Controls */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <h1 className="text-lg font-extrabold text-slate-100">Leads</h1>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono font-medium">
+                    {leads.length} guardados
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/api/export/csv"
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-lime-500 hover:bg-lime-400 text-black font-bold text-xs shadow-sm transition-all"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Exportar CSV</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Filters and Search Bar */}
+              <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-500" />
+                  <input
+                    type="text"
+                    value={leadSearchTerm}
+                    onChange={(e) => setLeadSearchTerm(e.target.value)}
+                    placeholder="Buscar por dominio, email, responsable..."
+                    className="w-full bg-[#0e131d] border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                {/* Filter Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                  {[
+                    { id: 'todos', label: 'Todos' },
+                    { id: 'nuevo', label: 'Nuevo' },
+                    { id: 'contactado', label: 'Contactado' },
+                    { id: 'enviado_instantly', label: 'Enviado a Instantly' },
+                    { id: 'respondio', label: 'Respondió' },
+                    { id: 'cliente', label: 'Cliente' },
+                    { id: 'descartado', label: 'Descartado' },
+                  ].map((filter) => (
+                    <button
+                      key={filter.id}
+                      onClick={() => setLeadFilter(filter.id)}
+                      className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition-colors ${
+                        leadFilter === filter.id
+                          ? 'bg-slate-700 text-white'
+                          : 'bg-[#101522] text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      }`}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Leads Table */}
+              <div className="rounded-xl border border-slate-800 overflow-hidden bg-[#0c1017]">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#0f1422] text-slate-400 font-mono text-[11px] uppercase border-b border-slate-800">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Dominio / Empresa</th>
+                      <th className="px-4 py-3 font-semibold">Email</th>
+                      <th className="px-4 py-3 font-semibold">Responsable / Cargo</th>
+                      <th className="px-4 py-3 font-semibold">Estado</th>
+                      <th className="px-4 py-3 font-semibold">Auditoría / Pitch</th>
+                      <th className="px-4 py-3 font-semibold text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {filteredLeads.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="px-4 py-8 text-center text-slate-500">
+                          No se encontraron leads con los filtros actuales.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredLeads.map((lead) => (
+                        <tr key={lead.id} className="hover:bg-slate-800/30 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="font-semibold text-slate-200">{lead.nombreEmpresa || lead.dominio}</div>
+                            <div className="font-mono text-[11px] text-orange-400 flex items-center gap-1">
+                              <span>{lead.pais === 'DO' ? '🇩🇴' : '🇸🇻'}</span>
+                              <a href={`https://${lead.dominio}`} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-0.5">
+                                {lead.dominio}
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3 font-mono text-slate-300">
+                            {lead.email ? (
+                              <a href={`mailto:${lead.email}`} className="text-slate-300 hover:text-orange-400">
+                                {lead.email}
+                              </a>
+                            ) : (
+                              <span className="text-slate-600 italic">Sin email</span>
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <div className="text-slate-200 font-medium">{lead.responsable || "Por asignar"}</div>
+                            <div className="text-[11px] text-slate-400">{lead.cargo || "Dirección"}</div>
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <select
+                              value={lead.estado}
+                              onChange={(e) => handleUpdateLeadStatus(lead.id, e.target.value)}
+                              className={`text-[10px] font-semibold px-2 py-1 rounded-md border bg-[#0b0f19] focus:outline-none cursor-pointer ${
+                                lead.estado === 'enviado_instantly' ? 'border-sky-500 text-sky-400' :
+                                lead.estado === 'cliente' ? 'border-emerald-500 text-emerald-400' :
+                                lead.estado === 'contactado' ? 'border-amber-500 text-amber-400' :
+                                lead.estado === 'respondio' ? 'border-purple-500 text-purple-400' :
+                                'border-slate-700 text-slate-300'
+                              }`}
+                            >
+                              <option value="nuevo">Nuevo</option>
+                              <option value="contactado">Contactado</option>
+                              <option value="enviado_instantly">Enviado a Instantly</option>
+                              <option value="respondio">Respondió</option>
+                              <option value="cliente">Cliente</option>
+                              <option value="descartado">Descartado</option>
+                            </select>
+                          </td>
+
+                          <td className="px-4 py-3">
+                            {lead.auditoria ? (
+                              <button
+                                onClick={() => {
+                                  setSelectedLeadModal(lead);
+                                  setModalTab('auditoria');
+                                }}
+                                className="text-[11px] font-medium text-emerald-400 hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20"
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Ver Auditoría ({lead.auditoria.puntos?.length || 3})</span>
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 italic">Sin auditar</span>
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {lead.pitch && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedLeadModal(lead);
+                                    setModalTab('pitch');
+                                  }}
+                                  className="p-1.5 rounded hover:bg-slate-700 text-orange-400"
+                                  title="Ver Email Pitch"
+                                >
+                                  <Mail className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  setLeadForPresupuesto(lead);
+                                  setActiveModule('presupuestos');
+                                }}
+                                className="p-1.5 rounded hover:bg-slate-700 text-amber-400"
+                                title="Crear Presupuesto con Portada Goglite"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleSendInstantly(lead.id)}
+                                className="p-1.5 rounded hover:bg-slate-700 text-sky-400"
+                                title="Enviar a Instantly"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteLead(lead.id)}
+                                className="p-1.5 rounded hover:bg-slate-700 text-red-400"
+                                title="Eliminar lead"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: AJUSTES & APIS */}
+          {activeTab === 'ajustes' && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <div>
+                <h1 className="text-base font-bold text-slate-100">Ajustes & Conectores de APIs</h1>
+                <p className="text-xs text-slate-400">
+                  Configura tus credenciales para enriquecimiento automático y análisis profundo con IA.
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveSettings} className="p-5 rounded-2xl bg-[#0e131d] border border-slate-800 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Google Gemini API Key (IA de Auditorías y Pitches)
+                  </label>
+                  <input
+                    type="password"
+                    value={settings.geminiApiKey || ''}
+                    onChange={(e) => setSettings({ ...settings, geminiApiKey: e.target.value })}
+                    placeholder="AIzaSy..."
+                    className="w-full bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-orange-500"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">Capa gratuita disponible con hasta 15 consultas por minuto.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Serper.dev API Key (Scraping de Google SERP)
+                  </label>
+                  <input
+                    type="password"
+                    value={settings.serperApiKey || ''}
+                    onChange={(e) => setSettings({ ...settings, serperApiKey: e.target.value })}
+                    placeholder="serper_..."
+                    className="w-full bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-orange-500"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">2,500 búsquedas gratuitas de bienvenida.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Apollo.io API Key (Extracción de Decisores y Emails)
+                  </label>
+                  <input
+                    type="password"
+                    value={settings.apolloApiKey || ''}
+                    onChange={(e) => setSettings({ ...settings, apolloApiKey: e.target.value })}
+                    placeholder="apollo_api_..."
+                    className="w-full bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Instantly.ai API Key (Envío Frío y Calentamiento)
+                  </label>
+                  <input
+                    type="password"
+                    value={settings.instantlyApiKey || ''}
+                    onChange={(e) => setSettings({ ...settings, instantlyApiKey: e.target.value })}
+                    placeholder="instantly_..."
+                    className="w-full bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-between">
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs shadow-md transition-all"
+                  >
+                    Guardar Configuración
+                  </button>
+
+                  {settingsSaved && (
+                    <span className="text-xs text-emerald-400 font-medium flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Guardado con éxito
+                    </span>
+                  )}
+                </div>
+              </form>
+            </div>
+          )}
+          </>
+          )}
+        </main>
+      </div>
+
+      {/* 3. MODAL: AUDITORÍA DETALLADA & EMAIL PITCH */}
+      {selectedLeadModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0f1422] border border-slate-800 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-[#121929]">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-base text-slate-100">
+                    {selectedLeadModal.nombreEmpresa || selectedLeadModal.dominio}
+                  </span>
+                  <span className="text-xs font-mono text-orange-400">
+                    ({selectedLeadModal.dominio})
+                  </span>
+                </div>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  Decisor: <span className="text-slate-200 font-medium">{selectedLeadModal.responsable}</span> · {selectedLeadModal.cargo}
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedLeadModal(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Tabs */}
+            <div className="flex border-b border-slate-800 px-6 bg-[#0c101a] text-xs">
+              <button
+                onClick={() => setModalTab('auditoria')}
+                className={`py-3 px-4 font-semibold border-b-2 transition-colors ${
+                  modalTab === 'auditoria'
+                    ? 'border-orange-500 text-orange-400'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Auditoría SEO/GEO/CRO
+              </button>
+              <button
+                onClick={() => setModalTab('pitch')}
+                className={`py-3 px-4 font-semibold border-b-2 transition-colors ${
+                  modalTab === 'pitch'
+                    ? 'border-orange-500 text-orange-400'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Email Pitch Personalizado
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto space-y-4">
+              
+              {/* TAB AUDITORIA */}
+              {modalTab === 'auditoria' && (
+                <div className="space-y-4">
+                  <div className="text-xs text-slate-400">
+                    Fecha de auditoría: {selectedLeadModal.auditoria?.fecha || "Reciente"}
+                  </div>
+
+                  {selectedLeadModal.auditoria?.puntos?.map((punto, idx) => (
+                    <div key={idx} className="p-4 rounded-xl bg-[#090d16] border border-slate-800/90 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                            #{idx + 1} {punto.categoria}
+                          </span>
+                          <span className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                            {punto.prioridad}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-sm font-bold text-slate-100">{punto.titulo}</div>
+
+                      <div className="space-y-1.5 text-xs">
+                        <div>
+                          <span className="text-[10px] font-mono uppercase text-slate-500 font-bold block">Problema</span>
+                          <p className="text-slate-300 leading-relaxed">{punto.problema}</p>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] font-mono uppercase text-slate-500 font-bold block">Por qué importa</span>
+                          <p className="text-slate-400 leading-relaxed">{punto.porQueImporta}</p>
+                        </div>
+
+                        <div className="pt-1 text-slate-400">
+                          <span className="text-[10px] font-mono uppercase text-emerald-500 font-bold block">Competidores líderes</span>
+                          <p className="text-slate-400 italic leading-relaxed">{punto.competidores}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      onClick={() => setModalTab('pitch')}
+                      className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md"
+                    >
+                      <span>Ver Email Pitch</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB PITCH */}
+              {modalTab === 'pitch' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-400">
+                      Borrador de correo listo para enviar a <strong className="text-slate-200">{selectedLeadModal.email}</strong>:
+                    </span>
+                    <button
+                      onClick={() => handleCopyPitch(selectedLeadModal.pitch)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
+                    >
+                      {copiedPitch ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedPitch ? 'Copiado' : 'Copiar Email'}</span>
+                    </button>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-[#080b11] border border-slate-800 font-sans text-xs text-slate-200 whitespace-pre-line leading-relaxed">
+                    {selectedLeadModal.pitch}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                    <a
+                      href={`mailto:${selectedLeadModal.email}?subject=Pregunta rápida sobre ${selectedLeadModal.nombreEmpresa || selectedLeadModal.dominio}&body=${encodeURIComponent(selectedLeadModal.pitch || '')}`}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-all"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Abrir en Gmail / Mail</span>
+                    </a>
+
+                    <button
+                      onClick={() => {
+                        handleSendInstantly(selectedLeadModal.id);
+                        setSelectedLeadModal(null);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md transition-all"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Enviar a Instantly</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

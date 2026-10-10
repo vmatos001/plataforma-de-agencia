@@ -1,0 +1,482 @@
+[
+  {
+    "id": "proj-1791661446263",
+    "codigo": "CON-2026-003",
+    "presupuestoId": "prop-2026-001",
+    "fechaCreacion": "2026-10-10",
+    "estado": "contrato_pendiente",
+    "pais": "SV",
+    "cliente": {
+      "nombre": "Brayan Muñoz (Bryan Muñoz)",
+      "empresa": "Grúas Andrea / Grúas Andrés",
+      "telefono": "+1 (323) 901-3886",
+      "email": "contacto@gruasandrea.com",
+      "identificacion": "",
+      "actividad": "Servicio de Grúas 24/7",
+      "ubicacion": "Los Ángeles / Cobertura Regional"
+    },
+    "contrato": {
+      "titulo": "CONTRATO OFICIAL DE PRESTACIÓN DE SERVICIOS DIGITALES Y DESARROLLO WEB",
+      "fechaEmision": "10 de octubre de 2026",
+      "plazoEjecucionDias": 15,
+      "totalInversion": 250,
+      "anticipo": 125,
+      "saldo": 125,
+      "moneda": "USD",
+      "alcanceResumen": "Implementación de un Sistema Digital Integral de Captación Inmediata y Posicionamiento para Grúas Andrea, transformando su presencia comercial en un canal activo que atrae llamadas y solicitudes de auxilio vial las 24 horas del día.",
+      "clausulas": [
+        {
+          "numero": "PRIMERA",
+          "titulo": "OBJETO Y ALCANCE DEL SERVICIO",
+          "texto": "GOGLITE se compromete a diseñar, desarrollar y desplegar la solución digital para EL CLIENTE (Grúas Andrea / Grúas Andrés), ejecutando los módulos acordados en la propuesta formal P-2026-001."
+        },
+        {
+          "numero": "SEGUNDA",
+          "titulo": "PLAZOS DE EJECUCIÓN Y ENTREGAS",
+          "texto": "El plazo de implementación pactado es de 10 a 15 días hábiles a partir de la firma de este contrato y de la recepción del anticipo y los activos esenciales del proyecto."
+        },
+        {
+          "numero": "TERCERA",
+          "titulo": "HONORARIOS Y CONDICIONES DE PAGO",
+          "texto": "El valor total del proyecto es de $250.00 USD. Se abonará un 50% ($125.00 USD) en concepto de anticipo para iniciar los trabajos y el 50% restante ($125.00 USD) contra entrega final y despliegue."
+        },
+        {
+          "numero": "CUARTA",
+          "titulo": "PROPIEDAD INTELECTUAL Y CÓDIGO FUENTE",
+          "texto": "Una vez completado el pago del 100%, EL CLIENTE será propietario absoluto del código fuente, diseños y activos desarrollados, sin contratos forzosos ni comisiones mensuales."
+        },
+        {
+          "numero": "QUINTA",
+          "titulo": "CONFIDENCIALIDAD",
+          "texto": "Las partes acuerdan mantener estricta reserva de toda la información confidencial, accesos de servidores y datos de negocio intercambiados."
+        },
+        {
+          "numero": "SEXTA",
+          "titulo": "GARANTÍA Y SOPORTE POST-LANZAMIENTO",
+          "texto": "GOGLITE otorga 30 días calendario de garantía post-lanzamiento para corregir fallos, dudas o ajustes técnicos sin costo alguno."
+        }
+      ],
+      "firmaCliente": {
+        "firmado": false,
+        "nombreFirmante": "",
+        "identificacion": "",
+        "timestampUtc": null,
+        "ipAddress": null,
+        "userAgent": null,
+        "firmaBase64": null
+      },
+      "firmaAgencia": {
+        "firmado": true,
+        "nombreFirmante": "Víctor Matos",
+        "cargo": "Director General · Goglite Digital",
+        "timestampUtc": "2026-10-10T19:44:06.264Z"
+      }
+    },
+    "onboarding": {
+      "completado": false,
+      "fecha": null,
+      "datos": {
+        "nombreComercial": "Grúas Andrea / Grúas Andrés",
+        "slogan": "",
+        "colorPrimario": "#FF6600",
+        "colorSecundario": "#0B0E16",
+        "colorAcento": "#22C55E",
+        "tipografia": "Inter / Montserrat",
+        "telefonoEmergencia": "+1 (323) 901-3886",
+        "whatsappVentas": "+1 (323) 901-3886",
+        "enlaceDriveArchivos": "",
+        "proveedorDominio": "",
+        "observaciones": ""
+      }
+    },
+    "pagos": {
+      "anticipoMonto": 125,
+      "anticipoEstado": "pendiente",
+      "anticipoFecha": null,
+      "anticipoMetodo": "",
+      "comprobanteUrl": "",
+      "saldoMonto": 125,
+      "saldoEstado": "pendiente"
+    },
+    "seguimiento": {
+      "faseActual": 1,
+      "porcentajeAvance": 10,
+      "hitos": [
+        {
+          "id": "h-1",
+          "titulo": "Firma del Contrato Legal & Aprobación de Términos",
+          "fase": 1,
+          "completado": false,
+          "fecha": "Pendiente"
+        },
+        {
+          "id": "h-2",
+          "titulo": "Confirmación de Anticipo del 50%",
+          "fase": 1,
+          "completado": false,
+          "fecha": "Pendiente"
+        },
+        {
+          "id": "h-3",
+          "titulo": "Recepción de Activos & Cuestionario de Onboarding",
+          "fase": 1,
+          "completado": false,
+          "fecha": "Pendiente"
+        },
+        {
+          "id": "h-4",
+          "titulo": "Wireframes UX & Estructura de Mensajes StoryBrand",
+          "fase": 2,
+          "completado": false,
+          "fecha": "Pendiente"
+        },
+        {
+          "id": "h-5",
+          "titulo": "Construcción Nativa Frontend React & Velocidad CWV",
+          "fase": 2,
+          "completado": false,
+          "fecha": "Pendiente"
+        },
+        {
+          "id": "h-6",
+          "titulo": "SEO Local (Schema.org), Google Maps & Auditoría Final",
+          "fase": 3,
+          "completado": false,
+          "fecha": "Pendiente"
+        },
+        {
+          "id": "h-7",
+          "titulo": "Lanzamiento Oficial en Vivo, Entrega de Accesos & Saldo",
+          "fase": 3,
+          "completado": false,
+          "fecha": "Pendiente"
+        }
+      ],
+      "entregables": {
+        "demoUrl": "",
+        "driveEntregables": "",
+        "repositorioUrl": ""
+      }
+    }
+  },
+  {
+    "id": "proj-1791661019465",
+    "codigo": "CON-2026-002",
+    "presupuestoId": "prop-2026-001",
+    "fechaCreacion": "2026-10-10",
+    "estado": "contrato_pendiente",
+    "pais": "SV",
+    "cliente": {
+      "nombre": "Brayan Muñoz (Bryan Muñoz)",
+      "empresa": "Grúas Andrea / Grúas Andrés",
+      "telefono": "+1 (323) 901-3886",
+      "email": "contacto@gruasandrea.com",
+      "identificacion": "",
+      "actividad": "Servicio de Grúas 24/7",
+      "ubicacion": "Los Ángeles / Cobertura Regional"
+    },
+    "contrato": {
+      "titulo": "CONTRATO OFICIAL DE PRESTACIÓN DE SERVICIOS DIGITALES Y DESARROLLO WEB",
+      "fechaEmision": "10 de octubre de 2026",
+      "plazoEjecucionDias": 15,
+      "totalInversion": 250,
+      "anticipo": 125,
+      "saldo": 125,
+      "moneda": "USD",
+      "alcanceResumen": "Implementación de un Sistema Digital Integral de Captación Inmediata y Posicionamiento para Grúas Andrea, transformando su presencia comercial en un canal activo que atrae llamadas y solicitudes de auxilio vial las 24 horas del día.",
+      "clausulas": [
+        {
+          "numero": "PRIMERA",
+          "titulo": "OBJETO Y ALCANCE DEL SERVICIO",
+          "texto": "GOGLITE se compromete a diseñar, desarrollar y desplegar la solución digital para EL CLIENTE (Grúas Andrea / Grúas Andrés), ejecutando los módulos acordados en la propuesta formal P-2026-001."
+        },
+        {
+          "numero": "SEGUNDA",
+          "titulo": "PLAZOS DE EJECUCIÓN Y ENTREGAS",
+          "texto": "El plazo de implementación pactado es de 10 a 15 días hábiles a partir de la firma de este contrato y de la recepción del anticipo y los activos esenciales del proyecto."
+        },
+        {
+          "numero": "TERCERA",
+          "titulo": "HONORARIOS Y CONDICIONES DE PAGO",
+          "texto": "El valor total del proyecto es de $250.00 USD. Se abonará un 50% ($125.00 USD) en concepto de anticipo para iniciar los trabajos y el 50% restante ($125.00 USD) contra entrega final y despliegue."
+        },
+        {
+          "numero": "CUARTA",
+          "titulo": "PROPIEDAD INTELECTUAL Y CÓDIGO FUENTE",
+          "texto": "Una vez completado el pago del 100%, EL CLIENTE será propietario absoluto del código fuente, diseños y activos desarrollados, sin contratos forzosos ni comisiones mensuales."
+        },
+        {
+          "numero": "QUINTA",
+          "titulo": "CONFIDENCIALIDAD",
+          "texto": "Las partes acuerdan mantener estricta reserva de toda la información confidencial, accesos de servidores y datos de negocio intercambiados."
+        },
+        {
+          "numero": "SEXTA",
+          "titulo": "GARANTÍA Y SOPORTE POST-LANZAMIENTO",
+          "texto": "GOGLITE otorga 30 días calendario de garantía post-lanzamiento para corregir fallos, dudas o ajustes técnicos sin costo alguno."
+        }
+      ],
+      "firmaCliente": {
+        "firmado": false,
+        "nombreFirmante": "",
+        "identificacion": "",
+        "timestampUtc": null,
+        "ipAddress": null,
+        "userAgent": null,
+        "firmaBase64": null
+      },
+      "firmaAgencia": {
+        "firmado": true,
+        "nombreFirmante": "Víctor Matos",
+        "cargo": "Director General · Goglite Digital",
+        "timestampUtc": "2026-10-10T19:36:59.489Z"
+      }
+    },
+    "onboarding": {
+      "completado": false,
+      "fecha": null,
+      "datos": {
+        "nombreComercial": "Grúas Andrea / Grúas Andrés",
+        "slogan": "",
+        "colorPrimario": "#FF6600",
+        "colorSecundario": "#0B0E16",
+        "colorAcento": "#22C55E",
+        "tipografia": "Inter / Montserrat",
+        "telefonoEmergencia": "+1 (323) 901-3886",
+        "whatsappVentas": "+1 (323) 901-3886",
+        "enlaceDriveArchivos": "",
+        "proveedorDominio": "",
+        "observaciones": ""
+      }
+    },
+    "pagos": {
+      "anticipoMonto": 125,
+      "anticipoEstado": "pendiente",
+      "anticipoFecha": null,
+      "anticipoMetodo": "",
+      "comprobanteUrl": "",
+      "saldoMonto": 125,
+      "saldoEstado": "pendiente"
+    },
+    "seguimiento": {
+      "faseActual": 1,
+      "porcentajeAvance": 10,
+      "hitos": [
+        {
+          "id": "h-1",
+          "titulo": "Firma del Contrato Legal & Aprobación de Términos",
+          "fase": 1,
+          "completado": false,
+          "fecha": "Pendiente"
+        },
+        {
+          "id": "h-2",
+          "titulo": "Confirmación de Anticipo del 50%",
+          "fase": 1,
+          "completado": false,
+          "fecha": "Pendiente"
+        },
+        {
+          "id": "h-3",
+          "titulo": "Recepción de Activos & Cuestionario de Onboarding",
+          "fase": 1,
+          "completado": false,
+          "fecha": "Pendiente"
+        },
+        {
+          "id": "h-4",
+          "titulo": "Wireframes UX & Estructura de Mensajes StoryBrand",
+          "fase": 2,
+          "completado": false,
+          "fecha": "Pendiente"
+        },
+        {
+          "id": "h-5",
+          "titulo": "Construcción Nativa Frontend React & Velocidad CWV",
+          "fase": 2,
+          "completado": false,
+          "fecha": "Pendiente"
+        },
+        {
+          "id": "h-6",
+          "titulo": "SEO Local (Schema.org), Google Maps & Auditoría Final",
+          "fase": 3,
+          "completado": false,
+          "fecha": "Pendiente"
+        },
+        {
+          "id": "h-7",
+          "titulo": "Lanzamiento Oficial en Vivo, Entrega de Accesos & Saldo",
+          "fase": 3,
+          "completado": false,
+          "fecha": "Pendiente"
+        }
+      ],
+      "entregables": {
+        "demoUrl": "",
+        "driveEntregables": "",
+        "repositorioUrl": ""
+      }
+    }
+  },
+  {
+    "id": "proj-2026-001",
+    "codigo": "CON-2026-001",
+    "presupuestoId": "prop-2026-001",
+    "fechaCreacion": "2026-10-10",
+    "estado": "firmado",
+    "pais": "SV",
+    "cliente": {
+      "nombre": "Bryan Muñoz",
+      "empresa": "Grúas Andrea / Grúas Andrés",
+      "telefono": "+1 (323) 901-3886",
+      "email": "contacto@gruasandrea.com",
+      "identificacion": "DUI / Licencia: 05482910-4",
+      "actividad": "Servicio de Grúas 24/7",
+      "ubicacion": "Los Ángeles / San Salvador"
+    },
+    "contrato": {
+      "titulo": "CONTRATO OFICIAL DE PRESTACIÓN DE SERVICIOS DIGITALES Y DESARROLLO WEB",
+      "fechaEmision": "10 de Octubre de 2026",
+      "plazoEjecucionDias": 15,
+      "totalInversion": 300,
+      "anticipo": 150,
+      "saldo": 150,
+      "moneda": "USD",
+      "alcanceResumen": "Implementación de Sistema Digital Integral Mobile-First para Grúas Andrea, Botones Click-to-Call de Urgencia, Optimización Google Maps y Campaña de Captación.",
+      "clausulas": [
+        {
+          "numero": "PRIMERA",
+          "titulo": "OBJETO Y ALCANCE DEL SERVICIO",
+          "texto": "GOGLITE se compromete a diseñar, desarrollar y desplegar la plataforma digital web de alta conversión y sistemas de contacto de auxilio vial para EL CLIENTE, cumpliendo con los 6 componentes técnicos acordados en la propuesta formal P-2026-001."
+        },
+        {
+          "numero": "SEGUNDA",
+          "titulo": "PLAZOS DE EJECUCIÓN Y ENTREGAS",
+          "texto": "El plazo total estimado de implementación es de 10 a 15 días hábiles a partir de la firma de este contrato y la entrega de los activos esenciales (logos, textos y accesos requeridos). La hoja de ruta se ejecutará en 3 fases: Fase 1 (Estrategia y Wireframes), Fase 2 (Construcción Frontend React) y Fase 3 (SEO Local, Tracking y Lanzamiento)."
+        },
+        {
+          "numero": "TERCERA",
+          "titulo": "HONORARIOS, FORMA DE PAGO Y CONDICIONES",
+          "texto": "El valor total pactado es de $300.00 USD netos. Las partes acuerdan la siguiente estructura de pago: 50% de anticipo ($150.00 USD) al momento de la firma para dar inicio formal al desarrollo, y el 50% restante ($150.00 USD) contra entrega final y despliegue en el dominio oficial del cliente."
+        },
+        {
+          "numero": "CUARTA",
+          "titulo": "PROPIEDAD INTELECTUAL Y CÓDIGO FUENTE",
+          "texto": "Una vez cancelado el 100% de los honorarios pactados, EL CLIENTE será el propietario exclusivo de todos los derechos de uso del sitio web, diseño final y código fuente desarrollado. GOGLITE no impondrá contratos de permanencia ni cobros de licenciamiento cautivo."
+        },
+        {
+          "numero": "QUINTA",
+          "titulo": "CONFIDENCIALIDAD Y PROTECCIÓN DE DATOS",
+          "texto": "Ambas partes se obligan a guardar estricta reserva de toda la información confidencial, accesos de servidores, datos de clientes y secretos comerciales compartidos durante la ejecución del proyecto."
+        },
+        {
+          "numero": "SEXTA",
+          "titulo": "GARANTÍA DE FUNCIONAMIENTO Y SOPORTE POST-LANZAMIENTO",
+          "texto": "GOGLITE otorga una garantía técnica de treinta (30) días calendario posteriores al lanzamiento en vivo para corrección de cualquier anomalía de funcionamiento, enlaces rotos o ajustes menores sin costo adicional."
+        }
+      ],
+      "firmaCliente": {
+        "firmado": true,
+        "nombreFirmante": "Bryan Muñoz",
+        "identificacion": "DUI: 05482910-4",
+        "timestampUtc": "2026-10-10T16:30:00Z",
+        "ipAddress": "190.86.104.22",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "firmaBase64": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='60'><path d='M10,40 Q40,10 70,35 T130,25 T190,45' fill='none' stroke='%230f172a' stroke-width='2.5'/></svg>"
+      },
+      "firmaAgencia": {
+        "firmado": true,
+        "nombreFirmante": "Víctor Matos",
+        "cargo": "Director General · Goglite Digital",
+        "timestampUtc": "2026-10-10T16:35:00Z"
+      }
+    },
+    "onboarding": {
+      "completado": true,
+      "fecha": "2026-10-10",
+      "datos": {
+        "nombreComercial": "Grúas Andrea - Auxilio Vial 24/7",
+        "slogan": "Llegamos en minutos a cualquier punto de la carretera",
+        "colorPrimario": "#FF6600",
+        "colorSecundario": "#0B0E16",
+        "colorAcento": "#22C55E",
+        "tipografia": "Inter / Montserrat",
+        "telefonoEmergencia": "+1 (323) 901-3886",
+        "whatsappVentas": "+1 (323) 901-3886",
+        "enlaceDriveArchivos": "https://drive.google.com/drive/folders/gruas-andrea-activos",
+        "proveedorDominio": "Namecheap / Cloudflare",
+        "observaciones": "El cliente solicitó destacar con prioridad alta los botones de llamada directa en el encabezado móvil."
+      }
+    },
+    "pagos": {
+      "anticipoMonto": 150,
+      "anticipoEstado": "confirmado",
+      "anticipoFecha": "2026-10-10",
+      "anticipoMetodo": "transferencia_bancaria",
+      "comprobanteUrl": "/assets/comprobante_muestra.png",
+      "saldoMonto": 150,
+      "saldoEstado": "pendiente"
+    },
+    "seguimiento": {
+      "faseActual": 2,
+      "porcentajeAvance": 50,
+      "hitos": [
+        {
+          "id": "h-1",
+          "titulo": "Firma del Contrato Legal & Aprobación de Términos",
+          "fase": 1,
+          "completado": true,
+          "fecha": "10 Oct 2026"
+        },
+        {
+          "id": "h-2",
+          "titulo": "Confirmación de Anticipo del 50%",
+          "fase": 1,
+          "completado": true,
+          "fecha": "10 Oct 2026"
+        },
+        {
+          "id": "h-3",
+          "titulo": "Recepción de Activos & Cuestionario de Onboarding",
+          "fase": 1,
+          "completado": true,
+          "fecha": "10 Oct 2026"
+        },
+        {
+          "id": "h-4",
+          "titulo": "Wireframes UX & Estructura de Mensajes StoryBrand",
+          "fase": 2,
+          "completado": true,
+          "fecha": "11 Oct 2026"
+        },
+        {
+          "id": "h-5",
+          "titulo": "Construcción Nativa Frontend React & Velocidad CWV",
+          "fase": 2,
+          "completado": false,
+          "fecha": "En progreso"
+        },
+        {
+          "id": "h-6",
+          "titulo": "SEO Local (Schema.org), Google Maps & Auditoría Final",
+          "fase": 3,
+          "completado": false,
+          "fecha": "Pendiente"
+        },
+        {
+          "id": "h-7",
+          "titulo": "Lanzamiento Oficial en Vivo, Entrega de Accesos & Saldo",
+          "fase": 3,
+          "completado": false,
+          "fecha": "Pendiente"
+        }
+      ],
+      "entregables": {
+        "demoUrl": "https://gruasandrea.preview.goglite.com",
+        "driveEntregables": "https://drive.google.com/drive/folders/gruas-andrea-final",
+        "repositorioUrl": "github.com/goglite/gruas-andrea-web"
+      }
+    }
+  }
+]

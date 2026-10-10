@@ -1,0 +1,201 @@
+[
+  {
+    "id": "lead-1791605700142-83et",
+    "dominio": "inmobiliariaspuntacanamodernosantodomingo.do",
+    "nombreEmpresa": "Inmobiliarias Punta Cana Moderno Santo Domingo",
+    "pais": "DO",
+    "email": "marcos@inmobiliariaspuntacanamodernosantodomingo.do",
+    "responsable": "Lic. Marcos Almonte",
+    "cargo": "Director General & Socio",
+    "telefono": "+1 809 6845-5645",
+    "posicionGoogle": 4,
+    "estado": "nuevo",
+    "actualizado": "2026-10-10",
+    "auditoria": {
+      "fecha": "2026-10-10 04:15",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "inmobiliariaspuntacanamodernosantodomingo.do no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en Santo Domingo consultan a Perplexity o SearchGPT por proveedores confiables de inmobiliarias Punta Cana, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en Santo Domingo",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en República Dominicana.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de inmobiliarias Punta Cana, dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Lic.,\n\nEstuve analizando la presencia digital de Inmobiliarias Punta Cana Moderno Santo Domingo frente a los principales referentes de su sector en República Dominicana.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en Santo Domingo: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791605700359-bisg",
+    "dominio": "grupoinmobiliariaspuntacanacaribe.com",
+    "nombreEmpresa": "Grupo Inmobiliarias Punta Cana Caribe",
+    "pais": "DO",
+    "email": "gerencia@grupoinmobiliariaspuntacanacaribe.com",
+    "responsable": "Lic. Marcos Almonte",
+    "cargo": "Director General & Socio",
+    "telefono": "+1 809 6070-4870",
+    "posicionGoogle": 5,
+    "estado": "nuevo",
+    "actualizado": "2026-10-10",
+    "auditoria": {
+      "fecha": "2026-10-10 04:15",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "grupoinmobiliariaspuntacanacaribe.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en Santo Domingo consultan a Perplexity o SearchGPT por proveedores confiables de inmobiliarias Punta Cana, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en Santo Domingo",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en República Dominicana.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de inmobiliarias Punta Cana, dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Lic.,\n\nEstuve analizando la presencia digital de Grupo Inmobiliarias Punta Cana Caribe frente a los principales referentes de su sector en República Dominicana.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en Santo Domingo: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-sv-001",
+    "dominio": "clinicadentalsv.com",
+    "nombreEmpresa": "Clínica Dental San Salvador",
+    "pais": "SV",
+    "email": "dr.rodriguez@clinicadentalsv.com",
+    "responsable": "Dr. Carlos Rodríguez",
+    "cargo": "Director Médico & Propietario",
+    "telefono": "+503 2260-4490",
+    "posicionGoogle": 5,
+    "estado": "enviado_instantly",
+    "actualizado": "2026-10-09",
+    "auditoria": {
+      "fecha": "2026-10-09 18:20",
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia de marcado semántico Schema (Invisibles ante ChatGPT y Perplexity)",
+          "problema": "clinicadentalsv.com no implementa JSON-LD MedicalBusiness ni DentalClinic. Cuando pacientes consultan a Perplexity o ChatGPT por 'mejores dentistas en San Salvador', la IA no puede estructurar sus especialidades ni reputación.",
+          "porQueImporta": "El 42% de los pacientes de alto poder adquisitivo investigan con IAs antes de agendar citas. La falta de entidades estructuradas cede todas las recomendaciones a competidores.",
+          "competidores": "DentalStudioSV (pos #1) cuenta con 14 esquemas de entidad médica validados y es la primera recomendación citada por Perplexity en San Salvador."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 sin keyword transaccional 'dentista san salvador'",
+          "problema": "El title dice únicamente 'Inicio - Especialistas' y el H1 repite 'Bienvenidos', omitiendo la intención explícita de compra y tratamiento que Google prioriza en El Salvador.",
+          "porQueImporta": "Pierde hasta un 65% del CTR potencial frente a búsquedas locales transaccionales en Google.",
+          "competidores": "Clínicas rivales posicionan en title 'Clínica Dental en San Salvador | Ortodoncia e Implantes' capturando el primer clic."
+        },
+        {
+          "categoria": "Velocidad & CRO",
+          "prioridad": "MEDIA",
+          "titulo": "LCP móvil de 4.8s y ausencia de botón flotante con WhatsApp directo",
+          "problema": "La web tarda 4.8 segundos en responder en redes 4G móviles y los usuarios deben llenar un formulario de 8 campos en vez de agendar por WhatsApp.",
+          "porQueImporta": "Más del 78% del tráfico médico en El Salvador llega por smartphone; cada segundo extra de carga duplica el rebote.",
+          "competidores": "Webs optimizadas cargan en 1.1s con botón háptico de WhatsApp directo."
+        }
+      ]
+    },
+    "pitch": "Hola Dr. Carlos,\n\nEstuve analizando la presencia digital de Clínica Dental San Salvador frente a las clínicas médicas de mayor crecimiento en El Salvador.\n\nDetectamos 3 fugas técnicas clave que están afectando directamente la captación de nuevos pacientes:\n\n1. Invisibilidad ante motores de IA: Su sitio carece de marcado semántico Schema, por lo que consultas en ChatGPT o Perplexity sobre 'mejores especialistas dentales en San Salvador' recomiendan directamente a DentalStudioSV en vez de su clínica.\n2. Su Title y H1 actuales omiten términos transaccionales de búsqueda clave en Google.\n3. El tiempo de carga en smartphones supera los 4.8s, perdiendo pacientes potenciales que buscan atención ágil.\n\nEn Goglite ayudamos a clínicas de alto nivel a dominar tanto Google como los nuevos motores de IA mediante arquitecturas ultrarrápidas y optimización GEO.\n\n¿Tiene 10 minutos esta semana para mostrarle el diagnóstico completo y cómo solucionarlo?\n\nSaludos,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial"
+  },
+  {
+    "id": "lead-do-002",
+    "dominio": "inmobiliariapuntacana.do",
+    "nombreEmpresa": "Punta Cana Prime Realty",
+    "pais": "DO",
+    "email": "ventas@inmobiliariapuntacana.do",
+    "responsable": "Lic. Alejandro Mendoza",
+    "cargo": "Managing Director",
+    "telefono": "+1 809 552-8811",
+    "posicionGoogle": 7,
+    "estado": "contactado",
+    "actualizado": "2026-10-08",
+    "auditoria": {
+      "fecha": "2026-10-08 14:15",
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Falta de entidades inmobiliarias para inversionistas internacionales",
+          "problema": "Inversionistas de EE.UU. y Europa preguntan en ChatGPT por 'best luxury villas for sale in Punta Cana' y la web no es referenciada debido a ausencia de arquitectura semántica multidioma.",
+          "porQueImporta": "Los compradores de propiedades de lujo ($300k+ USD) inician su prospección con asistentes inteligentes.",
+          "competidores": "PalmaRealRealty cuenta con sitemap semántico y citas automáticas en motores de IA."
+        },
+        {
+          "categoria": "Contenido",
+          "prioridad": "MEDIA",
+          "titulo": "Sin sección de FAQs sobre ley CONFOTUR y beneficios fiscales en RD",
+          "problema": "No resuelven en la web las dudas tributarias más buscadas por compradores extranjeros, perdiendo tráfico long-tail clave.",
+          "porQueImporta": "Las dudas fiscales son el principal freno de conversión antes de solicitar una visita.",
+          "competidores": "Las agencias líderes posicionan guías detalladas de CONFOTUR."
+        }
+      ]
+    },
+    "pitch": "Estimado Lic. Mendoza,\n\nRevisando el mercado de bienes raíces turísticos en Punta Cana, noté que Punta Cana Prime Realty tiene un portafolio excepcional pero presenta una oportunidad crítica no aprovechada en adquisición digital:\n\nCuando inversionistas extranjeros consultan en asistentes de IA como Perplexity o ChatGPT sobre oportunidades inmobiliarias en la zona, su inventario no aparece citado debido a la falta de marcado de datos estructurados para IA (GEO).\n\nAdicionalmente, su web no aborda las preguntas clave sobre exenciones fiscales (Ley CONFOTUR), que hoy son el principal filtro de decisión de los compradores.\n\nEn Goglite desarrollamos infraestructuras web diseñadas para ser priorizadas tanto por Google como por las nuevas IAs de búsqueda.\n\n¿Le parecería interesante revisar una breve comparativa de cómo su competencia está captando estos inversionistas?\n\nAtentamente,\nVíctor Matos\nGoglite — Agencia de Alto Rendimiento & GEO"
+  },
+  {
+    "id": "lead-sv-003",
+    "dominio": "lexcorporativo.sv",
+    "nombreEmpresa": "Lex Consultores Legales",
+    "pais": "SV",
+    "email": "contacto@lexcorporativo.sv",
+    "responsable": "Dra. Sofía Valiente",
+    "cargo": "Socia Directora",
+    "telefono": "+503 2505-1200",
+    "posicionGoogle": 6,
+    "estado": "nuevo",
+    "actualizado": "2026-10-09",
+    "auditoria": null,
+    "pitch": null
+  }
+]
