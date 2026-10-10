@@ -31,10 +31,12 @@ import {
   FileText,
   Briefcase,
   Layout,
-  Kanban
+  Kanban,
+  DollarSign
 } from 'lucide-react';
 import PresupuestosModule from './components/PresupuestosModule';
 import CrmPortalModule from './components/CrmPortalModule';
+import GestionRentabilidadModule from './components/GestionRentabilidadModule';
 import ContratosOnboardingModule from './components/ContratosOnboardingModule';
 import WireframesStoryBrandModule from './components/WireframesStoryBrandModule';
 import SeoLaunchQaModule from './components/SeoLaunchQaModule';
@@ -408,6 +410,7 @@ export default function App() {
                 {activeModule === 'lead_scrapper' ? 'Módulo 1 · Lead Scrapper' :
                  activeModule === 'presupuestos' ? 'Módulo 2 · Presupuestos' :
                  activeModule === 'crm_portal' ? 'Módulo 3 · CRM & Portal' :
+                 activeModule === 'gestion_rentabilidad' ? 'Módulo 4 · Rentabilidad' :
                  activeModule === 'contratos_onboarding' ? 'Contratos & SOW' :
                  activeModule === 'wireframes_storybrand' ? 'StoryBrand & UX' : 'SEO & Launch QA'}
               </span>
@@ -476,11 +479,26 @@ export default function App() {
                     <Kanban className="w-3.5 h-3.5 text-orange-400" />
                     <span>3. CRM & Portal de Cliente</span>
                   </div>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Listo</span>
+                </button>
+
+                {/* Módulo 4 */}
+                <button
+                  onClick={() => { setActiveModule('gestion_rentabilidad'); setToolsDropdownOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
+                    activeModule === 'gestion_rentabilidad' 
+                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
+                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-3.5 h-3.5 text-orange-400" />
+                    <span>4. Gestión & Rentabilidad (Holded)</span>
+                  </div>
                   <span className="text-[10px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">Activo</span>
                 </button>
 
                 {[
-                  { title: "4. Gestión & Rentabilidad (Holded)", tag: "Fase 4" },
                   { title: "5. SEO & GEO Tools (Rank Math)", tag: "Fase 5" },
                   { title: "6. Hub de Proyectos (Headless CMS)", tag: "Fase 6" },
                 ].map((m, i) => (
@@ -582,7 +600,22 @@ export default function App() {
                   <Kanban className="w-3.5 h-3.5" />
                   <span>CRM & Portal</span>
                 </div>
-                <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">3</span>
+                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">3</span>
+              </button>
+
+              <button
+                onClick={() => setActiveModule('gestion_rentabilidad')}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeModule === 'gestion_rentabilidad'
+                    ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-3.5 h-3.5" />
+                  <span>Rentabilidad</span>
+                </div>
+                <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">4</span>
               </button>
 
               <div className="pt-2 pb-1 text-[9px] uppercase font-mono tracking-wider text-slate-500 px-1">
@@ -720,6 +753,18 @@ export default function App() {
             </div>
           )}
 
+          {activeModule === 'gestion_rentabilidad' && (
+            <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-xs text-orange-300">
+              <div className="font-bold flex items-center gap-1.5 mb-1">
+                <DollarSign className="w-3.5 h-3.5" />
+                <span>Gestión & Rentabilidad</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-snug">
+                Panel P&L en tiempo real, facturas proforma imprimibles y rentabilidad unitaria por cliente $0.
+              </p>
+            </div>
+          )}
+
           {activeModule === 'contratos_onboarding' && (
             <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-xs text-orange-300">
               <div className="font-bold flex items-center gap-1.5 mb-1">
@@ -793,6 +838,10 @@ export default function App() {
                 setActiveModule('presupuestos');
               }}
               onOpenContrato={() => setActiveModule('contratos_onboarding')}
+            />
+          ) : activeModule === 'gestion_rentabilidad' ? (
+            <GestionRentabilidadModule
+              selectedCountry={selectedCountry}
             />
           ) : activeModule === 'contratos_onboarding' ? (
             <ContratosOnboardingModule

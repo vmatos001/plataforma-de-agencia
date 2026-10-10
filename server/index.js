@@ -19,6 +19,14 @@ import {
   addCrmInteraction, 
   addClientUploadedAsset 
 } from './services/crmStorage.js';
+import {
+  getFinanzas,
+  getResumenFinanciero,
+  crearFactura,
+  actualizarFactura,
+  crearGasto,
+  eliminarGasto
+} from './services/finanzasStorage.js';
 
 import path from 'path';
 import fs from 'fs';
@@ -826,6 +834,46 @@ app.post('/api/portal/:token/upload-assets', (req, res) => {
   const updated = addClientUploadedAsset(token, req.body);
   if (!updated) return res.status(404).json({ error: 'Portal no encontrado' });
   res.json({ success: true, lead: updated });
+});
+
+// ==========================================
+// 9. GESTIÓN FINANCIERA & RENTABILIDAD API
+// ==========================================
+app.get('/api/finanzas/resumen', (req, res) => {
+  const resumen = getResumenFinanciero();
+  res.json(resumen);
+});
+
+app.get('/api/finanzas/facturas', (req, res) => {
+  const { facturas } = getFinanzas();
+  res.json(facturas);
+});
+
+app.post('/api/finanzas/facturas', (req, res) => {
+  const nueva = crearFactura(req.body);
+  res.status(201).json(nueva);
+});
+
+app.patch('/api/finanzas/facturas/:id', (req, res) => {
+  const updated = actualizarFactura(req.params.id, req.body);
+  if (!updated) return res.status(404).json({ error: 'Factura no encontrada' });
+  res.json(updated);
+});
+
+app.get('/api/finanzas/gastos', (req, res) => {
+  const { gastos } = getFinanzas();
+  res.json(gastos);
+});
+
+app.post('/api/finanzas/gastos', (req, res) => {
+  const nuevoGasto = crearGasto(req.body);
+  res.status(201).json(nuevoGasto);
+});
+
+app.delete('/api/finanzas/gastos/:id', (req, res) => {
+  const ok = eliminarGasto(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Gasto no encontrado' });
+  res.json({ success: true });
 });
 
 // Serve assets directly from public/assets and dist

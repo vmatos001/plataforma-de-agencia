@@ -1,0 +1,295 @@
+[
+  {
+    "id": "crm-lead-1791605700142-83et",
+    "leadId": "lead-1791605700142-83et",
+    "empresa": "Inmobiliarias Punta Cana Moderno Santo Domingo",
+    "contacto": "Lic. Marcos Almonte",
+    "cargo": "Director General & Socio",
+    "email": "marcos@inmobiliariaspuntacanamodernosantodomingo.do",
+    "telefono": "+1 809 6845-5645",
+    "pais": "DO",
+    "dominio": "inmobiliariaspuntacanamodernosantodomingo.do",
+    "etapa": "contactado",
+    "valorEstimado": 950,
+    "probabilidad": 25,
+    "fuente": "Scraper Google SERP",
+    "portalToken": "portal-lead-1791605700142-83et-kkwqjl",
+    "interacciones": [
+      {
+        "id": "int-1-0",
+        "tipo": "nota",
+        "fecha": "2026-10-09",
+        "titulo": "Diagnóstico Inicial Detectado",
+        "detalle": "Prospecto captado vía Scraper. Puntos críticos: falta de Schema JSON-LD y tiempo de respuesta.",
+        "proximoPaso": "Enviar primer contacto de auditoría por WhatsApp",
+        "fechaProximoPaso": "2026-10-11"
+      }
+    ],
+    "portalConfig": {
+      "portalActivo": true,
+      "faseActual": "Diagnóstico Comercial",
+      "progresoPorcentaje": 10,
+      "archivosSubidos": [
+        {
+          "id": "f-1",
+          "nombre": "Logo_Vector_Marca.png",
+          "fecha": "2026-10-10",
+          "tipo": "imagen",
+          "tamaño": "1.2 MB"
+        }
+      ],
+      "notasCliente": "Prioridad: Captación de citas directas por WhatsApp móvil.",
+      "presupuestoId": null,
+      "proyectoId": null
+    },
+    "creadoEn": "2026-10-08",
+    "actualizadoEn": "2026-10-10"
+  },
+  {
+    "id": "crm-lead-1791605700359-bisg",
+    "leadId": "lead-1791605700359-bisg",
+    "empresa": "Grupo Inmobiliarias Punta Cana Caribe",
+    "contacto": "Lic. Marcos Almonte",
+    "cargo": "Director General & Socio",
+    "email": "gerencia@grupoinmobiliariaspuntacanacaribe.com",
+    "telefono": "+1 809 6070-4870",
+    "pais": "DO",
+    "dominio": "grupoinmobiliariaspuntacanacaribe.com",
+    "etapa": "contactado",
+    "valorEstimado": 1500,
+    "probabilidad": 25,
+    "fuente": "Scraper Google SERP",
+    "portalToken": "portal-lead-1791605700359-bisg-q34hq7",
+    "interacciones": [
+      {
+        "id": "int-1-1",
+        "tipo": "nota",
+        "fecha": "2026-10-09",
+        "titulo": "Diagnóstico Inicial Detectado",
+        "detalle": "Prospecto captado vía Scraper. Puntos críticos: falta de Schema JSON-LD y tiempo de respuesta.",
+        "proximoPaso": "Enviar primer contacto de auditoría por WhatsApp",
+        "fechaProximoPaso": "2026-10-11"
+      },
+      {
+        "id": "int-2-1",
+        "tipo": "whatsapp",
+        "fecha": "2026-10-10",
+        "titulo": "Primer Contacto por WhatsApp",
+        "detalle": "Enviado pitch de valor enfocado en conversión local y optimización en motores de IA.",
+        "proximoPaso": "Esperar respuesta o dar seguimiento en 48h",
+        "fechaProximoPaso": "2026-10-12"
+      }
+    ],
+    "portalConfig": {
+      "portalActivo": true,
+      "faseActual": "Diagnóstico Comercial",
+      "progresoPorcentaje": 10,
+      "archivosSubidos": [
+        {
+          "id": "f-1",
+          "nombre": "Logo_Vector_Marca.png",
+          "fecha": "2026-10-10",
+          "tipo": "imagen",
+          "tamaño": "1.2 MB"
+        }
+      ],
+      "notasCliente": "Prioridad: Captación de citas directas por WhatsApp móvil.",
+      "presupuestoId": null,
+      "proyectoId": null
+    },
+    "creadoEn": "2026-10-08",
+    "actualizadoEn": "2026-10-10"
+  },
+  {
+    "id": "crm-lead-sv-001",
+    "leadId": "lead-sv-001",
+    "empresa": "Clínica Dental San Salvador",
+    "contacto": "Dr. Carlos Rodríguez",
+    "cargo": "Director Médico & Propietario",
+    "email": "dr.rodriguez@clinicadentalsv.com",
+    "telefono": "+503 2260-4490",
+    "pais": "SV",
+    "dominio": "clinicadentalsv.com",
+    "etapa": "reunion",
+    "valorEstimado": 2200,
+    "probabilidad": 40,
+    "fuente": "Scraper Google SERP",
+    "portalToken": "portal-lead-sv-001-8wkxma",
+    "interacciones": [
+      {
+        "id": "int-1-2",
+        "tipo": "nota",
+        "fecha": "2026-10-09",
+        "titulo": "Diagnóstico Inicial Detectado",
+        "detalle": "Prospecto captado vía Scraper. Puntos críticos: falta de Schema JSON-LD y tiempo de respuesta.",
+        "proximoPaso": "Enviar primer contacto de auditoría por WhatsApp",
+        "fechaProximoPaso": "2026-10-11"
+      },
+      {
+        "id": "int-2-2",
+        "tipo": "whatsapp",
+        "fecha": "2026-10-10",
+        "titulo": "Primer Contacto por WhatsApp",
+        "detalle": "Enviado pitch de valor enfocado en conversión local y optimización en motores de IA.",
+        "proximoPaso": "Agendar videollamada de 15 min",
+        "fechaProximoPaso": "2026-10-12"
+      },
+      {
+        "id": "int-3-2",
+        "tipo": "reunion",
+        "fecha": "2026-10-10",
+        "titulo": "Reunión de Diagnóstico Estratégico",
+        "detalle": "El cliente confirmó interés en rediseñar su sitio para superar a su principal competidor local.",
+        "proximoPaso": "Enviar propuesta formal VIP con opciones de inversión",
+        "fechaProximoPaso": "2026-10-11"
+      }
+    ],
+    "portalConfig": {
+      "portalActivo": true,
+      "faseActual": "Diagnóstico Comercial",
+      "progresoPorcentaje": 10,
+      "archivosSubidos": [
+        {
+          "id": "f-1",
+          "nombre": "Logo_Vector_Marca.png",
+          "fecha": "2026-10-10",
+          "tipo": "imagen",
+          "tamaño": "1.2 MB"
+        }
+      ],
+      "notasCliente": "Prioridad: Captación de citas directas por WhatsApp móvil.",
+      "presupuestoId": null,
+      "proyectoId": null
+    },
+    "creadoEn": "2026-10-08",
+    "actualizadoEn": "2026-10-10"
+  },
+  {
+    "id": "crm-lead-do-002",
+    "leadId": "lead-do-002",
+    "empresa": "Punta Cana Prime Realty",
+    "contacto": "Lic. Alejandro Mendoza",
+    "cargo": "Managing Director",
+    "email": "ventas@inmobiliariapuntacana.do",
+    "telefono": "+1 809 552-8811",
+    "pais": "DO",
+    "dominio": "inmobiliariapuntacana.do",
+    "etapa": "propuesta_enviada",
+    "valorEstimado": 1800,
+    "probabilidad": 60,
+    "fuente": "Scraper Google SERP",
+    "portalToken": "portal-lead-do-002-k1yuq7",
+    "interacciones": [
+      {
+        "id": "int-1-3",
+        "tipo": "nota",
+        "fecha": "2026-10-09",
+        "titulo": "Diagnóstico Inicial Detectado",
+        "detalle": "Prospecto captado vía Scraper. Puntos críticos: falta de Schema JSON-LD y tiempo de respuesta.",
+        "proximoPaso": "Enviar primer contacto de auditoría por WhatsApp",
+        "fechaProximoPaso": "2026-10-11"
+      },
+      {
+        "id": "int-2-3",
+        "tipo": "whatsapp",
+        "fecha": "2026-10-10",
+        "titulo": "Primer Contacto por WhatsApp",
+        "detalle": "Enviado pitch de valor enfocado en conversión local y optimización en motores de IA.",
+        "proximoPaso": "Agendar videollamada de 15 min",
+        "fechaProximoPaso": "2026-10-12"
+      },
+      {
+        "id": "int-3-3",
+        "tipo": "reunion",
+        "fecha": "2026-10-10",
+        "titulo": "Reunión de Diagnóstico Estratégico",
+        "detalle": "El cliente confirmó interés en rediseñar su sitio para superar a su principal competidor local.",
+        "proximoPaso": "Enviar propuesta formal VIP con opciones de inversión",
+        "fechaProximoPaso": "2026-10-11"
+      }
+    ],
+    "portalConfig": {
+      "portalActivo": true,
+      "faseActual": "Diagnóstico Comercial",
+      "progresoPorcentaje": 25,
+      "archivosSubidos": [
+        {
+          "id": "f-1",
+          "nombre": "Logo_Vector_Marca.png",
+          "fecha": "2026-10-10",
+          "tipo": "imagen",
+          "tamaño": "1.2 MB"
+        }
+      ],
+      "notasCliente": "Prioridad: Captación de citas directas por WhatsApp móvil.",
+      "presupuestoId": null,
+      "proyectoId": null
+    },
+    "creadoEn": "2026-10-08",
+    "actualizadoEn": "2026-10-10"
+  },
+  {
+    "id": "crm-lead-sv-003",
+    "leadId": "lead-sv-003",
+    "empresa": "Lex Consultores Legales",
+    "contacto": "Dra. Sofía Valiente",
+    "cargo": "Socia Directora",
+    "email": "contacto@lexcorporativo.sv",
+    "telefono": "+503 2505-1200",
+    "pais": "SV",
+    "dominio": "lexcorporativo.sv",
+    "etapa": "perdido",
+    "valorEstimado": 3200,
+    "probabilidad": 0,
+    "fuente": "Scraper Google SERP",
+    "portalToken": "portal-lead-sv-003-6kqlrt",
+    "interacciones": [
+      {
+        "id": "int-1-4",
+        "tipo": "nota",
+        "fecha": "2026-10-09",
+        "titulo": "Diagnóstico Inicial Detectado",
+        "detalle": "Prospecto captado vía Scraper. Puntos críticos: falta de Schema JSON-LD y tiempo de respuesta.",
+        "proximoPaso": "Enviar primer contacto de auditoría por WhatsApp",
+        "fechaProximoPaso": "2026-10-11"
+      },
+      {
+        "id": "int-2-4",
+        "tipo": "whatsapp",
+        "fecha": "2026-10-10",
+        "titulo": "Primer Contacto por WhatsApp",
+        "detalle": "Enviado pitch de valor enfocado en conversión local y optimización en motores de IA.",
+        "proximoPaso": "Agendar videollamada de 15 min",
+        "fechaProximoPaso": "2026-10-12"
+      },
+      {
+        "id": "int-3-4",
+        "tipo": "reunion",
+        "fecha": "2026-10-10",
+        "titulo": "Reunión de Diagnóstico Estratégico",
+        "detalle": "El cliente confirmó interés en rediseñar su sitio para superar a su principal competidor local.",
+        "proximoPaso": "Enviar propuesta formal VIP con opciones de inversión",
+        "fechaProximoPaso": "2026-10-11"
+      }
+    ],
+    "portalConfig": {
+      "portalActivo": true,
+      "faseActual": "Desarrollo Web & StoryBrand",
+      "progresoPorcentaje": 60,
+      "archivosSubidos": [
+        {
+          "id": "f-1",
+          "nombre": "Logo_Vector_Marca.png",
+          "fecha": "2026-10-10",
+          "tipo": "imagen",
+          "tamaño": "1.2 MB"
+        }
+      ],
+      "notasCliente": "Prioridad: Captación de citas directas por WhatsApp móvil.",
+      "presupuestoId": null,
+      "proyectoId": null
+    },
+    "creadoEn": "2026-10-08",
+    "actualizadoEn": "2026-10-10"
+  }
+]
