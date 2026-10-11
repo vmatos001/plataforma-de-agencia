@@ -969,11 +969,11 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
             </div>
           </div>
 
-          {/* 2-Column Workspace (Estilo WhatsApp Web: 2 Apartados Fluidos) */}
+          {/* 2-Column Workspace (Estilo WhatsApp Web: 30% Contactos · 70% Conversación) */}
           <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
             
-            {/* APARTADO 1: BANDEJA DE CONVERSACIONES RECIENTES */}
-            <div className="w-full md:w-80 lg:w-96 shrink-0 border-r border-slate-800 flex flex-col bg-[#0b0f19]">
+            {/* APARTADO 1: BANDEJA DE CONVERSACIONES RECIENTES (30% DEL ANCHO) */}
+            <div className="w-full md:w-[30%] lg:w-[30%] shrink-0 border-r border-slate-800 flex flex-col bg-[#0b0f19]">
               {/* Inbox Header & Search */}
               <div className="p-3 border-b border-slate-800 space-y-2.5">
                 <div className="relative">
@@ -1045,18 +1045,18 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-emerald-400 shrink-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-emerald-400 shrink-0">
                               {leadItem.contacto?.charAt(0) || 'C'}
                             </div>
                             <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-xs text-white truncate max-w-[140px]">
+                              <div className="flex items-center gap-1">
+                                <span className="font-bold text-xs text-white truncate max-w-[110px]">
                                   {leadItem.contacto}
                                 </span>
-                                <span className="text-[10px]">{leadItem.pais === 'SV' ? '🇸🇻' : '🇩🇴'}</span>
+                                <span className="text-[10px] shrink-0">{leadItem.pais === 'SV' ? '🇸🇻' : '🇩🇴'}</span>
                               </div>
-                              <div className="text-[11px] text-slate-400 truncate max-w-[150px]">
+                              <div className="text-[11px] text-slate-400 truncate max-w-[120px]">
                                 {leadItem.empresa}
                               </div>
                             </div>
@@ -1066,14 +1066,11 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                             <span className="text-[10px] text-slate-500 font-mono">
                               {lastMsg?.fechaHora?.split(' ')?.[1] || 'Reciente'}
                             </span>
-                            <div className="text-[10px] font-mono text-emerald-400 font-bold mt-0.5">
-                              ${leadItem.valorEstimado || 1500}
-                            </div>
                           </div>
                         </div>
 
                         {/* Last message preview */}
-                        <div className="mt-2 text-[11px] text-slate-400 truncate line-clamp-1">
+                        <div className="mt-1.5 text-[11px] text-slate-400 truncate line-clamp-1">
                           {lastMsg ? (
                             <span>
                               <span className="text-slate-500 font-semibold">{lastMsg.emisor === 'agencia' ? 'Tú: ' : ''}</span>
@@ -1089,7 +1086,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                           <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${tempConfig.badge}`}>
                             {tempConfig.icon} {tempConfig.label}
                           </span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${stageTag.color} truncate max-w-[140px]`}>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${stageTag.color} truncate max-w-[120px]`}>
                             {stageTag.label}
                           </span>
                         </div>
@@ -1099,12 +1096,12 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
               </div>
             </div>
 
-            {/* APARTADO 2: CONVERSACIÓN ACTUAL (AMPLIA Y CÓMODA) */}
+            {/* APARTADO 2: CONVERSACIÓN ACTUAL (70% DEL ANCHO · AMPLIA Y ORGÁNICA) */}
             {(() => {
               const currentLead = leads.find(l => l.id === selectedWaLeadId) || filteredLeads[0];
               if (!currentLead) {
                 return (
-                  <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
+                  <div className="flex-1 md:w-[70%] flex items-center justify-center text-slate-500 text-sm">
                     Selecciona una conversación para comenzar
                   </div>
                 );
@@ -1114,87 +1111,97 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
               const messages = currentLead.whatsappData?.mensajes || [];
 
               return (
-                <div className="flex-1 flex flex-col bg-[#0a0e17] overflow-hidden relative">
+                <div className="flex-1 min-w-0 md:w-[70%] flex flex-col bg-[#0a0e17] overflow-hidden relative">
                   
-                  {/* Chat Header */}
-                  <div className="p-3.5 bg-[#0f1422] border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-md z-10">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center font-bold text-white text-sm shadow-md">
-                        {currentLead.contacto?.charAt(0) || 'C'}
+                  {/* Chat Header: Espacioso con separación orgánica de acciones y metadatos */}
+                  <div className="p-3.5 bg-[#0f1422] border-b border-slate-800 flex flex-col gap-3 shadow-md z-10">
+                    {/* Fila 1: Contacto + Acciones Principales */}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center font-bold text-white text-sm shadow-md shrink-0">
+                          {currentLead.contacto?.charAt(0) || 'C'}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-sm text-white truncate">{currentLead.contacto}</h4>
+                            <span className="text-xs shrink-0">{currentLead.pais === 'SV' ? '🇸🇻 El Salvador' : '🇩🇴 Rep. Dominicana'}</span>
+                          </div>
+                          <div className="text-xs text-slate-400 flex items-center gap-2 truncate">
+                            <span className="font-medium text-slate-300 truncate">{currentLead.empresa}</span>
+                            <span>·</span>
+                            <span className="font-mono text-emerald-400 shrink-0">{currentLead.whatsappData?.telefono || currentLead.telefono}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-sm text-white">{currentLead.contacto}</h4>
-                          <span className="text-xs">{currentLead.pais === 'SV' ? '🇸🇻 El Salvador' : '🇩🇴 Rep. Dominicana'}</span>
-                        </div>
-                        <div className="text-xs text-slate-400 flex items-center gap-2">
-                          <span>{currentLead.empresa}</span>
-                          <span>·</span>
-                          <span className="font-mono text-emerald-400">{currentLead.whatsappData?.telefono || currentLead.telefono}</span>
-                        </div>
+
+                      {/* Botones Principales (Grandes, cómodos, sin apiñarse) */}
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <a
+                          href={`https://wa.me/${cleanPhone}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950/50 transition-all"
+                        >
+                          <Smartphone className="w-3.5 h-3.5" />
+                          <span>Abrir wa.me</span>
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsCopilotOpen(!isCopilotOpen)}
+                          className={`px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-all ${
+                            isCopilotOpen
+                              ? 'bg-orange-600 text-white border border-orange-400 ring-2 ring-orange-500/30'
+                              : 'bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 border border-orange-500/30'
+                          }`}
+                          title="Abrir panel con guiones de alta conversión"
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>{isCopilotOpen ? 'Cerrar Copiloto' : '⚡ Copiloto de Ventas'}</span>
+                        </button>
                       </div>
                     </div>
 
-                    {/* Actions & Launchers */}
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      {/* Temperature Selector */}
-                      <select
-                        value={currentLead.whatsappData?.temperatura || 'tibio'}
-                        onChange={(e) => handleUpdateWaMeta(currentLead.id, { temperatura: e.target.value })}
-                        className="bg-[#182132] border border-slate-700 text-amber-300 font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none"
-                      >
-                        <option value="caliente">🔥 Caliente</option>
-                        <option value="tibio">🟡 Tibio</option>
-                        <option value="frio">❄️ Frío</option>
-                      </select>
+                    {/* Fila 2: Barra de Estado Comercial & Seguimiento (Píldoras bien ordenadas) */}
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/80 text-xs">
+                      <div className="flex items-center gap-1.5 bg-[#141b2a] px-2.5 py-1 rounded-lg border border-slate-800 shrink-0">
+                        <span className="text-[10px] font-mono text-slate-400 font-semibold uppercase">Etapa:</span>
+                        <select
+                          value={currentLead.etapa}
+                          onChange={(e) => handleStageChange(currentLead.id, e.target.value)}
+                          className="bg-transparent text-xs text-orange-400 font-bold focus:outline-none cursor-pointer"
+                        >
+                          {PIPELINE_STAGES.map(st => (
+                            <option key={st.id} value={st.id} className="bg-[#141b2a] text-slate-200">{st.label}</option>
+                          ))}
+                        </select>
+                      </div>
 
-                      {/* Follow-up Stage Selector */}
-                      <select
-                        value={currentLead.whatsappData?.estadoSeguimiento || 'esperando_respuesta'}
-                        onChange={(e) => handleUpdateWaMeta(currentLead.id, { estadoSeguimiento: e.target.value })}
-                        className="bg-[#182132] border border-slate-700 text-sky-300 font-medium rounded-lg px-2.5 py-1.5 focus:outline-none max-w-[150px]"
-                      >
-                        {FOLLOWUP_STAGES.map(st => (
-                          <option key={st.id} value={st.id}>{st.label}</option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-1.5 bg-[#141b2a] px-2.5 py-1 rounded-lg border border-slate-800 shrink-0">
+                        <span className="text-[10px] font-mono text-slate-400 font-semibold uppercase">Temperatura:</span>
+                        <select
+                          value={currentLead.whatsappData?.temperatura || 'tibio'}
+                          onChange={(e) => handleUpdateWaMeta(currentLead.id, { temperatura: e.target.value })}
+                          className="bg-transparent text-xs text-amber-300 font-bold focus:outline-none cursor-pointer"
+                        >
+                          <option value="caliente" className="bg-[#141b2a] text-amber-300">🔥 Caliente</option>
+                          <option value="tibio" className="bg-[#141b2a] text-yellow-300">🟡 Tibio</option>
+                          <option value="frio" className="bg-[#141b2a] text-sky-300">❄️ Frío</option>
+                        </select>
+                      </div>
 
-                      {/* Pipeline Stage Selector */}
-                      <select
-                        value={currentLead.etapa}
-                        onChange={(e) => handleStageChange(currentLead.id, e.target.value)}
-                        className="bg-[#182132] border border-slate-700 text-orange-400 font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none"
-                      >
-                        {PIPELINE_STAGES.map(st => (
-                          <option key={st.id} value={st.id}>{st.label}</option>
-                        ))}
-                      </select>
-
-                      {/* Real wa.me launcher button */}
-                      <a
-                        href={`https://wa.me/${cleanPhone}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-950 transition-all shrink-0"
-                      >
-                        <Smartphone className="w-3.5 h-3.5" />
-                        <span>Abrir wa.me</span>
-                      </a>
-
-                      {/* BOTÓN ON-DEMAND: ACTIVAR COPILOTO */}
-                      <button
-                        type="button"
-                        onClick={() => setIsCopilotOpen(!isCopilotOpen)}
-                        className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 shadow-md transition-all shrink-0 ${
-                          isCopilotOpen
-                            ? 'bg-orange-600 text-white border border-orange-400 ring-2 ring-orange-500/30'
-                            : 'bg-orange-500/15 hover:bg-orange-500/25 text-orange-400 border border-orange-500/30'
-                        }`}
-                        title="Abrir asistente de scripts y respuestas rápidas"
-                      >
-                        <Zap className="w-3.5 h-3.5" />
-                        <span>{isCopilotOpen ? 'Cerrar Copiloto' : '⚡ Copiloto de Ventas'}</span>
-                      </button>
+                      <div className="flex items-center gap-1.5 bg-[#141b2a] px-2.5 py-1 rounded-lg border border-slate-800 shrink-0">
+                        <span className="text-[10px] font-mono text-slate-400 font-semibold uppercase">Protocolo:</span>
+                        <select
+                          value={currentLead.whatsappData?.estadoSeguimiento || 'esperando_respuesta'}
+                          onChange={(e) => handleUpdateWaMeta(currentLead.id, { estadoSeguimiento: e.target.value })}
+                          className="bg-transparent text-xs text-sky-300 font-medium focus:outline-none cursor-pointer max-w-[170px]"
+                        >
+                          {FOLLOWUP_STAGES.map(st => (
+                            <option key={st.id} value={st.id} className="bg-[#141b2a] text-slate-200">{st.label}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -1243,66 +1250,65 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                     )}
                   </div>
 
-                  {/* Composer Bottom Area */}
-                  <div className="p-3.5 bg-[#0f1422] border-t border-slate-800 space-y-2 z-10">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-slate-400 font-semibold text-[11px]">Registrar como:</span>
+                  {/* Composer Bottom Area: Espacioso, orgánico y cómodo */}
+                  <div className="p-4 bg-[#0f1422] border-t border-slate-800 space-y-2.5 z-10">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-1 bg-[#131926] p-1 rounded-xl border border-slate-800">
                         <button
                           type="button"
                           onClick={() => setWaRole('agencia')}
-                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                            waRole === 'agencia' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-800 text-slate-400 hover:text-white'
+                          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                            waRole === 'agencia' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
                           }`}
                         >
-                          Mensaje Enviado
+                          💬 Mensaje Enviado
                         </button>
                         <button
                           type="button"
                           onClick={() => setWaRole('cliente')}
-                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                            waRole === 'cliente' ? 'bg-sky-600 text-white font-bold' : 'bg-slate-800 text-slate-400 hover:text-white'
+                          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                            waRole === 'cliente' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
                           }`}
                         >
-                          Respuesta del Cliente
+                          📥 Respuesta del Cliente
                         </button>
                       </div>
 
                       {/* Quick variable inserts & Copilot activator */}
-                      <div className="flex items-center gap-1 text-[10px]">
+                      <div className="flex items-center gap-2 text-xs">
                         <button
                           type="button"
                           onClick={() => setWaMessageInput(prev => prev + ` ¡Hola ${currentLead.contacto.split(' ')[0]}!`)}
-                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition-colors"
                         >
-                          + Nombre
+                          + {currentLead.contacto.split(' ')[0]}
                         </button>
                         <button
                           type="button"
                           onClick={() => setIsCopilotOpen(true)}
-                          className="px-2 py-0.5 rounded bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 font-semibold flex items-center gap-1"
+                          className="px-2.5 py-1 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-400 border border-orange-500/30 text-[11px] font-bold flex items-center gap-1 transition-colors"
                         >
-                          <Zap className="w-2.5 h-2.5" />
+                          <Zap className="w-3 h-3" />
                           <span>Ver Guiones</span>
                         </button>
                       </div>
                     </div>
 
                     {/* Composer Input & Buttons */}
-                    <form onSubmit={handleSendWaMessage} className="flex gap-2 items-end">
+                    <form onSubmit={handleSendWaMessage} className="flex gap-2.5 items-end">
                       <textarea
                         rows={2}
                         value={waMessageInput}
                         onChange={(e) => setWaMessageInput(e.target.value)}
                         placeholder={waRole === 'agencia' ? "Escribe un mensaje de WhatsApp o selecciona un guion del copiloto..." : "Registra la respuesta recibida del cliente..."}
-                        className="flex-1 bg-[#151c2d] border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/60 resize-none"
+                        className="flex-1 bg-[#141a29] border border-slate-700/80 rounded-xl p-3 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/60 resize-none leading-relaxed"
                       />
 
                       <div className="flex flex-col gap-1.5 shrink-0">
                         <button
                           type="submit"
                           disabled={!waMessageInput.trim()}
-                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950 transition-all"
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950 transition-all"
                         >
                           <Send className="w-3.5 h-3.5" />
                           <span>Guardar</span>
@@ -1312,7 +1318,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                           type="button"
                           onClick={() => handleOpenRealWhatsApp(currentLead, waMessageInput)}
                           disabled={!waMessageInput.trim()}
-                          className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-emerald-400 font-semibold text-[11px] flex items-center gap-1 transition-all"
+                          className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-emerald-400 font-semibold text-xs flex items-center justify-center gap-1 transition-all"
                           title="Lanzar este texto directamente a WhatsApp Web/App"
                         >
                           <Smartphone className="w-3 h-3" />
