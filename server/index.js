@@ -27,6 +27,8 @@ import {
   crearGasto,
   eliminarGasto
 } from './services/finanzasStorage.js';
+import { analyzeOnPageSeo, generateSchemaJsonLd, generateLsiKeywords } from './services/geoSeoService.js';
+import { getCmsSites, getCmsSiteBySlug, updateCmsSiteContent } from './services/headlessCmsStorage.js';
 
 import path from 'path';
 import fs from 'fs';
@@ -874,6 +876,39 @@ app.delete('/api/finanzas/gastos/:id', (req, res) => {
   const ok = eliminarGasto(req.params.id);
   if (!ok) return res.status(404).json({ error: 'Gasto no encontrado' });
   res.json({ success: true });
+});
+
+// ==========================================
+// 10. SEO & GEO TOOLS (RANK MATH PRO $0 ALT)
+// ==========================================
+app.post('/api/seo-geo/analyze', (req, res) => {
+  const result = analyzeOnPageSeo(req.body);
+  res.json(result);
+});
+
+app.post('/api/seo-geo/schema', (req, res) => {
+  const schema = generateSchemaJsonLd(req.body);
+  res.json(schema);
+});
+
+// ==========================================
+// 11. HUB DE PROYECTOS & HEADLESS CMS API
+// ==========================================
+app.get('/api/cms/sites', (req, res) => {
+  const sites = getCmsSites();
+  res.json(sites);
+});
+
+app.get('/api/cms/content/:slug', (req, res) => {
+  const site = getCmsSiteBySlug(req.params.slug);
+  if (!site) return res.status(404).json({ error: 'Sitio no encontrado' });
+  res.json(site);
+});
+
+app.patch('/api/cms/content/:slug', (req, res) => {
+  const updated = updateCmsSiteContent(req.params.slug, req.body);
+  if (!updated) return res.status(404).json({ error: 'Sitio no encontrado' });
+  res.json(updated);
 });
 
 // Serve assets directly from public/assets and dist

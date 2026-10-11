@@ -37,6 +37,8 @@ import {
 import PresupuestosModule from './components/PresupuestosModule';
 import CrmPortalModule from './components/CrmPortalModule';
 import GestionRentabilidadModule from './components/GestionRentabilidadModule';
+import SeoGeoToolsModule from './components/SeoGeoToolsModule';
+import HeadlessCmsHubModule from './components/HeadlessCmsHubModule';
 import ContratosOnboardingModule from './components/ContratosOnboardingModule';
 import WireframesStoryBrandModule from './components/WireframesStoryBrandModule';
 import SeoLaunchQaModule from './components/SeoLaunchQaModule';
@@ -411,6 +413,8 @@ export default function App() {
                  activeModule === 'presupuestos' ? 'Módulo 2 · Presupuestos' :
                  activeModule === 'crm_portal' ? 'Módulo 3 · CRM & Portal' :
                  activeModule === 'gestion_rentabilidad' ? 'Módulo 4 · Rentabilidad' :
+                 activeModule === 'seo_geo' ? 'Módulo 5 · SEO & GEO Tools' :
+                 activeModule === 'headless_cms' ? 'Módulo 6 · Headless CMS' :
                  activeModule === 'contratos_onboarding' ? 'Contratos & SOW' :
                  activeModule === 'wireframes_storybrand' ? 'StoryBrand & UX' : 'SEO & Launch QA'}
               </span>
@@ -495,18 +499,40 @@ export default function App() {
                     <DollarSign className="w-3.5 h-3.5 text-orange-400" />
                     <span>4. Gestión & Rentabilidad (Holded)</span>
                   </div>
-                  <span className="text-[10px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">Activo</span>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Listo</span>
                 </button>
 
-                {[
-                  { title: "5. SEO & GEO Tools (Rank Math)", tag: "Fase 5" },
-                  { title: "6. Hub de Proyectos (Headless CMS)", tag: "Fase 6" },
-                ].map((m, i) => (
-                  <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg text-slate-400 text-xs hover:bg-slate-800/40 opacity-70">
-                    <span>{m.title}</span>
-                    <span className="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">{m.tag}</span>
+                {/* Módulo 5 */}
+                <button
+                  onClick={() => { setActiveModule('seo_geo'); setToolsDropdownOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
+                    activeModule === 'seo_geo' 
+                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
+                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Search className="w-3.5 h-3.5 text-orange-400" />
+                    <span>5. SEO & GEO Tools (Rank Math)</span>
                   </div>
-                ))}
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Listo</span>
+                </button>
+
+                {/* Módulo 6 */}
+                <button
+                  onClick={() => { setActiveModule('headless_cms'); setToolsDropdownOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
+                    activeModule === 'headless_cms' 
+                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
+                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Globe className="w-3.5 h-3.5 text-orange-400" />
+                    <span>6. Hub de Proyectos (Headless CMS)</span>
+                  </div>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Listo</span>
+                </button>
               </div>
             )}
           </div>
@@ -615,7 +641,37 @@ export default function App() {
                   <DollarSign className="w-3.5 h-3.5" />
                   <span>Rentabilidad</span>
                 </div>
-                <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded font-mono">4</span>
+                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">4</span>
+              </button>
+
+              <button
+                onClick={() => setActiveModule('seo_geo')}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeModule === 'seo_geo'
+                    ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Search className="w-3.5 h-3.5" />
+                  <span>SEO & GEO Tools</span>
+                </div>
+                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">5</span>
+              </button>
+
+              <button
+                onClick={() => setActiveModule('headless_cms')}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeModule === 'headless_cms'
+                    ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Headless CMS</span>
+                </div>
+                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">6</span>
               </button>
 
               <div className="pt-2 pb-1 text-[9px] uppercase font-mono tracking-wider text-slate-500 px-1">
@@ -843,6 +899,12 @@ export default function App() {
             <GestionRentabilidadModule
               selectedCountry={selectedCountry}
             />
+          ) : activeModule === 'seo_geo' ? (
+            <SeoGeoToolsModule
+              selectedCountry={selectedCountry}
+            />
+          ) : activeModule === 'headless_cms' ? (
+            <HeadlessCmsHubModule />
           ) : activeModule === 'contratos_onboarding' ? (
             <ContratosOnboardingModule
               selectedCountry={selectedCountry}
