@@ -222,6 +222,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('kanban'); // 'kanban' | 'tabla' | 'whatsapp_crm'
   const [dragOverStage, setDragOverStage] = useState(null);
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [draggingLeadId, setDraggingLeadId] = useState(null);
   
   // Modal for lead details & interactions
@@ -611,8 +612,8 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
 
       {/* 3. MAIN CONTENT: KANBAN VERTICAL CON DRAG & DROP */}
       {activeTab === 'kanban' && (
-        <div className="flex flex-col gap-5 pb-8 select-none">
-          <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-8 select-none">
+          <div className="md:col-span-2 flex items-center justify-between text-xs text-slate-400 px-1">
             <span className="flex items-center gap-1.5 font-medium">
               <span>💡</span>
               <span>Puedes arrastrar las tarjetas con el ratón de una fase a otra para mover el estado del cliente.</span>
@@ -648,7 +649,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                     handleStageChange(droppedId, stage.id);
                   }
                 }}
-                className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
+                className={`rounded-2xl border transition-all duration-200 overflow-hidden ${stage.id === 'perdido' ? 'md:col-span-2' : ''} ${
                   isDropTarget
                     ? 'bg-orange-500/10 border-orange-500 ring-2 ring-orange-500/40 shadow-xl'
                     : 'bg-[#0b0f18] border-slate-800/80 hover:border-slate-700/80'
@@ -874,6 +875,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       )}
 
       {/* WHATSAPP CRM & CONVERSATIONAL SELLING SUITE */}
+      {/* WHATSAPP CRM & CONVERSATIONAL SELLING SUITE (ESTILO WHATSAPP WEB) */}
       {activeTab === 'whatsapp_crm' && (
         <div className="bg-[#0e1320] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[740px]">
           
@@ -902,18 +904,18 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
             </div>
           </div>
 
-          {/* 3-Column Workspace */}
-          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          {/* 2-Column Workspace (Estilo WhatsApp Web: 2 Apartados Fluidos) */}
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
             
-            {/* COLUMN 1: BANDEJA DE CHATS (INBOX) */}
-            <div className="w-full md:w-80 shrink-0 border-r border-slate-800 flex flex-col bg-[#0b0f19]">
+            {/* APARTADO 1: BANDEJA DE CONVERSACIONES RECIENTES */}
+            <div className="w-full md:w-80 lg:w-96 shrink-0 border-r border-slate-800 flex flex-col bg-[#0b0f19]">
               {/* Inbox Header & Search */}
               <div className="p-3 border-b border-slate-800 space-y-2.5">
                 <div className="relative">
                   <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Buscar por contacto o empresa..."
+                    placeholder="Buscar conversación..."
                     value={waSearchTerm}
                     onChange={(e) => setWaSearchTerm(e.target.value)}
                     className="w-full bg-[#131926] border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50"
@@ -979,17 +981,17 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-emerald-400 shrink-0">
+                            <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-emerald-400 shrink-0">
                               {leadItem.contacto?.charAt(0) || 'C'}
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-xs text-white truncate max-w-[130px]">
+                                <span className="font-bold text-xs text-white truncate max-w-[140px]">
                                   {leadItem.contacto}
                                 </span>
                                 <span className="text-[10px]">{leadItem.pais === 'SV' ? '🇸🇻' : '🇩🇴'}</span>
                               </div>
-                              <div className="text-[11px] text-slate-400 truncate max-w-[140px]">
+                              <div className="text-[11px] text-slate-400 truncate max-w-[150px]">
                                 {leadItem.empresa}
                               </div>
                             </div>
@@ -1022,7 +1024,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                           <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${tempConfig.badge}`}>
                             {tempConfig.icon} {tempConfig.label}
                           </span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${stageTag.color} truncate max-w-[130px]`}>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${stageTag.color} truncate max-w-[140px]`}>
                             {stageTag.label}
                           </span>
                         </div>
@@ -1032,26 +1034,25 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
               </div>
             </div>
 
-            {/* COLUMN 2: CONVERSACIÓN ACTIVA (WHATSAPP CHAT STREAM & COMPOSER) */}
+            {/* APARTADO 2: CONVERSACIÓN ACTUAL (AMPLIA Y CÓMODA) */}
             {(() => {
               const currentLead = leads.find(l => l.id === selectedWaLeadId) || filteredLeads[0];
               if (!currentLead) {
                 return (
                   <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
-                    Selecciona un lead para ver la conversación
+                    Selecciona una conversación para comenzar
                   </div>
                 );
               }
 
               const cleanPhone = (currentLead.whatsappData?.telefono || currentLead.telefono || '').replace(/[^\d]/g, '');
-              const portalLink = `${window.location.origin}/portal/${currentLead.portalToken}`;
               const messages = currentLead.whatsappData?.mensajes || [];
 
               return (
-                <div className="flex-1 flex flex-col bg-[#0a0e17] overflow-hidden">
+                <div className="flex-1 flex flex-col bg-[#0a0e17] overflow-hidden relative">
                   
                   {/* Chat Header */}
-                  <div className="p-3.5 bg-[#0f1422] border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-md">
+                  <div className="p-3.5 bg-[#0f1422] border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-md z-10">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center font-bold text-white text-sm shadow-md">
                         {currentLead.contacto?.charAt(0) || 'C'}
@@ -1069,7 +1070,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                       </div>
                     </div>
 
-                    {/* Meta Selectors & External Launchers */}
+                    {/* Actions & Launchers */}
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       {/* Temperature Selector */}
                       <select
@@ -1112,95 +1113,98 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                         className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-950 transition-all shrink-0"
                       >
                         <Smartphone className="w-3.5 h-3.5" />
-                        <span>Abrir en wa.me</span>
+                        <span>Abrir wa.me</span>
                       </a>
 
-                      {/* Portal Link Copy */}
+                      {/* BOTÓN ON-DEMAND: ACTIVAR COPILOTO */}
                       <button
-                        onClick={() => handleCopyPortalLink(currentLead.portalToken)}
-                        title="Copiar enlace privado al Portal de Cliente"
-                        className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium flex items-center gap-1 transition-all"
+                        type="button"
+                        onClick={() => setIsCopilotOpen(!isCopilotOpen)}
+                        className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 shadow-md transition-all shrink-0 ${
+                          isCopilotOpen
+                            ? 'bg-orange-600 text-white border border-orange-400 ring-2 ring-orange-500/30'
+                            : 'bg-orange-500/15 hover:bg-orange-500/25 text-orange-400 border border-orange-500/30'
+                        }`}
+                        title="Abrir asistente de scripts y respuestas rápidas"
                       >
-                        {portalCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span className="hidden sm:inline">Portal</span>
+                        <Zap className="w-3.5 h-3.5" />
+                        <span>{isCopilotOpen ? 'Cerrar Copiloto' : '⚡ Copiloto de Ventas'}</span>
                       </button>
                     </div>
                   </div>
 
-                  {/* Chat Bubbles Stream */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-gradient-to-b from-[#0a0e17] to-[#070a10]">
+                  {/* Chat Bubbles Stream (Amplio) */}
+                  <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3.5 bg-gradient-to-b from-[#0a0e17] to-[#070a10]">
                     <div className="text-center my-1">
                       <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[10px] text-slate-400 font-mono">
-                        Conversación iniciada · Lead captado en Google SERP
+                        Conversación activa · Lead captado para propuesta
                       </span>
                     </div>
 
-                    {messages.map((msg, idx) => {
-                      const isAgency = msg.emisor === 'agencia';
+                    {messages.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500 text-xs italic space-y-2">
+                        <MessageSquare className="w-8 h-8 text-slate-700 mx-auto" />
+                        <p>No hay mensajes registrados aún en este chat.</p>
+                        <p className="text-[11px] text-slate-600">Usa el compositor abajo o haz clic en <strong>⚡ Copiloto de Ventas</strong> para insertar un guion probado.</p>
+                      </div>
+                    ) : (
+                      messages.map((msg, idx) => {
+                        const isAgency = msg.emisor === 'agencia';
 
-                      return (
-                        <div
-                          key={msg.id || idx}
-                          className={`flex flex-col ${isAgency ? 'items-end' : 'items-start'}`}
-                        >
+                        return (
                           <div
-                            className={`max-w-[85%] rounded-2xl px-4 py-2.5 shadow-md text-xs leading-relaxed ${
-                              isAgency
-                                ? 'bg-gradient-to-r from-[#064e3b] to-[#065f46] text-emerald-50 border border-emerald-500/40 rounded-tr-none'
-                                : 'bg-[#1c2436] text-slate-200 border border-slate-700/60 rounded-tl-none'
-                            }`}
+                            key={msg.id || idx}
+                            className={`flex flex-col ${isAgency ? 'items-end' : 'items-start'}`}
                           >
-                            {/* Message Header */}
-                            <div className="flex items-center justify-between gap-3 text-[10px] opacity-75 mb-1 pb-1 border-b border-white/10 font-mono">
-                              <span className="font-semibold">
-                                {isAgency ? 'Tú (Agencia Goglite)' : `${currentLead.contacto}`}
+                            <div className="flex items-center gap-1.5 mb-1 px-1">
+                              <span className="text-[10px] text-slate-500 font-mono">{msg.fechaHora}</span>
+                              <span className={`text-[10px] font-semibold ${isAgency ? 'text-emerald-400' : 'text-sky-400'}`}>
+                                {isAgency ? 'Tú (Goglite)' : currentLead.contacto}
                               </span>
-                              <span>{msg.fechaHora || 'Hoy'}</span>
                             </div>
 
-                            {/* Message Body */}
-                            <div className="whitespace-pre-wrap">{msg.texto}</div>
-
-                            {/* Status Checks */}
-                            {isAgency && (
-                              <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-emerald-300/80">
-                                <CheckCheck className="w-3 h-3 text-sky-300" />
-                              </div>
-                            )}
+                            <div
+                              className={`max-w-[85%] md:max-w-[70%] p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap shadow-md ${
+                                isAgency
+                                  ? 'bg-emerald-600/20 border border-emerald-500/30 text-emerald-100 rounded-tr-none'
+                                  : 'bg-[#151d2e] border border-slate-700/70 text-slate-200 rounded-tl-none'
+                              }`}
+                            >
+                              {msg.texto}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                    )}
                   </div>
 
-                  {/* Chat Composer */}
-                  <div className="p-3 bg-[#0f1422] border-t border-slate-800 space-y-2">
-                    {/* Role selector & shortcuts */}
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-400 text-[11px]">Rol emisor:</span>
+                  {/* Composer Bottom Area */}
+                  <div className="p-3.5 bg-[#0f1422] border-t border-slate-800 space-y-2 z-10">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-slate-400 font-semibold text-[11px]">Registrar como:</span>
                         <button
                           type="button"
                           onClick={() => setWaRole('agencia')}
-                          className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
-                            waRole === 'agencia' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                            waRole === 'agencia' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-800 text-slate-400 hover:text-white'
                           }`}
                         >
-                          🟢 Agencia
+                          Mensaje Enviado
                         </button>
                         <button
                           type="button"
                           onClick={() => setWaRole('cliente')}
-                          className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
-                            waRole === 'cliente' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                            waRole === 'cliente' ? 'bg-sky-600 text-white font-bold' : 'bg-slate-800 text-slate-400 hover:text-white'
                           }`}
                         >
-                          👤 Cliente (Registrar Respuesta)
+                          Respuesta del Cliente
                         </button>
                       </div>
 
-                      {/* Quick variable inserts */}
-                      <div className="hidden sm:flex items-center gap-1 text-[10px]">
+                      {/* Quick variable inserts & Copilot activator */}
+                      <div className="flex items-center gap-1 text-[10px]">
                         <button
                           type="button"
                           onClick={() => setWaMessageInput(prev => prev + ` ¡Hola ${currentLead.contacto.split(' ')[0]}!`)}
@@ -1210,10 +1214,11 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                         </button>
                         <button
                           type="button"
-                          onClick={() => setWaMessageInput(prev => prev + ` ${portalLink}`)}
-                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                          onClick={() => setIsCopilotOpen(true)}
+                          className="px-2 py-0.5 rounded bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 font-semibold flex items-center gap-1"
                         >
-                          + Enlace Portal
+                          <Zap className="w-2.5 h-2.5" />
+                          <span>Ver Guiones</span>
                         </button>
                       </div>
                     </div>
@@ -1224,7 +1229,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                         rows={2}
                         value={waMessageInput}
                         onChange={(e) => setWaMessageInput(e.target.value)}
-                        placeholder={waRole === 'agencia' ? "Escribe un mensaje de WhatsApp o selecciona un script del copiloto..." : "Registra la respuesta que el cliente envió por WhatsApp..."}
+                        placeholder={waRole === 'agencia' ? "Escribe un mensaje de WhatsApp o selecciona un guion del copiloto..." : "Registra la respuesta recibida del cliente..."}
                         className="flex-1 bg-[#151c2d] border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/60 resize-none"
                       />
 
@@ -1252,309 +1257,120 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                     </form>
                   </div>
 
-                </div>
-              );
-            })()}
-
-            {/* COLUMN 3: COPILOTO DE VENTAS CONVERSACIONAL (SCRIPTS) */}
-            {(() => {
-              const currentLead = leads.find(l => l.id === selectedWaLeadId) || filteredLeads[0];
-
-              return (
-                <div className="w-full md:w-96 shrink-0 border-l border-slate-800 flex flex-col bg-[#0b0f19]">
-                  
-                  {/* Copilot Header */}
-                  <div className="p-3.5 border-b border-slate-800 bg-[#0e1320] space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-md bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold text-xs">
-                        <Zap className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-xs text-white">Copiloto de Venta WhatsApp</h4>
-                        <p className="text-[10px] text-slate-400">Scripts consultivos de alta conversión</p>
-                      </div>
-                    </div>
-
-                    {/* Script Category Filter Tabs */}
-                    <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px]">
-                      {[
-                        { id: 'todos', label: 'Todos' },
-                        { id: 'diagnostico', label: 'Saludo' },
-                        { id: 'solucion', label: 'Solución' },
-                        { id: 'objeciones', label: 'Objeciones' },
-                        { id: 'followup', label: '1-3-7' },
-                        { id: 'cierre', label: 'Cierre' }
-                      ].map(cat => (
-                        <button
-                          key={cat.id}
-                          onClick={() => setWaScriptCategory(cat.id)}
-                          className={`px-2 py-0.5 rounded transition-colors shrink-0 ${
-                            waScriptCategory === cat.id
-                              ? 'bg-orange-600 text-white font-semibold'
-                              : 'text-slate-400 hover:text-slate-200 bg-slate-800/50'
-                          }`}
-                        >
-                          {cat.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Scripts List */}
-                  <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                    {WHATSAPP_SCRIPTS
-                      .filter(s => waScriptCategory === 'todos' || s.categoria === waScriptCategory)
-                      .map(script => {
-                        const scriptText = currentLead ? script.generarTexto(currentLead) : 'Selecciona un prospecto';
-
-                        return (
-                          <div
-                            key={script.id}
-                            className="p-3 rounded-xl bg-[#121827] border border-slate-800 hover:border-slate-700 transition-all space-y-2"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-orange-400 border border-slate-700">
-                                {script.fase}
-                              </span>
-                              <span className="text-[10px] text-slate-500 font-semibold uppercase">
-                                {script.categoriaLabel}
-                              </span>
-                            </div>
-
-                            <div className="font-bold text-xs text-slate-200">
-                              {script.titulo}
-                            </div>
-
-                            <div className="p-2.5 rounded-lg bg-[#090d15] border border-slate-800/80 text-[11px] text-slate-300 leading-relaxed font-sans max-h-28 overflow-y-auto">
-                              {scriptText}
-                            </div>
-
-                            <div className="flex items-center justify-end gap-2 pt-1">
-                              <button
-                                type="button"
-                                onClick={() => handleInsertScript(scriptText)}
-                                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium flex items-center gap-1 transition-colors"
-                              >
-                                <Edit className="w-3 h-3 text-sky-400" />
-                                <span>Insertar</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleDirectLaunchScript(currentLead, scriptText)}
-                                className="px-2.5 py-1 rounded bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold flex items-center gap-1 transition-colors"
-                              >
-                                <Smartphone className="w-3 h-3 text-emerald-400" />
-                                <span>Lanzar wa.me</span>
-                              </button>
-                            </div>
+                  {/* DRAWER LATERAL ON-DEMAND DEL COPILOTO DE VENTAS */}
+                  {isCopilotOpen && (
+                    <div className="absolute inset-y-0 right-0 w-full sm:w-[380px] bg-[#0e1320] border-l border-slate-800 shadow-2xl z-20 flex flex-col animate-in slide-in-from-right duration-200">
+                      
+                      {/* Drawer Header */}
+                      <div className="p-3.5 border-b border-slate-800 bg-[#131926] flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-md bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold text-xs">
+                            <Zap className="w-3.5 h-3.5" />
                           </div>
-                        );
-                      })}
-                  </div>
+                          <div>
+                            <h4 className="font-bold text-xs text-white">Copiloto de Venta WhatsApp</h4>
+                            <p className="text-[10px] text-slate-400">Guiones persuasivos de alta conversión</p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => setIsCopilotOpen(false)}
+                          className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                          title="Cerrar panel"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Script Category Tabs */}
+                      <div className="p-2.5 border-b border-slate-800/80 bg-[#0f1422]">
+                        <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px]">
+                          {[
+                            { id: 'todos', label: 'Todos' },
+                            { id: 'diagnostico', label: 'Saludo' },
+                            { id: 'solucion', label: 'Solución' },
+                            { id: 'objeciones', label: 'Objeciones' },
+                            { id: 'followup', label: '1-3-7' },
+                            { id: 'cierre', label: 'Cierre' }
+                          ].map(cat => (
+                            <button
+                              key={cat.id}
+                              onClick={() => setWaScriptCategory(cat.id)}
+                              className={`px-2.5 py-1 rounded-md transition-colors shrink-0 ${
+                                waScriptCategory === cat.id
+                                  ? 'bg-orange-600 text-white font-semibold'
+                                  : 'text-slate-400 hover:text-slate-200 bg-slate-800/60'
+                              }`}
+                            >
+                              {cat.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Scripts List */}
+                      <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-[#0a0e17]">
+                        {WHATSAPP_SCRIPTS
+                          .filter(s => waScriptCategory === 'todos' || s.categoria === waScriptCategory)
+                          .map(script => {
+                            const scriptText = currentLead ? script.generarTexto(currentLead) : 'Selecciona un prospecto';
+
+                            return (
+                              <div
+                                key={script.id}
+                                className="p-3 rounded-xl bg-[#121827] border border-slate-800 hover:border-slate-700 transition-all space-y-2"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-orange-400 border border-slate-700">
+                                    {script.fase}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 font-semibold uppercase">
+                                    {script.categoriaLabel}
+                                  </span>
+                                </div>
+
+                                <div className="font-bold text-xs text-slate-200">
+                                  {script.titulo}
+                                </div>
+
+                                <div className="p-2.5 rounded-lg bg-[#090d15] border border-slate-800/80 text-[11px] text-slate-300 leading-relaxed font-sans max-h-28 overflow-y-auto">
+                                  {scriptText}
+                                </div>
+
+                                <div className="flex items-center justify-end gap-2 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleInsertScript(scriptText);
+                                    }}
+                                    className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium flex items-center gap-1 transition-colors"
+                                  >
+                                    <Edit className="w-3 h-3 text-sky-400" />
+                                    <span>Insertar en chat</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleDirectLaunchScript(currentLead, scriptText);
+                                    }}
+                                    className="px-2.5 py-1 rounded bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                                  >
+                                    <Smartphone className="w-3 h-3 text-emerald-400" />
+                                    <span>Lanzar wa.me</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+
+                    </div>
+                  )}
 
                 </div>
               );
             })()}
-
-          </div>
-        </div>
-      )}
-
-      {/* PORTAL DE CLIENTE VIEW (SIMULATOR) */}
-      {activeTab === 'portal_preview' && currentPortalLead && (
-        <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full">
-          
-          {/* Simulator Bar */}
-          <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-orange-400 animate-pulse"></span>
-              <span className="font-semibold text-orange-300">
-                Simulador del Portal Privado que ve tu Cliente en vivo
-              </span>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 text-slate-300">
-                <span>Cliente:</span>
-                <select
-                  value={selectedPortalLeadId}
-                  onChange={(e) => setSelectedPortalLeadId(e.target.value)}
-                  className="bg-[#131926] border border-slate-700 rounded px-2 py-1 text-xs text-white"
-                >
-                  {leads.map(l => (
-                    <option key={l.id} value={l.id}>{l.empresa} ({l.contacto})</option>
-                  ))}
-                </select>
-              </div>
-
-              <button
-                onClick={() => handleCopyPortalLink(currentPortalLead.portalToken)}
-                className="px-3 py-1 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-medium flex items-center gap-1.5 transition-all shadow-sm"
-              >
-                {portalCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{portalCopied ? 'Enlace Copiado' : 'Copiar Enlace del Portal'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Actual Client Portal Card (Branded) */}
-          <div className="rounded-2xl bg-[#0b0f19] border border-slate-800 shadow-2xl p-6 sm:p-8 space-y-8">
-            
-            {/* Brand Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-6 border-b border-slate-800 gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center font-black text-white text-lg">
-                  G
-                </div>
-                <div>
-                  <h2 className="text-xl font-black text-white tracking-tight">Portal de Cliente · Goglite</h2>
-                  <p className="text-xs text-slate-400">Área privada de gestión y entregables del proyecto</p>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <div className="text-xs font-mono text-slate-400 uppercase">Proyecto Asignado a:</div>
-                <div className="text-sm font-bold text-orange-400">{currentPortalLead.empresa}</div>
-                <div className="text-xs text-slate-500">{currentPortalLead.contacto} · {currentPortalLead.pais === 'SV' ? '🇸🇻 El Salvador' : '🇩🇴 República Dominicana'}</div>
-              </div>
-            </div>
-
-            {/* Project Progress Stepper */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-200">Estado de Ejecución del Proyecto</h3>
-                <span className="text-xs font-mono bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-semibold">
-                  {currentPortalLead.portalConfig?.faseActual || 'Diagnóstico Comercial'}
-                </span>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="w-full bg-slate-800/80 rounded-full h-2.5 overflow-hidden">
-                <div 
-                  className="bg-gradient-to-r from-orange-500 to-emerald-400 h-2.5 rounded-full transition-all duration-500"
-                  style={{ width: `${currentPortalLead.portalConfig?.progresoPorcentaje || 25}%` }}
-                ></div>
-              </div>
-
-              {/* Steps Milestones */}
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-center pt-2">
-                {[
-                  { step: '1. Diagnóstico', done: true },
-                  { step: '2. Presupuesto', done: ['propuesta_enviada', 'negociacion', 'ganado'].includes(currentPortalLead.etapa) },
-                  { step: '3. Contrato SOW', done: ['negociacion', 'ganado'].includes(currentPortalLead.etapa) },
-                  { step: '4. Activos & Logo', done: currentPortalLead.etapa === 'ganado' },
-                  { step: '5. Desarrollo Web', done: false },
-                  { step: '6. Lanzamiento', done: false }
-                ].map((m, i) => (
-                  <div key={i} className={`p-2 rounded-lg border text-xs ${m.done ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 font-semibold' : 'bg-slate-900/50 border-slate-800 text-slate-500'}`}>
-                    <div className="text-[10px] mb-0.5">{m.done ? '✓ Completado' : 'Pendiente'}</div>
-                    <div>{m.step}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Deliverables & Client Assets Area */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800">
-              
-              {/* Left Column: Official Documents */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">
-                  Documentos & Propuestas Oficiales
-                </h4>
-
-                <div className="p-4 rounded-xl bg-[#101625] border border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <FileText className="w-5 h-5 text-orange-400" />
-                      <div>
-                        <div className="text-xs font-bold text-white">Presupuesto VIP Personalizado</div>
-                        <div className="text-[10px] text-slate-400">PDF de 3 páginas con arquitectura y tiers</div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => onConvertToPresupuesto && onConvertToPresupuesto(currentPortalLead)}
-                      className="px-2.5 py-1 rounded bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border border-orange-500/30 text-xs font-semibold flex items-center gap-1"
-                    >
-                      <Eye className="w-3 h-3" />
-                      <span>Ver Documento</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#101625] border border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <Briefcase className="w-5 h-5 text-indigo-400" />
-                      <div>
-                        <div className="text-xs font-bold text-white">Contrato SOW & Firma Digital</div>
-                        <div className="text-[10px] text-slate-400">Términos legales y cuentas bancarias locales</div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => onOpenContrato && onOpenContrato()}
-                      className="px-2.5 py-1 rounded bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold flex items-center gap-1"
-                    >
-                      <ShieldCheck className="w-3 h-3" />
-                      <span>Firma Legal</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Upload Client Assets */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">
-                  Carga de Materiales de tu Marca
-                </h4>
-
-                <div className="p-4 rounded-xl bg-[#101625] border border-slate-800 space-y-3">
-                  <div className="text-xs text-slate-300">
-                    Sube tu logotipo en alta resolución (.png o .svg), manual de colores o accesos de hosting.
-                  </div>
-
-                  <div className="border-2 border-dashed border-slate-700 rounded-xl p-4 text-center hover:border-orange-500/50 transition-colors cursor-pointer">
-                    <Upload className="w-6 h-6 text-slate-500 mx-auto mb-1.5" />
-                    <div className="text-xs font-semibold text-slate-300">Haz clic o arrastra tus archivos aquí</div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">PNG, JPG, PDF, ZIP hasta 25MB</div>
-                  </div>
-
-                  {/* List of uploaded files */}
-                  <div className="space-y-1.5 pt-2">
-                    {currentPortalLead.portalConfig?.archivosSubidos?.map(f => (
-                      <div key={f.id} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800 text-xs">
-                        <span className="text-slate-300 truncate">{f.nombre}</span>
-                        <span className="text-[10px] text-emerald-400 font-mono">Recibido</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Direct WhatsApp Contact with Project Manager */}
-            <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-950/30 to-[#0e1320] border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold">
-                  VM
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-white">Director de Proyecto Asignado: Víctor Matos</div>
-                  <div className="text-[11px] text-slate-400">Atención personalizada y soporte directo para {currentPortalLead.empresa}</div>
-                </div>
-              </div>
-
-              <a
-                href={`https://wa.me/50370001122?text=${encodeURIComponent(`Hola Víctor, te escribo desde el Portal de Cliente de ${currentPortalLead.empresa}.`)}`}
-                target="_blank"
-                rel="noreferrer"
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950 transition-all shrink-0"
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>Contactar por WhatsApp</span>
-              </a>
-            </div>
 
           </div>
         </div>
