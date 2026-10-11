@@ -5,7 +5,7 @@ import { getSettings } from './storage.js';
  */
 export async function generatePitch(lead, audit, country = 'SV') {
   const settings = getSettings();
-  const geminiKey = settings.geminiApiKey;
+  const geminiKey = process.env.GEMINI_API_KEY || settings.geminiApiKey;
 
   const isDO = country.toUpperCase() === 'DO';
   const cName = isDO ? 'República Dominicana' : 'El Salvador';
@@ -28,18 +28,29 @@ Reglas de redacción:
 
 Devuelve únicamente el cuerpo del correo en texto plano.`;
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      });
+      // Try gemini-flash-latest first, fallback to gemini-3.8-flash
+      const modelsToTry = ['gemini-flash-latest', 'gemini-3.8-flash'];
+      for (const model of modelsToTry) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }]
+            })
+          });
 
-      if (res.ok) {
-        const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text.trim();
+          if (res.ok) {
+            const data = await res.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              console.log(`[PITCHER] Pitch generado exitosamente con Gemini (${model}) para ${lead.dominio}`);
+              return text.trim();
+            }
+          }
+        } catch (mErr) {
+          console.warn(`[PITCHER] Fallo intento con modelo ${model}:`, mErr.message);
+        }
       }
     } catch (err) {
       console.warn(`Gemini pitch generation failed for ${lead.dominio}:`, err.message);

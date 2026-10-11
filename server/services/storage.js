@@ -219,7 +219,15 @@ export const getSettings = () => {
     return defaultSettings;
   }
   try {
-    return { ...defaultSettings, ...JSON.parse(fs.readFileSync(settingsFile, 'utf8')) };
+    const fileSettings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+    return {
+      ...defaultSettings,
+      ...fileSettings,
+      geminiApiKey: (fileSettings.geminiApiKey && fileSettings.geminiApiKey.trim()) || process.env.GEMINI_API_KEY || "",
+      serperApiKey: (fileSettings.serperApiKey && fileSettings.serperApiKey.trim()) || process.env.SERPER_API_KEY || "",
+      apolloApiKey: (fileSettings.apolloApiKey && fileSettings.apolloApiKey.trim()) || process.env.APOLLO_API_KEY || "",
+      instantlyApiKey: (fileSettings.instantlyApiKey && fileSettings.instantlyApiKey.trim()) || process.env.INSTANTLY_API_KEY || "",
+    };
   } catch {
     return defaultSettings;
   }
