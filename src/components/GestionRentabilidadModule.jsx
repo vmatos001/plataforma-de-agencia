@@ -65,6 +65,17 @@ export default function GestionRentabilidadModule({ selectedCountry }) {
     frecuencia: 'unico'
   });
 
+  // Time Tracking State
+  const [newTimeModalOpen, setNewTimeModalOpen] = useState(false);
+  const [newTimeForm, setNewTimeForm] = useState({
+    proyectoId: '',
+    cliente: '',
+    concepto: '',
+    categoria: 'desarrollo',
+    horas: 2.5,
+    responsable: 'Senior Dev'
+  });
+
   // Fetch financial data
   useEffect(() => {
     fetchFinanzas();
@@ -203,6 +214,43 @@ export default function GestionRentabilidadModule({ selectedCountry }) {
     }
   };
 
+  // Create Time Entry
+  const handleCreateTimeEntry = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/finanzas/horas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTimeForm)
+      });
+      if (res.ok) {
+        fetchFinanzas();
+        setNewTimeModalOpen(false);
+        setNewTimeForm({
+          proyectoId: '',
+          cliente: '',
+          concepto: '',
+          categoria: 'desarrollo',
+          horas: 2.5,
+          responsable: 'Senior Dev'
+        });
+      }
+    } catch (err) {
+      console.error('Error registrando horas:', err);
+    }
+  };
+
+  // Delete Time Entry
+  const handleDeleteTimeEntry = async (id) => {
+    if (!confirm('¿Eliminar este registro de horas?')) return;
+    try {
+      const res = await fetch(`/api/finanzas/horas/${id}`, { method: 'DELETE' });
+      if (res.ok) fetchFinanzas();
+    } catch (err) {
+      console.error('Error eliminando horas:', err);
+    }
+  };
+
   if (loading || !data) {
     return (
       <div className="flex-1 flex items-center justify-center p-12 text-slate-400">
@@ -331,6 +379,13 @@ export default function GestionRentabilidadModule({ selectedCountry }) {
             <CreditCard className="w-3.5 h-3.5" />
             <span>Gastos Operativos ({gastos.length})</span>
           </button>
+          <button
+            onClick={() => setActiveTab('horas')}
+            className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors ${activeTab === 'horas' ? 'bg-slate-800 text-orange-400 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span>Time Tracking ({data.timeEntries?.length || 0})</span>
+          </button>
         </div>
 
         {/* Actions & Filters */}
@@ -373,6 +428,16 @@ export default function GestionRentabilidadModule({ selectedCountry }) {
             >
               <Plus className="w-3.5 h-3.5" />
               <span>+ Registrar Gasto</span>
+            </button>
+          )}
+
+          {activeTab === 'horas' && (
+            <button
+              onClick={() => setNewTimeModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md transition-all shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Registrar Horas</span>
             </button>
           )}
         </div>
@@ -603,6 +668,178 @@ export default function GestionRentabilidadModule({ selectedCountry }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* 6. TAB 4: CONTROL DE HORAS & TIME TRACKING */}
+      {activeTab === 'horas' && (
+        <div className="space-y-6">
+          {/* Top Metrics Cards for Time Tracking */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between text-slate-400 text-xs font-mono">
+                <span>TOTAL HORAS REGISTRADAS</span>
+                <Clock className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div className="text-2xl font-black text-white font-mono mt-2">
+                {kpis.horasRealesTotales || kpis.horasTotales} hrs
+              </div>
+              <p className="text-[10px] text-slate-500 mt-0.5">Dedicación activa en proyectos</p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between text-slate-400 text-xs font-mono">
+                <span>TARIFA MEDIA EFECTIVA</span>
+                <DollarSign className="w-4 h-4 text-orange-400" />
+              </div>
+              <div className="text-2xl font-black text-orange-400 font-mono mt-2">
+                ${kpis.tarifaMediaEfectivaHora || 50} <span className="text-xs font-normal text-slate-400">USD/h</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-0.5">Promedio ponderado cobrado</p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between text-slate-400 text-xs font-mono">
+                <span>TARIFA OBJETIVO AGENCIA</span>
+                <TrendingUp className="w-4 h-4 text-sky-400" />
+              </div>
+              <div className="text-2xl font-black text-sky-400 font-mono mt-2">
+                $50 <span className="text-xs font-normal text-slate-400">USD/h</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-0.5">Meta para alta rentabilidad</p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between text-slate-400 text-xs font-mono">
+                <span>COSTE INTERNO HORA</span>
+                <Wallet className="w-4 h-4 text-purple-400" />
+              </div>
+              <div className="text-2xl font-black text-purple-400 font-mono mt-2">
+                ${configuracion?.costoHoraInterno || 20} <span className="text-xs font-normal text-slate-400">USD/h</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-0.5">Coste base de producción</p>
+            </div>
+          </div>
+
+          {/* Table: Rentabilidad Horaria por Proyecto */}
+          <div className="bg-[#0c1017] border border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
+            <div className="p-3 bg-[#101522] border-b border-slate-800 text-xs font-bold text-slate-200 flex items-center justify-between">
+              <span>Rentabilidad Horaria & Alerta de Dilución por Proyecto</span>
+              <span className="text-[11px] font-mono text-slate-400">Tarifa Objetivo: $50 USD/hora</span>
+            </div>
+
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="bg-[#0d121c] border-b border-slate-800 text-[11px] font-mono uppercase text-slate-400">
+                <tr>
+                  <th className="p-3">Cliente / Proyecto</th>
+                  <th className="p-3">País</th>
+                  <th className="p-3">Facturado USD</th>
+                  <th className="p-3">Horas Dedicadas</th>
+                  <th className="p-3">Tarifa Efectiva ($/h)</th>
+                  <th className="p-3">Estado de Rentabilidad</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 font-sans">
+                {proyectosRentabilidad.map(p => (
+                  <tr key={p.facturaId} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="p-3">
+                      <div className="font-semibold text-white">{p.cliente}</div>
+                      <div className="text-[10px] font-mono text-slate-500">{p.numeroFactura}</div>
+                    </td>
+                    <td className="p-3">
+                      <span className="text-xs">{p.pais === 'SV' ? '🇸🇻 SV' : '🇩🇴 DO'}</span>
+                    </td>
+                    <td className="p-3 font-mono font-bold text-white">
+                      ${p.precioVendido.toLocaleString()} USD
+                    </td>
+                    <td className="p-3 font-mono">
+                      <span className="font-bold text-slate-200">{p.horasInvertidas} hrs</span>
+                      {p.horasRegistradas > 0 && (
+                        <span className="text-[10px] text-emerald-400 block font-mono">({p.horasRegistradas}h registradas)</span>
+                      )}
+                    </td>
+                    <td className="p-3 font-mono font-bold text-sm">
+                      <span className={p.tarifaEfectivaHora >= 50 ? 'text-emerald-400' : p.tarifaEfectivaHora >= 35 ? 'text-amber-400' : 'text-rose-400'}>
+                        ${p.tarifaEfectivaHora} USD/h
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      {p.alertaDilucion ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-bold">
+                          <AlertCircle className="w-3 h-3 text-rose-400" />
+                          <span>DILUCIÓN DE TARIFA (Exceso de Horas)</span>
+                        </span>
+                      ) : p.tarifaEfectivaHora >= 50 ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                          <span>ALTA RENTABILIDAD</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
+                          <span>RENTABILIDAD ACEPTABLE</span>
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Table: Time Entries Log */}
+          <div className="bg-[#0c1017] border border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
+            <div className="p-3 bg-[#101522] border-b border-slate-800 text-xs font-bold text-slate-200 flex items-center justify-between">
+              <span>Bitácora de Tiempos Registrados</span>
+              <button
+                onClick={() => setNewTimeModalOpen(true)}
+                className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[11px] flex items-center gap-1 transition-all shadow-sm"
+              >
+                <Plus className="w-3 h-3" />
+                <span>+ Agregar Registro</span>
+              </button>
+            </div>
+
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="bg-[#0d121c] border-b border-slate-800 text-[11px] font-mono uppercase text-slate-400">
+                <tr>
+                  <th className="p-3">Fecha</th>
+                  <th className="p-3">Cliente / Proyecto</th>
+                  <th className="p-3">Tarea / Concepto</th>
+                  <th className="p-3">Categoría</th>
+                  <th className="p-3">Responsable</th>
+                  <th className="p-3 text-right">Horas</th>
+                  <th className="p-3 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 font-sans">
+                {(data.timeEntries || []).map(t => (
+                  <tr key={t.id} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="p-3 font-mono text-[11px] text-slate-500">{t.fecha}</td>
+                    <td className="p-3 font-semibold text-white">{t.cliente}</td>
+                    <td className="p-3 text-slate-200">{t.concepto}</td>
+                    <td className="p-3">
+                      <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono text-[10px] uppercase">
+                        {t.categoria}
+                      </span>
+                    </td>
+                    <td className="p-3 text-slate-400 font-medium">{t.responsable}</td>
+                    <td className="p-3 text-right font-mono font-bold text-emerald-400 text-sm">
+                      {t.horas} h
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => handleDeleteTimeEntry(t.id)}
+                        className="p-1 rounded text-slate-500 hover:text-rose-400 transition-colors"
+                        title="Eliminar registro"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -940,6 +1177,115 @@ export default function GestionRentabilidadModule({ selectedCountry }) {
                 className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs mt-3 shadow-md"
               >
                 Guardar Gasto Operativo
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: NUEVO REGISTRO DE TIEMPO */}
+      {newTimeModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0e1320] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-[#121828]">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-emerald-400" />
+                <span className="font-bold text-sm text-white">Registrar Horas de Trabajo</span>
+              </div>
+              <button
+                onClick={() => setNewTimeModalOpen(false)}
+                className="w-7 h-7 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTimeEntry} className="p-5 space-y-3.5 text-xs">
+              <div>
+                <label className="text-slate-400 block mb-1">Cliente / Proyecto</label>
+                <select
+                  required
+                  value={newTimeForm.cliente}
+                  onChange={(e) => {
+                    const sel = facturas.find(f => f.cliente?.empresa === e.target.value);
+                    setNewTimeForm({
+                      ...newTimeForm,
+                      cliente: e.target.value,
+                      proyectoId: sel?.proyectoId || ''
+                    });
+                  }}
+                  className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                >
+                  <option value="">Selecciona un proyecto...</option>
+                  {facturas.map(f => (
+                    <option key={f.id} value={f.cliente?.empresa}>
+                      {f.cliente?.empresa} ({f.numeroFactura})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Concepto de la Tarea</label>
+                <input
+                  type="text"
+                  required
+                  value={newTimeForm.concepto}
+                  onChange={(e) => setNewTimeForm({ ...newTimeForm, concepto: e.target.value })}
+                  placeholder="ej: Diseño UX Hero, Maquetación React, Configuración DNS"
+                  className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-slate-400 block mb-1">Categoría</label>
+                  <select
+                    value={newTimeForm.categoria}
+                    onChange={(e) => setNewTimeForm({ ...newTimeForm, categoria: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                  >
+                    <option value="diseño">Diseño UX / UI</option>
+                    <option value="desarrollo">Desarrollo Frontend / React</option>
+                    <option value="seo">SEO & Copywriting</option>
+                    <option value="reunion">Reunión de Feedback</option>
+                    <option value="soporte">Soporte / Despliegue</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-400 block mb-1">Horas Dedicadas</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    required
+                    value={newTimeForm.horas}
+                    onChange={(e) => setNewTimeForm({ ...newTimeForm, horas: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Responsable</label>
+                <select
+                  value={newTimeForm.responsable}
+                  onChange={(e) => setNewTimeForm({ ...newTimeForm, responsable: e.target.value })}
+                  className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                >
+                  <option value="Senior Dev">Senior Developer</option>
+                  <option value="Director UX">Director UX</option>
+                  <option value="SEO Lead">SEO Specialist</option>
+                  <option value="Project Manager">Project Manager</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs mt-3 shadow-md transition-all"
+              >
+                Guardar Horas en Bitácora
               </button>
             </form>
           </div>

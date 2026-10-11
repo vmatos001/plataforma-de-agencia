@@ -25,9 +25,12 @@ import {
   crearFactura,
   actualizarFactura,
   crearGasto,
-  eliminarGasto
+  eliminarGasto,
+  getTimeEntries,
+  crearTimeEntry,
+  eliminarTimeEntry
 } from './services/finanzasStorage.js';
-import { analyzeOnPageSeo, generateSchemaJsonLd, generateLsiKeywords } from './services/geoSeoService.js';
+import { analyzeOnPageSeo, generateSchemaJsonLd, generateLsiKeywords, getSearchConsoleMetrics } from './services/geoSeoService.js';
 import { getCmsSites, getCmsSiteBySlug, updateCmsSiteContent } from './services/headlessCmsStorage.js';
 
 import path from 'path';
@@ -878,6 +881,24 @@ app.delete('/api/finanzas/gastos/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// Time Tracking API (Rentabilidad por Hora)
+app.get('/api/finanzas/horas', (req, res) => {
+  const { proyectoId } = req.query;
+  const entries = getTimeEntries(proyectoId);
+  res.json(entries);
+});
+
+app.post('/api/finanzas/horas', (req, res) => {
+  const nueva = crearTimeEntry(req.body);
+  res.status(201).json(nueva);
+});
+
+app.delete('/api/finanzas/horas/:id', (req, res) => {
+  const ok = eliminarTimeEntry(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Registro de tiempo no encontrado' });
+  res.json({ success: true });
+});
+
 // ==========================================
 // 10. SEO & GEO TOOLS (RANK MATH PRO $0 ALT)
 // ==========================================
@@ -889,6 +910,20 @@ app.post('/api/seo-geo/analyze', (req, res) => {
 app.post('/api/seo-geo/schema', (req, res) => {
   const schema = generateSchemaJsonLd(req.body);
   res.json(schema);
+});
+
+// Google Search Console & GA4 Live API ($0 USD)
+app.get('/api/seo-geo/gsc/:domain', (req, res) => {
+  const { domain } = req.params;
+  const { country = 'SV' } = req.query;
+  const metrics = getSearchConsoleMetrics({ domain, country });
+  res.json(metrics);
+});
+
+app.post('/api/seo-geo/gsc/sync', (req, res) => {
+  const { domain = 'gruasandrea.com', country = 'SV' } = req.body;
+  const metrics = getSearchConsoleMetrics({ domain, country });
+  res.json({ success: true, metrics, syncedAt: new Date().toISOString() });
 });
 
 // ==========================================

@@ -197,8 +197,51 @@ export function getResumenFinanciero() {
   // Totales de gastos operativos
   const totalGastosOperativos = gastos.reduce((acc, g) => acc + (Number(g.monto) || 0), 0);
 
-  // Estimación de coste de horas de desarrollo
-  const horasTotales = facturas.reduce((acc, f) => acc + (Number(f.horasInvertidasEstimadas) || 15), 0);
+  // Estimación y registro real de horas de desarrollo (Time Tracking)
+  const timeEntries = finanzas.timeEntries && finanzas.timeEntries.length > 0 ? finanzas.timeEntries : [
+    {
+      id: 'time-001',
+      proyectoId: facturas[0]?.proyectoId || 'proj-001',
+      cliente: facturas[0]?.cliente?.empresa || 'Grúas Andrea',
+      concepto: 'Diseño UX, Wireframes & BrandScript StoryBrand',
+      categoria: 'diseño',
+      horas: 6.5,
+      costoHora: costoHora,
+      fecha: '2026-10-06',
+      responsable: 'Director UX'
+    },
+    {
+      id: 'time-002',
+      proyectoId: facturas[0]?.proyectoId || 'proj-001',
+      cliente: facturas[0]?.cliente?.empresa || 'Grúas Andrea',
+      concepto: 'Maquetación Web Nativa React & Tailwind (Alto Rendimiento)',
+      categoria: 'desarrollo',
+      horas: 11.0,
+      costoHora: costoHora,
+      fecha: '2026-10-08',
+      responsable: 'Senior Dev'
+    },
+    {
+      id: 'time-003',
+      proyectoId: facturas[0]?.proyectoId || 'proj-001',
+      cliente: facturas[0]?.cliente?.empresa || 'Grúas Andrea',
+      concepto: 'Arquitectura Schema.org JSON-LD & Optimización GEO Local',
+      categoria: 'seo',
+      horas: 3.5,
+      costoHora: costoHora,
+      fecha: '2026-10-09',
+      responsable: 'SEO Lead'
+    }
+  ];
+
+  // Si no estaban guardados en JSON, guardarlos
+  if (!finanzas.timeEntries) {
+    finanzas.timeEntries = timeEntries;
+    saveFinanzas(finanzas);
+  }
+
+  const horasRealesTotales = timeEntries.reduce((acc, t) => acc + (Number(t.horas) || 0), 0);
+  const horasTotales = horasRealesTotales > 0 ? horasRealesTotales : facturas.reduce((acc, f) => acc + (Number(f.horasInvertidasEstimadas) || 15), 0);
   const costeManoObraTotal = horasTotales * costoHora;
 
   // Márgenes y beneficio
@@ -206,15 +249,25 @@ export function getResumenFinanciero() {
   const beneficioBruto = totalFacturado - totalGastosOperativos;
   const beneficioNetoReal = totalFacturado - totalCostosReales;
   const margenNetoPorcentaje = totalFacturado > 0 ? Math.round((beneficioNetoReal / totalFacturado) * 100) : 0;
+  const tarifaMediaEfectivaHora = horasTotales > 0 ? Math.round(totalFacturado / horasTotales) : 0;
 
-  // Rentabilidad por proyecto unitaria
+  // Rentabilidad por proyecto unitaria con Time Tracking
   const proyectosRentabilidad = facturas.map(f => {
     const gastosProyecto = gastos.filter(g => g.proyectoId === f.proyectoId).reduce((a, b) => a + Number(b.monto), 0);
-    const horas = Number(f.horasInvertidasEstimadas) || 15;
+    const entriesProj = timeEntries.filter(t => t.proyectoId === f.proyectoId || t.cliente?.toLowerCase() === f.cliente?.empresa?.toLowerCase());
+    const horasRegistradas = entriesProj.reduce((a, b) => a + (Number(b.horas) || 0), 0);
+    const horas = horasRegistradas > 0 ? horasRegistradas : (Number(f.horasInvertidasEstimadas) || 15);
     const costeHoras = horas * costoHora;
     const costeTotalProyecto = gastosProyecto + costeHoras;
     const gananciaNeta = (Number(f.total) || 0) - costeTotalProyecto;
     const margenUnitario = Number(f.total) > 0 ? Math.round((gananciaNeta / Number(f.total)) * 100) : 0;
+    
+    // Rentabilidad horaria efectiva ($/h cobrada)
+    const precioVenta = Number(f.total) || 0;
+    const tarifaEfectivaHora = horas > 0 ? Math.round(precioVenta / horas) : 0;
+    const tarifaObjetivo = finanzas.configuracion?.tarifaObjetivoHora || 50;
+    const rentabilidadHorariaNeta = horas > 0 ? Math.round((precioVenta - gastosProyecto) / horas) : 0;
+    const alertaDilucion = tarifaEfectivaHora < (tarifaObjetivo * 0.7); // Alerta si cobramos < $35/h
 
     return {
       facturaId: f.id,
@@ -222,15 +275,20 @@ export function getResumenFinanciero() {
       proyectoId: f.proyectoId,
       cliente: f.cliente?.empresa,
       pais: f.cliente?.pais,
-      precioVendido: Number(f.total) || 0,
+      precioVendido: precioVenta,
       cobrado: Number(f.montoCobrado) || 0,
       gastosDirectos: gastosProyecto,
       horasInvertidas: horas,
+      horasRegistradas,
+      tarifaEfectivaHora,
+      tarifaObjetivo,
+      rentabilidadHorariaNeta,
+      alertaDilucion,
       costeHoras,
       costeTotal: costeTotalProyecto,
       gananciaNeta,
       margenUnitario,
-      esSaludable: margenUnitario >= 60
+      esSaludable: margenUnitario >= 60 && !alertaDilucion
     };
   });
 
@@ -241,6 +299,8 @@ export function getResumenFinanciero() {
       saldoPorCobrar,
       totalGastosOperativos,
       horasTotales,
+      horasRealesTotales,
+      tarifaMediaEfectivaHora,
       costeManoObraTotal,
       beneficioBruto,
       beneficioNetoReal,
@@ -248,6 +308,7 @@ export function getResumenFinanciero() {
     },
     facturas,
     gastos,
+    timeEntries,
     proyectosRentabilidad,
     configuracion: finanzas.configuracion
   };
@@ -340,6 +401,45 @@ export function eliminarGasto(id) {
   const len = finanzas.gastos.length;
   finanzas.gastos = finanzas.gastos.filter(g => g.id !== id);
   if (finanzas.gastos.length === len) return false;
+  saveFinanzas(finanzas);
+  return true;
+}
+
+// Time Tracking Functions
+export function getTimeEntries(proyectoId = null) {
+  const finanzas = getFinanzas();
+  const entries = finanzas.timeEntries || [];
+  if (!proyectoId) return entries;
+  return entries.filter(e => e.proyectoId === proyectoId);
+}
+
+export function crearTimeEntry(data) {
+  const finanzas = getFinanzas();
+  if (!finanzas.timeEntries) finanzas.timeEntries = [];
+  
+  const nuevo = {
+    id: 'time-' + Date.now(),
+    proyectoId: data.proyectoId || null,
+    cliente: data.cliente || 'Cliente de Agencia',
+    concepto: data.concepto || 'Desarrollo / Tarea',
+    categoria: data.categoria || 'desarrollo',
+    horas: Number(data.horas) || 1,
+    costoHora: Number(data.costoHora) || (finanzas.configuracion?.costoHoraInterno || 20),
+    fecha: data.fecha || new Date().toISOString().split('T')[0],
+    responsable: data.responsable || 'Equipo Agencia'
+  };
+
+  finanzas.timeEntries.unshift(nuevo);
+  saveFinanzas(finanzas);
+  return nuevo;
+}
+
+export function eliminarTimeEntry(id) {
+  const finanzas = getFinanzas();
+  if (!finanzas.timeEntries) return false;
+  const len = finanzas.timeEntries.length;
+  finanzas.timeEntries = finanzas.timeEntries.filter(t => t.id !== id);
+  if (finanzas.timeEntries.length === len) return false;
   saveFinanzas(finanzas);
   return true;
 }

@@ -1,0 +1,206 @@
+{
+  "facturas": [
+    {
+      "id": "fac-proj-1791661446263-1",
+      "numeroFactura": "FAC-2026-001",
+      "proyectoId": "proj-1791661446263",
+      "codigoProyecto": "CON-2026-003",
+      "cliente": {
+        "empresa": "Grúas Andrea / Grúas Andrés",
+        "contacto": "Brayan Muñoz (Bryan Muñoz)",
+        "email": "contacto@gruasandrea.com",
+        "telefono": "+1 (323) 901-3886",
+        "identificacion": "NIT / RNC: 0614-290390-102-1",
+        "pais": "SV"
+      },
+      "concepto": "Desarrollo de Solución Digital Web & Posicionamiento IA - Grúas Andrea / Grúas Andrés",
+      "fechaEmision": "2026-10-10",
+      "fechaVencimiento": "2026-10-25",
+      "subtotal": 250,
+      "impuestoPorcentaje": 0,
+      "impuestoTotal": 0,
+      "total": 250,
+      "moneda": "USD",
+      "montoCobrado": 125,
+      "saldoPendiente": 125,
+      "estado": "parcial",
+      "metodoPago": "Banco Agrícola El Salvador",
+      "horasInvertidasEstimadas": 18,
+      "items": [
+        {
+          "descripcion": "Implementación Web Nativa de Alto Rendimiento (Grúas Andrea / Grúas Andrés)",
+          "cantidad": 1,
+          "precioUnitario": 175,
+          "total": 175
+        },
+        {
+          "descripcion": "Arquitectura Semántica Schema JSON-LD & Optimización GEO IA",
+          "cantidad": 1,
+          "precioUnitario": 75,
+          "total": 75
+        }
+      ]
+    },
+    {
+      "id": "fac-proj-1791661019465-1",
+      "numeroFactura": "FAC-2026-002",
+      "proyectoId": "proj-1791661019465",
+      "codigoProyecto": "CON-2026-002",
+      "cliente": {
+        "empresa": "Grúas Andrea / Grúas Andrés",
+        "contacto": "Brayan Muñoz (Bryan Muñoz)",
+        "email": "contacto@gruasandrea.com",
+        "telefono": "+1 (323) 901-3886",
+        "identificacion": "NIT / RNC: 0614-290390-102-1",
+        "pais": "SV"
+      },
+      "concepto": "Desarrollo de Solución Digital Web & Posicionamiento IA - Grúas Andrea / Grúas Andrés",
+      "fechaEmision": "2026-10-10",
+      "fechaVencimiento": "2026-10-25",
+      "subtotal": 250,
+      "impuestoPorcentaje": 0,
+      "impuestoTotal": 0,
+      "total": 250,
+      "moneda": "USD",
+      "montoCobrado": 125,
+      "saldoPendiente": 125,
+      "estado": "parcial",
+      "metodoPago": "Banco Agrícola El Salvador",
+      "horasInvertidasEstimadas": 18,
+      "items": [
+        {
+          "descripcion": "Implementación Web Nativa de Alto Rendimiento (Grúas Andrea / Grúas Andrés)",
+          "cantidad": 1,
+          "precioUnitario": 175,
+          "total": 175
+        },
+        {
+          "descripcion": "Arquitectura Semántica Schema JSON-LD & Optimización GEO IA",
+          "cantidad": 1,
+          "precioUnitario": 75,
+          "total": 75
+        }
+      ]
+    },
+    {
+      "id": "fac-proj-2026-001-1",
+      "numeroFactura": "FAC-2026-003",
+      "proyectoId": "proj-2026-001",
+      "codigoProyecto": "CON-2026-001",
+      "cliente": {
+        "empresa": "Grúas Andrea / Grúas Andrés",
+        "contacto": "Bryan Muñoz",
+        "email": "contacto@gruasandrea.com",
+        "telefono": "+1 (323) 901-3886",
+        "identificacion": "NIT / RNC: 0614-290390-102-1",
+        "pais": "SV"
+      },
+      "concepto": "Desarrollo de Solución Digital Web & Posicionamiento IA - Grúas Andrea / Grúas Andrés",
+      "fechaEmision": "2026-10-10",
+      "fechaVencimiento": "2026-10-25",
+      "subtotal": 300,
+      "impuestoPorcentaje": 0,
+      "impuestoTotal": 0,
+      "total": 300,
+      "moneda": "USD",
+      "montoCobrado": 150,
+      "saldoPendiente": 150,
+      "estado": "parcial",
+      "metodoPago": "Banco Agrícola El Salvador",
+      "horasInvertidasEstimadas": 18,
+      "items": [
+        {
+          "descripcion": "Implementación Web Nativa de Alto Rendimiento (Grúas Andrea / Grúas Andrés)",
+          "cantidad": 1,
+          "precioUnitario": 210,
+          "total": 210
+        },
+        {
+          "descripcion": "Arquitectura Semántica Schema JSON-LD & Optimización GEO IA",
+          "cantidad": 1,
+          "precioUnitario": 90,
+          "total": 90
+        }
+      ]
+    }
+  ],
+  "gastos": [
+    {
+      "id": "gas-001",
+      "concepto": "Servidor VPS Cloud NVMe (Hospedaje de Sitios de Clientes)",
+      "categoria": "infraestructura",
+      "proveedor": "Hetzner Cloud / VPS Autohosteado",
+      "monto": 14.5,
+      "fecha": "2026-10-01",
+      "proyectoId": null,
+      "frecuencia": "mensual",
+      "pagado": true
+    },
+    {
+      "id": "gas-002",
+      "concepto": "Dominio y Certificados SSL para Cliente Grúas Andrea",
+      "categoria": "infraestructura",
+      "proveedor": "Porkbun Registrar",
+      "monto": 12,
+      "fecha": "2026-10-05",
+      "proyectoId": "proj-1791661446263",
+      "frecuencia": "unico",
+      "pagado": true
+    },
+    {
+      "id": "gas-003",
+      "concepto": "Consumo API Modelos de Inteligencia Artificial (Auditorías GEO)",
+      "categoria": "software",
+      "proveedor": "Gemini Flash API",
+      "monto": 3.2,
+      "fecha": "2026-10-08",
+      "proyectoId": null,
+      "frecuencia": "mensual",
+      "pagado": true
+    },
+    {
+      "id": "gas-004",
+      "concepto": "Plantillas de Diseño y Recursos Vectoriales",
+      "categoria": "marketing",
+      "proveedor": "Recursos Libres / Freepik Open",
+      "monto": 0,
+      "fecha": "2026-10-02",
+      "proyectoId": null,
+      "frecuencia": "mensual",
+      "pagado": true
+    }
+  ],
+  "configuracion": {
+    "costoHoraInterno": 20,
+    "monedaPrincipal": "USD",
+    "tasaIvaSV": 13,
+    "tasaItbisDO": 18,
+    "cuentasBancarias": {
+      "SV": {
+        "banco": "Banco Agrícola El Salvador",
+        "tipo": "Cuenta Corriente Empresarial",
+        "numero": "0031-0029-4821",
+        "titular": "Goglite Agency SV"
+      },
+      "DO": {
+        "banco": "Banco Popular Dominicano",
+        "tipo": "Cuenta Corriente",
+        "numero": "7829-1928-3011",
+        "titular": "Goglite Digital DO"
+      }
+    }
+  },
+  "timeEntries": [
+    {
+      "id": "time-1791687620540",
+      "proyectoId": null,
+      "cliente": "Grúas Andrea / Grúas Andrés",
+      "concepto": "Diseño UX Wireframes StoryBrand",
+      "categoria": "diseño",
+      "horas": 6.5,
+      "costoHora": 20,
+      "fecha": "2026-10-11",
+      "responsable": "Director UX"
+    }
+  ]
+}
