@@ -6,7 +6,7 @@ import { getSettings } from './storage.js';
  */
 export async function searchGoogleSERP(query, country = 'SV') {
   const settings = getSettings();
-  const serperKey = settings.serperApiKey;
+  const serperKey = process.env.SERPER_API_KEY || settings.serperApiKey;
 
   // Country gl mapping
   const gl = country.toLowerCase() === 'do' ? 'do' : (country.toLowerCase() === 'sv' ? 'sv' : 'us');
@@ -14,6 +14,7 @@ export async function searchGoogleSERP(query, country = 'SV') {
 
   if (serperKey && serperKey.trim()) {
     try {
+      console.log(`[SCRAPER] Consultando Google en vivo vía Serper API para "${query}" (${gl})...`);
       const response = await fetch('https://google.serper.dev/search', {
         method: 'POST',
         headers: {
