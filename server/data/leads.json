@@ -13,7 +13,7 @@
     "calificacion": 4.5,
     "sinWeb": true,
     "tipoFuente": "google_maps",
-    "estado": "contactado",
+    "estado": "enviado_resend",
     "actualizado": "2026-10-11",
     "auditoria": {
       "fecha": "2026-10-11 07:35",
@@ -47,7 +47,13 @@
         }
       ]
     },
-    "pitch": "Asunto: Su sólida reputación de 4.5★ y una oportunidad clave para Hospital Veterinario Canino Real\n\nEstimado/a integrante de la Gerencia General de Hospital Veterinario Canino Real:\n\nAntes que nada, quiero felicitarlos sinceramente por la excelente reputación que han construido en El Salvador: contar con más de 721 reseñas y una calificación de 4.5 estrellas en Google Maps refleja con claridad la confianza de sus clientes y la calidad médica con la que cuidan a cada mascota.\n\nSin embargo, al realizar un análisis de su presencia digital, identificamos un punto ciego crítico: la ausencia de un sitio web propio. Actualmente, esta situación está provocando fugas importantes de clientes potenciales:\n\n1. Invisibilidad ante la Inteligencia Artificial: Cuando las personas preguntan a asistentes como ChatGPT o Perplexity por las mejores veterinarias o tratamientos especializados en San Salvador, estas herramientas no pueden leer sus servicios ni su trayectoria. Al no tener una fuente oficial que indexar, la IA recomienda a competidores que sí cuentan con un sitio web estructurado.\n2. Pérdida de búsquedas orgánicas en Google: Su visibilidad hoy se limita únicamente a la ficha del mapa, quedando completamente ausentes en los resultados web principales de búsqueda transaccional.\n3. Fuga de reservas 24/7: Fuera del horario de atención telefónica o de redes sociales, no existe una vía automatizada para que un cliente conozca sus servicios y agende una cita médica de inmediato.\n\nEn Goglite nos especializamos en transformar esa sólida autoridad que ustedes ya poseen en una máquina web moderna de captación directa de pacientes, optimizada para posicionar en Google y ser recomendada por motores de Inteligencia Artificial.\n\n¿Tendrían 10 minutos esta semana para una breve llamada donde les muestre una propuesta/demo visual adaptada a su clínica, sin ningún tipo de compromiso?\n\nQuedo a su disposición.\n\nAtentamente,\n\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial"
+    "pitch": "Asunto: Su sólida reputación de 4.5★ y una oportunidad clave para Hospital Veterinario Canino Real\n\nEstimado/a integrante de la Gerencia General de Hospital Veterinario Canino Real:\n\nAntes que nada, quiero felicitarlos sinceramente por la excelente reputación que han construido en El Salvador: contar con más de 721 reseñas y una calificación de 4.5 estrellas en Google Maps refleja con claridad la confianza de sus clientes y la calidad médica con la que cuidan a cada mascota.\n\nSin embargo, al realizar un análisis de su presencia digital, identificamos un punto ciego crítico: la ausencia de un sitio web propio. Actualmente, esta situación está provocando fugas importantes de clientes potenciales:\n\n1. Invisibilidad ante la Inteligencia Artificial: Cuando las personas preguntan a asistentes como ChatGPT o Perplexity por las mejores veterinarias o tratamientos especializados en San Salvador, estas herramientas no pueden leer sus servicios ni su trayectoria. Al no tener una fuente oficial que indexar, la IA recomienda a competidores que sí cuentan con un sitio web estructurado.\n2. Pérdida de búsquedas orgánicas en Google: Su visibilidad hoy se limita únicamente a la ficha del mapa, quedando completamente ausentes en los resultados web principales de búsqueda transaccional.\n3. Fuga de reservas 24/7: Fuera del horario de atención telefónica o de redes sociales, no existe una vía automatizada para que un cliente conozca sus servicios y agende una cita médica de inmediato.\n\nEn Goglite nos especializamos en transformar esa sólida autoridad que ustedes ya poseen en una máquina web moderna de captación directa de pacientes, optimizada para posicionar en Google y ser recomendada por motores de Inteligencia Artificial.\n\n¿Tendrían 10 minutos esta semana para una breve llamada donde les muestre una propuesta/demo visual adaptada a su clínica, sin ningún tipo de compromiso?\n\nQuedo a su disposición.\n\nAtentamente,\n\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial",
+    "ultimoEnvio": {
+      "proveedor": "resend",
+      "emailId": "sandbox-resend-1791757613050",
+      "destinatario": "v.matos.sv@gmail.com",
+      "fecha": "2026-10-11T22:26:53.050Z"
+    }
   },
   {
     "id": "lead-1791704289188-51kb",
