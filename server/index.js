@@ -17,7 +17,9 @@ import {
   getCrmLeadByToken, 
   updateCrmLeadStage, 
   addCrmInteraction, 
-  addClientUploadedAsset 
+  addClientUploadedAsset,
+  addWhatsAppMessage,
+  updateWhatsAppLeadMeta
 } from './services/crmStorage.js';
 import {
   getFinanzas,
@@ -787,6 +789,22 @@ app.patch('/api/crm/leads/:id/stage', (req, res) => {
 app.post('/api/crm/leads/:id/interactions', (req, res) => {
   const { id } = req.params;
   const updated = addCrmInteraction(id, req.body);
+  if (!updated) return res.status(404).json({ error: 'Lead no encontrado' });
+  res.json(updated);
+});
+
+// WhatsApp CRM: Agregar mensaje de chat
+app.post('/api/crm/leads/:id/whatsapp-message', (req, res) => {
+  const { id } = req.params;
+  const updated = addWhatsAppMessage(id, req.body);
+  if (!updated) return res.status(404).json({ error: 'Lead no encontrado' });
+  res.json(updated);
+});
+
+// WhatsApp CRM: Actualizar metadatos (temperatura, seguimiento, teléfono)
+app.patch('/api/crm/leads/:id/whatsapp-meta', (req, res) => {
+  const { id } = req.params;
+  const updated = updateWhatsAppLeadMeta(id, req.body);
   if (!updated) return res.status(404).json({ error: 'Lead no encontrado' });
   res.json(updated);
 });

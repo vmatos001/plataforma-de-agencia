@@ -16,6 +16,15 @@
     "portalToken": "portal-lead-1791605700142-83et-kkwqjl",
     "interacciones": [
       {
+        "id": "int-wa-1791689823412",
+        "tipo": "whatsapp",
+        "fecha": "2026-10-11",
+        "titulo": "Mensaje Enviado por WhatsApp",
+        "detalle": "Prueba de integración WhatsApp CRM exitosa",
+        "proximoPaso": "Continuar conversación / Agendar demo",
+        "fechaProximoPaso": ""
+      },
+      {
         "id": "int-1-0",
         "tipo": "nota",
         "fecha": "2026-10-09",
@@ -43,7 +52,44 @@
       "proyectoId": null
     },
     "creadoEn": "2026-10-08",
-    "actualizadoEn": "2026-10-10"
+    "actualizadoEn": "2026-10-11",
+    "whatsappData": {
+      "telefono": "+1 809 6845-5645",
+      "temperatura": "tibio",
+      "estadoSeguimiento": "dia_1_valor",
+      "ultimoMensajeFecha": "2026-10-11",
+      "mensajes": [
+        {
+          "id": "wa-m-0-1",
+          "emisor": "agencia",
+          "texto": "¡Hola Lic.! 👋 Qué gusto saludarte. Vi el sitio de Inmobiliarias Punta Cana Moderno Santo Domingo y noté que tarda más de 4.5s en abrir en celulares en conexiones locales. ¿Me permites hacerte un par de preguntas rápidas sobre cómo están captando clientes hoy?",
+          "fechaHora": "09 Oct 10:30",
+          "leido": true
+        },
+        {
+          "id": "wa-m-0-2",
+          "emisor": "cliente",
+          "texto": "Hola, buenos días. Sí, cuéntame qué detectaron. La web la hicieron hace tiempo y casi no nos genera contactos directos.",
+          "fechaHora": "09 Oct 11:05",
+          "leido": true
+        },
+        {
+          "id": "wa-m-0-3",
+          "emisor": "agencia",
+          "texto": "Justo eso detectamos Lic.. La falta de optimización móvil y Schema local hace que pierdan clientes calificados frente a competidores directos. Estamos implementando sitios en Antigravity que cargan en menos de 1s con StoryBrand para triplicar la conversión directa a WhatsApp. ¿Para cuándo les gustaría tener este canal generando ventas activas?",
+          "fechaHora": "09 Oct 11:20",
+          "leido": true
+        },
+        {
+          "id": "wa-msg-1791689823412",
+          "emisor": "agencia",
+          "texto": "Prueba de integración WhatsApp CRM exitosa",
+          "tipo": "texto",
+          "fechaHora": "10 Oct 23:37",
+          "leido": true
+        }
+      ]
+    }
   },
   {
     "id": "crm-lead-1791605700359-bisg",
@@ -98,7 +144,36 @@
       "proyectoId": null
     },
     "creadoEn": "2026-10-08",
-    "actualizadoEn": "2026-10-10"
+    "actualizadoEn": "2026-10-10",
+    "whatsappData": {
+      "telefono": "+1 809 6070-4870",
+      "temperatura": "tibio",
+      "estadoSeguimiento": "dia_1_valor",
+      "ultimoMensajeFecha": "2026-10-10",
+      "mensajes": [
+        {
+          "id": "wa-m-1-1",
+          "emisor": "agencia",
+          "texto": "¡Hola Lic.! 👋 Qué gusto saludarte. Vi el sitio de Grupo Inmobiliarias Punta Cana Caribe y noté que tarda más de 4.5s en abrir en celulares en conexiones locales. ¿Me permites hacerte un par de preguntas rápidas sobre cómo están captando clientes hoy?",
+          "fechaHora": "09 Oct 10:30",
+          "leido": true
+        },
+        {
+          "id": "wa-m-1-2",
+          "emisor": "cliente",
+          "texto": "Hola, buenos días. Sí, cuéntame qué detectaron. La web la hicieron hace tiempo y casi no nos genera contactos directos.",
+          "fechaHora": "09 Oct 11:05",
+          "leido": true
+        },
+        {
+          "id": "wa-m-1-3",
+          "emisor": "agencia",
+          "texto": "Justo eso detectamos Lic.. La falta de optimización móvil y Schema local hace que pierdan clientes calificados frente a competidores directos. Estamos implementando sitios en Antigravity que cargan en menos de 1s con StoryBrand para triplicar la conversión directa a WhatsApp. ¿Para cuándo les gustaría tener este canal generando ventas activas?",
+          "fechaHora": "09 Oct 11:20",
+          "leido": true
+        }
+      ]
+    }
   },
   {
     "id": "crm-lead-sv-001",
@@ -162,7 +237,43 @@
       "proyectoId": null
     },
     "creadoEn": "2026-10-08",
-    "actualizadoEn": "2026-10-10"
+    "actualizadoEn": "2026-10-10",
+    "whatsappData": {
+      "telefono": "+503 2260-4490",
+      "temperatura": "caliente",
+      "estadoSeguimiento": "dia_3_seguimiento",
+      "ultimoMensajeFecha": "2026-10-10",
+      "mensajes": [
+        {
+          "id": "wa-m-2-1",
+          "emisor": "agencia",
+          "texto": "Hola Dr., un gusto saludarte. Te comparto el enlace a tu Portal de Cliente privado con la auditoría técnica completa y la estructura de conversión propuesta:",
+          "fechaHora": "09 Oct 15:00",
+          "leido": true
+        },
+        {
+          "id": "wa-m-2-2",
+          "emisor": "agencia",
+          "texto": "🔗 Acceso al Portal: http://localhost:5173/portal/portal-lead-sv-001-8wkxma",
+          "fechaHora": "09 Oct 15:01",
+          "leido": true
+        },
+        {
+          "id": "wa-m-2-3",
+          "emisor": "cliente",
+          "texto": "Excelente, ya pude entrar al portal. Se ve muy claro el diagnóstico y el wireframe propuesto. ¿Qué opciones de presupuesto tenemos para arrancar?",
+          "fechaHora": "10 Oct 09:40",
+          "leido": true
+        },
+        {
+          "id": "wa-m-2-4",
+          "emisor": "agencia",
+          "texto": "¡Qué bueno que lo viste Dr.! Te cargamos una propuesta VIP con opciones escalonadas y pagos 50/50. ¿Te parece si agendamos una llamada rápida de 15 min hoy a las 3:00 PM o prefieres a las 5:00 PM para revisar el plan de entrega en 10 días?",
+          "fechaHora": "10 Oct 10:15",
+          "leido": true
+        }
+      ]
+    }
   },
   {
     "id": "crm-lead-do-002",
@@ -226,7 +337,43 @@
       "proyectoId": null
     },
     "creadoEn": "2026-10-08",
-    "actualizadoEn": "2026-10-10"
+    "actualizadoEn": "2026-10-10",
+    "whatsappData": {
+      "telefono": "+1 809 552-8811",
+      "temperatura": "caliente",
+      "estadoSeguimiento": "dia_3_seguimiento",
+      "ultimoMensajeFecha": "2026-10-10",
+      "mensajes": [
+        {
+          "id": "wa-m-3-1",
+          "emisor": "agencia",
+          "texto": "Hola Lic., un gusto saludarte. Te comparto el enlace a tu Portal de Cliente privado con la auditoría técnica completa y la estructura de conversión propuesta:",
+          "fechaHora": "09 Oct 15:00",
+          "leido": true
+        },
+        {
+          "id": "wa-m-3-2",
+          "emisor": "agencia",
+          "texto": "🔗 Acceso al Portal: http://localhost:5173/portal/portal-lead-do-002-k1yuq7",
+          "fechaHora": "09 Oct 15:01",
+          "leido": true
+        },
+        {
+          "id": "wa-m-3-3",
+          "emisor": "cliente",
+          "texto": "Excelente, ya pude entrar al portal. Se ve muy claro el diagnóstico y el wireframe propuesto. ¿Qué opciones de presupuesto tenemos para arrancar?",
+          "fechaHora": "10 Oct 09:40",
+          "leido": true
+        },
+        {
+          "id": "wa-m-3-4",
+          "emisor": "agencia",
+          "texto": "¡Qué bueno que lo viste Lic.! Te cargamos una propuesta VIP con opciones escalonadas y pagos 50/50. ¿Te parece si agendamos una llamada rápida de 15 min hoy a las 3:00 PM o prefieres a las 5:00 PM para revisar el plan de entrega en 10 días?",
+          "fechaHora": "10 Oct 10:15",
+          "leido": true
+        }
+      ]
+    }
   },
   {
     "id": "crm-lead-sv-003",
@@ -290,6 +437,21 @@
       "proyectoId": null
     },
     "creadoEn": "2026-10-08",
-    "actualizadoEn": "2026-10-10"
+    "actualizadoEn": "2026-10-10",
+    "whatsappData": {
+      "telefono": "+503 2505-1200",
+      "temperatura": "frio",
+      "estadoSeguimiento": "dia_7_cierre",
+      "ultimoMensajeFecha": "2026-10-10",
+      "mensajes": [
+        {
+          "id": "wa-m-4-1",
+          "emisor": "agencia",
+          "texto": "Hola Dra., asumo que las prioridades cambiaron por ahora. Dejo tu cotización en pausa y cuando estés listo retomamos sin problema. ¡Un gran abrazo!",
+          "fechaHora": "08 Oct 11:00",
+          "leido": true
+        }
+      ]
+    }
   }
 ]

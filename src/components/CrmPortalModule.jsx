@@ -32,7 +32,12 @@ import {
   ShieldCheck,
   Eye,
   Send,
-  X
+  X,
+  Flame,
+  CheckCheck,
+  Smartphone,
+  Share2,
+  Zap
 } from 'lucide-react';
 
 const PIPELINE_STAGES = [
@@ -45,12 +50,177 @@ const PIPELINE_STAGES = [
   { id: 'perdido', label: 'Perdido', color: 'border-rose-900/40', badge: 'bg-rose-900/30 text-rose-400', dot: 'bg-rose-500' }
 ];
 
+const TEMPERATURE_CONFIG = {
+  caliente: { label: 'Caliente', icon: '🔥', badge: 'bg-amber-500/15 text-amber-400 border border-amber-500/30' },
+  tibio: { label: 'Tibio', icon: '🟡', badge: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30' },
+  frio: { label: 'Frío', icon: '❄️', badge: 'bg-sky-500/15 text-sky-400 border border-sky-500/30' }
+};
+
+const FOLLOWUP_STAGES = [
+  { id: 'esperando_respuesta', label: 'Esperando respuesta', color: 'bg-slate-700/50 text-slate-300' },
+  { id: 'dia_1_valor', label: 'Día 1: Aporte de Valor', color: 'bg-sky-500/15 text-sky-400' },
+  { id: 'dia_3_seguimiento', label: 'Día 3: Seguimiento Suave', color: 'bg-indigo-500/15 text-indigo-400' },
+  { id: 'dia_7_cierre', label: 'Día 7: Cierre / Cortesía', color: 'bg-purple-500/15 text-purple-400' },
+  { id: 'en_dialogo', label: 'En Diálogo Activo', color: 'bg-emerald-500/15 text-emerald-400' },
+  { id: 'cerrado_ganado', label: 'Cerrado Ganado 🎉', color: 'bg-emerald-600/30 text-emerald-300 font-bold' },
+  { id: 'objecion_precio', label: 'Objeción de Precio', color: 'bg-amber-500/15 text-amber-400' },
+  { id: 'descartado', label: 'Descartado / Pausado', color: 'bg-rose-900/30 text-rose-400' }
+];
+
+const WHATSAPP_SCRIPTS = [
+  {
+    id: 's-diag-1',
+    categoria: 'diagnostico',
+    categoriaLabel: 'Diagnóstico & Saludo',
+    titulo: 'Rompehielos & Auditoría Gratis',
+    fase: 'Fase 1: Saludo Consultivo',
+    generarTexto: (lead) => {
+      const nombre = (lead?.contacto || 'Estimado').split(' ')[0];
+      const empresa = lead?.empresa || 'su empresa';
+      const dominio = lead?.dominio || '';
+      return `¡Hola ${nombre}! 👋 Qué gusto saludarte. Estuve analizando el sitio de ${empresa} (${dominio}) y noté un par de detalles clave en velocidad móvil y visibilidad en Google Maps. ¿Te gustaría que te comparta una auditoría breve de 2 minutos sin costo?`;
+    }
+  },
+  {
+    id: 's-diag-2',
+    categoria: 'diagnostico',
+    categoriaLabel: 'Diagnóstico & Saludo',
+    titulo: 'Pregunta de Situación (Cualificación)',
+    fase: 'Fase 2: Cualificación',
+    generarTexto: (lead) => {
+      const nombre = (lead?.contacto || 'Estimado').split(' ')[0];
+      return `¿Actualmente ya tienen un sitio web funcionando que les traiga prospectos constantes, o están buscando relanzar el proyecto desde cero, ${nombre}?`;
+    }
+  },
+  {
+    id: 's-diag-3',
+    categoria: 'diagnostico',
+    categoriaLabel: 'Diagnóstico & Saludo',
+    titulo: 'Pregunta de Dolor (Conversión)',
+    fase: 'Fase 2: Cualificación',
+    generarTexto: (lead) => {
+      return `¿Cuál es el mayor obstáculo que tienen hoy para convertir las visitas en clientes que les escriban directamente a WhatsApp?`;
+    }
+  },
+  {
+    id: 's-sol-1',
+    categoria: 'solucion',
+    categoriaLabel: 'Solución & Oferta',
+    titulo: 'Pitch Antigravity (10 Días Llave en Mano)',
+    fase: 'Fase 3: Oferta Específica',
+    generarTexto: (lead) => {
+      const nombre = (lead?.contacto || 'Estimado').split(' ')[0];
+      return `Perfecto, ${nombre}. Entiendo exactamente la situación. Justo para resolver eso, implementamos plataformas web nativas en código puro (sin WordPress pesado ni plugins lentos) que cargan en menos de 1s y triplican la conversión directa a WhatsApp en 10 días llave en mano.`;
+    }
+  },
+  {
+    id: 's-sol-2',
+    categoria: 'solucion',
+    categoriaLabel: 'Solución & Oferta',
+    titulo: 'Compartir Portal de Cliente Privado',
+    fase: 'Fase 3: Oferta Específica',
+    generarTexto: (lead) => {
+      const nombre = (lead?.contacto || 'Estimado').split(' ')[0];
+      const portalUrl = `${window.location.origin}/portal/${lead?.portalToken || 'portal-demo'}`;
+      return `Hola ${nombre}, te preparé un Portal de Cliente exclusivo e interactivo con el diagnóstico de tu empresa y el alcance del proyecto. Puedes explorarlo aquí: ${portalUrl}`;
+    }
+  },
+  {
+    id: 's-obj-1',
+    categoria: 'objeciones',
+    categoriaLabel: 'Objeciones',
+    titulo: 'Objeción: "Es muy caro / Sin presupuesto"',
+    fase: 'Fase 4: Manejo de Objeciones',
+    generarTexto: (lead) => {
+      const nombre = (lead?.contacto || 'Estimado').split(' ')[0];
+      return `Te entiendo perfectamente, ${nombre}. Cuando comparas la inversión, ¿lo estás midiendo contra no tener el sitio o contra una plantilla genérica? Recuerda que este sitio está pensado como un activo comercial que genera retorno y contactos desde el primer mes, no como un gasto estático. Además, manejamos facilidades de 50% de anticipo y 50% al entregar.`;
+    }
+  },
+  {
+    id: 's-obj-2',
+    categoria: 'objeciones',
+    categoriaLabel: 'Objeciones',
+    titulo: 'Objeción: "Déjame pensarlo y te aviso"',
+    fase: 'Fase 4: Manejo de Objeciones',
+    generarTexto: (lead) => {
+      const nombre = (lead?.contacto || 'Estimado').split(' ')[0];
+      return `Totalmente comprensible, ${nombre}. Normalmente cuando alguien necesita pensarlo es porque le queda alguna duda sobre el proceso o sobre los tiempos de entrega. ¿Hay algún punto en particular que no te haya quedado 100% claro para aclararlo ahora?`;
+    }
+  },
+  {
+    id: 's-obj-3',
+    categoria: 'objeciones',
+    categoriaLabel: 'Objeciones',
+    titulo: 'Objeción: "Ya tenemos diseñador / agencia"',
+    fase: 'Fase 4: Manejo de Objeciones',
+    generarTexto: (lead) => {
+      const nombre = (lead?.contacto || 'Estimado').split(' ')[0];
+      return `Me parece genial ${nombre}. La diferencia con nosotros es que no hacemos diseño decorativo: construimos arquitectura StoryBrand enfocada en captación y SEO local para que te encuentren primero a ti y no a tu competencia en Google. ¿Te gustaría que auditemos el resultado actual juntos en 10 min?`;
+    }
+  },
+  {
+    id: 's-follow-1',
+    categoria: 'followup',
+    categoriaLabel: 'Follow-Up 1-3-7',
+    titulo: 'Protocolo Día 1: Aporte de Valor',
+    fase: 'Fase 6: Follow-Up Sistemático',
+    generarTexto: (lead) => {
+      const nombre = (lead?.contacto || 'Estimado').split(' ')[0];
+      return `¡Hola ${nombre}! Encontré este ejemplo de diseño de alta conversión en tu misma industria y pensé de inmediato en el proyecto de ${lead?.empresa}. Échale un vistazo cuando tengas un momento, la velocidad es impresionante: [Ejemplo de Proyecto]`;
+    }
+  },
+  {
+    id: 's-follow-2',
+    categoria: 'followup',
+    categoriaLabel: 'Follow-Up 1-3-7',
+    titulo: 'Protocolo Día 3: Seguimiento Suave',
+    fase: 'Fase 6: Follow-Up Sistemático',
+    generarTexto: (lead) => {
+      const nombre = (lead?.contacto || 'Estimado').split(' ')[0];
+      return `¡Hola ${nombre}! 👋 ¿Pudiste revisar lo que conversamos y las opciones que te compartí en el portal? Quedo atento si tienes alguna pregunta.`;
+    }
+  },
+  {
+    id: 's-follow-3',
+    categoria: 'followup',
+    categoriaLabel: 'Follow-Up 1-3-7',
+    titulo: 'Protocolo Día 7: Cierre de Cortesía / Pausa',
+    fase: 'Fase 6: Follow-Up Sistemático',
+    generarTexto: (lead) => {
+      const nombre = (lead?.contacto || 'Estimado').split(' ')[0];
+      return `Hola ${nombre}, asumo que las prioridades cambiaron por ahora y es totalmente entendible. Dejo tu propuesta en pausa para no incomodarte, y cuando sea el momento adecuado para ustedes retomamos con gusto. ¡Un fuerte abrazo y mucho éxito!`;
+    }
+  },
+  {
+    id: 's-cierre-1',
+    categoria: 'cierre',
+    categoriaLabel: 'Cierre & Demo',
+    titulo: 'Micro-conversión: Videollamada 15 min',
+    fase: 'Fase 5: Cierre & Agendamiento',
+    generarTexto: (lead) => {
+      const nombre = (lead?.contacto || 'Estimado').split(' ')[0];
+      return `Para que veas exactamente cómo se estructuraría la web de ${lead?.empresa} y revisar los números finales, ¿te parece si hacemos una videollamada rápida de 15 minutos mañana? Tengo espacio a las 10:00 AM o a las 3:30 PM, ¿cuál te viene mejor, ${nombre}?`;
+    }
+  },
+  {
+    id: 's-cierre-2',
+    categoria: 'cierre',
+    categoriaLabel: 'Cierre & Demo',
+    titulo: 'Activación de Contrato & Inicio Inmediato',
+    fase: 'Fase 5: Cierre & Agendamiento',
+    generarTexto: (lead) => {
+      const nombre = (lead?.contacto || 'Estimado').split(' ')[0];
+      return `¡Excelente decisión ${nombre}! 🚀 Para apartar la fecha de entrega en el sprint de 10 días, el primer paso es formalizar el contrato SOW en tu portal y coordinar el anticipo del 50%. ¿Prefieres realizarlo vía transferencia bancaria o tarjeta?`;
+    }
+  }
+];
+
 export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato }) {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCountry, setSelectedCountry] = useState('ALL'); // 'ALL' | 'SV' | 'DO'
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('kanban'); // 'kanban' | 'tabla' | 'portal_preview'
+  const [activeTab, setActiveTab] = useState('kanban'); // 'kanban' | 'tabla' | 'whatsapp_crm' | 'portal_preview'
   
   // Modal for lead details & interactions
   const [activeLeadModal, setActiveLeadModal] = useState(null);
@@ -82,6 +252,15 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   const [portalData, setPortalData] = useState(null);
   const [portalCopied, setPortalCopied] = useState(false);
 
+  // WhatsApp CRM State
+  const [selectedWaLeadId, setSelectedWaLeadId] = useState(null);
+  const [waSearchTerm, setWaSearchTerm] = useState('');
+  const [waTemperatureFilter, setWaTemperatureFilter] = useState('ALL'); // 'ALL' | 'caliente' | 'tibio' | 'frio'
+  const [waRole, setWaRole] = useState('agencia'); // 'agencia' | 'cliente'
+  const [waMessageInput, setWaMessageInput] = useState('');
+  const [waScriptCategory, setWaScriptCategory] = useState('todos'); // 'todos' | 'diagnostico' | 'solucion' | 'objeciones' | 'followup' | 'cierre'
+  const [waNotice, setWaNotice] = useState(null);
+
   // Fetch leads
   useEffect(() => {
     fetchCrmLeads();
@@ -94,14 +273,96 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       if (res.ok) {
         const data = await res.json();
         setLeads(data);
-        if (data.length > 0 && !selectedPortalLeadId) {
-          setSelectedPortalLeadId(data[0].id);
+        if (data.length > 0) {
+          if (!selectedPortalLeadId) setSelectedPortalLeadId(data[0].id);
+          if (!selectedWaLeadId) setSelectedWaLeadId(data[0].id);
         }
       }
     } catch (err) {
       console.error('Error fetching CRM leads:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // WhatsApp CRM Handlers
+  const handleSendWaMessage = async (e) => {
+    if (e) e.preventDefault();
+    if (!selectedWaLeadId || !waMessageInput.trim()) return;
+
+    try {
+      const res = await fetch(`/api/crm/leads/${selectedWaLeadId}/whatsapp-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emisor: waRole,
+          texto: waMessageInput.trim()
+        })
+      });
+      if (res.ok) {
+        const updatedLead = await res.json();
+        setLeads(prev => prev.map(l => l.id === selectedWaLeadId ? updatedLead : l));
+        setWaMessageInput('');
+        setWaNotice('Mensaje guardado en el historial de WhatsApp');
+        setTimeout(() => setWaNotice(null), 3000);
+      }
+    } catch (err) {
+      console.error('Error enviando mensaje WhatsApp:', err);
+    }
+  };
+
+  const handleOpenRealWhatsApp = (lead, textOverride = null) => {
+    if (!lead) return;
+    const cleanPhone = (lead.whatsappData?.telefono || lead.telefono || '').replace(/[^\d]/g, '');
+    const textToSend = textOverride !== null ? textOverride : (waMessageInput || '');
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(textToSend)}`;
+    window.open(url, '_blank');
+  };
+
+  const handleUpdateWaMeta = async (leadId, metaUpdate) => {
+    try {
+      const res = await fetch(`/api/crm/leads/${leadId}/whatsapp-meta`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(metaUpdate)
+      });
+      if (res.ok) {
+        const updatedLead = await res.json();
+        setLeads(prev => prev.map(l => l.id === leadId ? updatedLead : l));
+      }
+    } catch (err) {
+      console.error('Error actualizando metadatos WhatsApp:', err);
+    }
+  };
+
+  const handleInsertScript = (scriptText) => {
+    setWaMessageInput(scriptText);
+    setWaNotice('Script insertado en el compositor');
+    setTimeout(() => setWaNotice(null), 2500);
+  };
+
+  const handleDirectLaunchScript = async (lead, scriptText) => {
+    if (!lead) return;
+    // 1. Open WhatsApp Web / App
+    handleOpenRealWhatsApp(lead, scriptText);
+    // 2. Also register in chat CRM
+    try {
+      const res = await fetch(`/api/crm/leads/${lead.id}/whatsapp-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emisor: 'agencia',
+          texto: scriptText
+        })
+      });
+      if (res.ok) {
+        const updatedLead = await res.json();
+        setLeads(prev => prev.map(l => l.id === lead.id ? updatedLead : l));
+        setWaNotice('Mensaje lanzado a wa.me y guardado en CRM');
+        setTimeout(() => setWaNotice(null), 3000);
+      }
+    } catch (err) {
+      console.error('Error guardando mensaje lanzado:', err);
     }
   };
 
@@ -325,6 +586,14 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
             >
               <FileText className="w-3.5 h-3.5" />
               <span>Lista</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('whatsapp_crm')}
+              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors ${activeTab === 'whatsapp_crm' ? 'bg-emerald-600/25 text-emerald-400 border border-emerald-500/40 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+              <span>WhatsApp CRM</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
             </button>
             <button
               onClick={() => setActiveTab('portal_preview')}
@@ -557,6 +826,494 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* WHATSAPP CRM & CONVERSATIONAL SELLING SUITE */}
+      {activeTab === 'whatsapp_crm' && (
+        <div className="bg-[#0e1320] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[740px]">
+          
+          {/* Top Banner / Strategy bar */}
+          <div className="px-5 py-3 bg-[#131926] border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="font-bold text-white flex items-center gap-1.5">
+                <MessageSquare className="w-4 h-4 text-emerald-400" />
+                <span>CRM WhatsApp Business & Venta Conversacional Directa</span>
+              </span>
+              <span className="text-[11px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">
+                100% Autohosteado · $0 Costo en APIs de Terceros · Deep-Link wa.me
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {waNotice && (
+                <div className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium text-[11px] animate-fadeIn">
+                  {waNotice}
+                </div>
+              )}
+              <div className="text-[11px] text-slate-400 font-mono">
+                {filteredLeads.length} leads en seguimiento activo
+              </div>
+            </div>
+          </div>
+
+          {/* 3-Column Workspace */}
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+            
+            {/* COLUMN 1: BANDEJA DE CHATS (INBOX) */}
+            <div className="w-full md:w-80 shrink-0 border-r border-slate-800 flex flex-col bg-[#0b0f19]">
+              {/* Inbox Header & Search */}
+              <div className="p-3 border-b border-slate-800 space-y-2.5">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por contacto o empresa..."
+                    value={waSearchTerm}
+                    onChange={(e) => setWaSearchTerm(e.target.value)}
+                    className="w-full bg-[#131926] border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50"
+                  />
+                </div>
+
+                {/* Filter chips for temperature */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px]">
+                  <button
+                    onClick={() => setWaTemperatureFilter('ALL')}
+                    className={`px-2 py-0.5 rounded-md transition-colors shrink-0 ${waTemperatureFilter === 'ALL' ? 'bg-slate-700 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                  >
+                    Todos ({filteredLeads.length})
+                  </button>
+                  <button
+                    onClick={() => setWaTemperatureFilter('caliente')}
+                    className={`px-2 py-0.5 rounded-md transition-colors shrink-0 ${waTemperatureFilter === 'caliente' ? 'bg-amber-500/30 text-amber-300 font-semibold border border-amber-500/40' : 'text-slate-400 hover:text-slate-200'}`}
+                  >
+                    🔥 Calientes
+                  </button>
+                  <button
+                    onClick={() => setWaTemperatureFilter('tibio')}
+                    className={`px-2 py-0.5 rounded-md transition-colors shrink-0 ${waTemperatureFilter === 'tibio' ? 'bg-yellow-500/30 text-yellow-300 font-semibold border border-yellow-500/40' : 'text-slate-400 hover:text-slate-200'}`}
+                  >
+                    🟡 Tibios
+                  </button>
+                  <button
+                    onClick={() => setWaTemperatureFilter('frio')}
+                    className={`px-2 py-0.5 rounded-md transition-colors shrink-0 ${waTemperatureFilter === 'frio' ? 'bg-sky-500/30 text-sky-300 font-semibold border border-sky-500/40' : 'text-slate-400 hover:text-slate-200'}`}
+                  >
+                    ❄️ Fríos
+                  </button>
+                </div>
+              </div>
+
+              {/* Chat list */}
+              <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60">
+                {filteredLeads
+                  .filter(l => {
+                    const matchesSearch = !waSearchTerm || 
+                      (l.empresa || '').toLowerCase().includes(waSearchTerm.toLowerCase()) ||
+                      (l.contacto || '').toLowerCase().includes(waSearchTerm.toLowerCase()) ||
+                      (l.telefono || '').includes(waSearchTerm);
+                    const matchesTemp = waTemperatureFilter === 'ALL' || (l.whatsappData?.temperatura === waTemperatureFilter);
+                    return matchesSearch && matchesTemp;
+                  })
+                  .map(leadItem => {
+                    const isSelected = (selectedWaLeadId === leadItem.id) || (!selectedWaLeadId && leadItem.id === filteredLeads[0]?.id);
+                    const lastMsg = leadItem.whatsappData?.mensajes?.[leadItem.whatsappData.mensajes.length - 1];
+                    const temp = leadItem.whatsappData?.temperatura || 'tibio';
+                    const tempConfig = TEMPERATURE_CONFIG[temp] || TEMPERATURE_CONFIG.tibio;
+                    const stageTag = FOLLOWUP_STAGES.find(s => s.id === (leadItem.whatsappData?.estadoSeguimiento || 'esperando_respuesta')) || FOLLOWUP_STAGES[0];
+
+                    return (
+                      <div
+                        key={leadItem.id}
+                        onClick={() => setSelectedWaLeadId(leadItem.id)}
+                        className={`p-3 cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-[#141c2c] border-l-4 border-emerald-500 shadow-inner'
+                            : 'hover:bg-slate-900/60'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-emerald-400 shrink-0">
+                              {leadItem.contacto?.charAt(0) || 'C'}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-xs text-white truncate max-w-[130px]">
+                                  {leadItem.contacto}
+                                </span>
+                                <span className="text-[10px]">{leadItem.pais === 'SV' ? '🇸🇻' : '🇩🇴'}</span>
+                              </div>
+                              <div className="text-[11px] text-slate-400 truncate max-w-[140px]">
+                                {leadItem.empresa}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {lastMsg?.fechaHora?.split(' ')?.[1] || 'Reciente'}
+                            </span>
+                            <div className="text-[10px] font-mono text-emerald-400 font-bold mt-0.5">
+                              ${leadItem.valorEstimado || 1500}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Last message preview */}
+                        <div className="mt-2 text-[11px] text-slate-400 truncate line-clamp-1">
+                          {lastMsg ? (
+                            <span>
+                              <span className="text-slate-500 font-semibold">{lastMsg.emisor === 'agencia' ? 'Tú: ' : ''}</span>
+                              {lastMsg.texto}
+                            </span>
+                          ) : (
+                            <span className="italic text-slate-600">Sin mensajes aún</span>
+                          )}
+                        </div>
+
+                        {/* Pills */}
+                        <div className="mt-2 flex items-center justify-between gap-1">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${tempConfig.badge}`}>
+                            {tempConfig.icon} {tempConfig.label}
+                          </span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${stageTag.color} truncate max-w-[130px]`}>
+                            {stageTag.label}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* COLUMN 2: CONVERSACIÓN ACTIVA (WHATSAPP CHAT STREAM & COMPOSER) */}
+            {(() => {
+              const currentLead = leads.find(l => l.id === selectedWaLeadId) || filteredLeads[0];
+              if (!currentLead) {
+                return (
+                  <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
+                    Selecciona un lead para ver la conversación
+                  </div>
+                );
+              }
+
+              const cleanPhone = (currentLead.whatsappData?.telefono || currentLead.telefono || '').replace(/[^\d]/g, '');
+              const portalLink = `${window.location.origin}/portal/${currentLead.portalToken}`;
+              const messages = currentLead.whatsappData?.mensajes || [];
+
+              return (
+                <div className="flex-1 flex flex-col bg-[#0a0e17] overflow-hidden">
+                  
+                  {/* Chat Header */}
+                  <div className="p-3.5 bg-[#0f1422] border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-md">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center font-bold text-white text-sm shadow-md">
+                        {currentLead.contacto?.charAt(0) || 'C'}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-sm text-white">{currentLead.contacto}</h4>
+                          <span className="text-xs">{currentLead.pais === 'SV' ? '🇸🇻 El Salvador' : '🇩🇴 Rep. Dominicana'}</span>
+                        </div>
+                        <div className="text-xs text-slate-400 flex items-center gap-2">
+                          <span>{currentLead.empresa}</span>
+                          <span>·</span>
+                          <span className="font-mono text-emerald-400">{currentLead.whatsappData?.telefono || currentLead.telefono}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Meta Selectors & External Launchers */}
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      {/* Temperature Selector */}
+                      <select
+                        value={currentLead.whatsappData?.temperatura || 'tibio'}
+                        onChange={(e) => handleUpdateWaMeta(currentLead.id, { temperatura: e.target.value })}
+                        className="bg-[#182132] border border-slate-700 text-amber-300 font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none"
+                      >
+                        <option value="caliente">🔥 Caliente</option>
+                        <option value="tibio">🟡 Tibio</option>
+                        <option value="frio">❄️ Frío</option>
+                      </select>
+
+                      {/* Follow-up Stage Selector */}
+                      <select
+                        value={currentLead.whatsappData?.estadoSeguimiento || 'esperando_respuesta'}
+                        onChange={(e) => handleUpdateWaMeta(currentLead.id, { estadoSeguimiento: e.target.value })}
+                        className="bg-[#182132] border border-slate-700 text-sky-300 font-medium rounded-lg px-2.5 py-1.5 focus:outline-none max-w-[150px]"
+                      >
+                        {FOLLOWUP_STAGES.map(st => (
+                          <option key={st.id} value={st.id}>{st.label}</option>
+                        ))}
+                      </select>
+
+                      {/* Pipeline Stage Selector */}
+                      <select
+                        value={currentLead.etapa}
+                        onChange={(e) => handleStageChange(currentLead.id, e.target.value)}
+                        className="bg-[#182132] border border-slate-700 text-orange-400 font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none"
+                      >
+                        {PIPELINE_STAGES.map(st => (
+                          <option key={st.id} value={st.id}>{st.label}</option>
+                        ))}
+                      </select>
+
+                      {/* Real wa.me launcher button */}
+                      <a
+                        href={`https://wa.me/${cleanPhone}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-950 transition-all shrink-0"
+                      >
+                        <Smartphone className="w-3.5 h-3.5" />
+                        <span>Abrir en wa.me</span>
+                      </a>
+
+                      {/* Portal Link Copy */}
+                      <button
+                        onClick={() => handleCopyPortalLink(currentLead.portalToken)}
+                        title="Copiar enlace privado al Portal de Cliente"
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium flex items-center gap-1 transition-all"
+                      >
+                        {portalCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span className="hidden sm:inline">Portal</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Chat Bubbles Stream */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-gradient-to-b from-[#0a0e17] to-[#070a10]">
+                    <div className="text-center my-1">
+                      <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[10px] text-slate-400 font-mono">
+                        Conversación iniciada · Lead captado en Google SERP
+                      </span>
+                    </div>
+
+                    {messages.map((msg, idx) => {
+                      const isAgency = msg.emisor === 'agencia';
+
+                      return (
+                        <div
+                          key={msg.id || idx}
+                          className={`flex flex-col ${isAgency ? 'items-end' : 'items-start'}`}
+                        >
+                          <div
+                            className={`max-w-[85%] rounded-2xl px-4 py-2.5 shadow-md text-xs leading-relaxed ${
+                              isAgency
+                                ? 'bg-gradient-to-r from-[#064e3b] to-[#065f46] text-emerald-50 border border-emerald-500/40 rounded-tr-none'
+                                : 'bg-[#1c2436] text-slate-200 border border-slate-700/60 rounded-tl-none'
+                            }`}
+                          >
+                            {/* Message Header */}
+                            <div className="flex items-center justify-between gap-3 text-[10px] opacity-75 mb-1 pb-1 border-b border-white/10 font-mono">
+                              <span className="font-semibold">
+                                {isAgency ? 'Tú (Agencia Goglite)' : `${currentLead.contacto}`}
+                              </span>
+                              <span>{msg.fechaHora || 'Hoy'}</span>
+                            </div>
+
+                            {/* Message Body */}
+                            <div className="whitespace-pre-wrap">{msg.texto}</div>
+
+                            {/* Status Checks */}
+                            {isAgency && (
+                              <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-emerald-300/80">
+                                <CheckCheck className="w-3 h-3 text-sky-300" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Chat Composer */}
+                  <div className="p-3 bg-[#0f1422] border-t border-slate-800 space-y-2">
+                    {/* Role selector & shortcuts */}
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-400 text-[11px]">Rol emisor:</span>
+                        <button
+                          type="button"
+                          onClick={() => setWaRole('agencia')}
+                          className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
+                            waRole === 'agencia' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          🟢 Agencia
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setWaRole('cliente')}
+                          className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
+                            waRole === 'cliente' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          👤 Cliente (Registrar Respuesta)
+                        </button>
+                      </div>
+
+                      {/* Quick variable inserts */}
+                      <div className="hidden sm:flex items-center gap-1 text-[10px]">
+                        <button
+                          type="button"
+                          onClick={() => setWaMessageInput(prev => prev + ` ¡Hola ${currentLead.contacto.split(' ')[0]}!`)}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                        >
+                          + Nombre
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setWaMessageInput(prev => prev + ` ${portalLink}`)}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                        >
+                          + Enlace Portal
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Composer Input & Buttons */}
+                    <form onSubmit={handleSendWaMessage} className="flex gap-2 items-end">
+                      <textarea
+                        rows={2}
+                        value={waMessageInput}
+                        onChange={(e) => setWaMessageInput(e.target.value)}
+                        placeholder={waRole === 'agencia' ? "Escribe un mensaje de WhatsApp o selecciona un script del copiloto..." : "Registra la respuesta que el cliente envió por WhatsApp..."}
+                        className="flex-1 bg-[#151c2d] border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/60 resize-none"
+                      />
+
+                      <div className="flex flex-col gap-1.5 shrink-0">
+                        <button
+                          type="submit"
+                          disabled={!waMessageInput.trim()}
+                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950 transition-all"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Guardar</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenRealWhatsApp(currentLead, waMessageInput)}
+                          disabled={!waMessageInput.trim()}
+                          className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-emerald-400 font-semibold text-[11px] flex items-center gap-1 transition-all"
+                          title="Lanzar este texto directamente a WhatsApp Web/App"
+                        >
+                          <Smartphone className="w-3 h-3" />
+                          <span>Enviar wa.me</span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                </div>
+              );
+            })()}
+
+            {/* COLUMN 3: COPILOTO DE VENTAS CONVERSACIONAL (SCRIPTS) */}
+            {(() => {
+              const currentLead = leads.find(l => l.id === selectedWaLeadId) || filteredLeads[0];
+
+              return (
+                <div className="w-full md:w-96 shrink-0 border-l border-slate-800 flex flex-col bg-[#0b0f19]">
+                  
+                  {/* Copilot Header */}
+                  <div className="p-3.5 border-b border-slate-800 bg-[#0e1320] space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-md bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold text-xs">
+                        <Zap className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-xs text-white">Copiloto de Venta WhatsApp</h4>
+                        <p className="text-[10px] text-slate-400">Scripts consultivos de alta conversión</p>
+                      </div>
+                    </div>
+
+                    {/* Script Category Filter Tabs */}
+                    <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px]">
+                      {[
+                        { id: 'todos', label: 'Todos' },
+                        { id: 'diagnostico', label: 'Saludo' },
+                        { id: 'solucion', label: 'Solución' },
+                        { id: 'objeciones', label: 'Objeciones' },
+                        { id: 'followup', label: '1-3-7' },
+                        { id: 'cierre', label: 'Cierre' }
+                      ].map(cat => (
+                        <button
+                          key={cat.id}
+                          onClick={() => setWaScriptCategory(cat.id)}
+                          className={`px-2 py-0.5 rounded transition-colors shrink-0 ${
+                            waScriptCategory === cat.id
+                              ? 'bg-orange-600 text-white font-semibold'
+                              : 'text-slate-400 hover:text-slate-200 bg-slate-800/50'
+                          }`}
+                        >
+                          {cat.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Scripts List */}
+                  <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                    {WHATSAPP_SCRIPTS
+                      .filter(s => waScriptCategory === 'todos' || s.categoria === waScriptCategory)
+                      .map(script => {
+                        const scriptText = currentLead ? script.generarTexto(currentLead) : 'Selecciona un prospecto';
+
+                        return (
+                          <div
+                            key={script.id}
+                            className="p-3 rounded-xl bg-[#121827] border border-slate-800 hover:border-slate-700 transition-all space-y-2"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-orange-400 border border-slate-700">
+                                {script.fase}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-semibold uppercase">
+                                {script.categoriaLabel}
+                              </span>
+                            </div>
+
+                            <div className="font-bold text-xs text-slate-200">
+                              {script.titulo}
+                            </div>
+
+                            <div className="p-2.5 rounded-lg bg-[#090d15] border border-slate-800/80 text-[11px] text-slate-300 leading-relaxed font-sans max-h-28 overflow-y-auto">
+                              {scriptText}
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleInsertScript(scriptText)}
+                                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium flex items-center gap-1 transition-colors"
+                              >
+                                <Edit className="w-3 h-3 text-sky-400" />
+                                <span>Insertar</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDirectLaunchScript(currentLead, scriptText)}
+                                className="px-2.5 py-1 rounded bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                              >
+                                <Smartphone className="w-3 h-3 text-emerald-400" />
+                                <span>Lanzar wa.me</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                </div>
+              );
+            })()}
+
+          </div>
         </div>
       )}
 
