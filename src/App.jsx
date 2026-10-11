@@ -42,8 +42,17 @@ import HeadlessCmsHubModule from './components/HeadlessCmsHubModule';
 import ContratosOnboardingModule from './components/ContratosOnboardingModule';
 import WireframesStoryBrandModule from './components/WireframesStoryBrandModule';
 import SeoLaunchQaModule from './components/SeoLaunchQaModule';
+import PublicClientPortal from './components/PublicClientPortal';
 
 export default function App() {
+  const [clientPortalToken, setClientPortalToken] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const match = window.location.pathname.match(/^\/portal\/([a-zA-Z0-9_-]+)/);
+      return match ? match[1] : null;
+    }
+    return null;
+  });
+
   const [activeModule, setActiveModule] = useState('presupuestos'); // 'lead_scrapper' | 'presupuestos'
   const [activeTab, setActiveTab] = useState('buscar'); // 'buscar' | 'sugerencias' | 'leads' | 'ajustes'
   const [selectedCountry, setSelectedCountry] = useState('SV'); // 'SV' | 'DO'
@@ -392,6 +401,18 @@ export default function App() {
       roi: "Alto"
     }
   ];
+
+  if (clientPortalToken) {
+    return (
+      <PublicClientPortal
+        token={clientPortalToken}
+        onBackToAdmin={() => {
+          window.history.pushState({}, '', '/');
+          setClientPortalToken(null);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#080b11] text-slate-100 flex flex-col selection:bg-orange-600 selection:text-white">

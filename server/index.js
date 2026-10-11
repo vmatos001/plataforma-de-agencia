@@ -911,6 +911,60 @@ app.patch('/api/cms/content/:slug', (req, res) => {
   res.json(updated);
 });
 
+// Turnkey Headless CMS Client Script
+app.get('/cms.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.send(`
+(function() {
+  var scriptTag = document.currentScript || (function() {
+    var scripts = document.getElementsByTagName('script');
+    return scripts[scripts.length - 1];
+  })();
+  var siteSlug = scriptTag.getAttribute('data-site');
+  var apiUrl = scriptTag.getAttribute('data-api') || window.location.origin;
+
+  if (!siteSlug) {
+    console.warn('[Goglite CMS] Falta atributo data-site en el script');
+    return;
+  }
+
+  fetch(apiUrl + '/api/cms/content/' + siteSlug)
+    .then(function(r) { return r.json(); })
+    .then(function(site) {
+      if (!site || !site.contenido) return;
+      var c = site.contenido;
+
+      function getVal(path, obj) {
+        return path.split('.').reduce(function(o, k) { return (o && o[k] !== 'undefined') ? o[k] : ''; }, obj);
+      }
+
+      document.querySelectorAll('[data-cms]').forEach(function(el) {
+        var key = el.getAttribute('data-cms');
+        var val = getVal(key, c);
+        if (val) el.textContent = val;
+      });
+
+      document.querySelectorAll('[data-cms-href]').forEach(function(el) {
+        var key = el.getAttribute('data-cms-href');
+        var val = getVal(key, c);
+        if (val) el.setAttribute('href', val);
+      });
+
+      document.querySelectorAll('[data-cms-src]').forEach(function(el) {
+        var key = el.getAttribute('data-cms-src');
+        var val = getVal(key, c);
+        if (val) el.setAttribute('src', val);
+      });
+
+      console.log('[Goglite CMS] Contenido sincronizado en tiempo real para:', site.nombre);
+    })
+    .catch(function(err) {
+      console.warn('[Goglite CMS] Error sincronizando contenido:', err);
+    });
+})();
+  `);
+});
+
 // Serve assets directly from public/assets and dist
 app.use('/assets', express.static(path.join(__dirname, '../public/assets')));
 app.use(express.static(distPath));
