@@ -340,7 +340,7 @@ app.get('/api/export/csv', (req, res) => {
 // 9. Send Email via Resend ($0.00 Free Tier) or Instantly.ai
 app.post('/api/send-email', async (req, res) => {
   try {
-    const { leadId, provider = 'resend', subject, customPitch } = req.body;
+    const { leadId, provider = 'resend', subject, customPitch, targetEmail } = req.body;
     const leads = getLeads();
     const lead = leads.find(l => l.id === leadId);
 
@@ -349,6 +349,7 @@ app.post('/api/send-email', async (req, res) => {
     const settings = getSettings();
     const pitchToSend = customPitch || lead.pitch || 'Hola, me pongo en contacto con respecto a su presencia digital.';
     const emailSubject = subject || `Pregunta rápida sobre ${lead.nombreEmpresa || lead.dominio}`;
+    const recipientEmail = targetEmail || lead.email;
 
     if (provider === 'resend') {
       if (!settings.resendApiKey) {
@@ -368,7 +369,7 @@ app.post('/api/send-email', async (req, res) => {
         },
         body: JSON.stringify({
           from: fromAddress,
-          to: [lead.email],
+          to: [recipientEmail],
           subject: emailSubject,
           text: pitchToSend,
           html: `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; padding: 20px;">

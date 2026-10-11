@@ -48,12 +48,13 @@ Reglas de redacción:
 
 Devuelve únicamente el cuerpo del correo en texto plano.`;
 
-      // Try gemini-flash-latest first, fallback to gemini-3.8-flash
-      const modelsToTry = ['gemini-flash-latest', 'gemini-3.8-flash'];
+      // Try gemini-1.5-flash first, fallback to gemini-2.0-flash
+      const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash'];
       for (const model of modelsToTry) {
         try {
           const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
             method: 'POST',
+            signal: AbortSignal.timeout(5000),
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }]

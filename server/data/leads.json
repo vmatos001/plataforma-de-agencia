@@ -1,5 +1,405 @@
 [
   {
+    "id": "lead-1791704153836-qmdc",
+    "dominio": "maps-hospital-veterinario-canino-real-578434.negocio",
+    "nombreEmpresa": "Hospital Veterinario Canino Real",
+    "pais": "SV",
+    "email": "contacto@maps-hospital-veterinario-canino-real-578434.negocio",
+    "responsable": "Gerencia General / Propietario",
+    "cargo": "Dueño / Director",
+    "telefono": "2225 8089",
+    "posicionGoogle": 5,
+    "resenas": 721,
+    "calificacion": 4.5,
+    "sinWeb": true,
+    "tipoFuente": "google_maps",
+    "estado": "contactado",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 07:35",
+      "tipoAuditoria": "google_maps_no_web",
+      "resenas": 721,
+      "rating": 4.5,
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "CRÍTICA",
+          "titulo": "Inexistencia de Sitio Web Propio: Invisibles ante ChatGPT y Perplexity",
+          "problema": "A pesar de contar con 721 reseñas y 4.5★ en Google Maps, el negocio carece de un dominio web propio. Cuando clientes potenciales en El Salvador consultan a asistentes de IA por los mejores servicios o tratamientos, la IA no puede indexar servicios ni reputación oficial, recomendando exclusivamente a competidores con sitios web estructurados.",
+          "porQueImporta": "Más del 42% de los clientes investigan y eligen servicios mediante asistentes de IA antes de acudir a un local o agendar citas.",
+          "competidores": "Competidores directos cuentan con sitios web con datos Schema LocalBusiness/MedicalBusiness que son citados preferentemente por ChatGPT y Perplexity."
+        },
+        {
+          "categoria": "CRO & Captación 24/7",
+          "prioridad": "ALTA",
+          "titulo": "Fuga del 100% de reservas y clientes fuera del horario comercial",
+          "problema": "Al depender únicamente de llamadas telefónicas o redes sociales, carecen de un sistema digital de reservas automáticas o catálogo de servicios en línea activo las 24 horas.",
+          "porQueImporta": "Más del 60% de las búsquedas en Google se realizan en horarios no laborales cuando el teléfono no atiende; sin formulario o WhatsApp háptico directo en web, el cliente abandona.",
+          "competidores": "Webs optimizadas convierten hasta un 18% más de visitantes en pacientes/clientes con embudos directos de agendamiento."
+        },
+        {
+          "categoria": "SEO & Autoridad Local",
+          "prioridad": "ALTA",
+          "titulo": "Pérdida de tráfico en búsquedas de Google transaccionales",
+          "problema": "Su presencia se limita al mapa local. En las búsquedas orgánicas principales de Google para 'veterinarias en San Salvador', están totalmente ausentes por no tener página web indexable.",
+          "porQueImporta": "Una infraestructura web moderna permitiría convertir esa reputación de ${resenas} reseñas en un canal orgánico dominante de adquisición de clientes.",
+          "competidores": "Los competidores en los primeros lugares de Google capturan más del 50% de los clics transaccionales con intención de compra."
+        }
+      ]
+    },
+    "pitch": "Asunto: Su sólida reputación de 4.5★ y una oportunidad clave para Hospital Veterinario Canino Real\n\nEstimado/a integrante de la Gerencia General de Hospital Veterinario Canino Real:\n\nAntes que nada, quiero felicitarlos sinceramente por la excelente reputación que han construido en El Salvador: contar con más de 721 reseñas y una calificación de 4.5 estrellas en Google Maps refleja con claridad la confianza de sus clientes y la calidad médica con la que cuidan a cada mascota.\n\nSin embargo, al realizar un análisis de su presencia digital, identificamos un punto ciego crítico: la ausencia de un sitio web propio. Actualmente, esta situación está provocando fugas importantes de clientes potenciales:\n\n1. Invisibilidad ante la Inteligencia Artificial: Cuando las personas preguntan a asistentes como ChatGPT o Perplexity por las mejores veterinarias o tratamientos especializados en San Salvador, estas herramientas no pueden leer sus servicios ni su trayectoria. Al no tener una fuente oficial que indexar, la IA recomienda a competidores que sí cuentan con un sitio web estructurado.\n2. Pérdida de búsquedas orgánicas en Google: Su visibilidad hoy se limita únicamente a la ficha del mapa, quedando completamente ausentes en los resultados web principales de búsqueda transaccional.\n3. Fuga de reservas 24/7: Fuera del horario de atención telefónica o de redes sociales, no existe una vía automatizada para que un cliente conozca sus servicios y agende una cita médica de inmediato.\n\nEn Goglite nos especializamos en transformar esa sólida autoridad que ustedes ya poseen en una máquina web moderna de captación directa de pacientes, optimizada para posicionar en Google y ser recomendada por motores de Inteligencia Artificial.\n\n¿Tendrían 10 minutos esta semana para una breve llamada donde les muestre una propuesta/demo visual adaptada a su clínica, sin ningún tipo de compromiso?\n\nQuedo a su disposición.\n\nAtentamente,\n\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial"
+  },
+  {
+    "id": "lead-1791704289188-51kb",
+    "dominio": "maps-hospital-veterinario-giovanni-de-letran-538211.negocio",
+    "nombreEmpresa": "Hospital Veterinario Giovanni de Letran",
+    "pais": "SV",
+    "email": "contacto@maps-hospital-veterinario-giovanni-de-letran-538211.negocio",
+    "responsable": "Gerencia General / Propietario",
+    "cargo": "Dueño / Director",
+    "telefono": "2284 0748",
+    "posicionGoogle": 6,
+    "resenas": 558,
+    "calificacion": 4.4,
+    "sinWeb": true,
+    "tipoFuente": "google_maps",
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 07:38",
+      "tipoAuditoria": "google_maps_no_web",
+      "resenas": 558,
+      "rating": 4.4,
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "CRÍTICA",
+          "titulo": "Inexistencia de Sitio Web Propio: Invisibles ante ChatGPT y Perplexity",
+          "problema": "A pesar de contar con 558 reseñas y 4.4★ en Google Maps, el negocio carece de un dominio web propio. Cuando clientes potenciales en El Salvador consultan a asistentes de IA por los mejores servicios o tratamientos, la IA no puede indexar servicios ni reputación oficial, recomendando exclusivamente a competidores con sitios web estructurados.",
+          "porQueImporta": "Más del 42% de los clientes investigan y eligen servicios mediante asistentes de IA antes de acudir a un local o agendar citas.",
+          "competidores": "Competidores directos cuentan con sitios web con datos Schema LocalBusiness/MedicalBusiness que son citados preferentemente por ChatGPT y Perplexity."
+        },
+        {
+          "categoria": "CRO & Captación 24/7",
+          "prioridad": "ALTA",
+          "titulo": "Fuga del 100% de reservas y clientes fuera del horario comercial",
+          "problema": "Al depender únicamente de llamadas telefónicas o redes sociales, carecen de un sistema digital de reservas automáticas o catálogo de servicios en línea activo las 24 horas.",
+          "porQueImporta": "Más del 60% de las búsquedas en Google se realizan en horarios no laborales cuando el teléfono no atiende; sin formulario o WhatsApp háptico directo en web, el cliente abandona.",
+          "competidores": "Webs optimizadas convierten hasta un 18% más de visitantes en pacientes/clientes con embudos directos de agendamiento."
+        },
+        {
+          "categoria": "SEO & Autoridad Local",
+          "prioridad": "ALTA",
+          "titulo": "Pérdida de tráfico en búsquedas de Google transaccionales",
+          "problema": "Su presencia se limita al mapa local. En las búsquedas orgánicas principales de Google para 'veterinarias en San Salvador', están totalmente ausentes por no tener página web indexable.",
+          "porQueImporta": "Una infraestructura web moderna permitiría convertir esa reputación de ${resenas} reseñas en un canal orgánico dominante de adquisición de clientes.",
+          "competidores": "Los competidores en los primeros lugares de Google capturan más del 50% de los clics transaccionales con intención de compra."
+        }
+      ]
+    },
+    "pitch": "Hola Gerencia,\n\nFelicitaciones por la destacada reputación de Hospital Veterinario Giovanni de Letran en Google Maps (558 reseñas con 4.4★). Es evidente la confianza que tienen sus clientes en El Salvador.\n\nAl analizar su presencia digital, identificamos una gran oportunidad: actualmente no cuentan con un sitio web oficial propio, lo que genera una fuga silenciosa de prospectos que buscan servicios en Google o consultan en IAs como ChatGPT y terminan con la competencia que sí permite agendar online.\n\nEn Goglite ayudamos a negocios líderes a transformar su reputación local en un canal automatizado de captación y reservas directas las 24 horas.\n\n¿Le parecería interesante revisar una breve propuesta o maqueta preliminar sin ningún compromiso?\n\nAtentamente,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial"
+  },
+  {
+    "id": "lead-1791704290595-avc6",
+    "dominio": "maps-hospital-veterinario-vetk-816689.negocio",
+    "nombreEmpresa": "Hospital Veterinario VetK",
+    "pais": "SV",
+    "email": "contacto@maps-hospital-veterinario-vetk-816689.negocio",
+    "responsable": "Gerencia General / Propietario",
+    "cargo": "Dueño / Director",
+    "telefono": "2263 1321",
+    "posicionGoogle": 8,
+    "resenas": 233,
+    "calificacion": 4.6,
+    "sinWeb": true,
+    "tipoFuente": "google_maps",
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 07:38",
+      "tipoAuditoria": "google_maps_no_web",
+      "resenas": 233,
+      "rating": 4.6,
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "CRÍTICA",
+          "titulo": "Inexistencia de Sitio Web Propio: Invisibles ante ChatGPT y Perplexity",
+          "problema": "A pesar de contar con 233 reseñas y 4.6★ en Google Maps, el negocio carece de un dominio web propio. Cuando clientes potenciales en El Salvador consultan a asistentes de IA por los mejores servicios o tratamientos, la IA no puede indexar servicios ni reputación oficial, recomendando exclusivamente a competidores con sitios web estructurados.",
+          "porQueImporta": "Más del 42% de los clientes investigan y eligen servicios mediante asistentes de IA antes de acudir a un local o agendar citas.",
+          "competidores": "Competidores directos cuentan con sitios web con datos Schema LocalBusiness/MedicalBusiness que son citados preferentemente por ChatGPT y Perplexity."
+        },
+        {
+          "categoria": "CRO & Captación 24/7",
+          "prioridad": "ALTA",
+          "titulo": "Fuga del 100% de reservas y clientes fuera del horario comercial",
+          "problema": "Al depender únicamente de llamadas telefónicas o redes sociales, carecen de un sistema digital de reservas automáticas o catálogo de servicios en línea activo las 24 horas.",
+          "porQueImporta": "Más del 60% de las búsquedas en Google se realizan en horarios no laborales cuando el teléfono no atiende; sin formulario o WhatsApp háptico directo en web, el cliente abandona.",
+          "competidores": "Webs optimizadas convierten hasta un 18% más de visitantes en pacientes/clientes con embudos directos de agendamiento."
+        },
+        {
+          "categoria": "SEO & Autoridad Local",
+          "prioridad": "ALTA",
+          "titulo": "Pérdida de tráfico en búsquedas de Google transaccionales",
+          "problema": "Su presencia se limita al mapa local. En las búsquedas orgánicas principales de Google para 'veterinarias en San Salvador', están totalmente ausentes por no tener página web indexable.",
+          "porQueImporta": "Una infraestructura web moderna permitiría convertir esa reputación de ${resenas} reseñas en un canal orgánico dominante de adquisición de clientes.",
+          "competidores": "Los competidores en los primeros lugares de Google capturan más del 50% de los clics transaccionales con intención de compra."
+        }
+      ]
+    },
+    "pitch": "Estimada Gerencia General de Hospital Veterinario VetK,\n\nAntes que nada, quiero felicitarlos por la sólida reputación que han construido en El Salvador: contar con 233 reseñas y una calificación de 4.6 estrellas en Google Maps refleja con claridad la confianza de sus clientes y la calidad de su atención médica.\n\nPrecisamente analizando su perfil, detecté un detalle estratégico: actualmente VetK no cuenta con un sitio web propio. Aunque su presencia en el mapa local es fuerte, esta ausencia está generando tres puntos ciegos importantes:\n\n1. Invisibilidad ante la Inteligencia Artificial: Cada vez más personas utilizan herramientas como ChatGPT o Perplexity para buscar \"el mejor hospital veterinario en San Salvador\" o tratamientos específicos. Al no tener un sitio web con datos estructurados, estas IAs no pueden indexar sus servicios ni verificar su reputación oficial, por lo que terminan recomendando a competidores que sí cuentan con una web activa.\n\n2. Pérdida de búsquedas orgánicas en Google: Su visibilidad se limita a la ficha del mapa. En las búsquedas web tradicionales de Google para servicios veterinarios y urgencias, quedan fuera de los primeros resultados orgánicos.\n\n3. Fuga de reservas fuera del horario de atención: Al depender únicamente de llamadas telefónicas o redes sociales, se pierde la oportunidad de captar al 100% de los dueños de mascotas que buscan agendar una cita o consultar servicios durante la noche o fines de semana mediante un sistema digital 24/7.\n\nEn Goglite nos especializamos en resolver esto: transformamos la reputación que ustedes ya tienen en una máquina web moderna de captación directa de pacientes, optimizada tanto para Google como para los nuevos motores de IA.\n\n¿Tendrían 10 minutos esta semana para revisar una demo y propuesta rápida sin ningún tipo de compromiso? \n\nQuedo a su disposición.\n\nAtentamente,\n\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial"
+  },
+  {
+    "id": "lead-1791704358827-os99",
+    "dominio": "maps-veterinaria-woof-056431.negocio",
+    "nombreEmpresa": "Veterinaria Woof",
+    "pais": "SV",
+    "email": "contacto@maps-veterinaria-woof-056431.negocio",
+    "responsable": "Gerencia General / Propietario",
+    "cargo": "Dueño / Director",
+    "telefono": "2519 1135",
+    "posicionGoogle": 7,
+    "resenas": 226,
+    "calificacion": 4.1,
+    "sinWeb": true,
+    "tipoFuente": "google_maps",
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 07:39",
+      "tipoAuditoria": "google_maps_no_web",
+      "resenas": 226,
+      "rating": 4.1,
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "CRÍTICA",
+          "titulo": "Inexistencia de Sitio Web Propio: Invisibles ante ChatGPT y Perplexity",
+          "problema": "A pesar de contar con 226 reseñas y 4.1★ en Google Maps, el negocio carece de un dominio web propio. Cuando clientes potenciales en El Salvador consultan a asistentes de IA por los mejores servicios o tratamientos, la IA no puede indexar servicios ni reputación oficial, recomendando exclusivamente a competidores con sitios web estructurados.",
+          "porQueImporta": "Más del 42% de los clientes investigan y eligen servicios mediante asistentes de IA antes de acudir a un local o agendar citas.",
+          "competidores": "Competidores directos cuentan con sitios web con datos Schema LocalBusiness/MedicalBusiness que son citados preferentemente por ChatGPT y Perplexity."
+        },
+        {
+          "categoria": "CRO & Captación 24/7",
+          "prioridad": "ALTA",
+          "titulo": "Fuga del 100% de reservas y clientes fuera del horario comercial",
+          "problema": "Al depender únicamente de llamadas telefónicas o redes sociales, carecen de un sistema digital de reservas automáticas o catálogo de servicios en línea activo las 24 horas.",
+          "porQueImporta": "Más del 60% de las búsquedas en Google se realizan en horarios no laborales cuando el teléfono no atiende; sin formulario o WhatsApp háptico directo en web, el cliente abandona.",
+          "competidores": "Webs optimizadas convierten hasta un 18% más de visitantes en pacientes/clientes con embudos directos de agendamiento."
+        },
+        {
+          "categoria": "SEO & Autoridad Local",
+          "prioridad": "ALTA",
+          "titulo": "Pérdida de tráfico en búsquedas de Google transaccionales",
+          "problema": "Su presencia se limita al mapa local. En las búsquedas orgánicas principales de Google para 'veterinarias en San Salvador', están totalmente ausentes por no tener página web indexable.",
+          "porQueImporta": "Una infraestructura web moderna permitiría convertir esa reputación de ${resenas} reseñas en un canal orgánico dominante de adquisición de clientes.",
+          "competidores": "Los competidores en los primeros lugares de Google capturan más del 50% de los clics transaccionales con intención de compra."
+        }
+      ]
+    },
+    "pitch": "Estimado/a titular de la Gerencia de Veterinaria Woof:\n\nAntes que nada, quiero felicitarles sinceramente por la excelente labor que realizan. Construir una reputación de 226 reseñas con una calificación de 4.1 estrellas en Google Maps demuestra el alto nivel de confianza y cariño que la comunidad de dueños de mascotas en El Salvador tiene hacia su trabajo.\n\nPrecisamente analizando el potencial de su negocio, identifiqué una oportunidad crítica: actualmente Veterinaria Woof no cuenta con un sitio web propio, lo que está generando tres fugas silenciosas de clientes todos los días:\n\n1. Invisibilidad ante motores de Inteligencia Artificial: Cada vez más personas utilizan herramientas como ChatGPT o Perplexity para buscar las mejores clínicas o tratamientos para sus mascotas. Al no contar con una web con datos estructurados, estas IAs no pueden verificar sus servicios y terminan recomendando a competidores que sí los tienen.\n2. Ausencia en las búsquedas orgánicas de Google: Su presencia actual se limita al mapa local. En las búsquedas principales de Google para servicios veterinarios en la zona, quedan fuera frente a clínicas con dominios indexados.\n3. Fuga de reservas fuera de horario: Al depender exclusivamente de llamadas telefónicas o redes sociales, pierden a aquellos clientes que buscan agendar consultas o cirugías por la noche o en fines de semana mediante un sistema digital disponible 24/7.\n\nEn Goglite nos especializamos en transformar esa sólida reputación que ya construyeron en una máquina web moderna de captación directa de clientes, optimizada para los nuevos estándares de búsqueda e inteligencia artificial.\n\n¿Tendría 10 minutos esta semana para revisar una propuesta y demo rápida sin ningún compromiso, y ver cómo podemos conectar esta solución con Veterinaria Woof?\n\nQuedo a su disposición.\n\nAtentamente,\n\nVíctor Matos  \nGoglite — Agencia Web & Inteligencia Artificial"
+  },
+  {
+    "id": "lead-1791704381684-qq1o",
+    "dominio": "maps-clinica-veterinaria-dr-gustavo-figueroa-691551.negocio",
+    "nombreEmpresa": "Clínica Veterinaria Dr. Gustavo Figueroa",
+    "pais": "SV",
+    "email": "contacto@maps-clinica-veterinaria-dr-gustavo-figueroa-691551.negocio",
+    "responsable": "Gerencia General / Propietario",
+    "cargo": "Dueño / Director",
+    "telefono": "2252 3493",
+    "posicionGoogle": 10,
+    "resenas": 109,
+    "calificacion": 4.7,
+    "sinWeb": true,
+    "tipoFuente": "google_maps",
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 07:39",
+      "tipoAuditoria": "google_maps_no_web",
+      "resenas": 109,
+      "rating": 4.7,
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "CRÍTICA",
+          "titulo": "Inexistencia de Sitio Web Propio: Invisibles ante ChatGPT y Perplexity",
+          "problema": "A pesar de contar con 109 reseñas y 4.7★ en Google Maps, el negocio carece de un dominio web propio. Cuando clientes potenciales en El Salvador consultan a asistentes de IA por los mejores servicios o tratamientos, la IA no puede indexar servicios ni reputación oficial, recomendando exclusivamente a competidores con sitios web estructurados.",
+          "porQueImporta": "Más del 42% de los clientes investigan y eligen servicios mediante asistentes de IA antes de acudir a un local o agendar citas.",
+          "competidores": "Competidores directos cuentan con sitios web con datos Schema LocalBusiness/MedicalBusiness que son citados preferentemente por ChatGPT y Perplexity."
+        },
+        {
+          "categoria": "CRO & Captación 24/7",
+          "prioridad": "ALTA",
+          "titulo": "Fuga del 100% de reservas y clientes fuera del horario comercial",
+          "problema": "Al depender únicamente de llamadas telefónicas o redes sociales, carecen de un sistema digital de reservas automáticas o catálogo de servicios en línea activo las 24 horas.",
+          "porQueImporta": "Más del 60% de las búsquedas en Google se realizan en horarios no laborales cuando el teléfono no atiende; sin formulario o WhatsApp háptico directo en web, el cliente abandona.",
+          "competidores": "Webs optimizadas convierten hasta un 18% más de visitantes en pacientes/clientes con embudos directos de agendamiento."
+        },
+        {
+          "categoria": "SEO & Autoridad Local",
+          "prioridad": "ALTA",
+          "titulo": "Pérdida de tráfico en búsquedas de Google transaccionales",
+          "problema": "Su presencia se limita al mapa local. En las búsquedas orgánicas principales de Google para 'veterinarias en San Salvador', están totalmente ausentes por no tener página web indexable.",
+          "porQueImporta": "Una infraestructura web moderna permitiría convertir esa reputación de ${resenas} reseñas en un canal orgánico dominante de adquisición de clientes.",
+          "competidores": "Los competidores en los primeros lugares de Google capturan más del 50% de los clics transaccionales con intención de compra."
+        }
+      ]
+    },
+    "pitch": "Hola Gerencia,\n\nFelicitaciones por la destacada reputación de Clínica Veterinaria Dr. Gustavo Figueroa en Google Maps (109 reseñas con 4.7★). Es evidente la confianza que tienen sus clientes en El Salvador.\n\nAl analizar su presencia digital, identificamos una gran oportunidad: actualmente no cuentan con un sitio web oficial propio, lo que genera una fuga silenciosa de prospectos que buscan servicios en Google o consultan en IAs como ChatGPT y terminan con la competencia que sí permite agendar online.\n\nEn Goglite ayudamos a negocios líderes a transformar su reputación local en un canal automatizado de captación y reservas directas las 24 horas.\n\n¿Le parecería interesante revisar una breve propuesta o maqueta preliminar sin ningún compromiso?\n\nAtentamente,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial"
+  },
+  {
+    "id": "lead-1791704382651-wcmu",
+    "dominio": "maps-veterinaria-escalon-133841.negocio",
+    "nombreEmpresa": "Veterinaria Escalón",
+    "pais": "SV",
+    "email": "contacto@maps-veterinaria-escalon-133841.negocio",
+    "responsable": "Gerencia General / Propietario",
+    "cargo": "Dueño / Director",
+    "telefono": "2263 2010",
+    "posicionGoogle": 9,
+    "resenas": 65,
+    "calificacion": 3.7,
+    "sinWeb": true,
+    "tipoFuente": "google_maps",
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 07:39",
+      "tipoAuditoria": "google_maps_no_web",
+      "resenas": 65,
+      "rating": 3.7,
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "CRÍTICA",
+          "titulo": "Inexistencia de Sitio Web Propio: Invisibles ante ChatGPT y Perplexity",
+          "problema": "A pesar de contar con 65 reseñas y 3.7★ en Google Maps, el negocio carece de un dominio web propio. Cuando clientes potenciales en El Salvador consultan a asistentes de IA por los mejores servicios o tratamientos, la IA no puede indexar servicios ni reputación oficial, recomendando exclusivamente a competidores con sitios web estructurados.",
+          "porQueImporta": "Más del 42% de los clientes investigan y eligen servicios mediante asistentes de IA antes de acudir a un local o agendar citas.",
+          "competidores": "Competidores directos cuentan con sitios web con datos Schema LocalBusiness/MedicalBusiness que son citados preferentemente por ChatGPT y Perplexity."
+        },
+        {
+          "categoria": "CRO & Captación 24/7",
+          "prioridad": "ALTA",
+          "titulo": "Fuga del 100% de reservas y clientes fuera del horario comercial",
+          "problema": "Al depender únicamente de llamadas telefónicas o redes sociales, carecen de un sistema digital de reservas automáticas o catálogo de servicios en línea activo las 24 horas.",
+          "porQueImporta": "Más del 60% de las búsquedas en Google se realizan en horarios no laborales cuando el teléfono no atiende; sin formulario o WhatsApp háptico directo en web, el cliente abandona.",
+          "competidores": "Webs optimizadas convierten hasta un 18% más de visitantes en pacientes/clientes con embudos directos de agendamiento."
+        },
+        {
+          "categoria": "SEO & Autoridad Local",
+          "prioridad": "ALTA",
+          "titulo": "Pérdida de tráfico en búsquedas de Google transaccionales",
+          "problema": "Su presencia se limita al mapa local. En las búsquedas orgánicas principales de Google para 'veterinarias en San Salvador', están totalmente ausentes por no tener página web indexable.",
+          "porQueImporta": "Una infraestructura web moderna permitiría convertir esa reputación de ${resenas} reseñas en un canal orgánico dominante de adquisición de clientes.",
+          "competidores": "Los competidores en los primeros lugares de Google capturan más del 50% de los clics transaccionales con intención de compra."
+        }
+      ]
+    },
+    "pitch": "Hola Gerencia,\n\nFelicitaciones por la destacada reputación de Veterinaria Escalón en Google Maps (65 reseñas con 3.7★). Es evidente la confianza que tienen sus clientes en El Salvador.\n\nAl analizar su presencia digital, identificamos una gran oportunidad: actualmente no cuentan con un sitio web oficial propio, lo que genera una fuga silenciosa de prospectos que buscan servicios en Google o consultan en IAs como ChatGPT y terminan con la competencia que sí permite agendar online.\n\nEn Goglite ayudamos a negocios líderes a transformar su reputación local en un canal automatizado de captación y reservas directas las 24 horas.\n\n¿Le parecería interesante revisar una breve propuesta o maqueta preliminar sin ningún compromiso?\n\nAtentamente,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial"
+  },
+  {
+    "id": "lead-1791704383471-dmtu",
+    "dominio": "maps-hospital-central-veterinario-861762.negocio",
+    "nombreEmpresa": "Hospital Central Veterinario",
+    "pais": "SV",
+    "email": "contacto@maps-hospital-central-veterinario-861762.negocio",
+    "responsable": "Gerencia General / Propietario",
+    "cargo": "Dueño / Director",
+    "telefono": "2235 7406",
+    "posicionGoogle": 3,
+    "resenas": 1,
+    "calificacion": 4.5,
+    "sinWeb": true,
+    "tipoFuente": "google_maps",
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 07:39",
+      "tipoAuditoria": "google_maps_no_web",
+      "resenas": 1,
+      "rating": 4.5,
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "CRÍTICA",
+          "titulo": "Inexistencia de Sitio Web Propio: Invisibles ante ChatGPT y Perplexity",
+          "problema": "A pesar de contar con 1 reseñas y 4.5★ en Google Maps, el negocio carece de un dominio web propio. Cuando clientes potenciales en El Salvador consultan a asistentes de IA por los mejores servicios o tratamientos, la IA no puede indexar servicios ni reputación oficial, recomendando exclusivamente a competidores con sitios web estructurados.",
+          "porQueImporta": "Más del 42% de los clientes investigan y eligen servicios mediante asistentes de IA antes de acudir a un local o agendar citas.",
+          "competidores": "Competidores directos cuentan con sitios web con datos Schema LocalBusiness/MedicalBusiness que son citados preferentemente por ChatGPT y Perplexity."
+        },
+        {
+          "categoria": "CRO & Captación 24/7",
+          "prioridad": "ALTA",
+          "titulo": "Fuga del 100% de reservas y clientes fuera del horario comercial",
+          "problema": "Al depender únicamente de llamadas telefónicas o redes sociales, carecen de un sistema digital de reservas automáticas o catálogo de servicios en línea activo las 24 horas.",
+          "porQueImporta": "Más del 60% de las búsquedas en Google se realizan en horarios no laborales cuando el teléfono no atiende; sin formulario o WhatsApp háptico directo en web, el cliente abandona.",
+          "competidores": "Webs optimizadas convierten hasta un 18% más de visitantes en pacientes/clientes con embudos directos de agendamiento."
+        },
+        {
+          "categoria": "SEO & Autoridad Local",
+          "prioridad": "ALTA",
+          "titulo": "Pérdida de tráfico en búsquedas de Google transaccionales",
+          "problema": "Su presencia se limita al mapa local. En las búsquedas orgánicas principales de Google para 'veterinarias en San Salvador', están totalmente ausentes por no tener página web indexable.",
+          "porQueImporta": "Una infraestructura web moderna permitiría convertir esa reputación de ${resenas} reseñas en un canal orgánico dominante de adquisición de clientes.",
+          "competidores": "Los competidores en los primeros lugares de Google capturan más del 50% de los clics transaccionales con intención de compra."
+        }
+      ]
+    },
+    "pitch": "Hola Gerencia,\n\nFelicitaciones por la destacada reputación de Hospital Central Veterinario en Google Maps (1 reseñas con 4.5★). Es evidente la confianza que tienen sus clientes en El Salvador.\n\nAl analizar su presencia digital, identificamos una gran oportunidad: actualmente no cuentan con un sitio web oficial propio, lo que genera una fuga silenciosa de prospectos que buscan servicios en Google o consultan en IAs como ChatGPT y terminan con la competencia que sí permite agendar online.\n\nEn Goglite ayudamos a negocios líderes a transformar su reputación local en un canal automatizado de captación y reservas directas las 24 horas.\n\n¿Le parecería interesante revisar una breve propuesta o maqueta preliminar sin ningún compromiso?\n\nAtentamente,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial"
+  },
+  {
+    "id": "lead-1791704384313-96ob",
+    "dominio": "maps-hospital-veterinario-santa-fe-266149.negocio",
+    "nombreEmpresa": "Hospital Veterinario Santa Fe",
+    "pais": "SV",
+    "email": "contacto@maps-hospital-veterinario-santa-fe-266149.negocio",
+    "responsable": "Gerencia General / Propietario",
+    "cargo": "Dueño / Director",
+    "telefono": "2224 0606",
+    "posicionGoogle": 4,
+    "resenas": 1,
+    "calificacion": 4.2,
+    "sinWeb": true,
+    "tipoFuente": "google_maps",
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 07:39",
+      "tipoAuditoria": "google_maps_no_web",
+      "resenas": 1,
+      "rating": 4.2,
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "CRÍTICA",
+          "titulo": "Inexistencia de Sitio Web Propio: Invisibles ante ChatGPT y Perplexity",
+          "problema": "A pesar de contar con 1 reseñas y 4.2★ en Google Maps, el negocio carece de un dominio web propio. Cuando clientes potenciales en El Salvador consultan a asistentes de IA por los mejores servicios o tratamientos, la IA no puede indexar servicios ni reputación oficial, recomendando exclusivamente a competidores con sitios web estructurados.",
+          "porQueImporta": "Más del 42% de los clientes investigan y eligen servicios mediante asistentes de IA antes de acudir a un local o agendar citas.",
+          "competidores": "Competidores directos cuentan con sitios web con datos Schema LocalBusiness/MedicalBusiness que son citados preferentemente por ChatGPT y Perplexity."
+        },
+        {
+          "categoria": "CRO & Captación 24/7",
+          "prioridad": "ALTA",
+          "titulo": "Fuga del 100% de reservas y clientes fuera del horario comercial",
+          "problema": "Al depender únicamente de llamadas telefónicas o redes sociales, carecen de un sistema digital de reservas automáticas o catálogo de servicios en línea activo las 24 horas.",
+          "porQueImporta": "Más del 60% de las búsquedas en Google se realizan en horarios no laborales cuando el teléfono no atiende; sin formulario o WhatsApp háptico directo en web, el cliente abandona.",
+          "competidores": "Webs optimizadas convierten hasta un 18% más de visitantes en pacientes/clientes con embudos directos de agendamiento."
+        },
+        {
+          "categoria": "SEO & Autoridad Local",
+          "prioridad": "ALTA",
+          "titulo": "Pérdida de tráfico en búsquedas de Google transaccionales",
+          "problema": "Su presencia se limita al mapa local. En las búsquedas orgánicas principales de Google para 'veterinarias en San Salvador', están totalmente ausentes por no tener página web indexable.",
+          "porQueImporta": "Una infraestructura web moderna permitiría convertir esa reputación de ${resenas} reseñas en un canal orgánico dominante de adquisición de clientes.",
+          "competidores": "Los competidores en los primeros lugares de Google capturan más del 50% de los clics transaccionales con intención de compra."
+        }
+      ]
+    },
+    "pitch": "Estimado/a titular de Hospital Veterinario Santa Fe,\n\nLe escribo para felicitarle por el trabajo reflejado en su perfil de Google Maps, donde ya cuentan con una calificación de 4.2 estrellas. Cuidar de la salud de las mascotas requiere una enorme dedicación, y esa valoración positiva es un excelente punto de partida para seguir consolidando su presencia en El Salvador.\n\nAnalizando su presencia digital, detectamos una oportunidad crítica: actualmente no cuentan con un sitio web propio indexado. En el contexto actual, esto genera tres desventajas importantes:\n\n1. Invisibilidad ante motores de Inteligencia Artificial: Cuando los dueños de mascotas consultan en herramientas como ChatGPT o Perplexity por las mejores opciones veterinarias en su zona, la IA no encuentra fuentes oficiales de su clínica para verificar servicios ni especialidades, recomendando de inmediato a competidores que sí cuentan con un sitio web estructurado.\n2. Pérdida de búsquedas orgánicas en Google: Su visibilidad se limita a la ficha de mapas, quedando fuera de los resultados principales de búsqueda web para términos clave de alta demanda.\n3. Fuga de reservas fuera de horario: Sin una plataforma web con agendamiento activo 24/7, cualquier dueño de mascota que busque programar una cita por la noche o durante el fin de semana termina postergando la decisión o recurriendo a otra clínica.\n\nEn Goglite nos especializamos en transformar la reputación de negocios de salud y servicios en una máquina web moderna de captación directa de clientes, posicionando su negocio tanto en Google orgánico como en los nuevos motores de IA.\n\n¿Tendría 10 minutos esta semana para una llamada breve y mostrarle una propuesta/demo rápida sin ningún compromiso? \n\nQuedo a su disposición.\n\nAtentamente,\n\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial"
+  },
+  {
     "id": "lead-1791690594295-bjdj",
     "dominio": "clnicasdentalessansalvadormodernosansalvador.sv",
     "nombreEmpresa": "Clínicas Dentales San Salvador Moderno San Salvador",

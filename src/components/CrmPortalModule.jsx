@@ -220,7 +220,9 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   const [loading, setLoading] = useState(true);
   const [selectedCountry, setSelectedCountry] = useState('ALL'); // 'ALL' | 'SV' | 'DO'
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('kanban'); // 'kanban' | 'tabla' | 'whatsapp_crm' | 'portal_preview'
+  const [activeTab, setActiveTab] = useState('kanban'); // 'kanban' | 'tabla' | 'whatsapp_crm'
+  const [dragOverStage, setDragOverStage] = useState(null);
+  const [draggingLeadId, setDraggingLeadId] = useState(null);
   
   // Modal for lead details & interactions
   const [activeLeadModal, setActiveLeadModal] = useState(null);
@@ -595,13 +597,6 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
               <span>WhatsApp CRM</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
             </button>
-            <button
-              onClick={() => setActiveTab('portal_preview')}
-              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors ${activeTab === 'portal_preview' ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              <Globe className="w-3.5 h-3.5" />
-              <span>Portal de Cliente</span>
-            </button>
           </div>
 
           <button
@@ -614,138 +609,195 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
         </div>
       </div>
 
-      {/* 3. MAIN CONTENT: KANBAN OR TABLE OR PORTAL PREVIEW */}
+      {/* 3. MAIN CONTENT: KANBAN VERTICAL CON DRAG & DROP */}
       {activeTab === 'kanban' && (
-        <div className="flex gap-4 overflow-x-auto pb-4 items-start select-none">
-          {PIPELINE_STAGES.map(stage => {
+        <div className="flex flex-col gap-5 pb-8 select-none">
+          <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+            <span className="flex items-center gap-1.5 font-medium">
+              <span>💡</span>
+              <span>Puedes arrastrar las tarjetas con el ratón de una fase a otra para mover el estado del cliente.</span>
+            </span>
+            <span className="font-mono text-[11px] text-slate-500">
+              7 Fases en Embudo Vertical
+            </span>
+          </div>
+
+          {PIPELINE_STAGES.map((stage, sIdx) => {
             const stageLeads = filteredLeads.filter(l => l.etapa === stage.id);
             const stageValue = stageLeads.reduce((acc, l) => acc + (Number(l.valorEstimado) || 0), 0);
+            const isDropTarget = dragOverStage === stage.id;
 
             return (
-              <div 
-                key={stage.id} 
-                className="w-72 shrink-0 bg-[#0c1017] border border-slate-800/80 rounded-xl flex flex-col max-h-[calc(100vh-280px)]"
+              <div
+                key={stage.id}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (dragOverStage !== stage.id) setDragOverStage(stage.id);
+                }}
+                onDragLeave={(e) => {
+                  if (e.currentTarget.contains(e.relatedTarget)) return;
+                  setDragOverStage(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverStage(null);
+                  setDraggingLeadId(null);
+                  const droppedId = e.dataTransfer.getData('text/plain');
+                  if (droppedId) {
+                    handleStageChange(droppedId, stage.id);
+                  }
+                }}
+                className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
+                  isDropTarget
+                    ? 'bg-orange-500/10 border-orange-500 ring-2 ring-orange-500/40 shadow-xl'
+                    : 'bg-[#0b0f18] border-slate-800/80 hover:border-slate-700/80'
+                }`}
               >
-                {/* Column Header */}
-                <div className="p-3 border-b border-slate-800/80 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ${stage.dot}`}></span>
-                    <span className="font-bold text-xs text-slate-200">{stage.label}</span>
-                    <span className="text-[10px] bg-slate-800/90 text-slate-400 px-1.5 py-0.2 rounded-full font-mono">
-                      {stageLeads.length}
+                {/* Stage Header */}
+                <div className="p-3.5 bg-[#0f1422] border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-[11px] font-mono text-slate-500 font-bold">
+                      {sIdx + 1}.
+                    </span>
+                    <span className={`w-3 h-3 rounded-full ${stage.dot} shadow-sm`}></span>
+                    <h3 className="font-bold text-sm text-white tracking-tight">
+                      {stage.label}
+                    </h3>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono font-semibold border border-slate-700/60">
+                      {stageLeads.length} {stageLeads.length === 1 ? 'prospecto' : 'prospectos'}
                     </span>
                   </div>
-                  <span className="text-[11px] font-mono font-semibold text-slate-400">
-                    ${stageValue.toLocaleString()}
-                  </span>
+
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-mono text-slate-500 font-semibold block">Valor en Fase</span>
+                      <span className="text-xs font-mono font-bold text-orange-400">
+                        ${stageValue.toLocaleString()} USD
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Cards List */}
-                <div className="p-2 space-y-2.5 overflow-y-auto flex-1">
+                {/* Cards Container */}
+                <div className="p-3.5">
                   {stageLeads.length === 0 ? (
-                    <div className="text-center py-8 text-slate-600 text-xs italic">
-                      Sin prospectos
+                    <div className={`py-6 border-2 border-dashed rounded-xl text-center text-xs flex items-center justify-center gap-2 transition-colors ${
+                      isDropTarget
+                        ? 'border-orange-500/60 text-orange-300 bg-orange-500/5'
+                        : 'border-slate-800/60 text-slate-500'
+                    }`}>
+                      <span>Sin prospectos en <strong>{stage.label}</strong>. Arrastra una tarjeta aquí para cambiar de fase.</span>
                     </div>
                   ) : (
-                    stageLeads.map(lead => (
-                      <div
-                        key={lead.id}
-                        className="p-3 rounded-lg bg-[#111624] border border-slate-800/70 hover:border-slate-700 transition-all shadow-sm flex flex-col gap-2 group"
-                      >
-                        {/* Header: Company & Country */}
-                        <div className="flex items-start justify-between gap-1.5">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-xs text-white truncate" title={lead.empresa}>
-                              {lead.empresa}
-                            </h4>
-                            <p className="text-[11px] text-slate-400 truncate">
-                              {lead.contacto} · <span className="text-slate-500">{lead.cargo}</span>
-                            </p>
-                          </div>
-                          <span className="text-xs shrink-0" title={lead.pais === 'SV' ? 'El Salvador' : 'República Dominicana'}>
-                            {lead.pais === 'SV' ? '🇸🇻' : '🇩🇴'}
-                          </span>
-                        </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                      {stageLeads.map(lead => {
+                        const isDragging = draggingLeadId === lead.id;
 
-                        {/* Deal Value & Probability */}
-                        <div className="flex items-center justify-between py-1 border-y border-slate-800/50 text-[11px]">
-                          <span className="font-mono font-bold text-orange-400">
-                            ${Number(lead.valorEstimado).toLocaleString()} USD
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {lead.probabilidad}% prob.
-                          </span>
-                        </div>
-
-                        {/* Quick Actions Bar */}
-                        <div className="flex items-center justify-between pt-1">
-                          <div className="flex items-center gap-1">
-                            {lead.telefono && (
-                              <a
-                                href={`https://wa.me/${lead.telefono.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${lead.contacto}, un saludo desde Goglite. Estuvimos analizando ${lead.empresa} y tenemos una propuesta de alto impacto para su captación web.`)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                title="Enviar WhatsApp"
-                                className="w-6 h-6 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 flex items-center justify-center transition-colors"
-                              >
-                                <MessageSquare className="w-3 h-3" />
-                              </a>
-                            )}
-                            {lead.email && (
-                              <a
-                                href={`mailto:${lead.email}?subject=Propuesta Estratégica para ${lead.empresa}`}
-                                title="Enviar Correo"
-                                className="w-6 h-6 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 flex items-center justify-center transition-colors"
-                              >
-                                <Mail className="w-3 h-3" />
-                              </a>
-                            )}
-                            <button
-                              onClick={() => setActiveLeadModal(lead)}
-                              title="Bitácora e Interacciones"
-                              className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors text-[10px] font-mono"
-                            >
-                              💬 {lead.interacciones?.length || 0}
-                            </button>
-                          </div>
-
-                          {/* Stage Mover Selector */}
-                          <div className="flex items-center gap-1">
-                            <select
-                              value={lead.etapa}
-                              onChange={(e) => handleStageChange(lead.id, e.target.value)}
-                              className="text-[10px] bg-[#171e2e] border border-slate-700 rounded px-1.5 py-0.5 text-slate-300 focus:outline-none focus:border-orange-500"
-                            >
-                              {PIPELINE_STAGES.map(s => (
-                                <option key={s.id} value={s.id}>{s.label}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Bottom Link to Proposal or Contract */}
-                        <div className="flex items-center justify-between pt-1 border-t border-slate-800/40 text-[10px]">
-                          <button
-                            onClick={() => onConvertToPresupuesto && onConvertToPresupuesto(lead)}
-                            className="text-orange-400 hover:text-orange-300 font-medium flex items-center gap-1 transition-colors"
-                          >
-                            <FileText className="w-3 h-3" />
-                            <span>Crear Presupuesto</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setSelectedPortalLeadId(lead.id);
-                              setActiveTab('portal_preview');
+                        return (
+                          <div
+                            key={lead.id}
+                            draggable={true}
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('text/plain', lead.id);
+                              e.dataTransfer.effectAllowed = 'move';
+                              setDraggingLeadId(lead.id);
                             }}
-                            className="text-slate-400 hover:text-slate-200 flex items-center gap-1 transition-colors"
+                            onDragEnd={() => {
+                              setDraggingLeadId(null);
+                              setDragOverStage(null);
+                            }}
+                            className={`p-3.5 rounded-xl bg-[#111624] border transition-all duration-150 shadow-sm flex flex-col gap-2.5 cursor-grab active:cursor-grabbing hover:border-orange-500/50 hover:shadow-lg hover:shadow-orange-950/10 ${
+                              isDragging
+                                ? 'opacity-30 border-dashed border-orange-500 scale-95'
+                                : 'border-slate-800/80'
+                            }`}
                           >
-                            <Eye className="w-3 h-3" />
-                            <span>Portal</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))
+                            {/* Card Top: Company, Contact, Country & Temperature */}
+                            <div className="flex items-start justify-between gap-1.5">
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-bold text-xs text-white truncate" title={lead.empresa}>
+                                  {lead.empresa}
+                                </h4>
+                                <p className="text-[11px] text-slate-400 truncate">
+                                  {lead.contacto} · <span className="text-slate-500">{lead.cargo}</span>
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-xs" title={lead.pais === 'SV' ? 'El Salvador' : 'República Dominicana'}>
+                                  {lead.pais === 'SV' ? '🇸🇻' : '🇩🇴'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Value and Probability */}
+                            <div className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-[#0d121c] border border-slate-800/60 text-[11px]">
+                              <span className="font-mono font-bold text-orange-400">
+                                ${Number(lead.valorEstimado || 1500).toLocaleString()} USD
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {lead.probabilidad || 50}% prob.
+                              </span>
+                            </div>
+
+                            {/* Actions & Mover */}
+                            <div className="flex items-center justify-between pt-1">
+                              <div className="flex items-center gap-1.5">
+                                {lead.telefono && (
+                                  <a
+                                    href={`https://wa.me/${lead.telefono.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${lead.contacto}, un saludo desde Goglite. Estuvimos analizando ${lead.empresa} y tenemos una propuesta de alto impacto para su captación web.`)}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    title="Abrir WhatsApp"
+                                    className="w-7 h-7 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 flex items-center justify-center transition-colors"
+                                  >
+                                    <MessageSquare className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                                {lead.email && (
+                                  <a
+                                    href={`mailto:${lead.email}?subject=Propuesta Estratégica para ${lead.empresa}`}
+                                    title="Enviar Correo"
+                                    className="w-7 h-7 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 flex items-center justify-center transition-colors"
+                                  >
+                                    <Mail className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                                <button
+                                  onClick={() => setActiveLeadModal(lead)}
+                                  title="Bitácora e Interacciones"
+                                  className="h-7 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1 transition-colors text-[10px] font-mono"
+                                >
+                                  💬 {lead.interacciones?.length || 0}
+                                </button>
+                              </div>
+
+                              {/* Manual Stage Fallback */}
+                              <select
+                                value={lead.etapa}
+                                onChange={(e) => handleStageChange(lead.id, e.target.value)}
+                                className="text-[10px] bg-[#171e2e] border border-slate-700 rounded-lg px-2 py-1 text-slate-300 focus:outline-none focus:border-orange-500 cursor-pointer"
+                              >
+                                {PIPELINE_STAGES.map(s => (
+                                  <option key={s.id} value={s.id}>{s.label}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Bottom Primary Action: Crear Presupuesto */}
+                            <div className="pt-2 border-t border-slate-800/60">
+                              <button
+                                onClick={() => onConvertToPresupuesto && onConvertToPresupuesto(lead)}
+                                className="w-full py-1.5 px-2.5 rounded-lg bg-orange-600/15 hover:bg-orange-600/25 text-orange-400 border border-orange-500/30 font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                <span>Generar Presupuesto →</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
@@ -812,15 +864,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                     >
                       Presupuesto
                     </button>
-                    <button
-                      onClick={() => {
-                        setSelectedPortalLeadId(lead.id);
-                        setActiveTab('portal_preview');
-                      }}
-                      className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition-colors"
-                    >
-                      Ver Portal
-                    </button>
+                    
                   </td>
                 </tr>
               ))}

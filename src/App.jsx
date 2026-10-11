@@ -55,7 +55,7 @@ export default function App() {
     return null;
   });
 
-  const [activeModule, setActiveModule] = useState('presupuestos'); // 'lead_scrapper' | 'presupuestos'
+  const [activeModule, setActiveModule] = useState('crm_portal'); // 'lead_scrapper' | 'crm_portal' | 'presupuestos'
   const [activeTab, setActiveTab] = useState('buscar'); // 'buscar' | 'sugerencias' | 'leads' | 'ajustes'
   const [selectedCountry, setSelectedCountry] = useState('SV'); // 'SV' | 'DO'
   const [searchMode, setSearchMode] = useState('maps'); // 'maps' | 'web'
@@ -312,14 +312,19 @@ export default function App() {
 
   // Send email via Resend ($0.00 stack) or Instantly
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [customRecipient, setCustomRecipient] = useState('');
 
-  const handleSendEmail = async (leadId, provider = 'resend') => {
+  const handleSendEmail = async (leadId, provider = 'resend', overrideEmail = null) => {
     setIsSendingEmail(true);
     try {
       const res = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadId, provider })
+        body: JSON.stringify({ 
+          leadId, 
+          provider,
+          targetEmail: overrideEmail || customRecipient || selectedLeadModal?.email
+        })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || data.error);
@@ -473,8 +478,8 @@ export default function App() {
               </span>
               <span className="text-xs font-mono text-orange-400/90 font-semibold px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20">
                 {activeModule === 'lead_scrapper' ? 'Módulo 1 · Lead Scrapper' :
-                 activeModule === 'presupuestos' ? 'Módulo 2 · Presupuestos' :
-                 activeModule === 'crm_portal' ? 'Módulo 3 · CRM & Portal' :
+                 activeModule === 'crm_portal' ? 'Módulo 2 · CRM & WhatsApp' :
+                 activeModule === 'presupuestos' ? 'Módulo 3 · Presupuestos' :
                  activeModule === 'gestion_rentabilidad' ? 'Módulo 4 · Rentabilidad' :
                  activeModule === 'seo_geo' ? 'Módulo 5 · SEO & GEO Tools' :
                  activeModule === 'headless_cms' ? 'Módulo 6 · Headless CMS' :
@@ -517,23 +522,7 @@ export default function App() {
                   <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Listo</span>
                 </button>
 
-                {/* Módulo 2 */}
-                <button
-                  onClick={() => { setActiveModule('presupuestos'); setToolsDropdownOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
-                    activeModule === 'presupuestos' 
-                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
-                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5 text-orange-400" />
-                    <span>2. Presupuestos & Propuestas</span>
-                  </div>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Listo</span>
-                </button>
-
-                {/* Módulo 3 */}
+                {/* Módulo 2: CRM & WhatsApp */}
                 <button
                   onClick={() => { setActiveModule('crm_portal'); setToolsDropdownOpen(false); }}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
@@ -544,7 +533,23 @@ export default function App() {
                 >
                   <div className="flex items-center gap-2">
                     <Kanban className="w-3.5 h-3.5 text-orange-400" />
-                    <span>3. CRM & Portal de Cliente</span>
+                    <span>2. CRM & WhatsApp</span>
+                  </div>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Listo</span>
+                </button>
+
+                {/* Módulo 3: Presupuestos */}
+                <button
+                  onClick={() => { setActiveModule('presupuestos'); setToolsDropdownOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
+                    activeModule === 'presupuestos' 
+                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
+                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5 text-orange-400" />
+                    <span>3. Presupuestos & Propuestas</span>
                   </div>
                   <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Listo</span>
                 </button>
@@ -663,6 +668,21 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => setActiveModule('crm_portal')}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeModule === 'crm_portal'
+                    ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Kanban className="w-3.5 h-3.5" />
+                  <span>CRM & WhatsApp</span>
+                </div>
+                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">2</span>
+              </button>
+
+              <button
                 onClick={() => setActiveModule('presupuestos')}
                 className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   activeModule === 'presupuestos'
@@ -673,21 +693,6 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   <FileText className="w-3.5 h-3.5" />
                   <span>Presupuestos</span>
-                </div>
-                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">2</span>
-              </button>
-
-              <button
-                onClick={() => setActiveModule('crm_portal')}
-                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  activeModule === 'crm_portal'
-                    ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
-                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Kanban className="w-3.5 h-3.5" />
-                  <span>CRM & Portal</span>
                 </div>
                 <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">3</span>
               </button>
@@ -1843,7 +1848,7 @@ export default function App() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-slate-400">
-                      Borrador de correo listo para enviar a <strong className="text-slate-200">{selectedLeadModal.email}</strong>:
+                      Borrador de correo listo para enviar:
                     </span>
                     <button
                       onClick={() => handleCopyPitch(selectedLeadModal.pitch)}
@@ -1854,13 +1859,25 @@ export default function App() {
                     </button>
                   </div>
 
+                  {/* Campo de Destinatario Editable */}
+                  <div className="flex items-center gap-2 bg-[#090d16] px-3 py-2 rounded-xl border border-slate-800">
+                    <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">Enviar a (Email):</span>
+                    <input
+                      type="email"
+                      value={customRecipient !== '' ? customRecipient : (selectedLeadModal.email || '')}
+                      onChange={(e) => setCustomRecipient(e.target.value)}
+                      className="flex-1 bg-transparent text-xs text-emerald-400 font-mono focus:outline-none placeholder-slate-600"
+                      placeholder="v.matos.sv@gmail.com"
+                    />
+                  </div>
+
                   <div className="p-4 rounded-xl bg-[#080b11] border border-slate-800 font-sans text-xs text-slate-200 whitespace-pre-line leading-relaxed">
                     {selectedLeadModal.pitch}
                   </div>
 
                   <div className="flex items-center justify-between pt-2 border-t border-slate-800 gap-2 flex-wrap">
                     <a
-                      href={`mailto:${selectedLeadModal.email}?subject=Pregunta rápida sobre ${selectedLeadModal.nombreEmpresa || selectedLeadModal.dominio}&body=${encodeURIComponent(selectedLeadModal.pitch || '')}`}
+                      href={`mailto:${customRecipient || selectedLeadModal.email}?subject=Pregunta rápida sobre ${selectedLeadModal.nombreEmpresa || selectedLeadModal.dominio}&body=${encodeURIComponent(selectedLeadModal.pitch || '')}`}
                       className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-all"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
@@ -1871,7 +1888,7 @@ export default function App() {
                       <button
                         disabled={isSendingEmail}
                         onClick={async () => {
-                          await handleSendEmail(selectedLeadModal.id, 'resend');
+                          await handleSendEmail(selectedLeadModal.id, 'resend', customRecipient || selectedLeadModal.email);
                           setSelectedLeadModal(null);
                         }}
                         className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md transition-all disabled:opacity-50"
@@ -1884,7 +1901,7 @@ export default function App() {
                       <button
                         disabled={isSendingEmail}
                         onClick={async () => {
-                          await handleSendEmail(selectedLeadModal.id, 'instantly');
+                          await handleSendEmail(selectedLeadModal.id, 'instantly', customRecipient || selectedLeadModal.email);
                           setSelectedLeadModal(null);
                         }}
                         className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md transition-all disabled:opacity-50"
