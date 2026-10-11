@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Kanban,
   Users,
+  User,
   DollarSign,
   TrendingUp,
   Search,
@@ -468,11 +469,19 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     return matchesCountry && matchesSearch;
   });
 
-  // Calculate metrics
-  const totalPipeline = filteredLeads.filter(l => l.etapa !== 'perdido').reduce((acc, l) => acc + (Number(l.valorEstimado) || 0), 0);
-  const totalGanado = filteredLeads.filter(l => l.etapa === 'ganado').reduce((acc, l) => acc + (Number(l.valorEstimado) || 0), 0);
+  // Lógica de Presupuesto real: solo existe cotización a partir de propuesta enviada o con ID vinculado
+  const STAGES_CON_PRESUPUESTO = ['propuesta_enviada', 'propuesta', 'negociacion', 'ganado'];
+  const tienePresupuesto = (lead) => {
+    return STAGES_CON_PRESUPUESTO.includes(lead.etapa) || Boolean(lead.portalConfig?.presupuestoId) || Boolean(lead.presupuestoId);
+  };
+
+  // Calculate metrics: Pipeline Activo solo suma cotizaciones emitidas en negociación/propuesta
+  const leadsCotizadosActivos = filteredLeads.filter(l => ['propuesta_enviada', 'propuesta', 'negociacion'].includes(l.etapa));
+  const totalPipeline = leadsCotizadosActivos.reduce((acc, l) => acc + (Number(l.presupuestoMonto || l.valorEstimado) || 0), 0);
+  const totalGanado = filteredLeads.filter(l => l.etapa === 'ganado').reduce((acc, l) => acc + (Number(l.presupuestoMonto || l.valorEstimado) || 0), 0);
   const leadsGanadosCount = filteredLeads.filter(l => l.etapa === 'ganado').length;
   const tasaConversion = filteredLeads.length > 0 ? Math.round((leadsGanadosCount / filteredLeads.length) * 100) : 0;
+  const leadsEnProspeccion = filteredLeads.filter(l => ['nuevo', 'contactado', 'reunion', 'reunion_demo'].includes(l.etapa)).length;
 
   // Selected lead for portal preview
   const currentPortalLead = leads.find(l => l.id === selectedPortalLeadId) || leads[0];
@@ -484,11 +493,11 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 rounded-xl bg-[#0e131f] border border-slate-800/80 flex items-center justify-between shadow-sm">
           <div>
-            <div className="text-xs font-mono uppercase text-slate-400 font-semibold">Pipeline Activo</div>
+            <div className="text-xs font-mono uppercase text-slate-400 font-semibold">Pipeline Cotizado</div>
             <div className="text-2xl font-black text-white mt-1">
               ${totalPipeline.toLocaleString()} <span className="text-xs font-normal text-slate-400">USD</span>
             </div>
-            <div className="text-[11px] text-slate-500 mt-0.5">En negociación & propuestas</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">{leadsCotizadosActivos.length} propuestas en curso · {leadsEnProspeccion} en prospección</div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center font-bold">
             <DollarSign className="w-5 h-5" />
@@ -624,8 +633,13 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
           </div>
 
           {PIPELINE_STAGES.map((stage, sIdx) => {
-            const stageLeads = filteredLeads.filter(l => l.etapa === stage.id);
-            const stageValue = stageLeads.reduce((acc, l) => acc + (Number(l.valorEstimado) || 0), 0);
+            const stageLeads = filteredLeads.filter(l => {
+              if (stage.id === 'reunion') return l.etapa === 'reunion' || l.etapa === 'reunion_demo';
+              if (stage.id === 'propuesta_enviada') return l.etapa === 'propuesta_enviada' || l.etapa === 'propuesta';
+              return l.etapa === stage.id;
+            });
+            const esProspeccion = ['nuevo', 'contactado', 'reunion', 'reunion_demo'].includes(stage.id);
+            const stageValue = stageLeads.reduce((acc, l) => acc + (Number(l.presupuestoMonto || l.valorEstimado) || 0), 0);
             const isDropTarget = dragOverStage === stage.id;
 
             return (
@@ -656,7 +670,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                 }`}
               >
                 {/* Stage Header */}
-                <div className="p-3.5 bg-[#0f1422] border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+                <div className="p-4 bg-[#0f1422] border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <span className="text-[11px] font-mono text-slate-500 font-bold">
                       {sIdx + 1}.
@@ -665,25 +679,43 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                     <h3 className="font-bold text-sm text-white tracking-tight">
                       {stage.label}
                     </h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono font-semibold border border-slate-700/60">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono font-semibold border border-slate-700/60">
                       {stageLeads.length} {stageLeads.length === 1 ? 'prospecto' : 'prospectos'}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <span className="text-[10px] uppercase font-mono text-slate-500 font-semibold block">Valor en Fase</span>
-                      <span className="text-xs font-mono font-bold text-orange-400">
-                        ${stageValue.toLocaleString()} USD
-                      </span>
+                      {esProspeccion ? (
+                        <>
+                          <span className="text-[10px] uppercase font-mono text-slate-500 font-semibold block">Fase Comercial</span>
+                          <span className="text-xs font-mono font-medium text-slate-400">
+                            Prospección & Contacto
+                          </span>
+                        </>
+                      ) : stage.id === 'perdido' ? (
+                        <>
+                          <span className="text-[10px] uppercase font-mono text-slate-500 font-semibold block">Fase Comercial</span>
+                          <span className="text-xs font-mono font-medium text-rose-400/80">
+                            Sin Cierre / Pausado
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-[10px] uppercase font-mono text-slate-500 font-semibold block">Valor Cotizado</span>
+                          <span className="text-xs font-mono font-bold text-emerald-400">
+                            ${stageValue.toLocaleString()} USD
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* Cards Container */}
-                <div className="p-3.5">
+                {/* Cards Container: Tarjetas ordenadas verticalmente con ancho completo y sin cortes */}
+                <div className="p-4">
                   {stageLeads.length === 0 ? (
-                    <div className={`py-6 border-2 border-dashed rounded-xl text-center text-xs flex items-center justify-center gap-2 transition-colors ${
+                    <div className={`py-8 border-2 border-dashed rounded-xl text-center text-xs flex items-center justify-center gap-2 transition-colors ${
                       isDropTarget
                         ? 'border-orange-500/60 text-orange-300 bg-orange-500/5'
                         : 'border-slate-800/60 text-slate-500'
@@ -691,9 +723,10 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                       <span>Sin prospectos en <strong>{stage.label}</strong>. Arrastra una tarjeta aquí para cambiar de fase.</span>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                    <div className="flex flex-col gap-3.5">
                       {stageLeads.map(lead => {
                         const isDragging = draggingLeadId === lead.id;
+                        const conPresupuesto = tienePresupuesto(lead);
 
                         return (
                           <div
@@ -708,76 +741,104 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                               setDraggingLeadId(null);
                               setDragOverStage(null);
                             }}
-                            className={`p-3.5 rounded-xl bg-[#111624] border transition-all duration-150 shadow-sm flex flex-col gap-2.5 cursor-grab active:cursor-grabbing hover:border-orange-500/50 hover:shadow-lg hover:shadow-orange-950/10 ${
+                            className={`p-4 rounded-xl bg-[#101524] border transition-all duration-150 shadow-md flex flex-col gap-3 cursor-grab active:cursor-grabbing hover:border-orange-500/50 hover:shadow-xl ${
                               isDragging
-                                ? 'opacity-30 border-dashed border-orange-500 scale-95'
-                                : 'border-slate-800/80'
+                                ? 'opacity-30 border-dashed border-orange-500 scale-98'
+                                : 'border-slate-800'
                             }`}
                           >
-                            {/* Card Top: Company, Contact, Country & Temperature */}
-                            <div className="flex items-start justify-between gap-1.5">
+                            {/* 1. Header: Empresa y País */}
+                            <div className="flex items-start justify-between gap-2.5">
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-bold text-xs text-white truncate" title={lead.empresa}>
+                                <h4 className="font-bold text-sm text-white leading-tight break-words">
                                   {lead.empresa}
                                 </h4>
-                                <p className="text-[11px] text-slate-400 truncate">
-                                  {lead.contacto} · <span className="text-slate-500">{lead.cargo}</span>
-                                </p>
+                                <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
+                                  <User className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                  <span className="font-medium text-slate-300">{lead.contacto}</span>
+                                  {lead.cargo && <span className="text-slate-500">· {lead.cargo}</span>}
+                                </div>
+                                {lead.dominio && (
+                                  <div className="text-[11px] font-mono text-slate-500 mt-0.5 truncate">
+                                    🌐 {lead.dominio}
+                                  </div>
+                                )}
                               </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <span className="text-xs" title={lead.pais === 'SV' ? 'El Salvador' : 'República Dominicana'}>
-                                  {lead.pais === 'SV' ? '🇸🇻' : '🇩🇴'}
+                              <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#090d16] border border-slate-800 text-xs font-medium text-slate-300">
+                                <span>{lead.pais === 'SV' ? '🇸🇻' : '🇩🇴'}</span>
+                                <span className="text-[11px]">{lead.pais === 'SV' ? 'El Salvador' : 'Rep. Dom.'}</span>
+                              </div>
+                            </div>
+
+                            {/* 2. Estado del Presupuesto (¡Sin precios ficticios en prospección!) */}
+                            {conPresupuesto ? (
+                              <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-xs">
+                                <div className="flex items-center gap-1.5 text-emerald-300 font-semibold">
+                                  <DollarSign className="w-4 h-4 text-emerald-400 shrink-0" />
+                                  <span>Presupuesto Cotizado:</span>
+                                  <span className="font-mono font-bold text-white text-sm">
+                                    ${Number(lead.presupuestoMonto || lead.valorEstimado || 1500).toLocaleString()} USD
+                                  </span>
+                                </div>
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
+                                  {lead.etapa === 'ganado' ? 'Firmado' : 'Propuesta'}
                                 </span>
                               </div>
-                            </div>
-
-                            {/* Value and Probability */}
-                            <div className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-[#0d121c] border border-slate-800/60 text-[11px]">
-                              <span className="font-mono font-bold text-orange-400">
-                                ${Number(lead.valorEstimado || 1500).toLocaleString()} USD
-                              </span>
-                              <span className="text-[10px] text-slate-400 font-mono">
-                                {lead.probabilidad || 50}% prob.
-                              </span>
-                            </div>
-
-                            {/* Actions & Mover */}
-                            <div className="flex items-center justify-between pt-1">
-                              <div className="flex items-center gap-1.5">
-                                {lead.telefono && (
-                                  <a
-                                    href={`https://wa.me/${lead.telefono.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${lead.contacto}, un saludo desde Goglite. Estuvimos analizando ${lead.empresa} y tenemos una propuesta de alto impacto para su captación web.`)}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    title="Abrir WhatsApp"
-                                    className="w-7 h-7 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 flex items-center justify-center transition-colors"
-                                  >
-                                    <MessageSquare className="w-3.5 h-3.5" />
-                                  </a>
-                                )}
-                                {lead.email && (
-                                  <a
-                                    href={`mailto:${lead.email}?subject=Propuesta Estratégica para ${lead.empresa}`}
-                                    title="Enviar Correo"
-                                    className="w-7 h-7 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 flex items-center justify-center transition-colors"
-                                  >
-                                    <Mail className="w-3.5 h-3.5" />
-                                  </a>
-                                )}
-                                <button
-                                  onClick={() => setActiveLeadModal(lead)}
-                                  title="Bitácora e Interacciones"
-                                  className="h-7 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1 transition-colors text-[10px] font-mono"
-                                >
-                                  💬 {lead.interacciones?.length || 0}
-                                </button>
+                            ) : (
+                              <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#0a0e18] border border-slate-800/80 text-xs text-slate-400">
+                                <div className="flex items-center gap-1.5">
+                                  <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                  <span>Sin presupuesto generado aún</span>
+                                </div>
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700/60">
+                                  Prospección
+                                </span>
                               </div>
+                            )}
 
-                              {/* Manual Stage Fallback */}
+                            {/* 3. Botones de Contacto Directo & Bitácora (Bien espaciados y con textos claros) */}
+                            <div className="flex items-center gap-2 pt-0.5">
+                              {lead.telefono ? (
+                                <a
+                                  href={`https://wa.me/${lead.telefono.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${lead.contacto}, un saludo desde Goglite.`)}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title="Abrir WhatsApp"
+                                  className="flex-1 py-1.5 px-2.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 flex items-center justify-center gap-1.5 text-xs font-semibold transition-colors"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                  <span>WhatsApp</span>
+                                </a>
+                              ) : null}
+
+                              {lead.email ? (
+                                <a
+                                  href={`mailto:${lead.email}?subject=Contacto desde Goglite Agencia`}
+                                  title="Enviar Correo"
+                                  className="flex-1 py-1.5 px-2.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 flex items-center justify-center gap-1.5 text-xs font-semibold transition-colors"
+                                >
+                                  <Mail className="w-3.5 h-3.5" />
+                                  <span>Correo</span>
+                                </a>
+                              ) : null}
+
+                              <button
+                                onClick={() => setActiveLeadModal(lead)}
+                                title="Bitácora e Interacciones"
+                                className="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60 flex items-center justify-center gap-1.5 text-xs font-medium transition-colors"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5 text-orange-400" />
+                                <span>💬 {lead.interacciones?.length || 0}</span>
+                              </button>
+                            </div>
+
+                            {/* 4. Selector de Etapa integrado (Ancho 100% sin desbordes de ningún botón) */}
+                            <div className="flex items-center gap-2 pt-1 border-t border-slate-800/80">
+                              <span className="text-[11px] font-mono text-slate-400 shrink-0">Mover etapa:</span>
                               <select
                                 value={lead.etapa}
                                 onChange={(e) => handleStageChange(lead.id, e.target.value)}
-                                className="text-[10px] bg-[#171e2e] border border-slate-700 rounded-lg px-2 py-1 text-slate-300 focus:outline-none focus:border-orange-500 cursor-pointer"
+                                className="flex-1 text-xs bg-[#090d16] border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-orange-500 cursor-pointer"
                               >
                                 {PIPELINE_STAGES.map(s => (
                                   <option key={s.id} value={s.id}>{s.label}</option>
@@ -785,14 +846,18 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                               </select>
                             </div>
 
-                            {/* Bottom Primary Action: Crear Presupuesto */}
-                            <div className="pt-2 border-t border-slate-800/60">
+                            {/* 5. Acción Principal: Generar Presupuesto */}
+                            <div className="pt-1">
                               <button
                                 onClick={() => onConvertToPresupuesto && onConvertToPresupuesto(lead)}
-                                className="w-full py-1.5 px-2.5 rounded-lg bg-orange-600/15 hover:bg-orange-600/25 text-orange-400 border border-orange-500/30 font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                                className={`w-full py-2 px-3 rounded-lg font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-md ${
+                                  conPresupuesto
+                                    ? 'bg-slate-800 hover:bg-slate-700 text-orange-400 border border-orange-500/30'
+                                    : 'bg-orange-600 hover:bg-orange-500 text-white shadow-orange-950/40'
+                                }`}
                               >
-                                <FileText className="w-3.5 h-3.5" />
-                                <span>Generar Presupuesto →</span>
+                                <FileText className="w-4 h-4" />
+                                <span>{conPresupuesto ? 'Ver / Modificar Presupuesto →' : 'Generar Presupuesto →'}</span>
                               </button>
                             </div>
                           </div>
