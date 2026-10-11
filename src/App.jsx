@@ -55,7 +55,16 @@ export default function App() {
     return null;
   });
 
-  const [activeModule, setActiveModule] = useState('crm_portal'); // 'lead_scrapper' | 'crm_portal' | 'presupuestos'
+  const [activeModule, setActiveModule] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('goglite_active_module')) || 'crm_portal';
+  }); // 'lead_scrapper' | 'crm_portal' | 'presupuestos'
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('goglite_active_module', activeModule);
+    }
+  }, [activeModule]);
+
   const [activeTab, setActiveTab] = useState('buscar'); // 'buscar' | 'sugerencias' | 'leads' | 'ajustes'
   const [selectedCountry, setSelectedCountry] = useState('SV'); // 'SV' | 'DO'
   const [searchMode, setSearchMode] = useState('maps'); // 'maps' | 'web'
@@ -70,8 +79,21 @@ export default function App() {
   const [isPipelineRunning, setIsPipelineRunning] = useState(false);
   const [pipelineProgress, setPipelineProgress] = useState('');
 
-  // State for Leads
-  const [leads, setLeads] = useState([]);
+  // State for Leads con persistencia local
+  const [leads, setLeads] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const cached = localStorage.getItem('goglite_outbound_leads');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Error leyendo caché local de leads:', e);
+    }
+    return [];
+  });
   const [leadFilter, setLeadFilter] = useState('todos');
   const [leadSearchTerm, setLeadSearchTerm] = useState('');
   
@@ -106,9 +128,12 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setLeads(data);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('goglite_outbound_leads', JSON.stringify(data));
+        }
       }
     } catch (err) {
-      console.error('Error fetching leads:', err);
+      console.warn('Backend API offline o en hosting estático, operando con almacenamiento local persistente:', err);
     }
   };
 
@@ -293,8 +318,22 @@ export default function App() {
     setActiveTab('leads');
   };
 
-  // Change lead status
+  // Change lead status con persistencia inmediata
   const handleUpdateLeadStatus = async (leadId, newStatus) => {
+    // 1. Guardar de inmediato en memoria y localStorage
+    setLeads(prev => {
+      const updated = prev.map(l => l.id === leadId ? { ...l, estado: newStatus, actualizado: new Date().toISOString().split('T')[0] } : l);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('goglite_outbound_leads', JSON.stringify(updated));
+      }
+      return updated;
+    });
+
+    if (selectedLeadModal && selectedLeadModal.id === leadId) {
+      setSelectedLeadModal(prev => ({ ...prev, estado: newStatus }));
+    }
+
+    // 2. Sincronizar con API backend
     try {
       await fetch(`/api/leads/${leadId}`, {
         method: 'PATCH',
@@ -302,11 +341,8 @@ export default function App() {
         body: JSON.stringify({ estado: newStatus })
       });
       fetchLeads();
-      if (selectedLeadModal && selectedLeadModal.id === leadId) {
-        setSelectedLeadModal(prev => ({ ...prev, estado: newStatus }));
-      }
     } catch (err) {
-      console.error(err);
+      console.warn('Cambio guardado localmente (API offline):', err);
     }
   };
 
@@ -316,6 +352,24 @@ export default function App() {
 
   const handleSendEmail = async (leadId, provider = 'resend', overrideEmail = null) => {
     setIsSendingEmail(true);
+    const targetStatus = provider === 'resend' ? 'enviado_resend' : 'enviado_instantly';
+    
+    // 1. Persistencia local inmediata
+    setLeads(prev => {
+      const updated = prev.map(l => l.id === leadId ? { ...l, estado: targetStatus, actualizado: new Date().toISOString().split('T')[0] } : l);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('goglite_outbound_leads', JSON.stringify(updated));
+      }
+      return updated;
+    });
+
+    if (selectedLeadModal && selectedLeadModal.id === leadId) {
+      setSelectedLeadModal(prev => ({
+        ...prev,
+        estado: targetStatus
+      }));
+    }
+
     try {
       const res = await fetch('/api/send-email', {
         method: 'POST',
@@ -330,12 +384,6 @@ export default function App() {
       if (!res.ok) throw new Error(data.message || data.error);
       fetchLeads();
       alert(data.message || `Correo procesado con éxito vía ${provider === 'resend' ? 'Resend ($0.00)' : 'Instantly.ai'}.`);
-      if (selectedLeadModal && selectedLeadModal.id === leadId) {
-        setSelectedLeadModal(prev => ({
-          ...prev,
-          estado: provider === 'resend' ? 'enviado_resend' : 'enviado_instantly'
-        }));
-      }
     } catch (err) {
       alert('Aviso de Envío: ' + err.message);
     } finally {

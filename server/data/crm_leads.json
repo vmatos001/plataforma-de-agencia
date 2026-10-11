@@ -9,9 +9,9 @@
     "telefono": "+1 809 6845-5645",
     "pais": "DO",
     "dominio": "inmobiliariaspuntacanamodernosantodomingo.do",
-    "etapa": "contactado",
+    "etapa": "nuevo",
     "valorEstimado": 950,
-    "probabilidad": 25,
+    "probabilidad": 10,
     "fuente": "Scraper Google SERP",
     "portalToken": "portal-lead-1791605700142-83et-kkwqjl",
     "interacciones": [
@@ -101,9 +101,9 @@
     "telefono": "+1 809 6070-4870",
     "pais": "DO",
     "dominio": "grupoinmobiliariaspuntacanacaribe.com",
-    "etapa": "contactado",
+    "etapa": "reunion",
     "valorEstimado": 1500,
-    "probabilidad": 25,
+    "probabilidad": 45,
     "fuente": "Scraper Google SERP",
     "portalToken": "portal-lead-1791605700359-bisg-q34hq7",
     "interacciones": [
@@ -144,7 +144,7 @@
       "proyectoId": null
     },
     "creadoEn": "2026-10-08",
-    "actualizadoEn": "2026-10-10",
+    "actualizadoEn": "2026-10-11",
     "whatsappData": {
       "telefono": "+1 809 6070-4870",
       "temperatura": "tibio",
@@ -185,9 +185,9 @@
     "telefono": "+503 2260-4490",
     "pais": "SV",
     "dominio": "clinicadentalsv.com",
-    "etapa": "reunion",
+    "etapa": "propuesta_enviada",
     "valorEstimado": 2200,
-    "probabilidad": 40,
+    "probabilidad": 65,
     "fuente": "Scraper Google SERP",
     "portalToken": "portal-lead-sv-001-8wkxma",
     "interacciones": [
@@ -221,8 +221,8 @@
     ],
     "portalConfig": {
       "portalActivo": true,
-      "faseActual": "Diagnóstico Comercial",
-      "progresoPorcentaje": 10,
+      "faseActual": "Presupuesto Presentado",
+      "progresoPorcentaje": 25,
       "archivosSubidos": [
         {
           "id": "f-1",
@@ -237,7 +237,7 @@
       "proyectoId": null
     },
     "creadoEn": "2026-10-08",
-    "actualizadoEn": "2026-10-10",
+    "actualizadoEn": "2026-10-11",
     "whatsappData": {
       "telefono": "+503 2260-4490",
       "temperatura": "caliente",

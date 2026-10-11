@@ -216,12 +216,175 @@ const WHATSAPP_SCRIPTS = [
   }
 ];
 
+// Semilla inicial enriquecida para que la plataforma nunca esté vacía
+const SEED_CRM_LEADS = [
+  {
+    id: "crm-lead-1",
+    empresa: "Inmobiliarias Punta Cana Moderno Santo Domingo",
+    contacto: "Lic. Marcos Almonte",
+    cargo: "Director General & Socio",
+    email: "marcos@inmobiliariaspuntacanamodernosantodomingo.do",
+    telefono: "+1 809 6845-5645",
+    pais: "DO",
+    dominio: "inmobiliariaspuntacanamodernosantodomingo.do",
+    etapa: "nuevo",
+    valorEstimado: 950,
+    probabilidad: 10,
+    fuente: "Scraper Google SERP",
+    portalToken: "portal-lead-1",
+    interacciones: [
+      { id: "int-1", tipo: "nota", fecha: "2026-10-09", titulo: "Diagnóstico Inicial Detectado", detalle: "Prospecto captado vía Scraper. Puntos críticos: falta de Schema JSON-LD y tiempo de respuesta." }
+    ],
+    whatsappData: {
+      telefono: "+1 809 6845-5645",
+      temperatura: "tibio",
+      estadoSeguimiento: "dia_1_valor",
+      mensajes: [
+        { id: "wa-1-1", emisor: "agencia", texto: "¡Hola Lic.! 👋 Qué gusto saludarte. Vi el sitio de Inmobiliarias Punta Cana Moderno Santo Domingo y noté que tarda más de 4.5s en abrir en celulares en conexiones locales. ¿Me permites hacerte un par de preguntas rápidas sobre cómo están captando clientes hoy?", fechaHora: "09 Oct 10:30", leido: true },
+        { id: "wa-1-2", emisor: "cliente", texto: "Hola, buenos días. Sí, cuéntame qué detectaron. La web la hicieron hace tiempo y casi no nos genera contactos directos.", fechaHora: "09 Oct 11:05", leido: true }
+      ]
+    }
+  },
+  {
+    id: "crm-lead-2",
+    empresa: "Grupo Inmobiliarias Punta Cana Caribe",
+    contacto: "Lic. Marcos Almonte",
+    cargo: "Director General & Socio",
+    email: "gerencia@grupoinmobiliariaspuntacanacaribe.com",
+    telefono: "+1 809 555-8900",
+    pais: "DO",
+    dominio: "grupoinmobiliariaspuntacanacaribe.com",
+    etapa: "reunion",
+    valorEstimado: 1500,
+    probabilidad: 45,
+    fuente: "Google Maps",
+    portalToken: "portal-lead-2",
+    interacciones: [],
+    whatsappData: {
+      telefono: "+1 809 555-8900",
+      temperatura: "tibio",
+      estadoSeguimiento: "dia_1_valor",
+      mensajes: [
+        { id: "wa-2-1", emisor: "agencia", texto: "Hola Lic. Marcos, gracias por la llamada de ayer. Quedamos en revisar la demo de alta conversión el jueves a las 10:00 AM.", fechaHora: "10 Oct 14:00", leido: true }
+      ]
+    }
+  },
+  {
+    id: "crm-lead-3",
+    empresa: "Clínica Dental San Salvador",
+    contacto: "Dr. Carlos Rodríguez",
+    cargo: "Director Médico & Propietario",
+    email: "dr.rodriguez@clinicadentalsv.com",
+    telefono: "+503 2260-4490",
+    pais: "SV",
+    dominio: "clinicadentalsv.com",
+    etapa: "propuesta_enviada",
+    presupuestoMonto: 2200,
+    valorEstimado: 2200,
+    probabilidad: 65,
+    fuente: "Google Maps",
+    portalToken: "portal-lead-3",
+    interacciones: [],
+    whatsappData: {
+      telefono: "+503 2260-4490",
+      temperatura: "caliente",
+      estadoSeguimiento: "dia_3_seguimiento",
+      mensajes: [
+        { id: "wa-3-1", emisor: "agencia", texto: "Estimado Dr. Rodríguez, ya le compartimos el presupuesto formal en su portal. Quedamos atentos a cualquier duda.", fechaHora: "11 Oct 11:30", leido: true }
+      ]
+    }
+  },
+  {
+    id: "crm-lead-4",
+    empresa: "Punta Cana Prime Realty",
+    contacto: "Lic. Alejandro Mendoza",
+    cargo: "Managing Director",
+    email: "alejandro@puntacanaprime.do",
+    telefono: "+1 809 552-0199",
+    pais: "DO",
+    dominio: "puntacanaprime.do",
+    etapa: "propuesta_enviada",
+    presupuestoMonto: 1800,
+    valorEstimado: 1800,
+    probabilidad: 60,
+    fuente: "Scraper Google",
+    portalToken: "portal-lead-4",
+    interacciones: [],
+    whatsappData: {
+      telefono: "+1 809 552-0199",
+      temperatura: "caliente",
+      estadoSeguimiento: "dia_3_seguimiento",
+      mensajes: [
+        { id: "wa-4-1", emisor: "agencia", texto: "Hola Alejandro, propuesta enviada por correo. ¿Pudiste revisarla?", fechaHora: "11 Oct 15:20", leido: true }
+      ]
+    }
+  },
+  {
+    id: "crm-lead-5",
+    empresa: "Lex Consultores Legales",
+    contacto: "Dra. Sofía Valiente",
+    cargo: "Socia Directora",
+    email: "contacto@lexcorporativo.sv",
+    telefono: "+503 2505-1200",
+    pais: "SV",
+    dominio: "lexcorporativo.sv",
+    etapa: "perdido",
+    valorEstimado: 3200,
+    probabilidad: 0,
+    fuente: "Google SERP",
+    portalToken: "portal-lead-5",
+    interacciones: [],
+    whatsappData: {
+      telefono: "+503 2505-1200",
+      temperatura: "frio",
+      estadoSeguimiento: "dia_7_cierre",
+      mensajes: [
+        { id: "wa-5-1", emisor: "agencia", texto: "Estimada Dra. Sofía, dejamos la propuesta en pausa. Éxitos en sus proyectos.", fechaHora: "09 Oct 18:00", leido: true }
+      ]
+    }
+  }
+];
+
 export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato }) {
-  const [leads, setLeads] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedCountry, setSelectedCountry] = useState('ALL'); // 'ALL' | 'SV' | 'DO'
+  // Persistencia local resiliente: Si recargas (F5), se lee de localStorage
+  const [leads, setLeads] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const cached = localStorage.getItem('goglite_crm_leads');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Error leyendo goglite_crm_leads de localStorage:', e);
+    }
+    return SEED_CRM_LEADS;
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('goglite_crm_country')) || 'ALL';
+  });
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('kanban'); // 'kanban' | 'tabla' | 'whatsapp_crm'
+  
+  const [activeTab, setActiveTab] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('goglite_crm_active_tab')) || 'kanban';
+  });
+  
+  // Guardar pestaña en localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('goglite_crm_active_tab', activeTab);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('goglite_crm_country', selectedCountry);
+    }
+  }, [selectedCountry]);
+
   const [dragOverStage, setDragOverStage] = useState(null);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [draggingLeadId, setDraggingLeadId] = useState(null);
@@ -257,7 +420,16 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   const [portalCopied, setPortalCopied] = useState(false);
 
   // WhatsApp CRM State
-  const [selectedWaLeadId, setSelectedWaLeadId] = useState(null);
+  const [selectedWaLeadId, setSelectedWaLeadId] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('goglite_crm_selected_wa_id')) || null;
+  });
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined' && selectedWaLeadId) {
+      localStorage.setItem('goglite_crm_selected_wa_id', selectedWaLeadId);
+    }
+  }, [selectedWaLeadId]);
+
   const [waSearchTerm, setWaSearchTerm] = useState('');
   const [waTemperatureFilter, setWaTemperatureFilter] = useState('ALL'); // 'ALL' | 'caliente' | 'tibio' | 'frio'
   const [waRole, setWaRole] = useState('agencia'); // 'agencia' | 'cliente'
@@ -265,7 +437,18 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   const [waScriptCategory, setWaScriptCategory] = useState('todos'); // 'todos' | 'diagnostico' | 'solucion' | 'objeciones' | 'followup' | 'cierre'
   const [waNotice, setWaNotice] = useState(null);
 
-  // Fetch leads
+  // Helper para persistir leads siempre en localStorage
+  const updateAndPersistLeads = (updater) => {
+    setLeads(prev => {
+      const nextLeads = typeof updater === 'function' ? updater(prev) : updater;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('goglite_crm_leads', JSON.stringify(nextLeads));
+      }
+      return nextLeads;
+    });
+  };
+
+  // Fetch leads de API y sincronizar con localStorage
   useEffect(() => {
     fetchCrmLeads();
   }, []);
@@ -276,42 +459,70 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       const res = await fetch('/api/crm/leads');
       if (res.ok) {
         const data = await res.json();
-        setLeads(data);
-        if (data.length > 0) {
+        if (Array.isArray(data) && data.length > 0) {
+          updateAndPersistLeads(data);
           if (!selectedPortalLeadId) setSelectedPortalLeadId(data[0].id);
           if (!selectedWaLeadId) setSelectedWaLeadId(data[0].id);
         }
       }
     } catch (err) {
-      console.error('Error fetching CRM leads:', err);
+      console.warn('API de CRM offline o estática, operando con almacenamiento local:', err);
+      // Aseguramos persistencia de la semilla si estaba vacía
+      if (leads.length === 0) {
+        updateAndPersistLeads(SEED_CRM_LEADS);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // WhatsApp CRM Handlers
+  // WhatsApp CRM Handlers con persistencia inmediata
   const handleSendWaMessage = async (e) => {
     if (e) e.preventDefault();
     if (!selectedWaLeadId || !waMessageInput.trim()) return;
 
+    const texto = waMessageInput.trim();
+    const emisor = waRole;
+    const now = new Date();
+    const timeStr = `${now.getDate()} ${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][now.getMonth()]} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    const nuevoMsg = {
+      id: 'wa-msg-' + Date.now(),
+      emisor,
+      texto,
+      fechaHora: timeStr,
+      leido: true
+    };
+
+    // 1. Guardar de inmediato en memoria y localStorage
+    updateAndPersistLeads(prev => prev.map(l => {
+      if (l.id === selectedWaLeadId) {
+        const wa = l.whatsappData || { mensajes: [] };
+        return {
+          ...l,
+          whatsappData: {
+            ...wa,
+            ultimoMensajeFecha: 'Hoy',
+            mensajes: [...(wa.mensajes || []), nuevoMsg]
+          }
+        };
+      }
+      return l;
+    }));
+
+    setWaMessageInput('');
+    setWaNotice('Mensaje guardado en CRM');
+    setTimeout(() => setWaNotice(null), 3000);
+
+    // 2. Sincronizar en segundo plano con el backend
     try {
-      const res = await fetch(`/api/crm/leads/${selectedWaLeadId}/whatsapp-message`, {
+      await fetch(`/api/crm/leads/${selectedWaLeadId}/whatsapp-message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          emisor: waRole,
-          texto: waMessageInput.trim()
-        })
+        body: JSON.stringify({ emisor, texto })
       });
-      if (res.ok) {
-        const updatedLead = await res.json();
-        setLeads(prev => prev.map(l => l.id === selectedWaLeadId ? updatedLead : l));
-        setWaMessageInput('');
-        setWaNotice('Mensaje guardado en el historial de WhatsApp');
-        setTimeout(() => setWaNotice(null), 3000);
-      }
     } catch (err) {
-      console.error('Error enviando mensaje WhatsApp:', err);
+      console.warn('Mensaje guardado localmente (Backend offline):', err);
     }
   };
 
@@ -324,18 +535,30 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   };
 
   const handleUpdateWaMeta = async (leadId, metaUpdate) => {
+    // 1. Guardar de inmediato en memoria y localStorage
+    updateAndPersistLeads(prev => prev.map(l => {
+      if (l.id === leadId) {
+        return {
+          ...l,
+          etapa: metaUpdate.etapa !== undefined ? metaUpdate.etapa : l.etapa,
+          whatsappData: {
+            ...(l.whatsappData || {}),
+            ...metaUpdate
+          }
+        };
+      }
+      return l;
+    }));
+
+    // 2. Sincronizar en segundo plano
     try {
-      const res = await fetch(`/api/crm/leads/${leadId}/whatsapp-meta`, {
+      await fetch(`/api/crm/leads/${leadId}/whatsapp-meta`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(metaUpdate)
       });
-      if (res.ok) {
-        const updatedLead = await res.json();
-        setLeads(prev => prev.map(l => l.id === leadId ? updatedLead : l));
-      }
     } catch (err) {
-      console.error('Error actualizando metadatos WhatsApp:', err);
+      console.warn('Metadatos guardados localmente (Backend offline):', err);
     }
   };
 
@@ -347,31 +570,61 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
 
   const handleDirectLaunchScript = async (lead, scriptText) => {
     if (!lead) return;
-    // 1. Open WhatsApp Web / App
     handleOpenRealWhatsApp(lead, scriptText);
-    // 2. Also register in chat CRM
+
+    const now = new Date();
+    const timeStr = `${now.getDate()} ${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][now.getMonth()]} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const nuevoMsg = {
+      id: 'wa-msg-' + Date.now(),
+      emisor: 'agencia',
+      texto: scriptText,
+      fechaHora: timeStr,
+      leido: true
+    };
+
+    updateAndPersistLeads(prev => prev.map(l => {
+      if (l.id === lead.id) {
+        const wa = l.whatsappData || { mensajes: [] };
+        return {
+          ...l,
+          whatsappData: {
+            ...wa,
+            ultimoMensajeFecha: 'Hoy',
+            mensajes: [...(wa.mensajes || []), nuevoMsg]
+          }
+        };
+      }
+      return l;
+    }));
+
+    setWaNotice('Mensaje lanzado a wa.me y guardado en CRM');
+    setTimeout(() => setWaNotice(null), 3000);
+
     try {
-      const res = await fetch(`/api/crm/leads/${lead.id}/whatsapp-message`, {
+      await fetch(`/api/crm/leads/${lead.id}/whatsapp-message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          emisor: 'agencia',
-          texto: scriptText
-        })
+        body: JSON.stringify({ emisor: 'agencia', texto: scriptText })
       });
-      if (res.ok) {
-        const updatedLead = await res.json();
-        setLeads(prev => prev.map(l => l.id === lead.id ? updatedLead : l));
-        setWaNotice('Mensaje lanzado a wa.me y guardado en CRM');
-        setTimeout(() => setWaNotice(null), 3000);
-      }
     } catch (err) {
-      console.error('Error guardando mensaje lanzado:', err);
+      console.warn('Lanzamiento guardado localmente:', err);
     }
   };
 
-  // Change lead stage
+  // Change lead stage con persistencia inmediata
   const handleStageChange = async (leadId, newStage) => {
+    // 1. Persistencia inmediata local
+    updateAndPersistLeads(prev => prev.map(l => {
+      if (l.id === leadId) {
+        return { ...l, etapa: newStage };
+      }
+      return l;
+    }));
+    if (activeLeadModal && activeLeadModal.id === leadId) {
+      setActiveLeadModal(prev => ({ ...prev, etapa: newStage }));
+    }
+
+    // 2. Sincronizar en segundo plano con el backend
     try {
       const res = await fetch(`/api/crm/leads/${leadId}/stage`, {
         method: 'PATCH',
@@ -380,21 +633,52 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       });
       if (res.ok) {
         const updated = await res.json();
-        setLeads(prev => prev.map(l => l.id === leadId ? updated : l));
+        updateAndPersistLeads(prev => prev.map(l => l.id === leadId ? updated : l));
         if (activeLeadModal && activeLeadModal.id === leadId) {
           setActiveLeadModal(updated);
         }
       }
     } catch (err) {
-      console.error('Error actualizando etapa:', err);
+      console.warn('Etapa guardada localmente (backend offline):', err);
     }
   };
 
-  // Add interaction
+  // Add interaction con persistencia inmediata
   const handleAddInteraction = async (e) => {
     e.preventDefault();
     if (!activeLeadModal || !interactionForm.titulo) return;
 
+    const nuevaInteraccion = {
+      id: 'inter-' + Date.now(),
+      fecha: new Date().toISOString(),
+      ...interactionForm
+    };
+
+    // 1. Persistencia inmediata local
+    updateAndPersistLeads(prev => prev.map(l => {
+      if (l.id === activeLeadModal.id) {
+        const interacciones = l.interacciones || [];
+        return {
+          ...l,
+          interacciones: [nuevaInteraccion, ...interacciones]
+        };
+      }
+      return l;
+    }));
+    setActiveLeadModal(prev => ({
+      ...prev,
+      interacciones: [nuevaInteraccion, ...(prev.interacciones || [])]
+    }));
+
+    setInteractionForm({
+      tipo: 'whatsapp',
+      titulo: '',
+      detalle: '',
+      proximoPaso: '',
+      fechaProximoPaso: ''
+    });
+
+    // 2. Sincronizar en segundo plano
     try {
       const res = await fetch(`/api/crm/leads/${activeLeadModal.id}/interactions`, {
         method: 'POST',
@@ -403,24 +687,47 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       });
       if (res.ok) {
         const updated = await res.json();
-        setLeads(prev => prev.map(l => l.id === activeLeadModal.id ? updated : l));
+        updateAndPersistLeads(prev => prev.map(l => l.id === activeLeadModal.id ? updated : l));
         setActiveLeadModal(updated);
-        setInteractionForm({
-          tipo: 'whatsapp',
-          titulo: '',
-          detalle: '',
-          proximoPaso: '',
-          fechaProximoPaso: ''
-        });
       }
     } catch (err) {
-      console.error('Error agregando interacción:', err);
+      console.warn('Interacción guardada localmente (backend offline):', err);
     }
   };
 
-  // Create new lead
+  // Create new lead con persistencia inmediata
   const handleCreateLead = async (e) => {
     e.preventDefault();
+    const tempLead = {
+      id: 'lead-local-' + Date.now(),
+      ...newLeadForm,
+      interacciones: [],
+      whatsappData: {
+        telefono: newLeadForm.telefono,
+        mensajes: [],
+        ultimoMensajeFecha: 'Ahora',
+        etapaConversacion: 'primer_contacto'
+      },
+      createdAt: new Date().toISOString()
+    };
+
+    // 1. Persistencia local inmediata
+    updateAndPersistLeads(prev => [tempLead, ...prev]);
+    setCreateLeadModalOpen(false);
+    setNewLeadForm({
+      empresa: '',
+      contacto: '',
+      cargo: '',
+      email: '',
+      telefono: '',
+      pais: 'SV',
+      dominio: '',
+      valorEstimado: 1500,
+      etapa: 'nuevo',
+      notasIniciales: ''
+    });
+
+    // 2. Sincronizar en segundo plano
     try {
       const res = await fetch('/api/crm/leads', {
         method: 'POST',
@@ -429,23 +736,10 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       });
       if (res.ok) {
         const created = await res.json();
-        setLeads(prev => [created, ...prev]);
-        setCreateLeadModalOpen(false);
-        setNewLeadForm({
-          empresa: '',
-          contacto: '',
-          cargo: '',
-          email: '',
-          telefono: '',
-          pais: 'SV',
-          dominio: '',
-          valorEstimado: 1500,
-          etapa: 'nuevo',
-          notasIniciales: ''
-        });
+        updateAndPersistLeads(prev => prev.map(l => l.id === tempLead.id ? created : l));
       }
     } catch (err) {
-      console.error('Error creando lead:', err);
+      console.warn('Lead guardado localmente (backend offline):', err);
     }
   };
 
