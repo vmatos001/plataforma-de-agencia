@@ -1,5 +1,20 @@
 [
   {
+    "id": "search-1791700043950",
+    "query": "clinicas dentales san salvador",
+    "country": "SV",
+    "searchMode": "maps",
+    "timestamp": "2026-10-11T06:27:23.950Z",
+    "resultsCount": 10
+  },
+  {
+    "id": "search-1791698327661",
+    "query": "inmobiliaria punta cana",
+    "country": "DO",
+    "timestamp": "2026-10-11T05:58:47.661Z",
+    "resultsCount": 10
+  },
+  {
     "id": "search-1791691064865",
     "query": "clinicas dentales ",
     "country": "SV",
