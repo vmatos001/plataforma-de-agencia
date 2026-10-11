@@ -66,7 +66,8 @@ app.get('/api/status', (req, res) => {
       gemini: Boolean(settings.geminiApiKey),
       serper: Boolean(settings.serperApiKey),
       apollo: Boolean(settings.apolloApiKey),
-      instantly: Boolean(settings.instantlyApiKey)
+      instantly: Boolean(settings.instantlyApiKey),
+      resend: Boolean(settings.resendApiKey)
     }
   });
 });
@@ -80,6 +81,7 @@ app.get('/api/settings', (req, res) => {
     serperApiKeyMasked: settings.serperApiKey ? `${settings.serperApiKey.slice(0, 4)}...${settings.serperApiKey.slice(-4)}` : '',
     apolloApiKeyMasked: settings.apolloApiKey ? `${settings.apolloApiKey.slice(0, 4)}...${settings.apolloApiKey.slice(-4)}` : '',
     instantlyApiKeyMasked: settings.instantlyApiKey ? `${settings.instantlyApiKey.slice(0, 4)}...${settings.instantlyApiKey.slice(-4)}` : '',
+    resendApiKeyMasked: settings.resendApiKey ? `${settings.resendApiKey.slice(0, 4)}...${settings.resendApiKey.slice(-4)}` : '',
   };
   res.json(masked);
 });
@@ -335,17 +337,130 @@ app.get('/api/export/csv', (req, res) => {
   res.send('\uFEFF' + csvContent); // BOM for Excel
 });
 
-// 9. Send to Instantly API or mark sent
-app.post('/api/send-instantly', async (req, res) => {
-  const { leadId } = req.body;
-  const leads = getLeads();
-  const lead = leads.find(l => l.id === leadId);
+// 9. Send Email via Resend ($0.00 Free Tier) or Instantly.ai
+app.post('/api/send-email', async (req, res) => {
+  try {
+    const { leadId, provider = 'resend', subject, customPitch } = req.body;
+    const leads = getLeads();
+    const lead = leads.find(l => l.id === leadId);
 
+    if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
+
+    const settings = getSettings();
+    const pitchToSend = customPitch || lead.pitch || 'Hola, me pongo en contacto con respecto a su presencia digital.';
+    const emailSubject = subject || `Pregunta rápida sobre ${lead.nombreEmpresa || lead.dominio}`;
+
+    if (provider === 'resend') {
+      if (!settings.resendApiKey) {
+        return res.status(400).json({
+          error: 'Resend API Key no configurada',
+          message: 'Configura tu Resend API Key en la pestaña Ajustes & APIs para enviar hasta 3,000 correos gratis al mes con el stack $0.00.'
+        });
+      }
+
+      const fromAddress = settings.resendFromEmail || 'Goglite Agencia <onboarding@resend.dev>';
+      
+      const resendResponse = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${settings.resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: fromAddress,
+          to: [lead.email],
+          subject: emailSubject,
+          text: pitchToSend,
+          html: `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; padding: 20px;">
+            ${pitchToSend.replace(/\n/g, '<br/>')}
+            <br/><br/>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+            <small style="color: #64748b; font-size: 11px;">Enviado vía Goglite Agency Suite · Infraestructura Resend ($0.00 Stack)</small>
+          </div>`
+        })
+      });
+
+      const resendData = await resendResponse.json();
+      if (!resendResponse.ok) {
+        throw new Error(resendData.message || resendData.error || 'Error al enviar email con Resend');
+      }
+
+      lead.estado = 'enviado_resend';
+      lead.actualizado = new Date().toISOString().split('T')[0];
+      lead.ultimoEnvio = {
+        proveedor: 'resend',
+        emailId: resendData.id,
+        fecha: new Date().toISOString()
+      };
+      saveLeads(leads);
+
+      return res.json({
+        success: true,
+        provider: 'resend',
+        id: resendData.id,
+        lead,
+        message: `Correo enviado con éxito a ${lead.email} mediante Resend ($0.00 Stack).`
+      });
+    } else if (provider === 'instantly') {
+      if (!settings.instantlyApiKey) {
+        return res.status(400).json({
+          error: 'Instantly.ai API Key no configurada',
+          message: 'Configura tu Instantly API Key en la pestaña Ajustes & APIs para enviar a secuencias de calentamiento.'
+        });
+      }
+
+      try {
+        await fetch('https://api.instantly.ai/api/v1/lead/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_key: settings.instantlyApiKey,
+            email: lead.email,
+            first_name: lead.responsable?.split(' ')[0] || '',
+            last_name: lead.responsable?.split(' ').slice(1).join(' ') || '',
+            company_name: lead.nombreEmpresa || lead.dominio,
+            custom_variables: {
+              dominio: lead.dominio,
+              pitch: pitchToSend
+            }
+          })
+        });
+      } catch (e) {
+        console.warn('Instantly push warning:', e.message);
+      }
+
+      lead.estado = 'enviado_instantly';
+      lead.actualizado = new Date().toISOString().split('T')[0];
+      lead.ultimoEnvio = {
+        proveedor: 'instantly',
+        fecha: new Date().toISOString()
+      };
+      saveLeads(leads);
+
+      return res.json({
+        success: true,
+        provider: 'instantly',
+        lead,
+        message: 'Lead enviado a la cola de Instantly.ai con éxito.'
+      });
+    } else {
+      return res.status(400).json({ error: 'Proveedor no válido. Usa "resend" o "instantly".' });
+    }
+  } catch (err) {
+    console.error('[EMAIL ERROR]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Legacy / alias endpoint
+app.post('/api/send-instantly', async (req, res) => {
+  req.body.provider = 'instantly';
+  const leads = getLeads();
+  const lead = leads.find(l => l.id === req.body.leadId);
   if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
 
   const settings = getSettings();
   if (settings.instantlyApiKey) {
-    // Call Instantly API webhook / lead push if configured
     try {
       await fetch('https://api.instantly.ai/api/v1/lead/add', {
         method: 'POST',
@@ -367,11 +482,9 @@ app.post('/api/send-instantly', async (req, res) => {
     }
   }
 
-  // Update lead status
   lead.estado = 'enviado_instantly';
   lead.actualizado = new Date().toISOString().split('T')[0];
   saveLeads(leads);
-
   res.json({ success: true, lead });
 });
 

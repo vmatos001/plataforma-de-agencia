@@ -210,6 +210,9 @@ export const getSettings = () => {
     serperApiKey: process.env.SERPER_API_KEY || "",
     apolloApiKey: process.env.APOLLO_API_KEY || "",
     instantlyApiKey: process.env.INSTANTLY_API_KEY || "",
+    resendApiKey: process.env.RESEND_API_KEY || "",
+    resendFromEmail: process.env.RESEND_FROM_EMAIL || "Goglite Agencia <onboarding@resend.dev>",
+    preferredEmailProvider: process.env.PREFERRED_EMAIL_PROVIDER || "resend", // "resend" | "instantly"
     defaultCountry: "SV",
     demoMode: true, // Enables rich heuristic simulator if external paid keys aren't set
   };
@@ -227,6 +230,9 @@ export const getSettings = () => {
       serperApiKey: (fileSettings.serperApiKey && fileSettings.serperApiKey.trim()) || process.env.SERPER_API_KEY || "",
       apolloApiKey: (fileSettings.apolloApiKey && fileSettings.apolloApiKey.trim()) || process.env.APOLLO_API_KEY || "",
       instantlyApiKey: (fileSettings.instantlyApiKey && fileSettings.instantlyApiKey.trim()) || process.env.INSTANTLY_API_KEY || "",
+      resendApiKey: (fileSettings.resendApiKey && fileSettings.resendApiKey.trim()) || process.env.RESEND_API_KEY || "",
+      resendFromEmail: (fileSettings.resendFromEmail && fileSettings.resendFromEmail.trim()) || process.env.RESEND_FROM_EMAIL || "Goglite Agencia <onboarding@resend.dev>",
+      preferredEmailProvider: fileSettings.preferredEmailProvider || process.env.PREFERRED_EMAIL_PROVIDER || "resend",
     };
   } catch {
     return defaultSettings;

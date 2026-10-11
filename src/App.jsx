@@ -86,6 +86,9 @@ export default function App() {
     serperApiKey: '',
     apolloApiKey: '',
     instantlyApiKey: '',
+    resendApiKey: '',
+    resendFromEmail: 'Goglite Agencia <onboarding@resend.dev>',
+    preferredEmailProvider: 'resend',
     defaultCountry: 'SV'
   });
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -307,20 +310,35 @@ export default function App() {
     }
   };
 
-  // Send to instantly
-  const handleSendInstantly = async (leadId) => {
+  // Send email via Resend ($0.00 stack) or Instantly
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
+  const handleSendEmail = async (leadId, provider = 'resend') => {
+    setIsSendingEmail(true);
     try {
-      await fetch('/api/send-instantly', {
+      const res = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadId })
+        body: JSON.stringify({ leadId, provider })
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error);
       fetchLeads();
-      alert('Lead enviado a la cola de Instantly con éxito.');
+      alert(data.message || `Correo procesado con éxito vía ${provider === 'resend' ? 'Resend ($0.00)' : 'Instantly.ai'}.`);
+      if (selectedLeadModal && selectedLeadModal.id === leadId) {
+        setSelectedLeadModal(prev => ({
+          ...prev,
+          estado: provider === 'resend' ? 'enviado_resend' : 'enviado_instantly'
+        }));
+      }
     } catch (err) {
-      alert('Error al enviar: ' + err.message);
+      alert('Aviso de Envío: ' + err.message);
+    } finally {
+      setIsSendingEmail(false);
     }
   };
+
+  const handleSendInstantly = (leadId) => handleSendEmail(leadId, 'instantly');
 
   // Delete lead
   const handleDeleteLead = async (leadId) => {
@@ -1325,7 +1343,8 @@ export default function App() {
                     { id: 'todos', label: 'Todos' },
                     { id: 'nuevo', label: 'Nuevo' },
                     { id: 'contactado', label: 'Contactado' },
-                    { id: 'enviado_instantly', label: 'Enviado a Instantly' },
+                    { id: 'enviado_resend', label: '⚡ Enviado Resend ($0.00)' },
+                    { id: 'enviado_instantly', label: '🔥 Enviado Instantly' },
                     { id: 'respondio', label: 'Respondió' },
                     { id: 'cliente', label: 'Cliente' },
                     { id: 'descartado', label: 'Descartado' },
@@ -1420,7 +1439,8 @@ export default function App() {
                               value={lead.estado}
                               onChange={(e) => handleUpdateLeadStatus(lead.id, e.target.value)}
                               className={`text-[10px] font-semibold px-2 py-1 rounded-md border bg-[#0b0f19] focus:outline-none cursor-pointer ${
-                                lead.estado === 'enviado_instantly' ? 'border-sky-500 text-sky-400' :
+                                lead.estado === 'enviado_resend' ? 'border-emerald-500 text-emerald-400 bg-emerald-950/20' :
+                                lead.estado === 'enviado_instantly' ? 'border-sky-500 text-sky-400 bg-sky-950/20' :
                                 lead.estado === 'cliente' ? 'border-emerald-500 text-emerald-400' :
                                 lead.estado === 'contactado' ? 'border-amber-500 text-amber-400' :
                                 lead.estado === 'respondio' ? 'border-purple-500 text-purple-400' :
@@ -1429,7 +1449,8 @@ export default function App() {
                             >
                               <option value="nuevo">Nuevo</option>
                               <option value="contactado">Contactado</option>
-                              <option value="enviado_instantly">Enviado a Instantly</option>
+                              <option value="enviado_resend">⚡ Enviado Resend ($0.00)</option>
+                              <option value="enviado_instantly">🔥 Enviado Instantly</option>
                               <option value="respondio">Respondió</option>
                               <option value="cliente">Cliente</option>
                               <option value="descartado">Descartado</option>
@@ -1478,11 +1499,18 @@ export default function App() {
                                 <FileText className="w-3.5 h-3.5" />
                               </button>
                               <button
-                                onClick={() => handleSendInstantly(lead.id)}
-                                className="p-1.5 rounded hover:bg-slate-700 text-sky-400"
-                                title="Enviar a Instantly"
+                                onClick={() => handleSendEmail(lead.id, 'resend')}
+                                className="p-1.5 rounded hover:bg-slate-700 text-emerald-400"
+                                title="Enviar Email con Resend ($0.00 Free Tier)"
                               >
                                 <Send className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleSendEmail(lead.id, 'instantly')}
+                                className="p-1.5 rounded hover:bg-slate-700 text-sky-400"
+                                title="Enviar a Campaña de Instantly.ai"
+                              >
+                                <Zap className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDeleteLead(lead.id)}
@@ -1508,11 +1536,30 @@ export default function App() {
               <div>
                 <h1 className="text-base font-bold text-slate-100">Ajustes & Conectores de APIs</h1>
                 <p className="text-xs text-slate-400">
-                  Configura tus credenciales para enriquecimiento automático y análisis profundo con IA.
+                  Configura tus credenciales para enriquecimiento automático, prospección y envíos de correo.
                 </p>
               </div>
 
-              <form onSubmit={handleSaveSettings} className="p-5 rounded-2xl bg-[#0e131d] border border-slate-800 space-y-4">
+              {/* STACK $0.00 SHOWCASE */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-[#0e131d] to-slate-900 border border-emerald-500/30 flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      STACK GRATUITO ($0.00 / MES)
+                    </span>
+                    <span className="text-xs text-slate-300 font-semibold">Infraestructura Outbound & Web</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Tu plataforma corre con servicios de nivel corporativo en su tier gratuito: <strong>Firebase Hosting</strong> ($0.00), <strong>Neon PostgreSQL</strong> ($0.00), <strong>Google Gemini AI</strong> ($0.00), <strong>Serper Google SERP</strong> ($0.00) y <strong>Resend</strong> (3,000 correos/mes a $0.00).
+                  </p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <span className="text-2xl font-black text-emerald-400 font-mono">$0.00</span>
+                  <p className="text-[10px] text-slate-500">Costo mensual</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveSettings} className="p-5 rounded-2xl bg-[#0e131d] border border-slate-800 space-y-5">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
                     Google Gemini API Key (IA de Auditorías y Pitches)
@@ -1529,7 +1576,7 @@ export default function App() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Serper.dev API Key (Scraping de Google SERP)
+                    Serper.dev API Key (Scraping de Google SERP y Maps)
                   </label>
                   <input
                     type="password"
@@ -1554,17 +1601,109 @@ export default function App() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Instantly.ai API Key (Envío Frío y Calentamiento)
-                  </label>
-                  <input
-                    type="password"
-                    value={settings.instantlyApiKey || ''}
-                    onChange={(e) => setSettings({ ...settings, instantlyApiKey: e.target.value })}
-                    placeholder="instantly_..."
-                    className="w-full bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-orange-500"
-                  />
+                {/* EMAIL PROVIDERS SECTION */}
+                <div className="pt-2 border-t border-slate-800/80 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-200">Motor de Email para Envíos de Prospección</h3>
+                      <p className="text-[11px] text-slate-400">Elige la alternativa gratuita del stack (Resend) o campañas frías (Instantly.ai).</p>
+                    </div>
+
+                    <div className="flex items-center gap-1 bg-[#080b11] p-1 rounded-xl border border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, preferredEmailProvider: 'resend' })}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                          settings.preferredEmailProvider === 'resend'
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        ⚡ Resend ($0.00)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, preferredEmailProvider: 'instantly' })}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                          settings.preferredEmailProvider === 'instantly'
+                            ? 'bg-sky-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        🔥 Instantly.ai
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* RESEND CONFIG */}
+                  <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/20 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <label className="text-xs font-bold text-emerald-300">
+                          Resend API Key (Alternativa Gratuita · 3,000 emails/mes gratis)
+                        </label>
+                      </div>
+                      <a
+                        href="https://resend.com"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-0.5 underline font-medium"
+                      >
+                        Obtener clave gratis en resend.com <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    </div>
+                    <input
+                      type="password"
+                      value={settings.resendApiKey || ''}
+                      onChange={(e) => setSettings({ ...settings, resendApiKey: e.target.value })}
+                      placeholder="re_123456789..."
+                      className="w-full bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500"
+                    />
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                        Remitente (From Email):
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.resendFromEmail || ''}
+                        onChange={(e) => setSettings({ ...settings, resendFromEmail: e.target.value })}
+                        placeholder="Goglite Agencia <onboarding@resend.dev>"
+                        className="w-full bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Puedes usar <code>onboarding@resend.dev</code> para pruebas de inmediato, o tu dominio verificado.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* INSTANTLY CONFIG */}
+                  <div className="p-3.5 rounded-xl bg-sky-950/20 border border-sky-500/20 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-sky-300">
+                        Instantly.ai API Key (Envío Frío, Campañas & Calentamiento)
+                      </label>
+                      <a
+                        href="https://instantly.ai"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-sky-400 hover:text-sky-300 flex items-center gap-0.5 underline font-medium"
+                      >
+                        instantly.ai <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    </div>
+                    <input
+                      type="password"
+                      value={settings.instantlyApiKey || ''}
+                      onChange={(e) => setSettings({ ...settings, instantlyApiKey: e.target.value })}
+                      placeholder="instantly_..."
+                      className="w-full bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-sky-500"
+                    />
+                    <p className="text-[10px] text-slate-500">
+                      Sincroniza y empuja automáticamente los prospectos a tus secuencias de correo frío en Instantly.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="pt-2 flex items-center justify-between">
@@ -1719,25 +1858,42 @@ export default function App() {
                     {selectedLeadModal.pitch}
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-800 gap-2 flex-wrap">
                     <a
                       href={`mailto:${selectedLeadModal.email}?subject=Pregunta rápida sobre ${selectedLeadModal.nombreEmpresa || selectedLeadModal.dominio}&body=${encodeURIComponent(selectedLeadModal.pitch || '')}`}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-all"
+                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-all"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       <span>Abrir en Gmail / Mail</span>
                     </a>
 
-                    <button
-                      onClick={() => {
-                        handleSendInstantly(selectedLeadModal.id);
-                        setSelectedLeadModal(null);
-                      }}
-                      className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md transition-all"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Enviar a Instantly</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        disabled={isSendingEmail}
+                        onClick={async () => {
+                          await handleSendEmail(selectedLeadModal.id, 'resend');
+                          setSelectedLeadModal(null);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md transition-all disabled:opacity-50"
+                        title="Enviar correo real directo mediante Resend ($0.00 Tier)"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>{isSendingEmail ? 'Enviando...' : '⚡ Enviar con Resend ($0.00)'}</span>
+                      </button>
+
+                      <button
+                        disabled={isSendingEmail}
+                        onClick={async () => {
+                          await handleSendEmail(selectedLeadModal.id, 'instantly');
+                          setSelectedLeadModal(null);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md transition-all disabled:opacity-50"
+                        title="Subir lead a secuencia de calentamiento de Instantly"
+                      >
+                        <Zap className="w-3.5 h-3.5" />
+                        <span>Enviar a Instantly</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
