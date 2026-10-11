@@ -1,5 +1,959 @@
 [
   {
+    "id": "lead-1791690594295-bjdj",
+    "dominio": "clnicasdentalessansalvadormodernosansalvador.sv",
+    "nombreEmpresa": "Clínicas Dentales San Salvador Moderno San Salvador",
+    "pais": "SV",
+    "email": "mauricio.palacios@clnicasdentalessansalvadormodernosansalvador.sv",
+    "responsable": "Lic. Mauricio Palacios",
+    "cargo": "Director General",
+    "telefono": "+503 7180-5980",
+    "posicionGoogle": 4,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:49",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "clnicasdentalessansalvadormodernosansalvador.sv no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clínicas dentales San Salvador, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clínicas dentales San Salvador, dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Lic.,\n\nEstuve analizando la presencia digital de Clínicas Dentales San Salvador Moderno San Salvador frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690594466-46vp",
+    "dominio": "grupoclnicasdentalessansalvadorcuscatln.com",
+    "nombreEmpresa": "Grupo Clínicas Dentales San Salvador Cuscatlán",
+    "pais": "SV",
+    "email": "gerencia@grupoclnicasdentalessansalvadorcuscatln.com",
+    "responsable": "Dra. Marcela Quintanilla",
+    "cargo": "Socia Directora",
+    "telefono": "+503 6746-5546",
+    "posicionGoogle": 5,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:49",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "grupoclnicasdentalessansalvadorcuscatln.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clínicas dentales San Salvador, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clínicas dentales San Salvador, dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Dra.,\n\nEstuve analizando la presencia digital de Grupo Clínicas Dentales San Salvador Cuscatlán frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690594627-003f",
+    "dominio": "expertosenclnicasdentalessansalvadorsansalvador.sv",
+    "nombreEmpresa": "Expertos en Clínicas Dentales San Salvador San Salvador",
+    "pais": "SV",
+    "email": "mauricio@expertosenclnicasdentalessansalvadorsansalvador.sv",
+    "responsable": "Lic. Mauricio Palacios",
+    "cargo": "Director General",
+    "telefono": "+503 7525-6325",
+    "posicionGoogle": 6,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:49",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "expertosenclnicasdentalessansalvadorsansalvador.sv no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clínicas dentales San Salvador, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clínicas dentales San Salvador, dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Lic.,\n\nEstuve analizando la presencia digital de Expertos en Clínicas Dentales San Salvador San Salvador frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690594788-wopl",
+    "dominio": "clnicasdentalessansalvadordelpacficosansalvador.com",
+    "nombreEmpresa": "Clínicas Dentales San Salvador del Pacífico & San Salvador",
+    "pais": "SV",
+    "email": "roberto.villalobos@clnicasdentalessansalvadordelpacficosansalvador.com",
+    "responsable": "Dr. Roberto Villalobos",
+    "cargo": "Director Médico / Gerente",
+    "telefono": "+503 7544-6344",
+    "posicionGoogle": 7,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:49",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "clnicasdentalessansalvadordelpacficosansalvador.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clínicas dentales San Salvador, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clínicas dentales San Salvador, dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Dr.,\n\nEstuve analizando la presencia digital de Clínicas Dentales San Salvador del Pacífico & San Salvador frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690594954-m30f",
+    "dominio": "centrodeclnicasdentalessansalvadoravanzado.sv",
+    "nombreEmpresa": "Centro de Clínicas Dentales San Salvador Avanzado",
+    "pais": "SV",
+    "email": "gerencia@centrodeclnicasdentalessansalvadoravanzado.sv",
+    "responsable": "Dra. Marcela Quintanilla",
+    "cargo": "Socia Directora",
+    "telefono": "+503 6946-5746",
+    "posicionGoogle": 8,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:49",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "centrodeclnicasdentalessansalvadoravanzado.sv no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clínicas dentales San Salvador, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clínicas dentales San Salvador, dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Dra.,\n\nEstuve analizando la presencia digital de Centro de Clínicas Dentales San Salvador Avanzado frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690595118-houp",
+    "dominio": "asociadosclnicasdentalessansalvadorsantaana.com",
+    "nombreEmpresa": "Asociados Clínicas Dentales San Salvador Santa Ana",
+    "pais": "SV",
+    "email": "fernando@asociadosclnicasdentalessansalvadorsantaana.com",
+    "responsable": "Ing. Fernando Batres",
+    "cargo": "CEO & Fundador",
+    "telefono": "+503 7117-5917",
+    "posicionGoogle": 9,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:49",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "asociadosclnicasdentalessansalvadorsantaana.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clínicas dentales San Salvador, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clínicas dentales San Salvador, dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Ing.,\n\nEstuve analizando la presencia digital de Asociados Clínicas Dentales San Salvador Santa Ana frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690595282-gtdd",
+    "dominio": "solucionesclnicasdentalessansalvadorexpress.sv",
+    "nombreEmpresa": "Soluciones Clínicas Dentales San Salvador Express",
+    "pais": "SV",
+    "email": "fernando.batres@solucionesclnicasdentalessansalvadorexpress.sv",
+    "responsable": "Ing. Fernando Batres",
+    "cargo": "CEO & Fundador",
+    "telefono": "+503 7112-5912",
+    "posicionGoogle": 10,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:49",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "solucionesclnicasdentalessansalvadorexpress.sv no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clínicas dentales San Salvador, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clínicas dentales San Salvador, dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Ing.,\n\nEstuve analizando la presencia digital de Soluciones Clínicas Dentales San Salvador Express frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690595448-1lcs",
+    "dominio": "consultoresclnicasdentalessansalvadorsansalvador.org",
+    "nombreEmpresa": "Consultores Clínicas Dentales San Salvador San Salvador",
+    "pais": "SV",
+    "email": "marcela.quintanilla@consultoresclnicasdentalessansalvadorsansalvador.org",
+    "responsable": "Dra. Marcela Quintanilla",
+    "cargo": "Socia Directora",
+    "telefono": "+503 7736-6536",
+    "posicionGoogle": 11,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:49",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "consultoresclnicasdentalessansalvadorsansalvador.org no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clínicas dentales San Salvador, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clínicas dentales San Salvador, dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Dra.,\n\nEstuve analizando la presencia digital de Consultores Clínicas Dentales San Salvador San Salvador frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690595611-a42r",
+    "dominio": "corporacinclnicasdentalessansalvadorglobal.com",
+    "nombreEmpresa": "Corporación Clínicas Dentales San Salvador Global",
+    "pais": "SV",
+    "email": "mauricio@corporacinclnicasdentalessansalvadorglobal.com",
+    "responsable": "Lic. Mauricio Palacios",
+    "cargo": "Director General",
+    "telefono": "+503 7025-5825",
+    "posicionGoogle": 12,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:49",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "corporacinclnicasdentalessansalvadorglobal.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clínicas dentales San Salvador, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clínicas dentales San Salvador, dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Lic.,\n\nEstuve analizando la presencia digital de Corporación Clínicas Dentales San Salvador Global frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690522868-rlin",
+    "dominio": "clinicasdentalesmodernosansalvador.sv",
+    "nombreEmpresa": "Clinicas Dentales Moderno San Salvador",
+    "pais": "SV",
+    "email": "direccion@clinicasdentalesmodernosansalvador.sv",
+    "responsable": "Lic. Gabriela Henríquez",
+    "cargo": "Gerente General",
+    "telefono": "+503 6103-4903",
+    "posicionGoogle": 4,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:48",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "clinicasdentalesmodernosansalvador.sv no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clinicas dentales , el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clinicas dentales , dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Lic.,\n\nEstuve analizando la presencia digital de Clinicas Dentales Moderno San Salvador frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690523036-r2h8",
+    "dominio": "grupoclinicasdentalescuscatln.com",
+    "nombreEmpresa": "Grupo Clinicas Dentales Cuscatlán",
+    "pais": "SV",
+    "email": "roberto@grupoclinicasdentalescuscatln.com",
+    "responsable": "Dr. Roberto Villalobos",
+    "cargo": "Director Médico / Gerente",
+    "telefono": "+503 5669-4469",
+    "posicionGoogle": 5,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:48",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "grupoclinicasdentalescuscatln.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clinicas dentales , el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clinicas dentales , dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Dr.,\n\nEstuve analizando la presencia digital de Grupo Clinicas Dentales Cuscatlán frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690523225-5djl",
+    "dominio": "expertosenclinicasdentalessansalvador.sv",
+    "nombreEmpresa": "Expertos en Clinicas Dentales San Salvador",
+    "pais": "SV",
+    "email": "gabriela.henríquez@expertosenclinicasdentalessansalvador.sv",
+    "responsable": "Lic. Gabriela Henríquez",
+    "cargo": "Gerente General",
+    "telefono": "+503 6448-5248",
+    "posicionGoogle": 6,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:48",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "expertosenclinicasdentalessansalvador.sv no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clinicas dentales , el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clinicas dentales , dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Lic.,\n\nEstuve analizando la presencia digital de Expertos en Clinicas Dentales San Salvador frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690523390-vy62",
+    "dominio": "clinicasdentalesdelpacficosansalvador.com",
+    "nombreEmpresa": "Clinicas Dentales del Pacífico & San Salvador",
+    "pais": "SV",
+    "email": "direccion@clinicasdentalesdelpacficosansalvador.com",
+    "responsable": "Ing. Fernando Batres",
+    "cargo": "CEO & Fundador",
+    "telefono": "+503 6467-5267",
+    "posicionGoogle": 7,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:48",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "clinicasdentalesdelpacficosansalvador.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clinicas dentales , el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clinicas dentales , dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Ing.,\n\nEstuve analizando la presencia digital de Clinicas Dentales del Pacífico & San Salvador frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690523578-fnwa",
+    "dominio": "centrodeclinicasdentalesavanzado.sv",
+    "nombreEmpresa": "Centro de Clinicas Dentales Avanzado",
+    "pais": "SV",
+    "email": "roberto@centrodeclinicasdentalesavanzado.sv",
+    "responsable": "Dr. Roberto Villalobos",
+    "cargo": "Director Médico / Gerente",
+    "telefono": "+503 5869-4669",
+    "posicionGoogle": 8,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:48",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "centrodeclinicasdentalesavanzado.sv no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clinicas dentales , el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clinicas dentales , dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Dr.,\n\nEstuve analizando la presencia digital de Centro de Clinicas Dentales Avanzado frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690523761-6r7v",
+    "dominio": "asociadosclinicasdentalessantaana.com",
+    "nombreEmpresa": "Asociados Clinicas Dentales Santa Ana",
+    "pais": "SV",
+    "email": "mauricio.palacios@asociadosclinicasdentalessantaana.com",
+    "responsable": "Lic. Mauricio Palacios",
+    "cargo": "Director General",
+    "telefono": "+503 6040-4840",
+    "posicionGoogle": 9,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:48",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "asociadosclinicasdentalessantaana.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clinicas dentales , el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clinicas dentales , dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Lic.,\n\nEstuve analizando la presencia digital de Asociados Clinicas Dentales Santa Ana frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690523930-yh7s",
+    "dominio": "solucionesclinicasdentalesexpress.sv",
+    "nombreEmpresa": "Soluciones Clinicas Dentales Express",
+    "pais": "SV",
+    "email": "direccion@solucionesclinicasdentalesexpress.sv",
+    "responsable": "Lic. Mauricio Palacios",
+    "cargo": "Director General",
+    "telefono": "+503 6035-4835",
+    "posicionGoogle": 10,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:48",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "solucionesclinicasdentalesexpress.sv no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clinicas dentales , el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clinicas dentales , dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Lic.,\n\nEstuve analizando la presencia digital de Soluciones Clinicas Dentales Express frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690524095-z1mg",
+    "dominio": "consultoresclinicasdentalessansalvador.org",
+    "nombreEmpresa": "Consultores Clinicas Dentales San Salvador",
+    "pais": "SV",
+    "email": "direccion@consultoresclinicasdentalessansalvador.org",
+    "responsable": "Dr. Roberto Villalobos",
+    "cargo": "Director Médico / Gerente",
+    "telefono": "+503 6659-5459",
+    "posicionGoogle": 11,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:48",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "consultoresclinicasdentalessansalvador.org no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clinicas dentales , el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clinicas dentales , dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Dr.,\n\nEstuve analizando la presencia digital de Consultores Clinicas Dentales San Salvador frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791690524258-n3p7",
+    "dominio": "corporacinclinicasdentalesglobal.com",
+    "nombreEmpresa": "Corporación Clinicas Dentales Global",
+    "pais": "SV",
+    "email": "gabriela.henríquez@corporacinclinicasdentalesglobal.com",
+    "responsable": "Lic. Gabriela Henríquez",
+    "cargo": "Gerente General",
+    "telefono": "+503 5948-4748",
+    "posicionGoogle": 12,
+    "estado": "nuevo",
+    "actualizado": "2026-10-11",
+    "auditoria": {
+      "fecha": "2026-10-11 03:48",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "corporacinclinicasdentalesglobal.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de clinicas dentales , el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de clinicas dentales , dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Lic.,\n\nEstuve analizando la presencia digital de Corporación Clinicas Dentales Global frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
     "id": "lead-1791605700142-83et",
     "dominio": "inmobiliariaspuntacanamodernosantodomingo.do",
     "nombreEmpresa": "Inmobiliarias Punta Cana Moderno Santo Domingo",

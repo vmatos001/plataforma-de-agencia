@@ -141,6 +141,8 @@ Goglite — Agencia de Alto Rendimiento & GEO`
   }
 ];
 
+import { pool } from './db.js';
+
 export const getLeads = () => {
   if (!fs.existsSync(leadsFile)) {
     fs.writeFileSync(leadsFile, JSON.stringify(initialLeads, null, 2));
@@ -155,6 +157,50 @@ export const getLeads = () => {
 
 export const saveLeads = (leads) => {
   fs.writeFileSync(leadsFile, JSON.stringify(leads, null, 2));
+
+  // Async background sync with Neon PostgreSQL
+  if (pool) {
+    (async () => {
+      try {
+        for (const l of leads) {
+          await pool.query(`
+            INSERT INTO leads (
+              id, dominio, nombre_empresa, pais, email, responsable, cargo, telefono, posicion_google, estado, actualizado, auditoria, pitch
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+            )
+            ON CONFLICT (dominio) DO UPDATE SET
+              nombre_empresa = EXCLUDED.nombre_empresa,
+              email = EXCLUDED.email,
+              responsable = EXCLUDED.responsable,
+              cargo = EXCLUDED.cargo,
+              telefono = EXCLUDED.telefono,
+              estado = EXCLUDED.estado,
+              actualizado = EXCLUDED.actualizado,
+              auditoria = EXCLUDED.auditoria,
+              pitch = EXCLUDED.pitch;
+          `, [
+            l.id,
+            l.dominio,
+            l.nombreEmpresa || l.dominio,
+            l.pais || 'SV',
+            l.email || '',
+            l.responsable || '',
+            l.cargo || '',
+            l.telefono || '',
+            l.posicionGoogle || null,
+            l.estado || 'nuevo',
+            l.actualizado || new Date().toISOString().split('T')[0],
+            JSON.stringify(l.auditoria || null),
+            l.pitch || null
+          ]);
+        }
+      } catch (err) {
+        console.warn('[DB] Error de sincronización a Neon:', err.message);
+      }
+    })();
+  }
+
   return leads;
 };
 

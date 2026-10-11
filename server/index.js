@@ -34,12 +34,16 @@ import {
 } from './services/finanzasStorage.js';
 import { analyzeOnPageSeo, generateSchemaJsonLd, generateLsiKeywords, getSearchConsoleMetrics } from './services/geoSeoService.js';
 import { getCmsSites, getCmsSiteBySlug, updateCmsSiteContent } from './services/headlessCmsStorage.js';
+import { initDb } from './services/db.js';
 
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
+
+// Initialize Neon Database if DATABASE_URL is set
+initDb().catch(e => console.warn('[DB] Fallback a local JSON:', e.message));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
