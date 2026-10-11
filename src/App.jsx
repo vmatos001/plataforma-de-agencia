@@ -32,7 +32,9 @@ import {
   Briefcase,
   Layout,
   Kanban,
-  DollarSign
+  DollarSign,
+  MapPin,
+  Star
 } from 'lucide-react';
 import PresupuestosModule from './components/PresupuestosModule';
 import CrmPortalModule from './components/CrmPortalModule';
@@ -56,6 +58,7 @@ export default function App() {
   const [activeModule, setActiveModule] = useState('presupuestos'); // 'lead_scrapper' | 'presupuestos'
   const [activeTab, setActiveTab] = useState('buscar'); // 'buscar' | 'sugerencias' | 'leads' | 'ajustes'
   const [selectedCountry, setSelectedCountry] = useState('SV'); // 'SV' | 'DO'
+  const [searchMode, setSearchMode] = useState('maps'); // 'maps' | 'web'
   const [pipelineInput, setPipelineInput] = useState('');
   const [manualSearchInput, setManualSearchInput] = useState('');
   const [leadForPresupuesto, setLeadForPresupuesto] = useState(null);
@@ -132,15 +135,15 @@ export default function App() {
       const res = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, country: selectedCountry })
+        body: JSON.stringify({ query: q, country: selectedCountry, searchMode })
       });
       const data = await res.json();
       if (data.success) {
         setSearchResults(data.results);
-        // Pre-select recommended positions 4 to 20
+        // Pre-select recommended / golden prospects
         const recommended = new Set(
           data.results
-            .filter(r => r.recomendadoOutbound)
+            .filter(r => r.recomendadoOutbound || r.esProspectoOro)
             .map(r => r.dominio)
         );
         setSelectedResults(recommended);
@@ -158,14 +161,16 @@ export default function App() {
     if (!q.trim()) return;
 
     setIsPipelineRunning(true);
-    setPipelineProgress('Buscando empresas en Google (posiciones 4-20)...');
+    setPipelineProgress(searchMode === 'maps'
+      ? 'Consultando Google Maps para negocios con reseñas pero SIN página web...'
+      : 'Buscando empresas en Google (posiciones 4-20)...');
 
     try {
-      setPipelineProgress('Extrayendo decisores en Apollo y auditando sitios con IA...');
+      setPipelineProgress('Auditando presencia, analizando reseñas y redactando pitches con Gemini IA...');
       const res = await fetch('/api/pipeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, country: selectedCountry, limit: 10 })
+        body: JSON.stringify({ query: q, country: selectedCountry, limit: 10, searchMode })
       });
       const data = await res.json();
       if (data.success) {
@@ -199,7 +204,7 @@ export default function App() {
   };
 
   const selectRecommendedResults = () => {
-    setSelectedResults(new Set(searchResults.filter(r => r.recomendadoOutbound).map(r => r.dominio)));
+    setSelectedResults(new Set(searchResults.filter(r => r.recomendadoOutbound || r.esProspectoOro).map(r => r.dominio)));
   };
 
   // Extract contacts and audit for selected
@@ -215,7 +220,13 @@ export default function App() {
         const enrichRes = await fetch('/api/enrich', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ domain: item.dominio, companyName: item.titulo, country: selectedCountry })
+          body: JSON.stringify({ 
+            domain: item.dominio, 
+            companyName: item.titulo, 
+            country: selectedCountry,
+            sinWeb: item.sinWeb,
+            telefono: item.telefono
+          })
         });
         const enrichData = await enrichRes.json();
         const contact = enrichData.contact || {};
@@ -223,7 +234,16 @@ export default function App() {
         const auditRes = await fetch('/api/audit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ domain: item.dominio, query: manualSearchInput, country: selectedCountry })
+          body: JSON.stringify({ 
+            domain: item.dominio, 
+            query: manualSearchInput, 
+            country: selectedCountry,
+            resenas: item.resenas,
+            calificacion: item.calificacion,
+            sinWeb: item.sinWeb,
+            tipoFuente: item.tipoFuente,
+            titulo: item.titulo
+          })
         });
         const auditData = await auditRes.json();
         const audit = auditData.audit;
@@ -235,8 +255,12 @@ export default function App() {
           email: contact.email,
           responsable: contact.responsable,
           cargo: contact.cargo,
-          telefono: contact.telefono,
+          telefono: contact.telefono || item.telefono || '',
           posicionGoogle: item.posicion,
+          resenas: item.resenas || 0,
+          calificacion: item.calificacion || 0,
+          sinWeb: Boolean(item.sinWeb),
+          tipoFuente: item.tipoFuente || (searchMode === 'maps' ? 'google_maps' : 'google_serp'),
           auditoria: audit,
           pitch: null
         };
@@ -946,14 +970,47 @@ export default function App() {
           {activeTab === 'buscar' && (
             <div className="max-w-5xl mx-auto space-y-6">
               
+              {/* Selector de Modo: Google Maps (Sin Web) vs Google Web */}
+              <div className="flex items-center gap-2 bg-[#0e131d] border border-slate-800 p-1.5 rounded-xl w-fit">
+                <button
+                  onClick={() => setSearchMode('maps')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    searchMode === 'maps'
+                      ? 'bg-orange-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>📍 Google Maps (Negocios con Reseñas · SIN WEB)</span>
+                  <span className="text-[10px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded font-mono font-bold">Top Cierre</span>
+                </button>
+                <button
+                  onClick={() => setSearchMode('web')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    searchMode === 'web'
+                      ? 'bg-orange-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>🌐 Google Web (SERP Posiciones #4-#20)</span>
+                </button>
+              </div>
+
               {/* 1-Click Pipeline Card */}
               <div className="p-5 rounded-2xl bg-gradient-to-br from-[#121826] to-[#0d121c] border border-orange-500/30 shadow-glow-sm relative overflow-hidden">
                 <div className="flex items-center gap-2 text-xs font-semibold text-orange-400 mb-1">
                   <Zap className="w-4 h-4 fill-orange-400" />
-                  <span>Pipeline Automático 1-Click</span>
+                  <span>
+                    {searchMode === 'maps' 
+                      ? 'Pipeline Automático Google Maps (Oportunidades de Oro Sin Web)' 
+                      : 'Pipeline Automático 1-Click Google SERP'}
+                  </span>
                 </div>
                 <p className="text-xs text-slate-400 mb-3.5">
-                  Busca en Google · Extrae posiciones #4-#20 · Enriquece emails directos (Apollo) · Audita fallos GEO/SEO con IA · Redacta email pitch.
+                  {searchMode === 'maps'
+                    ? 'Extrae negocios de Google Maps con alta reputación (estrellas y reseñas) que NO tienen página web · Detecta teléfonos · Audita pérdida de ventas · Redacta pitch con Gemini IA.'
+                    : 'Busca en Google · Extrae posiciones #4-#20 · Enriquece contactos · Audita fallos GEO/SEO con IA · Redacta email pitch.'}
                 </p>
 
                 <div className="flex gap-2">
@@ -963,7 +1020,11 @@ export default function App() {
                       value={pipelineInput}
                       onChange={(e) => setPipelineInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleRunPipeline()}
-                      placeholder={selectedCountry === 'DO' ? 'ej: inmobiliarias en Punta Cana' : 'ej: clínicas dentales en San Salvador'}
+                      placeholder={
+                        searchMode === 'maps'
+                          ? (selectedCountry === 'DO' ? 'ej: restaurantes en Punta Cana o talleres en Santo Domingo' : 'ej: dentistas en San Salvador o restaurantes en Santa Tecla')
+                          : (selectedCountry === 'DO' ? 'ej: inmobiliarias en Punta Cana' : 'ej: clínicas dentales en San Salvador')
+                      }
                       className="w-full bg-[#090c13] border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500"
                     />
                   </div>
@@ -997,7 +1058,7 @@ export default function App() {
               {/* Manual Search Box */}
               <div className="p-5 rounded-2xl bg-[#0e131d] border border-slate-800">
                 <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                  Intención de Búsqueda Manual
+                  {searchMode === 'maps' ? 'Búsqueda Manual en Google Maps (Places)' : 'Intención de Búsqueda Manual Google Web'}
                 </div>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
@@ -1006,7 +1067,11 @@ export default function App() {
                       value={manualSearchInput}
                       onChange={(e) => setManualSearchInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleManualSearch()}
-                      placeholder={selectedCountry === 'DO' ? 'ej: cirujanos plásticos Santo Domingo' : 'ej: bufetes de abogados San Salvador'}
+                      placeholder={
+                        searchMode === 'maps'
+                          ? (selectedCountry === 'DO' ? 'ej: clínicas estéticas Santo Domingo' : 'ej: bufetes de abogados San Salvador')
+                          : (selectedCountry === 'DO' ? 'ej: cirujanos plásticos Santo Domingo' : 'ej: bufetes de abogados San Salvador')
+                      }
                       className="w-full bg-[#080b11] border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500"
                     />
                   </div>
@@ -1025,15 +1090,25 @@ export default function App() {
               {searchResults.length > 0 && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-bold text-slate-200">
-                      Resultados de Google ({searchResults.length})
+                    <div className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                      {searchMode === 'maps' ? (
+                        <>
+                          <MapPin className="w-4 h-4 text-orange-400" />
+                          <span>Negocios de Google Maps ({searchResults.length})</span>
+                        </>
+                      ) : (
+                        <>
+                          <Globe className="w-4 h-4 text-orange-400" />
+                          <span>Resultados Orgánicos de Google ({searchResults.length})</span>
+                        </>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-xs">
                       <button 
                         onClick={selectRecommendedResults}
                         className="text-orange-400 hover:text-orange-300 font-medium"
                       >
-                        Seleccionar recomendados (#4 a #20)
+                        {searchMode === 'maps' ? 'Seleccionar prospectos sin web' : 'Seleccionar recomendados (#4 a #20)'}
                       </button>
                       <span className="text-slate-700">•</span>
                       <button 
@@ -1049,6 +1124,7 @@ export default function App() {
                   <div className="space-y-2 pb-20">
                     {searchResults.map((item) => {
                       const isSelected = selectedResults.has(item.dominio);
+                      const isMapsItem = item.tipoFuente === 'google_maps' || item.sinWeb;
                       return (
                         <div
                           key={item.dominio}
@@ -1056,6 +1132,8 @@ export default function App() {
                           className={`p-4 rounded-xl cursor-pointer transition-all border ${
                             isSelected 
                               ? 'bg-orange-500/[0.04] border-orange-500/60 shadow-sm' 
+                              : item.esProspectoOro
+                              ? 'bg-[#15120c] border-amber-500/40 hover:border-amber-500/70 shadow-sm'
                               : 'bg-[#0e131d]/70 hover:bg-[#121824] border-slate-800/80'
                           }`}
                         >
@@ -1067,22 +1145,57 @@ export default function App() {
                               className="mt-1 w-4 h-4 rounded text-orange-600 focus:ring-0 bg-slate-900 border-slate-700"
                             />
                             <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                                  item.posicion <= 3 
-                                    ? 'bg-slate-800 text-slate-400' 
-                                    : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                                }`}>
-                                  #{item.posicion}
-                                </span>
-                                <span className="font-mono text-xs text-orange-400/90 font-medium">{item.dominio}</span>
-                                {item.recomendadoOutbound && (
-                                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/40">
-                                    ★ Ideal para Outbound
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                {isMapsItem ? (
+                                  <>
+                                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1">
+                                      <MapPin className="w-2.5 h-2.5" />
+                                      Maps #{item.posicion}
+                                    </span>
+                                    {item.sinWeb && (
+                                      <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                                        ⚠️ SIN WEB PROPIA
+                                      </span>
+                                    )}
+                                    {item.resenas > 0 && (
+                                      <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-300 border border-yellow-500/20 flex items-center gap-1">
+                                        <Star className="w-2.5 h-2.5 fill-yellow-400 text-yellow-400" />
+                                        {item.calificacion}★ ({item.resenas} reseñas)
+                                      </span>
+                                    )}
+                                    {item.esProspectoOro && (
+                                      <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                        🏆 CLIENTE DE ORO
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                                      item.posicion <= 3 
+                                        ? 'bg-slate-800 text-slate-400' 
+                                        : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                    }`}>
+                                      #{item.posicion}
+                                    </span>
+                                    <span className="font-mono text-xs text-orange-400/90 font-medium">{item.dominio}</span>
+                                    {item.recomendadoOutbound && (
+                                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/40">
+                                        ★ Ideal para Outbound
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                              <div className="text-sm font-semibold text-slate-100 flex items-center justify-between">
+                                <span>{item.titulo}</span>
+                                {item.telefono && (
+                                  <span className="text-xs font-mono text-slate-400 flex items-center gap-1 shrink-0 ml-2">
+                                    <Phone className="w-3 h-3 text-emerald-400" />
+                                    {item.telefono}
                                   </span>
                                 )}
                               </div>
-                              <div className="text-sm font-semibold text-slate-100">{item.titulo}</div>
                               <div className="text-xs text-slate-400 mt-0.5 line-clamp-2">{item.snippet}</div>
                             </div>
                           </div>
@@ -1257,22 +1370,43 @@ export default function App() {
                         <tr key={lead.id} className="hover:bg-slate-800/30 transition-colors">
                           <td className="px-4 py-3">
                             <div className="font-semibold text-slate-200">{lead.nombreEmpresa || lead.dominio}</div>
-                            <div className="font-mono text-[11px] text-orange-400 flex items-center gap-1">
+                            <div className="font-mono text-[11px] text-orange-400 flex items-center gap-1 flex-wrap">
                               <span>{lead.pais === 'DO' ? '🇩🇴' : '🇸🇻'}</span>
-                              <a href={`https://${lead.dominio}`} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-0.5">
-                                {lead.dominio}
-                                <ExternalLink className="w-2.5 h-2.5" />
-                              </a>
+                              {lead.sinWeb || lead.dominio?.startsWith('maps-') ? (
+                                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30 flex items-center gap-1 font-sans font-medium">
+                                  <MapPin className="w-2.5 h-2.5" />
+                                  Google Maps {lead.resenas > 0 ? `· ${lead.resenas} reseñas (${lead.calificacion || 4.8}★)` : '· Sin Web'}
+                                </span>
+                              ) : (
+                                <a href={`https://${lead.dominio}`} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-0.5">
+                                  {lead.dominio}
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                              )}
                             </div>
                           </td>
 
                           <td className="px-4 py-3 font-mono text-slate-300">
-                            {lead.email ? (
-                              <a href={`mailto:${lead.email}`} className="text-slate-300 hover:text-orange-400">
+                            {lead.email && !lead.email.endsWith('.negocio') ? (
+                              <a href={`mailto:${lead.email}`} className="text-slate-300 hover:text-orange-400 block">
                                 {lead.email}
                               </a>
                             ) : (
-                              <span className="text-slate-600 italic">Sin email</span>
+                              <span className="text-slate-500 italic block">Sin email oficial</span>
+                            )}
+                            {lead.telefono && (
+                              <div className="text-[11px] font-mono text-emerald-400 flex items-center gap-1 mt-0.5">
+                                <Phone className="w-2.5 h-2.5" />
+                                <a 
+                                  href={`https://wa.me/${lead.telefono.replace(/[^0-9]/g, '')}`} 
+                                  target="_blank" 
+                                  rel="noreferrer"
+                                  className="hover:underline"
+                                  title="Enviar mensaje por WhatsApp"
+                                >
+                                  {lead.telefono}
+                                </a>
+                              </div>
                             )}
                           </td>
 

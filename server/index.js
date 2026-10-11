@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { getLeads, saveLeads, getSettings, saveSettings, getSearches, saveSearch } from './services/storage.js';
-import { searchGoogleSERP } from './services/scraper.js';
+import { searchGoogleSERP, searchGooglePlaces } from './services/scraper.js';
 import { enrichDomain } from './services/enricher.js';
 import { auditDomain } from './services/auditor.js';
 import { generatePitch } from './services/pitcher.js';
@@ -89,26 +89,29 @@ app.post('/api/settings', (req, res) => {
   res.json({ success: true, settings: updated });
 });
 
-// 2. Search SERP
+// 2. Search (SERP Web or Google Maps Places)
 app.post('/api/search', async (req, res) => {
   try {
-    const { query, country = 'SV' } = req.body;
+    const { query, country = 'SV', searchMode = 'web' } = req.body;
     if (!query || !query.trim()) {
       return res.status(400).json({ error: 'La intención de búsqueda es obligatoria' });
     }
 
-    const results = await searchGoogleSERP(query, country);
+    const results = searchMode === 'maps'
+      ? await searchGooglePlaces(query, country)
+      : await searchGoogleSERP(query, country);
 
     // Save to search history
     saveSearch({
       id: 'search-' + Date.now(),
       query,
       country,
+      searchMode,
       timestamp: new Date().toISOString(),
       resultsCount: results.length
     });
 
-    res.json({ success: true, query, country, results });
+    res.json({ success: true, query, country, searchMode, results });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -117,9 +120,23 @@ app.post('/api/search', async (req, res) => {
 // 3. Enrich Contacts for selected items
 app.post('/api/enrich', async (req, res) => {
   try {
-    const { domain, companyName = '', country = 'SV' } = req.body;
+    const { domain, companyName = '', country = 'SV', sinWeb, telefono } = req.body;
     if (!domain) {
       return res.status(400).json({ error: 'Dominio es requerido' });
+    }
+
+    if (domain.startsWith('maps-') || sinWeb) {
+      return res.json({
+        success: true,
+        domain,
+        contact: {
+          responsable: companyName ? 'Gerencia / Propietario' : 'Dirección General',
+          cargo: 'Propietario / Director',
+          email: `contacto@${domain}`,
+          telefono: telefono || '',
+          enriquecidoPor: 'Google Maps'
+        }
+      });
     }
 
     const contact = await enrichDomain(domain, companyName, country);
@@ -137,7 +154,7 @@ app.post('/api/audit', async (req, res) => {
       return res.status(400).json({ error: 'Dominio es requerido' });
     }
 
-    const audit = await auditDomain(domain, query, country);
+    const audit = await auditDomain(domain, query, country, req.body);
     res.json({ success: true, domain, audit });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -159,21 +176,26 @@ app.post('/api/pitch', async (req, res) => {
   }
 });
 
-// 6. The 1-Click Pipeline!
+// 6. The 1-Click Pipeline! (Web SERP or Google Maps)
 app.post('/api/pipeline', async (req, res) => {
   try {
-    const { query, country = 'SV', limit = 10 } = req.body;
+    const { query, country = 'SV', limit = 10, searchMode = 'web' } = req.body;
     if (!query) return res.status(400).json({ error: 'Consulta requerida' });
 
-    console.log(`[PIPELINE] Iniciando ejecución para "${query}" (${country})...`);
+    console.log(`[PIPELINE] Iniciando ejecución (${searchMode}) para "${query}" (${country})...`);
 
-    // Step A: Search Google
-    const serpResults = await searchGoogleSERP(query, country);
-
-    // Step B: Filter out positions 1-3, keep 4 to 20
-    const targetItems = serpResults.filter(r => r.posicion >= 4 && r.posicion <= 20).slice(0, limit);
-
-    console.log(`[PIPELINE] ${targetItems.length} candidatos seleccionados en posiciones 4-20.`);
+    let targetItems = [];
+    if (searchMode === 'maps') {
+      const places = await searchGooglePlaces(query, country);
+      // Prioritize golden prospects (Reviews without website)
+      targetItems = places.filter(p => p.esProspectoOro || p.sinWeb).slice(0, limit);
+      if (targetItems.length === 0) targetItems = places.slice(0, limit);
+      console.log(`[PIPELINE] ${targetItems.length} negocios de Google Maps (sin web o alta reseña) seleccionados.`);
+    } else {
+      const serpResults = await searchGoogleSERP(query, country);
+      targetItems = serpResults.filter(r => r.posicion >= 4 && r.posicion <= 20).slice(0, limit);
+      console.log(`[PIPELINE] ${targetItems.length} candidatos seleccionados en posiciones 4-20.`);
+    }
 
     const currentLeads = getLeads();
     const processedLeads = [];
@@ -181,13 +203,23 @@ app.post('/api/pipeline', async (req, res) => {
     // Step C: Enrich, Audit, and Draft Pitch for each target
     for (const item of targetItems) {
       try {
-        console.log(`[PIPELINE] Procesando: ${item.dominio}...`);
+        console.log(`[PIPELINE] Procesando: ${item.dominio} (${item.titulo})...`);
         
-        // Enrich
-        const contact = await enrichDomain(item.dominio, item.titulo, country);
+        let contact = {};
+        if (item.sinWeb || item.dominio?.startsWith('maps-')) {
+          contact = {
+            responsable: 'Gerencia General / Propietario',
+            cargo: 'Dueño / Director',
+            email: `contacto@${item.dominio}`,
+            telefono: item.telefono || '',
+            enriquecidoPor: 'Google Maps'
+          };
+        } else {
+          contact = await enrichDomain(item.dominio, item.titulo, country);
+        }
         
-        // Audit
-        const audit = await auditDomain(item.dominio, query, country);
+        // Audit (passes item with resenas, calificacion, sinWeb, etc.)
+        const audit = await auditDomain(item.dominio, query, country, item);
 
         const newLead = {
           id: 'lead-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
@@ -198,14 +230,18 @@ app.post('/api/pipeline', async (req, res) => {
           responsable: contact.responsable,
           cargo: contact.cargo,
           telefono: contact.telefono,
-          posicionGoogle: item.posicion,
+          posicionGoogle: item.posicion || null,
+          resenas: item.resenas || 0,
+          calificacion: item.calificacion || 0,
+          sinWeb: Boolean(item.sinWeb),
+          tipoFuente: item.tipoFuente || (searchMode === 'maps' ? 'google_maps' : 'google_serp'),
           estado: 'nuevo',
           actualizado: new Date().toISOString().split('T')[0],
           auditoria: audit,
           pitch: null
         };
 
-        // Generate Pitch
+        // Generate Pitch with Gemini
         newLead.pitch = await generatePitch(newLead, audit, country);
 
         processedLeads.push(newLead);
@@ -220,12 +256,13 @@ app.post('/api/pipeline', async (req, res) => {
     const finalLeads = [...leadsToAdd, ...currentLeads];
     saveLeads(finalLeads);
 
-    console.log(`[PIPELINE] Completado con éxito: ${leadsToAdd.length} leads nuevos guardados.`);
+    console.log(`[PIPELINE] Completado: ${leadsToAdd.length} leads nuevos guardados en Neon/Local.`);
 
     res.json({
       success: true,
       query,
       country,
+      searchMode,
       totalProcesados: processedLeads.length,
       nuevosGuardados: leadsToAdd.length,
       leads: leadsToAdd

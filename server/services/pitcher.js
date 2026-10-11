@@ -10,10 +10,30 @@ export async function generatePitch(lead, audit, country = 'SV') {
   const isDO = country.toUpperCase() === 'DO';
   const cName = isDO ? 'República Dominicana' : 'El Salvador';
 
+  const isMapsNoWeb = Boolean(lead.sinWeb || lead.dominio?.startsWith('maps-') || audit.tipoAuditoria === 'google_maps_no_web');
+  const resenasCount = lead.resenas || audit.resenas || 50;
+  const ratingVal = lead.calificacion || audit.rating || 4.8;
+
   // 1. Try Gemini if configured
   if (geminiKey && geminiKey.trim()) {
     try {
-      const prompt = `Redacta un correo electrónico en frío corto, directo y de altísima conversión para la agencia de tecnología web y posicionamiento IA "Goglite".
+      const prompt = isMapsNoWeb 
+        ? `Redacta una propuesta de prospección comercial persuasiva, empática y directa para la agencia de desarrollo web y posicionamiento IA "Goglite".
+Destinatario: ${lead.responsable || 'Dirección / Gerencia General'} del negocio "${lead.nombreEmpresa || lead.titulo || lead.dominio}".
+País: ${cName}.
+Canal: Google Maps (Lead sin página web).
+Datos de reputación: Tiene ${resenasCount} reseñas con calificación de ${ratingVal} estrellas en Google Maps.
+Puntos detectados en auditoría:
+${audit.puntos.map((p, idx) => `${idx + 1}. ${p.titulo}: ${p.problema}`).join('\n')}
+
+Reglas de redacción:
+1. Tono: Muy profesional, felicitándolos sinceramente por su sólida reputación de ${resenasCount} reseñas en Google Maps.
+2. Problema real: Explicarles que carecer de sitio web propio provoca fugas de clientes ante Google orgánico y ante IAs (ChatGPT, Perplexity) que no pueden verificar sus servicios ni permitir agendamiento 24/7.
+3. Propuesta de valor: En Goglite transformamos esa reputación en una máquina web moderna de captación directa de clientes.
+4. CTA suave: Preguntar si tienen 10 minutos para revisar una propuesta/demo sin compromiso.
+5. Firma: Víctor Matos, Goglite — Agencia Web & Inteligencia Artificial.
+Devuelve únicamente el cuerpo del correo en texto plano.`
+        : `Redacta un correo electrónico en frío corto, directo y de altísima conversión para la agencia de tecnología web y posicionamiento IA "Goglite".
 Destinatario: ${lead.responsable} (${lead.cargo}) en la empresa "${lead.nombreEmpresa || lead.dominio}".
 País: ${cName}.
 Puntos críticos detectados en la auditoría técnica de su web:
@@ -57,9 +77,25 @@ Devuelve únicamente el cuerpo del correo en texto plano.`;
     }
   }
 
-  // 2. High-converting proven cold outreach formula
+  // 2. High-converting fallback formula
   const primerNombre = lead.responsable ? lead.responsable.split(' ')[0] : 'Estimado/a';
   const empresa = lead.nombreEmpresa || lead.dominio;
+
+  if (isMapsNoWeb) {
+    return `Hola ${primerNombre},
+
+Felicitaciones por la destacada reputación de ${empresa} en Google Maps (${resenasCount} reseñas con ${ratingVal}★). Es evidente la confianza que tienen sus clientes en ${cName}.
+
+Al analizar su presencia digital, identificamos una gran oportunidad: actualmente no cuentan con un sitio web oficial propio, lo que genera una fuga silenciosa de prospectos que buscan servicios en Google o consultan en IAs como ChatGPT y terminan con la competencia que sí permite agendar online.
+
+En Goglite ayudamos a negocios líderes a transformar su reputación local en un canal automatizado de captación y reservas directas las 24 horas.
+
+¿Le parecería interesante revisar una breve propuesta o maqueta preliminar sin ningún compromiso?
+
+Atentamente,
+Víctor Matos
+Goglite — Agencia Web & Inteligencia Artificial`;
+  }
   const p1 = audit.puntos[0]?.titulo || 'Invisibilidad ante asistentes de IA';
   const p2 = audit.puntos[1]?.titulo || 'Falta de optimización transaccional en Google';
 
