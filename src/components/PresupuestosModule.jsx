@@ -43,20 +43,48 @@ export default function PresupuestosModule({ onSelectLeadToQuote, onNavigateToCo
   const [copiedLink, setCopiedLink] = useState(false);
   const [savedNotification, setSavedNotification] = useState(false);
 
+  const getBackendEndpoint = (endpoint) => {
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return `http://localhost:3001${endpoint}`;
+    }
+    return endpoint;
+  };
+
   useEffect(() => {
+    // Cargar caché local inmediato si existe
+    try {
+      if (typeof window !== 'undefined') {
+        const cached = localStorage.getItem('goglite_presupuestos');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) setPresupuestos(parsed);
+        }
+      }
+    } catch (e) {}
+
     fetchPresupuestos();
     fetchPlantillas();
   }, []);
 
   const fetchPresupuestos = async () => {
     try {
-      const res = await fetch('/api/presupuestos');
-      if (res.ok) {
+      let res;
+      try {
+        res = await fetch(getBackendEndpoint('/api/presupuestos'));
+      } catch {
+        res = await fetch('/api/presupuestos');
+      }
+      if (res && res.ok) {
         const data = await res.json();
-        setPresupuestos(data);
+        if (Array.isArray(data) && data.length > 0) {
+          setPresupuestos(data);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('goglite_presupuestos', JSON.stringify(data));
+          }
+        }
       }
     } catch (err) {
-      console.error(err);
+      console.warn('API presupuestos offline:', err);
     } finally {
       setLoading(false);
     }
@@ -64,13 +92,18 @@ export default function PresupuestosModule({ onSelectLeadToQuote, onNavigateToCo
 
   const fetchPlantillas = async () => {
     try {
-      const res = await fetch('/api/presupuestos/plantillas');
-      if (res.ok) {
+      let res;
+      try {
+        res = await fetch(getBackendEndpoint('/api/presupuestos/plantillas'));
+      } catch {
+        res = await fetch('/api/presupuestos/plantillas');
+      }
+      if (res && res.ok) {
         const data = await res.json();
         setPlantillas(data);
       }
     } catch (err) {
-      console.error(err);
+      console.warn('API plantillas offline:', err);
     }
   };
 
@@ -102,20 +135,36 @@ export default function PresupuestosModule({ onSelectLeadToQuote, onNavigateToCo
     if (!activePresupuesto) return;
     try {
       const exists = presupuestos.some(p => p.id === activePresupuesto.id);
-      const url = exists ? `/api/presupuestos/${activePresupuesto.id}` : '/api/presupuestos';
+      const url = exists ? getBackendEndpoint(`/api/presupuestos/${activePresupuesto.id}`) : getBackendEndpoint('/api/presupuestos');
       const method = exists ? 'PATCH' : 'POST';
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(activePresupuesto)
+      // 1. Persistir de inmediato en el estado local y en localStorage
+      setPresupuestos(prev => {
+        let updated;
+        if (exists) {
+          updated = prev.map(p => p.id === activePresupuesto.id ? activePresupuesto : p);
+        } else {
+          updated = [activePresupuesto, ...prev];
+        }
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('goglite_presupuestos', JSON.stringify(updated));
+        }
+        return updated;
       });
 
-      if (res.ok) {
-        setSavedNotification(true);
-        setTimeout(() => setSavedNotification(false), 2500);
-        fetchPresupuestos();
+      // 2. Intentar sincronizar con el backend
+      try {
+        await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(activePresupuesto)
+        });
+      } catch (e) {
+        console.warn('Backend sync error (usando local):', e);
       }
+
+      setSavedNotification(true);
+      setTimeout(() => setSavedNotification(false), 2500);
     } catch (err) {
       alert('Error al guardar: ' + err.message);
     }
@@ -126,7 +175,18 @@ export default function PresupuestosModule({ onSelectLeadToQuote, onNavigateToCo
     e?.stopPropagation();
     if (!confirm('¿Eliminar esta propuesta?')) return;
     try {
-      await fetch(`/api/presupuestos/${id}`, { method: 'DELETE' });
+      try {
+        await fetch(getBackendEndpoint(`/api/presupuestos/${id}`), { method: 'DELETE' });
+      } catch (err) {
+        console.warn('Delete backend error, removiendo localmente:', err);
+      }
+      setPresupuestos(prev => {
+        const updated = prev.filter(p => p.id !== id);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('goglite_presupuestos', JSON.stringify(updated));
+        }
+        return updated;
+      });
       fetchPresupuestos();
       if (activePresupuesto?.id === id) {
         setViewMode('list');

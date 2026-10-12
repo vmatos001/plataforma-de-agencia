@@ -1,5 +1,37 @@
 [
   {
+    "id": "search-1791783016125",
+    "query": "clínicas dentales San Salvador",
+    "country": "SV",
+    "searchMode": "maps",
+    "timestamp": "2026-10-12T05:30:16.125Z",
+    "resultsCount": 10
+  },
+  {
+    "id": "search-1791781922877",
+    "query": "clinica dental",
+    "country": "SV",
+    "searchMode": "maps",
+    "timestamp": "2026-10-12T05:12:02.877Z",
+    "resultsCount": 10
+  },
+  {
+    "id": "search-1791781919274",
+    "query": "clinica dental",
+    "country": "SV",
+    "searchMode": "maps",
+    "timestamp": "2026-10-12T05:11:59.274Z",
+    "resultsCount": 10
+  },
+  {
+    "id": "search-1791781826261",
+    "query": "clinica dental",
+    "country": "SV",
+    "searchMode": "maps",
+    "timestamp": "2026-10-12T05:10:26.261Z",
+    "resultsCount": 10
+  },
+  {
     "id": "search-1791700043950",
     "query": "clinicas dentales san salvador",
     "country": "SV",

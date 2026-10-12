@@ -220,130 +220,203 @@ const WHATSAPP_SCRIPTS = [
   }
 ];
 
-// Semilla inicial enriquecida para que la plataforma nunca esté vacía
+// Semilla con los contactos y conversaciones reales de WhatsApp Web del usuario
 const SEED_CRM_LEADS = [
   {
-    id: "crm-lead-1",
-    empresa: "Inmobiliarias Punta Cana Moderno Santo Domingo",
-    contacto: "Lic. Marcos Almonte",
-    cargo: "Director General & Socio",
-    email: "marcos@inmobiliariaspuntacanamodernosantodomingo.do",
-    telefono: "+1 809 6845-5645",
+    id: "wa-real-447974905044",
+    empresa: "+44 7974 905044",
+    contacto: "+44 7974 905044",
+    cargo: "Contacto WhatsApp",
+    email: "",
+    telefono: "+44 7974 905044",
     pais: "DO",
-    dominio: "inmobiliariaspuntacanamodernosantodomingo.do",
-    etapa: "nuevo",
-    valorEstimado: 950,
-    probabilidad: 10,
-    fuente: "Scraper Google SERP",
-    portalToken: "portal-lead-1",
-    interacciones: [
-      { id: "int-1", tipo: "nota", fecha: "2026-10-09", titulo: "Diagnóstico Inicial Detectado", detalle: "Prospecto captado vía Scraper. Puntos críticos: falta de Schema JSON-LD y tiempo de respuesta." }
-    ],
+    etapa: "contactado",
+    valorEstimado: 0,
+    probabilidad: 20,
+    fuente: "WhatsApp Real DO (+18295284713)",
     whatsappData: {
-      telefono: "+1 809 6845-5645",
+      telefono: "+44 7974 905044",
       temperatura: "tibio",
-      estadoSeguimiento: "dia_1_valor",
+      estadoSeguimiento: "esperando_respuesta",
+      ultimoMensajeFecha: "Ayer",
       mensajes: [
-        { id: "wa-1-1", emisor: "agencia", texto: "¡Hola Lic.! 👋 Qué gusto saludarte. Vi el sitio de Inmobiliarias Punta Cana Moderno Santo Domingo y noté que tarda más de 4.5s en abrir en celulares en conexiones locales. ¿Me permites hacerte un par de preguntas rápidas sobre cómo están captando clientes hoy?", fechaHora: "09 Oct 10:30", leido: true },
-        { id: "wa-1-2", emisor: "cliente", texto: "Hola, buenos días. Sí, cuéntame qué detectaron. La web la hicieron hace tiempo y casi no nos genera contactos directos.", fechaHora: "09 Oct 11:05", leido: true }
+        { id: "msg-44-1", emisor: "cliente", texto: "I didn't request a code", fechaHora: "Ayer 18:42", leido: true, origen: "whatsapp_real_DO" }
       ]
     }
   },
   {
-    id: "crm-lead-2",
-    empresa: "Grupo Inmobiliarias Punta Cana Caribe",
-    contacto: "Lic. Marcos Almonte",
-    cargo: "Director General & Socio",
-    email: "gerencia@grupoinmobiliariaspuntacanacaribe.com",
-    telefono: "+1 809 555-8900",
+    id: "wa-real-vmatosv",
+    empresa: "@vmatosv",
+    contacto: "@vmatosv",
+    cargo: "Contacto WhatsApp",
+    email: "",
+    telefono: "+1 829 000-0002",
     pais: "DO",
-    dominio: "grupoinmobiliariaspuntacanacaribe.com",
-    etapa: "reunion",
-    valorEstimado: 1500,
-    probabilidad: 45,
-    fuente: "Google Maps",
-    portalToken: "portal-lead-2",
-    interacciones: [],
+    etapa: "contactado",
+    valorEstimado: 0,
+    probabilidad: 25,
+    fuente: "WhatsApp Real DO (+18295284713)",
     whatsappData: {
-      telefono: "+1 809 555-8900",
+      telefono: "+1 829 000-0002",
       temperatura: "tibio",
-      estadoSeguimiento: "dia_1_valor",
+      estadoSeguimiento: "esperando_respuesta",
+      ultimoMensajeFecha: "Ayer",
       mensajes: [
-        { id: "wa-2-1", emisor: "agencia", texto: "Hola Lic. Marcos, gracias por la llamada de ayer. Quedamos en revisar la demo de alta conversión el jueves a las 10:00 AM.", fechaHora: "10 Oct 14:00", leido: true }
+        { id: "msg-vm-1", emisor: "cliente", texto: "📷 Foto", fechaHora: "Ayer 16:15", leido: true, origen: "whatsapp_real_DO" }
       ]
     }
   },
   {
-    id: "crm-lead-3",
-    empresa: "Clínica Dental San Salvador",
-    contacto: "Dr. Carlos Rodríguez",
-    cargo: "Director Médico & Propietario",
-    email: "dr.rodriguez@clinicadentalsv.com",
-    telefono: "+503 2260-4490",
-    pais: "SV",
-    dominio: "clinicadentalsv.com",
-    etapa: "propuesta_enviada",
-    presupuestoMonto: 2200,
-    valorEstimado: 2200,
-    probabilidad: 65,
-    fuente: "Google Maps",
-    portalToken: "portal-lead-3",
-    interacciones: [],
-    whatsappData: {
-      telefono: "+503 2260-4490",
-      temperatura: "caliente",
-      estadoSeguimiento: "dia_3_seguimiento",
-      mensajes: [
-        { id: "wa-3-1", emisor: "agencia", texto: "Estimado Dr. Rodríguez, ya le compartimos el presupuesto formal en su portal. Quedamos atentos a cualquier duda.", fechaHora: "11 Oct 11:30", leido: true }
-      ]
-    }
-  },
-  {
-    id: "crm-lead-4",
-    empresa: "Punta Cana Prime Realty",
-    contacto: "Lic. Alejandro Mendoza",
-    cargo: "Managing Director",
-    email: "alejandro@puntacanaprime.do",
-    telefono: "+1 809 552-0199",
+    id: "wa-real-18098210756",
+    empresa: "+1 (809) 821-0756",
+    contacto: "+1 (809) 821-0756",
+    cargo: "Contacto WhatsApp",
+    email: "",
+    telefono: "+1 809 821-0756",
     pais: "DO",
-    dominio: "puntacanaprime.do",
+    etapa: "contactado",
+    valorEstimado: 500,
+    probabilidad: 50,
+    fuente: "WhatsApp Real DO (+18295284713)",
+    whatsappData: {
+      telefono: "+1 809 821-0756",
+      temperatura: "tibio",
+      estadoSeguimiento: "seguimiento",
+      ultimoMensajeFecha: "Jueves",
+      mensajes: [
+        { id: "msg-809-1", emisor: "cliente", texto: "Ok hermano", fechaHora: "Jueves 14:10", leido: true, origen: "whatsapp_real_DO" }
+      ]
+    }
+  },
+  {
+    id: "wa-real-pena-lavia",
+    empresa: "Caribes Tours",
+    contacto: "Sr. Peña Lavia Caribes Tours.",
+    cargo: "Director / Gerencia",
+    email: "",
+    telefono: "+1 809 221-4422",
+    pais: "DO",
     etapa: "propuesta_enviada",
-    presupuestoMonto: 1800,
     valorEstimado: 1800,
     probabilidad: 60,
-    fuente: "Scraper Google",
-    portalToken: "portal-lead-4",
-    interacciones: [],
+    fuente: "WhatsApp Real DO (+18295284713)",
     whatsappData: {
-      telefono: "+1 809 552-0199",
+      telefono: "+1 809 221-4422",
       temperatura: "caliente",
       estadoSeguimiento: "dia_3_seguimiento",
+      ultimoMensajeFecha: "Miércoles",
       mensajes: [
-        { id: "wa-4-1", emisor: "agencia", texto: "Hola Alejandro, propuesta enviada por correo. ¿Pudiste revisarla?", fechaHora: "11 Oct 15:20", leido: true }
+        { id: "msg-pena-1", emisor: "cliente", texto: "Sr. Peña Lavia Caribes Tours. usa una duración predeterminada para los mensajes temporales en los chats nuevos...", fechaHora: "Miércoles 11:25", leido: true, origen: "whatsapp_real_DO" }
       ]
     }
   },
   {
-    id: "crm-lead-5",
-    empresa: "Lex Consultores Legales",
-    contacto: "Dra. Sofía Valiente",
-    cargo: "Socia Directora",
-    email: "contacto@lexcorporativo.sv",
-    telefono: "+503 2505-1200",
+    id: "wa-real-50375628574",
+    empresa: "+503 7562 8574",
+    contacto: "+503 7562 8574",
+    cargo: "Contacto WhatsApp El Salvador",
+    email: "",
+    telefono: "+503 7562 8574",
     pais: "SV",
-    dominio: "lexcorporativo.sv",
-    etapa: "perdido",
-    valorEstimado: 3200,
-    probabilidad: 0,
-    fuente: "Google SERP",
-    portalToken: "portal-lead-5",
-    interacciones: [],
+    etapa: "contactado",
+    valorEstimado: 750,
+    probabilidad: 40,
+    fuente: "WhatsApp Real (+503 7562 8574)",
     whatsappData: {
-      telefono: "+503 2505-1200",
-      temperatura: "frio",
-      estadoSeguimiento: "dia_7_cierre",
+      telefono: "+503 7562 8574",
+      temperatura: "tibio",
+      estadoSeguimiento: "dia_1_valor",
+      ultimoMensajeFecha: "Miércoles",
       mensajes: [
-        { id: "wa-5-1", emisor: "agencia", texto: "Estimada Dra. Sofía, dejamos la propuesta en pausa. Éxitos en sus proyectos.", fechaHora: "09 Oct 18:00", leido: true }
+        { id: "msg-503-1", emisor: "cliente", texto: "https://youtube.com/shorts/8B2KniibJEo?si=N-k92F-i44K4kI1g", fechaHora: "Miércoles 17:02", leido: true, origen: "whatsapp_real_SV" }
+      ]
+    }
+  },
+  {
+    id: "wa-real-18099841958",
+    empresa: "+1 (809) 984-1958",
+    contacto: "+1 (809) 984-1958",
+    cargo: "Contacto WhatsApp",
+    email: "",
+    telefono: "+1 809 984-1958",
+    pais: "DO",
+    etapa: "contactado",
+    valorEstimado: 600,
+    probabilidad: 35,
+    fuente: "WhatsApp Real DO (+18295284713)",
+    whatsappData: {
+      telefono: "+1 809 984-1958",
+      temperatura: "tibio",
+      estadoSeguimiento: "esperando_respuesta",
+      ultimoMensajeFecha: "Martes",
+      mensajes: [
+        { id: "msg-809-2", emisor: "cliente", texto: "🎤 Nota de voz (0:09)", fechaHora: "Martes 13:45", leido: true, origen: "whatsapp_real_DO" }
+      ]
+    }
+  },
+  {
+    id: "wa-real-julio-alcantara",
+    empresa: "Cerámicas Taína",
+    contacto: "Julio Alcantara Ceramicas Taina",
+    cargo: "Gerente Comercial",
+    email: "ventas@ceramicastaina.com.do",
+    telefono: "+1 809 567-3311",
+    pais: "DO",
+    etapa: "reunion",
+    valorEstimado: 2100,
+    probabilidad: 70,
+    fuente: "WhatsApp Real DO (+18295284713)",
+    whatsappData: {
+      telefono: "+1 809 567-3311",
+      temperatura: "caliente",
+      estadoSeguimiento: "dia_1_valor",
+      ultimoMensajeFecha: "Martes",
+      mensajes: [
+        { id: "msg-julio-1", emisor: "cliente", texto: "Puede hacer publicaciones en redes con enlaces directos para que los clientes lleguen a cotizar las cerámicas por WhatsApp", fechaHora: "Martes 09:20", leido: true, origen: "whatsapp_real_DO" }
+      ]
+    }
+  },
+  {
+    id: "wa-real-airon-mrs",
+    empresa: "@airon_mrs",
+    contacto: "@airon_mrs",
+    cargo: "Contacto WhatsApp",
+    email: "",
+    telefono: "+1 829 000-0003",
+    pais: "DO",
+    etapa: "contactado",
+    valorEstimado: 0,
+    probabilidad: 15,
+    fuente: "WhatsApp Real DO (+18295284713)",
+    whatsappData: {
+      telefono: "+1 829 000-0003",
+      temperatura: "tibio",
+      estadoSeguimiento: "primer_contacto",
+      ultimoMensajeFecha: "24/9/2026",
+      mensajes: [
+        { id: "msg-airon-1", emisor: "cliente", texto: "Reaccionaste con 👍 a: 🎤 0:02", fechaHora: "24 Sep 20:12", leido: true, origen: "whatsapp_real_DO" }
+      ]
+    }
+  },
+  {
+    id: "wa-real-carro-tu",
+    empresa: "Carro (Tú)",
+    contacto: "Carro (Tú)",
+    cargo: "Notas Personales & Leads de Cotización",
+    email: "",
+    telefono: "+1 829 528-4713",
+    pais: "DO",
+    etapa: "propuesta_enviada",
+    valorEstimado: 1200,
+    probabilidad: 50,
+    fuente: "WhatsApp Real DO (+18295284713)",
+    whatsappData: {
+      telefono: "+1 829 528-4713",
+      temperatura: "caliente",
+      estadoSeguimiento: "dia_3_seguimiento",
+      ultimoMensajeFecha: "23/9/2026",
+      mensajes: [
+        { id: "msg-carro-1", emisor: "cliente", texto: "NUEVA SOLICITUD DE COTIZACIÓN ===\nNombre: Cliente Interesado\nServicio: Rediseño Web StoryBrand & Landing Page", fechaHora: "23 Sep 16:30", leido: true, origen: "whatsapp_real_DO" }
       ]
     }
   }
@@ -540,6 +613,31 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Delete Lead con confirmación y persistencia inmediata
+  const handleDeleteLead = async (leadId, empresaNombre, e) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar al lead "${empresaNombre || leadId}" del CRM?`)) {
+      return;
+    }
+
+    // 1. Eliminar de inmediato en estado local y localStorage
+    updateAndPersistLeads(prev => prev.filter(l => l.id !== leadId));
+
+    // Si estaba seleccionado en portal o whatsapp, cambiar la selección
+    if (selectedPortalLeadId === leadId) setSelectedPortalLeadId(null);
+    if (selectedWaLeadId === leadId) setSelectedWaLeadId(null);
+    if (activeLeadModal?.id === leadId) setActiveLeadModal(null);
+
+    // 2. Sincronizar eliminación con backend si está disponible
+    try {
+      await fetch(getBackendEndpoint(`/api/crm/leads/${leadId}`), {
+        method: 'DELETE'
+      });
+    } catch (err) {
+      console.warn('Eliminación guardada localmente (API offline):', err);
     }
   };
 
@@ -848,16 +946,41 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     setTimeout(() => setWaNotice(null), 3000);
   };
 
-  // Limpiar prospectos simulados iniciales
-  const handleClearMockLeads = () => {
-    if (!confirm('¿Deseas eliminar las conversaciones de demostración iniciales para dejar únicamente tus contactos reales?')) return;
-    const mockIds = ['crm-lead-1', 'crm-lead-2', 'crm-lead-3', 'crm-lead-4', 'crm-lead-5'];
-    updateAndPersistLeads(prev => {
-      const filtered = prev.filter(l => !mockIds.includes(l.id));
-      if (filtered.length > 0) setSelectedWaLeadId(filtered[0].id);
-      return filtered;
-    });
-    setWaNotice('Conversaciones de ejemplo eliminadas');
+  // Limpiar prospectos simulados iniciales y sincronizar con contactos reales
+  const handleClearMockLeads = async () => {
+    if (!confirm('¿Deseas restablecer y dejar únicamente tus contactos reales de WhatsApp?')) return;
+    
+    // IDs de mockups legacy a filtrar
+    const legacyMockPatterns = ['crm-lead-1', 'crm-lead-2', 'crm-lead-3', 'crm-lead-4', 'crm-lead-5', '1791605700142', '1791605700359', 'lead-sv-001', 'lead-do-002', 'lead-sv-003'];
+    
+    try {
+      // 1. Intentar consultar leads frescos del backend
+      let freshData = null;
+      try {
+        const res = await fetch(getBackendEndpoint('/api/crm/leads'));
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) freshData = data;
+        }
+      } catch (err) {}
+
+      if (freshData && freshData.length > 0) {
+        updateAndPersistLeads(freshData);
+        setSelectedWaLeadId(freshData[0].id);
+      } else {
+        updateAndPersistLeads(prev => {
+          const filtered = prev.filter(l => !legacyMockPatterns.some(pattern => (l.id || '').includes(pattern) || (l.leadId || '').includes(pattern)));
+          const finalLeads = filtered.length > 0 ? filtered : SEED_CRM_LEADS;
+          setSelectedWaLeadId(finalLeads[0].id);
+          return finalLeads;
+        });
+      }
+    } catch (e) {
+      updateAndPersistLeads(SEED_CRM_LEADS);
+      setSelectedWaLeadId(SEED_CRM_LEADS[0].id);
+    }
+    
+    setWaNotice('✅ Bandeja sincronizada con tus contactos reales');
     setTimeout(() => setWaNotice(null), 3000);
   };
 
@@ -1308,9 +1431,19 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                                   </div>
                                 )}
                               </div>
-                              <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#090d16] border border-slate-800 text-xs font-medium text-slate-300">
-                                <span>{lead.pais === 'SV' ? '🇸🇻' : '🇩🇴'}</span>
-                                <span className="text-[11px]">{lead.pais === 'SV' ? 'El Salvador' : 'Rep. Dom.'}</span>
+                              <div className="shrink-0 flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#090d16] border border-slate-800 text-xs font-medium text-slate-300">
+                                  <span>{lead.pais === 'SV' ? '🇸🇻' : '🇩🇴'}</span>
+                                  <span className="text-[11px]">{lead.pais === 'SV' ? 'El Salvador' : 'Rep. Dom.'}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleDeleteLead(lead.id, lead.empresa, e)}
+                                  title="Eliminar Lead"
+                                  className="p-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 hover:border-rose-500/40 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             </div>
 
@@ -1470,11 +1603,20 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                   <td className="p-3 text-right space-x-2">
                     <button
                       onClick={() => onConvertToPresupuesto && onConvertToPresupuesto(lead)}
-                      className="px-2.5 py-1 rounded bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 font-medium text-xs transition-colors"
+                      className="px-2.5 py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 font-medium text-xs transition-colors"
+                      title="Generar Presupuesto VIP"
                     >
                       Presupuesto
                     </button>
                     
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteLead(lead.id, lead.empresa, e)}
+                      title="Eliminar Lead"
+                      className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 hover:border-rose-500/40 transition-all inline-flex items-center justify-center align-middle"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -1727,16 +1869,28 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                         </div>
                       </div>
 
-                      {/* Botones Principales (Grandes, cómodos, sin apiñarse) */}
+                      {/* Botones Principales del Centro de Comando */}
                       <div className="flex items-center gap-2.5 shrink-0">
+                        <a
+                          href="https://web.whatsapp.com/"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950/50 transition-all"
+                          title="Abrir WhatsApp Web oficial en tu navegador (sesión real sin riesgo de baneo)"
+                        >
+                          <Smartphone className="w-3.5 h-3.5" />
+                          <span>Abrir WhatsApp Web</span>
+                        </a>
+
                         <a
                           href={`https://wa.me/${cleanPhone}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950/50 transition-all"
+                          className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold text-xs flex items-center gap-1.5 border border-slate-700 transition-all"
+                          title="Abrir chat directo en wa.me"
                         >
-                          <Smartphone className="w-3.5 h-3.5" />
-                          <span>Abrir wa.me</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>wa.me</span>
                         </a>
 
                         <button
@@ -1747,10 +1901,10 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                               ? 'bg-orange-600 text-white border border-orange-400 ring-2 ring-orange-500/30'
                               : 'bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 border border-orange-500/30'
                           }`}
-                          title="Abrir panel con guiones de alta conversión"
+                          title="Abrir panel con guiones StoryBrand y objeciones"
                         >
                           <Zap className="w-3.5 h-3.5" />
-                          <span>{isCopilotOpen ? 'Cerrar Copiloto' : '⚡ Copiloto de Ventas'}</span>
+                          <span>{isCopilotOpen ? 'Cerrar Copiloto' : '⚡ Copiloto StoryBrand'}</span>
                         </button>
                       </div>
                     </div>

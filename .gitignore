@@ -25,3 +25,6 @@ Thumbs.db
 temp_*
 .cache/
 .firebase/
+
+# WhatsApp sessions & credentials (Security / Privacy)
+server/sessions/

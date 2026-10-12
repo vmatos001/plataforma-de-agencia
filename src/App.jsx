@@ -45,6 +45,7 @@ import ContratosOnboardingModule from './components/ContratosOnboardingModule';
 import WireframesStoryBrandModule from './components/WireframesStoryBrandModule';
 import SeoLaunchQaModule from './components/SeoLaunchQaModule';
 import PublicClientPortal from './components/PublicClientPortal';
+import { clientSearch, generateClientLead } from './services/clientLeadEngine';
 
 export default function App() {
   const [clientPortalToken, setClientPortalToken] = useState(() => {
@@ -59,6 +60,13 @@ export default function App() {
     return (typeof window !== 'undefined' && localStorage.getItem('goglite_active_module')) || 'crm_portal';
   }); // 'lead_scrapper' | 'crm_portal' | 'presupuestos'
   
+  const getBackendEndpoint = (endpoint) => {
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return `http://localhost:3001${endpoint}`;
+    }
+    return endpoint;
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('goglite_active_module', activeModule);
@@ -124,7 +132,7 @@ export default function App() {
 
   const fetchLeads = async () => {
     try {
-      const res = await fetch('/api/leads');
+      const res = await fetch(getBackendEndpoint('/api/leads'));
       if (res.ok) {
         const data = await res.json();
         setLeads(data);
@@ -139,7 +147,7 @@ export default function App() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch('/api/settings');
+      const res = await fetch(getBackendEndpoint('/api/settings'));
       if (res.ok) {
         const data = await res.json();
         setSettings(data);
@@ -150,7 +158,7 @@ export default function App() {
     }
   };
 
-  // Run Manual Search
+  // Run Manual Search (Híbrido: Backend con fallback autónomo en cliente)
   const handleManualSearch = async (queryText) => {
     const q = queryText || manualSearchInput;
     if (!q.trim()) return;
@@ -160,22 +168,42 @@ export default function App() {
     setSelectedResults(new Set());
 
     try {
-      const res = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, country: selectedCountry, searchMode })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSearchResults(data.results);
-        // Pre-select recommended / golden prospects
-        const recommended = new Set(
-          data.results
-            .filter(r => r.recomendadoOutbound || r.esProspectoOro)
-            .map(r => r.dominio)
-        );
-        setSelectedResults(recommended);
+      let results = [];
+      let success = false;
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        const res = await fetch(getBackendEndpoint('/api/search'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q, country: selectedCountry, searchMode }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.results)) {
+            results = data.results;
+            success = true;
+          }
+        }
+      } catch (backendErr) {
+        console.warn('Backend search offline o bloqueado por navegador, activando motor autónomo de cliente:', backendErr);
       }
+
+      // Si el backend no respondió o está en hosting estático sin proxy
+      if (!success || results.length === 0) {
+        results = await clientSearch(q, selectedCountry, searchMode, settings.serperApiKey);
+      }
+
+      setSearchResults(results);
+      const recommended = new Set(
+        results
+          .filter(r => r.recomendadoOutbound || r.esProspectoOro)
+          .map(r => r.dominio)
+      );
+      setSelectedResults(recommended);
     } catch (err) {
       alert('Error al realizar búsqueda: ' + err.message);
     } finally {
@@ -183,7 +211,7 @@ export default function App() {
     }
   };
 
-  // Run 1-Click Pipeline
+  // Run 1-Click Pipeline (Híbrido: Backend con fallback autónomo en cliente)
   const handleRunPipeline = async (queryText) => {
     const q = queryText || pipelineInput;
     if (!q.trim()) return;
@@ -194,26 +222,55 @@ export default function App() {
       : 'Buscando empresas en Google (posiciones 4-20)...');
 
     try {
-      setPipelineProgress('Auditando presencia, analizando reseñas y redactando pitches con Gemini IA...');
-      const res = await fetch('/api/pipeline', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, country: selectedCountry, limit: 10, searchMode })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setPipelineProgress(`¡Completado! Se generaron ${data.nuevosGuardados} leads nuevos.`);
-        await fetchLeads();
-        setTimeout(() => {
-          setIsPipelineRunning(false);
-          setActiveTab('leads');
-        }, 1500);
-      } else {
-        alert('Error en pipeline: ' + (data.error || 'Desconocido'));
-        setIsPipelineRunning(false);
+      setPipelineProgress('Auditando presencia, analizando reseñas y estructurando pitches comerciales...');
+      let completed = false;
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        const res = await fetch(getBackendEndpoint('/api/pipeline'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q, country: selectedCountry, limit: 10, searchMode }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            setPipelineProgress(`¡Completado! Se generaron ${data.nuevosGuardados} leads nuevos.`);
+            await fetchLeads();
+            completed = true;
+          }
+        }
+      } catch (backendErr) {
+        console.warn('Backend pipeline offline o bloqueado por navegador, ejecutando motor autónomo de cliente:', backendErr);
       }
+
+      // Fallback autónomo en el navegador (producción sin backend)
+      if (!completed) {
+        const rawResults = await clientSearch(q, selectedCountry, searchMode, settings.serperApiKey);
+        const targets = rawResults.slice(0, 8);
+        const newLeads = targets.map(t => generateClientLead(t, q, selectedCountry));
+
+        setLeads(prev => {
+          const combined = [...newLeads, ...prev];
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('goglite_outbound_leads', JSON.stringify(combined));
+          }
+          return combined;
+        });
+
+        setPipelineProgress(`¡Completado! Se generaron ${newLeads.length} prospectos listos para prospección.`);
+        completed = true;
+      }
+
+      setTimeout(() => {
+        setIsPipelineRunning(false);
+        setActiveTab('leads');
+      }, 1200);
     } catch (err) {
-      alert('Error al ejecutar pipeline: ' + err.message);
+      alert('Error en pipeline: ' + err.message);
       setIsPipelineRunning(false);
     }
   };
@@ -245,69 +302,84 @@ export default function App() {
 
     for (const item of itemsToProcess) {
       try {
-        const enrichRes = await fetch('/api/enrich', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            domain: item.dominio, 
-            companyName: item.titulo, 
-            country: selectedCountry,
-            sinWeb: item.sinWeb,
-            telefono: item.telefono
-          })
-        });
-        const enrichData = await enrichRes.json();
-        const contact = enrichData.contact || {};
+        let newLeadPayload;
+        try {
+          const enrichRes = await fetch(getBackendEndpoint('/api/enrich'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              domain: item.dominio, 
+              companyName: item.titulo, 
+              country: selectedCountry,
+              sinWeb: item.sinWeb,
+              telefono: item.telefono
+            })
+          });
+          const enrichData = await enrichRes.json();
+          const contact = enrichData.contact || {};
 
-        const auditRes = await fetch('/api/audit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            domain: item.dominio, 
-            query: manualSearchInput, 
-            country: selectedCountry,
-            resenas: item.resenas,
-            calificacion: item.calificacion,
-            sinWeb: item.sinWeb,
-            tipoFuente: item.tipoFuente,
-            titulo: item.titulo
-          })
-        });
-        const auditData = await auditRes.json();
-        const audit = auditData.audit;
+          const auditRes = await fetch(getBackendEndpoint('/api/audit'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              domain: item.dominio, 
+              query: manualSearchInput, 
+              country: selectedCountry,
+              resenas: item.resenas,
+              calificacion: item.calificacion,
+              sinWeb: item.sinWeb,
+              tipoFuente: item.tipoFuente,
+              titulo: item.titulo
+            })
+          });
+          const auditData = await auditRes.json();
+          const audit = auditData.audit;
 
-        const newLeadPayload = {
-          dominio: item.dominio,
-          nombreEmpresa: item.titulo.split('|')[0].trim(),
-          pais: selectedCountry,
-          email: contact.email,
-          responsable: contact.responsable,
-          cargo: contact.cargo,
-          telefono: contact.telefono || item.telefono || '',
-          posicionGoogle: item.posicion,
-          resenas: item.resenas || 0,
-          calificacion: item.calificacion || 0,
-          sinWeb: Boolean(item.sinWeb),
-          tipoFuente: item.tipoFuente || (searchMode === 'maps' ? 'google_maps' : 'google_serp'),
-          auditoria: audit,
-          pitch: null
-        };
+          newLeadPayload = {
+            dominio: item.dominio,
+            nombreEmpresa: item.titulo.split('|')[0].trim(),
+            pais: selectedCountry,
+            email: contact.email,
+            responsable: contact.responsable,
+            cargo: contact.cargo,
+            telefono: contact.telefono || item.telefono || '',
+            posicionGoogle: item.posicion,
+            resenas: item.resenas || 0,
+            calificacion: item.calificacion || 0,
+            sinWeb: Boolean(item.sinWeb),
+            tipoFuente: item.tipoFuente || (searchMode === 'maps' ? 'google_maps' : 'google_serp'),
+            auditoria: audit,
+            pitch: null
+          };
 
-        const pitchRes = await fetch('/api/pitch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lead: newLeadPayload, audit, country: selectedCountry })
-        });
-        const pitchData = await pitchRes.json();
-        newLeadPayload.pitch = pitchData.pitch;
+          const pitchRes = await fetch(getBackendEndpoint('/api/pitch'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lead: newLeadPayload, audit, country: selectedCountry })
+          });
+          const pitchData = await pitchRes.json();
+          newLeadPayload.pitch = pitchData.pitch;
 
-        await fetch('/api/leads', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newLeadPayload)
-        });
+          await fetch(getBackendEndpoint('/api/leads'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newLeadPayload)
+          });
+        } catch {
+          // Fallback cliente 100% autónomo
+          newLeadPayload = generateClientLead(item, manualSearchInput, selectedCountry);
+        }
 
-        addedCount++;
+        if (newLeadPayload) {
+          setLeads(prev => {
+            const updated = [newLeadPayload, ...prev];
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('goglite_outbound_leads', JSON.stringify(updated));
+            }
+            return updated;
+          });
+          addedCount++;
+        }
       } catch (err) {
         console.error('Error procesando lead individual:', err);
       }
@@ -335,7 +407,7 @@ export default function App() {
 
     // 2. Sincronizar con API backend
     try {
-      await fetch(`/api/leads/${leadId}`, {
+      await fetch(getBackendEndpoint(`/api/leads/${leadId}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ estado: newStatus })
@@ -371,7 +443,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('/api/send-email', {
+      const res = await fetch(getBackendEndpoint('/api/send-email'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -397,7 +469,7 @@ export default function App() {
   const handleDeleteLead = async (leadId) => {
     if (!confirm('¿Eliminar este lead?')) return;
     try {
-      await fetch(`/api/leads/${leadId}`, { method: 'DELETE' });
+      await fetch(getBackendEndpoint(`/api/leads/${leadId}`), { method: 'DELETE' });
       fetchLeads();
       if (selectedLeadModal?.id === leadId) setSelectedLeadModal(null);
     } catch (err) {
@@ -409,7 +481,7 @@ export default function App() {
   const handleSaveSettings = async (e) => {
     e.preventDefault();
     try {
-      await fetch('/api/settings', {
+      await fetch(getBackendEndpoint('/api/settings'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
