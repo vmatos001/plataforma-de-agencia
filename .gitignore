@@ -28,3 +28,29 @@ temp_*
 
 # WhatsApp sessions & credentials (Security / Privacy)
 server/sessions/
+
+# === GOGLITE SECURITY POLICY: EXCLUSIONES SENSIBLES OBLIGATORIAS ===
+# Credenciales, cuentas y accesos
+CUENTAS_Y_ACCESOS*.md
+*CUENTAS*.md
+*ACCESOS*.md
+*CREDENTIALS*.md
+*credenciales*
+# Propuestas comerciales y cotizaciones internas
+PROPUESTA_*.md
+*PROPUESTA*.md
+*COTIZACION*.md
+*CONTRATO*.md
+# Archivos de entorno y claves privadas
+.env.*
+*.key
+*.pem
+*id_rsa*
+# Claves y tokens de servicios en la nube
+*service-account*.json
+*serviceAccount*.json
+*firebase-adminsdk*.json
+client_secret*.json
+# Registros y volcados
+*.sql
+*.dump

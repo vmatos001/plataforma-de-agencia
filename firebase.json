@@ -3,7 +3,11 @@
     "public": "dist",
     "ignore": [
       "firebase.json",
+      "**/*ACCESOS*",
+      "**/*PROPUESTA*",
       "**/.*",
+      "**/.env*",
+      "**/*CUENTAS*",
       "**/node_modules/**"
     ],
     "rewrites": [
@@ -11,6 +15,7 @@
         "source": "**",
         "destination": "/index.html"
       }
-    ]
+    ],
+    "cleanUrls": true
   }
 }
