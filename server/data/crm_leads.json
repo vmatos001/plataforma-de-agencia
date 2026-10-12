@@ -9,12 +9,21 @@
     "telefono": "+1 809 6845-5645",
     "pais": "DO",
     "dominio": "inmobiliariaspuntacanamodernosantodomingo.do",
-    "etapa": "nuevo",
+    "etapa": "contactado",
     "valorEstimado": 950,
-    "probabilidad": 10,
+    "probabilidad": 25,
     "fuente": "Scraper Google SERP",
     "portalToken": "portal-lead-1791605700142-83et-kkwqjl",
     "interacciones": [
+      {
+        "id": "int-wa-1791761361728",
+        "tipo": "whatsapp",
+        "fecha": "2026-10-11",
+        "titulo": "Mensaje Enviado por WhatsApp",
+        "detalle": "Hola Lic. Marcos, le enviamos la auditoria tecnica y confirmamos la cita para mañana a las 10am.",
+        "proximoPaso": "Continuar conversación / Agendar demo",
+        "fechaProximoPaso": ""
+      },
       {
         "id": "int-wa-1791689823412",
         "tipo": "whatsapp",
@@ -86,6 +95,14 @@
           "texto": "Prueba de integración WhatsApp CRM exitosa",
           "tipo": "texto",
           "fechaHora": "10 Oct 23:37",
+          "leido": true
+        },
+        {
+          "id": "wa-msg-1791761361728",
+          "emisor": "agencia",
+          "texto": "Hola Lic. Marcos, le enviamos la auditoria tecnica y confirmamos la cita para mañana a las 10am.",
+          "tipo": "texto",
+          "fechaHora": "11 Oct 19:29",
           "leido": true
         }
       ]

@@ -35,6 +35,12 @@ import {
 import { analyzeOnPageSeo, generateSchemaJsonLd, generateLsiKeywords, getSearchConsoleMetrics } from './services/geoSeoService.js';
 import { getCmsSites, getCmsSiteBySlug, updateCmsSiteContent } from './services/headlessCmsStorage.js';
 import { initDb } from './services/db.js';
+import { 
+  getSessionsStatus, 
+  startWhatsAppSession, 
+  sendRealWhatsAppMessage, 
+  disconnectWhatsAppSession 
+} from './services/whatsappMultiService.js';
 
 import path from 'path';
 import fs from 'fs';
@@ -976,6 +982,50 @@ app.patch('/api/crm/leads/:id/whatsapp-meta', (req, res) => {
   const updated = updateWhatsAppLeadMeta(id, req.body);
   if (!updated) return res.status(404).json({ error: 'Lead no encontrado' });
   res.json(updated);
+});
+
+// ==========================================
+// 8.1 WHATSAPP REAL MULTI-SESIÓN (SV & DO)
+// ==========================================
+app.get('/api/whatsapp/sessions', (req, res) => {
+  res.json(getSessionsStatus());
+});
+
+app.get('/api/whatsapp/sessions/:country', (req, res) => {
+  const status = getSessionsStatus(req.params.country);
+  if (!status) return res.status(404).json({ error: 'País no soportado' });
+  res.json(status);
+});
+
+app.post('/api/whatsapp/sessions/:country/connect', async (req, res) => {
+  try {
+    const result = await startWhatsAppSession(req.params.country);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/whatsapp/sessions/:country', async (req, res) => {
+  try {
+    const result = await disconnectWhatsAppSession(req.params.country);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/whatsapp/sessions/:country/send', async (req, res) => {
+  const { telefono, texto } = req.body;
+  if (!telefono || !texto) {
+    return res.status(400).json({ error: 'Teléfono y texto son requeridos' });
+  }
+  try {
+    const result = await sendRealWhatsAppMessage(req.params.country, telefono, texto);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.patch('/api/crm/leads/:id', (req, res) => {

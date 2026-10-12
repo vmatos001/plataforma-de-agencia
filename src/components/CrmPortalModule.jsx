@@ -38,7 +38,11 @@ import {
   CheckCheck,
   Smartphone,
   Share2,
-  Zap
+  Zap,
+  QrCode,
+  Wifi,
+  WifiOff,
+  RefreshCw
 } from 'lucide-react';
 
 const PIPELINE_STAGES = [
@@ -437,6 +441,40 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   const [waScriptCategory, setWaScriptCategory] = useState('todos'); // 'todos' | 'diagnostico' | 'solucion' | 'objeciones' | 'followup' | 'cierre'
   const [waNotice, setWaNotice] = useState(null);
 
+  // Estados de WhatsApp Multi-Sesión Real (SV & DO)
+  const [waSessions, setWaSessions] = useState({
+    SV: { country: 'SV', label: 'El Salvador (🇸🇻)', prefix: '+503', status: 'disconnected', qrCode: null, phoneNumber: null },
+    DO: { country: 'DO', label: 'Rep. Dominicana (🇩🇴)', prefix: '+1', status: 'disconnected', qrCode: null, phoneNumber: null }
+  });
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [selectedQrCountry, setSelectedQrCountry] = useState('SV');
+  const [isConnectingSession, setIsConnectingSession] = useState(false);
+  const [selectedSendingLine, setSelectedSendingLine] = useState('SV');
+  const [isSendingRealMsg, setIsSendingRealMsg] = useState(false);
+
+  // Polling de sesiones de WhatsApp (cada 5s normal, cada 2s con modal abierto)
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSessions = async () => {
+      try {
+        const res = await fetch('/api/whatsapp/sessions');
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) setWaSessions(data);
+        }
+      } catch (e) {
+        // Modo estático o backend no disponible
+      }
+    };
+
+    fetchSessions();
+    const interval = setInterval(fetchSessions, isQrModalOpen ? 2000 : 5000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isQrModalOpen]);
+
   // Helper para persistir leads siempre en localStorage
   const updateAndPersistLeads = (updater) => {
     setLeads(prev => {
@@ -608,6 +646,112 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       });
     } catch (err) {
       console.warn('Lanzamiento guardado localmente:', err);
+    }
+  };
+
+  // WhatsApp Multi-Sesión Real: Conectar, Desconectar y Enviar
+  const handleStartSession = async (country) => {
+    setIsConnectingSession(true);
+    try {
+      const res = await fetch(`/api/whatsapp/sessions/${country}/connect`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setWaSessions(prev => ({
+          ...prev,
+          [country]: { ...prev[country], ...data }
+        }));
+      }
+    } catch (e) {
+      console.warn('Error iniciando sesión WhatsApp:', e);
+    } finally {
+      setIsConnectingSession(false);
+    }
+  };
+
+  const handleDisconnectSession = async (country) => {
+    if (!confirm(`¿Deseas desvincular la línea de WhatsApp para ${country === 'SV' ? 'El Salvador' : 'Rep. Dominicana'}?`)) return;
+    try {
+      await fetch(`/api/whatsapp/sessions/${country}`, { method: 'DELETE' });
+      setWaSessions(prev => ({
+        ...prev,
+        [country]: { ...prev[country], status: 'disconnected', qrCode: null, phoneNumber: null }
+      }));
+    } catch (e) {
+      console.warn('Error desconectando sesión:', e);
+    }
+  };
+
+  const handleSendRealWhatsAppViaLine = async (lead, texto, lineCountry) => {
+    if (!lead || !texto.trim()) return;
+    const cleanPhone = (lead.whatsappData?.telefono || lead.telefono || '').replace(/[^\d]/g, '');
+    if (!cleanPhone) {
+      alert('Este prospecto no tiene número de teléfono registrado');
+      return;
+    }
+
+    const session = waSessions[lineCountry];
+    if (!session || session.status !== 'connected') {
+      alert(`La línea de ${lineCountry === 'SV' ? 'El Salvador 🇸🇻' : 'Rep. Dominicana 🇩🇴'} no está vinculada. Vamos a abrir el modal de vinculación para escanear el código QR.`);
+      setSelectedQrCountry(lineCountry);
+      setIsQrModalOpen(true);
+      return;
+    }
+
+    setIsSendingRealMsg(true);
+    try {
+      const res = await fetch(`/api/whatsapp/sessions/${lineCountry}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefono: cleanPhone, texto })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Fallo al enviar mensaje');
+      }
+
+      // Guardar en bitácora local inmediata
+      const now = new Date();
+      const timeStr = `${now.getDate()} ${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][now.getMonth()]} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const nuevoMsg = {
+        id: 'wa-msg-real-' + Date.now(),
+        emisor: 'agencia',
+        texto,
+        fechaHora: timeStr,
+        leido: true,
+        origen: `whatsapp_real_${lineCountry}`
+      };
+
+      updateAndPersistLeads(prev => prev.map(l => {
+        if (l.id === lead.id) {
+          const wa = l.whatsappData || { mensajes: [] };
+          return {
+            ...l,
+            whatsappData: {
+              ...wa,
+              ultimoMensajeFecha: 'Hoy',
+              mensajes: [...(wa.mensajes || []), nuevoMsg]
+            }
+          };
+        }
+        return l;
+      }));
+
+      setWaMessageInput('');
+      setWaNotice(`✅ Mensaje enviado exitosamente vía WhatsApp Real (${lineCountry})`);
+      setTimeout(() => setWaNotice(null), 4000);
+
+      // Sincronizar en backend
+      fetch(`/api/crm/leads/${lead.id}/whatsapp-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emisor: 'agencia', texto, origen: `whatsapp_real_${lineCountry}` })
+      }).catch(() => {});
+
+    } catch (err) {
+      alert('Error enviando mensaje por WhatsApp Real: ' + err.message);
+    } finally {
+      setIsSendingRealMsg(false);
     }
   };
 
@@ -1238,17 +1382,45 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       {activeTab === 'whatsapp_crm' && (
         <div className="bg-[#0e1320] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[740px]">
           
-          {/* Top Banner / Strategy bar */}
-          <div className="px-5 py-3 bg-[#131926] border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="font-bold text-white flex items-center gap-1.5">
+          {/* Top Banner / Strategy & Multi-Session bar */}
+          <div className="px-5 py-2.5 bg-[#131926] border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-bold text-white flex items-center gap-1.5 mr-2">
                 <MessageSquare className="w-4 h-4 text-emerald-400" />
-                <span>CRM WhatsApp Business & Venta Conversacional Directa</span>
+                <span>WhatsApp Multi-Línea</span>
               </span>
-              <span className="text-[11px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">
-                100% Autohosteado · $0 Costo en APIs de Terceros · Deep-Link wa.me
-              </span>
+
+              {/* Pill Línea El Salvador */}
+              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono ${
+                waSessions.SV?.status === 'connected'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-slate-800/80 border-slate-700/80 text-slate-400'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${waSessions.SV?.status === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`}></span>
+                <span className="font-bold">🇸🇻 SV:</span>
+                <span>{waSessions.SV?.status === 'connected' ? `+${waSessions.SV.phoneNumber || '503'}` : 'Desconectada'}</span>
+              </div>
+
+              {/* Pill Línea República Dominicana */}
+              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono ${
+                waSessions.DO?.status === 'connected'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-slate-800/80 border-slate-700/80 text-slate-400'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${waSessions.DO?.status === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`}></span>
+                <span className="font-bold">🇩🇴 DO:</span>
+                <span>{waSessions.DO?.status === 'connected' ? `+${waSessions.DO.phoneNumber || '1'}` : 'Desconectada'}</span>
+              </div>
+
+              {/* Botón Abrir Modal de QR */}
+              <button
+                type="button"
+                onClick={() => setIsQrModalOpen(true)}
+                className="ml-1 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                <span>Vincular por Código QR</span>
+              </button>
             </div>
 
             <div className="flex items-center gap-3">
@@ -1257,8 +1429,8 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                   {waNotice}
                 </div>
               )}
-              <div className="text-[11px] text-slate-400 font-mono">
-                {filteredLeads.length} leads en seguimiento activo
+              <div className="text-[11px] text-slate-400 font-mono hidden sm:block">
+                {filteredLeads.length} prospectos activos
               </div>
             </div>
           </div>
@@ -1568,23 +1740,42 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                         </button>
                       </div>
 
-                      {/* Quick variable inserts & Copilot activator */}
-                      <div className="flex items-center gap-2 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => setWaMessageInput(prev => prev + ` ¡Hola ${currentLead.contacto.split(' ')[0]}!`)}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition-colors"
-                        >
-                          + {currentLead.contacto.split(' ')[0]}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsCopilotOpen(true)}
-                          className="px-2.5 py-1 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-400 border border-orange-500/30 text-[11px] font-bold flex items-center gap-1 transition-colors"
-                        >
-                          <Zap className="w-3 h-3" />
-                          <span>Ver Guiones</span>
-                        </button>
+                      {/* Quick variable inserts, Sending Line Selector & Copilot activator */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        {/* Selector de Línea Emisora */}
+                        <div className="flex items-center gap-1.5 bg-[#131926] px-2.5 py-1 rounded-lg border border-slate-800 text-[11px]">
+                          <span className="text-slate-400 font-semibold">Línea Emisora:</span>
+                          <select
+                            value={selectedSendingLine}
+                            onChange={(e) => setSelectedSendingLine(e.target.value)}
+                            className="bg-transparent text-emerald-400 font-bold focus:outline-none cursor-pointer"
+                          >
+                            <option value="SV" className="bg-[#131926] text-slate-200">
+                              🇸🇻 El Salvador {waSessions.SV?.status === 'connected' ? '🟢 Conectada' : '🔴 Desconectada'}
+                            </option>
+                            <option value="DO" className="bg-[#131926] text-slate-200">
+                              🇩🇴 Rep. Dominicana {waSessions.DO?.status === 'connected' ? '🟢 Conectada' : '🔴 Desconectada'}
+                            </option>
+                          </select>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setWaMessageInput(prev => prev + ` ¡Hola ${currentLead.contacto.split(' ')[0]}!`)}
+                            className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition-colors"
+                          >
+                            + {currentLead.contacto.split(' ')[0]}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsCopilotOpen(true)}
+                            className="px-2.5 py-1 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-400 border border-orange-500/30 text-[11px] font-bold flex items-center gap-1 transition-colors"
+                          >
+                            <Zap className="w-3 h-3" />
+                            <span>Ver Guiones</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -1599,25 +1790,43 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                       />
 
                       <div className="flex flex-col gap-1.5 shrink-0">
-                        <button
-                          type="submit"
-                          disabled={!waMessageInput.trim()}
-                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950 transition-all"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                          <span>Guardar</span>
-                        </button>
-
+                        {/* Botón Principal: Enviar por WhatsApp Web Real */}
                         <button
                           type="button"
-                          onClick={() => handleOpenRealWhatsApp(currentLead, waMessageInput)}
-                          disabled={!waMessageInput.trim()}
-                          className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-emerald-400 font-semibold text-xs flex items-center justify-center gap-1 transition-all"
-                          title="Lanzar este texto directamente a WhatsApp Web/App"
+                          onClick={() => handleSendRealWhatsAppViaLine(currentLead, waMessageInput, selectedSendingLine)}
+                          disabled={!waMessageInput.trim() || isSendingRealMsg}
+                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950 transition-all"
+                          title="Enviar directamente a través de la sesión de WhatsApp Web vinculada"
                         >
-                          <Smartphone className="w-3 h-3" />
-                          <span>Enviar wa.me</span>
+                          {isSendingRealMsg ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Send className="w-3.5 h-3.5" />
+                          )}
+                          <span>Enviar WhatsApp</span>
                         </button>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="submit"
+                            disabled={!waMessageInput.trim()}
+                            className="flex-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 font-semibold text-[11px] flex items-center justify-center gap-1 transition-all"
+                            title="Guardar en bitácora sin enviar"
+                          >
+                            <span>Guardar</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenRealWhatsApp(currentLead, waMessageInput)}
+                            disabled={!waMessageInput.trim()}
+                            className="flex-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-emerald-400 font-semibold text-[11px] flex items-center justify-center gap-1 transition-all"
+                            title="Abrir enlace wa.me"
+                          >
+                            <Smartphone className="w-3 h-3" />
+                            <span>wa.me</span>
+                          </button>
+                        </div>
                       </div>
                     </form>
                   </div>
@@ -1985,6 +2194,181 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                 Crear Lead en CRM
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. MODAL DE VINCULACIÓN MULTI-LÍNEA WHATSAPP REAL (CÓDIGO QR A $0 COSTO) */}
+      {isQrModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0f1422] border border-slate-700/80 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-4 bg-[#131926] border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm">
+                  <QrCode className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                    <span>Vincular WhatsApp Web Real</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-mono border border-emerald-500/30">
+                      $0 Costo
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Soporte multicuenta para El Salvador y República Dominicana
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsQrModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Country Tabs */}
+            <div className="p-3 bg-[#0c101a] border-b border-slate-800 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedQrCountry('SV')}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                  selectedQrCountry === 'SV'
+                    ? 'bg-slate-800 text-emerald-400 border border-emerald-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                }`}
+              >
+                <span>🇸🇻 El Salvador (+503)</span>
+                <span className={`w-2 h-2 rounded-full ${waSessions.SV?.status === 'connected' ? 'bg-emerald-400' : 'bg-slate-600'}`}></span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedQrCountry('DO')}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                  selectedQrCountry === 'DO'
+                    ? 'bg-slate-800 text-emerald-400 border border-emerald-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                }`}
+              >
+                <span>🇩🇴 Rep. Dominicana (+1)</span>
+                <span className={`w-2 h-2 rounded-full ${waSessions.DO?.status === 'connected' ? 'bg-emerald-400' : 'bg-slate-600'}`}></span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            {(() => {
+              const activeSession = waSessions[selectedQrCountry] || {};
+              const isConnected = activeSession.status === 'connected';
+              const isQrReady = activeSession.status === 'qr_ready' && activeSession.qrCode;
+              const isConnecting = isConnectingSession || activeSession.status === 'connecting';
+
+              return (
+                <div className="p-6 flex flex-col items-center text-center space-y-4">
+                  {isConnected ? (
+                    <div className="w-full bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-5 space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-xl">
+                        <CheckCircle2 className="w-7 h-7" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white text-sm">
+                          ¡Línea de {selectedQrCountry === 'SV' ? 'El Salvador' : 'República Dominicana'} Conectada!
+                        </h4>
+                        <p className="text-xs text-emerald-300 font-mono mt-1">
+                          Número activo: +{activeSession.phoneNumber || 'Vinculado'}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-2">
+                          Esta sesión se encuentra activa en el servidor y guardada en disco de forma permanente.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDisconnectSession(selectedQrCountry)}
+                        className="px-3.5 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-semibold flex items-center justify-center gap-1.5 mx-auto transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Desvincular esta línea</span>
+                      </button>
+                    </div>
+                  ) : isQrReady ? (
+                    <div className="space-y-4 w-full">
+                      <div className="bg-white p-3 rounded-2xl shadow-xl inline-block border-2 border-emerald-500">
+                        <img
+                          src={activeSession.qrCode}
+                          alt="Código QR de WhatsApp"
+                          className="w-56 h-56 mx-auto object-contain"
+                        />
+                      </div>
+
+                      <div className="bg-[#141b2a] border border-slate-800 rounded-xl p-3.5 text-left text-xs space-y-1.5">
+                        <div className="font-bold text-slate-200 mb-1 flex items-center gap-1.5">
+                          <span>📱</span>
+                          <span>Instrucciones para escanear en tu teléfono:</span>
+                        </div>
+                        <p className="text-slate-400">1. Abre WhatsApp en el teléfono correspondiente a <strong>{selectedQrCountry === 'SV' ? 'El Salvador' : 'República Dominicana'}</strong>.</p>
+                        <p className="text-slate-400">2. Toca <strong>Menú (⋮)</strong> o <strong>Ajustes</strong> y selecciona <strong>Dispositivos vinculados</strong>.</p>
+                        <p className="text-slate-400">3. Toca <strong>Vincular un dispositivo</strong> y apunta tu cámara a este código QR.</p>
+                      </div>
+
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleStartSession(selectedQrCountry)}
+                          disabled={isConnecting}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isConnecting ? 'animate-spin' : ''}`} />
+                          <span>Regenerar QR</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : isConnecting ? (
+                    <div className="py-12 space-y-3">
+                      <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin mx-auto" />
+                      <p className="text-xs text-slate-300 font-medium">
+                        Iniciando socket seguro con WhatsApp Web...
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Generando código QR para {selectedQrCountry === 'SV' ? 'El Salvador' : 'Rep. Dominicana'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="py-8 space-y-4 w-full">
+                      <div className="w-14 h-14 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center mx-auto text-slate-400">
+                        <QrCode className="w-7 h-7" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white text-sm">
+                          Línea de {selectedQrCountry === 'SV' ? 'El Salvador 🇸🇻' : 'Rep. Dominicana 🇩🇴'} no vinculada
+                        </h4>
+                        <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
+                          Al vincularla, podrás enviar y recibir mensajes directamente desde esta pantalla sin salir de la plataforma.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleStartSession(selectedQrCountry)}
+                        className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 mx-auto shadow-lg shadow-emerald-950 transition-all"
+                      >
+                        <QrCode className="w-4 h-4" />
+                        <span>Generar Código QR para Vincular</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Modal Footer */}
+            <div className="p-3 bg-[#131926] border-t border-slate-800 text-center">
+              <span className="text-[11px] text-slate-500 font-mono">
+                Tecnología Baileys WebSocket · Datos encriptados localmente · Cero intermediarios
+              </span>
+            </div>
           </div>
         </div>
       )}
