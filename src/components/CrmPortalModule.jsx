@@ -451,19 +451,48 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   const [isConnectingSession, setIsConnectingSession] = useState(false);
   const [selectedSendingLine, setSelectedSendingLine] = useState('SV');
   const [isSendingRealMsg, setIsSendingRealMsg] = useState(false);
+  const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
+  const [newChatForm, setNewChatForm] = useState({
+    telefono: '',
+    contacto: '',
+    empresa: '',
+    pais: 'DO'
+  });
+
+  const [backendOfflineNotice, setBackendOfflineNotice] = useState(null);
+
+  // Helper para resolver URL del backend (local o producción)
+  const getBackendEndpoint = (endpoint) => {
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      return `http://localhost:3001${endpoint}`;
+    }
+    return endpoint;
+  };
 
   // Polling de sesiones de WhatsApp (cada 5s normal, cada 2s con modal abierto)
   useEffect(() => {
     let isMounted = true;
     const fetchSessions = async () => {
       try {
-        const res = await fetch('/api/whatsapp/sessions');
-        if (res.ok) {
+        let res;
+        try {
+          res = await fetch('/api/whatsapp/sessions');
+          if (!res.ok && res.status === 404) throw new Error('404');
+        } catch (localErr) {
+          res = await fetch('http://localhost:3001/api/whatsapp/sessions');
+        }
+
+        if (res && res.ok) {
           const data = await res.json();
-          if (isMounted) setWaSessions(data);
+          if (isMounted) {
+            setWaSessions(data);
+            setBackendOfflineNotice(null);
+          }
         }
       } catch (e) {
-        // Modo estático o backend no disponible
+        if (isMounted && isQrModalOpen) {
+          setBackendOfflineNotice('El servidor Node.js de WhatsApp no responde en puerto 3001. Para conectar WhatsApp Web real debes tener "npm run dev" activo en tu máquina.');
+        }
       }
     };
 
@@ -652,17 +681,31 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   // WhatsApp Multi-Sesión Real: Conectar, Desconectar y Enviar
   const handleStartSession = async (country) => {
     setIsConnectingSession(true);
+    setWaSessions(prev => ({
+      ...prev,
+      [country]: { ...prev[country], status: 'connecting', qrCode: null }
+    }));
     try {
-      const res = await fetch(`/api/whatsapp/sessions/${country}/connect`, { method: 'POST' });
-      if (res.ok) {
+      let res;
+      try {
+        res = await fetch(getBackendEndpoint(`/api/whatsapp/sessions/${country}/connect`), { method: 'POST' });
+      } catch (netErr) {
+        res = await fetch(`http://localhost:3001/api/whatsapp/sessions/${country}/connect`, { method: 'POST' });
+      }
+
+      if (res && res.ok) {
         const data = await res.json();
         setWaSessions(prev => ({
           ...prev,
           [country]: { ...prev[country], ...data }
         }));
+        setBackendOfflineNotice(null);
+      } else {
+        throw new Error('Servidor no disponible');
       }
     } catch (e) {
       console.warn('Error iniciando sesión WhatsApp:', e);
+      setBackendOfflineNotice('El servidor de WhatsApp no está accesible en puerto 3001. Para vincular WhatsApp Web real debes tener "npm run dev" ejecutándose en tu computadora.');
     } finally {
       setIsConnectingSession(false);
     }
@@ -671,7 +714,12 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   const handleDisconnectSession = async (country) => {
     if (!confirm(`¿Deseas desvincular la línea de WhatsApp para ${country === 'SV' ? 'El Salvador' : 'Rep. Dominicana'}?`)) return;
     try {
-      await fetch(`/api/whatsapp/sessions/${country}`, { method: 'DELETE' });
+      let res;
+      try {
+        res = await fetch(getBackendEndpoint(`/api/whatsapp/sessions/${country}`), { method: 'DELETE' });
+      } catch (netErr) {
+        res = await fetch(`http://localhost:3001/api/whatsapp/sessions/${country}`, { method: 'DELETE' });
+      }
       setWaSessions(prev => ({
         ...prev,
         [country]: { ...prev[country], status: 'disconnected', qrCode: null, phoneNumber: null }
@@ -699,11 +747,20 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
 
     setIsSendingRealMsg(true);
     try {
-      const res = await fetch(`/api/whatsapp/sessions/${lineCountry}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telefono: cleanPhone, texto })
-      });
+      let res;
+      try {
+        res = await fetch(getBackendEndpoint(`/api/whatsapp/sessions/${lineCountry}/send`), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telefono: cleanPhone, texto })
+        });
+      } catch (netErr) {
+        res = await fetch(`http://localhost:3001/api/whatsapp/sessions/${lineCountry}/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telefono: cleanPhone, texto })
+        });
+      }
 
       if (!res.ok) {
         const errData = await res.json();
@@ -753,6 +810,55 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     } finally {
       setIsSendingRealMsg(false);
     }
+  };
+
+  // Iniciar nuevo chat real con cualquier número
+  const handleStartNewRealChat = (e) => {
+    e.preventDefault();
+    if (!newChatForm.telefono.trim()) return;
+
+    let cleanPhone = newChatForm.telefono.trim().replace(/[^\d+]/g, '');
+    const defaultCountry = waSessions.DO?.status === 'connected' ? 'DO' : 'SV';
+    const pais = newChatForm.pais || defaultCountry;
+
+    const newLead = {
+      id: 'lead-real-' + Date.now(),
+      contacto: newChatForm.contacto.trim() || `Contacto ${cleanPhone}`,
+      empresa: newChatForm.empresa.trim() || `WhatsApp (${cleanPhone})`,
+      telefono: cleanPhone,
+      pais,
+      etapa: 'nuevo',
+      valorEstimado: 0,
+      createdAt: new Date().toISOString(),
+      whatsappData: {
+        telefono: cleanPhone,
+        temperatura: 'caliente',
+        estadoSeguimiento: 'primer_contacto',
+        ultimoMensajeFecha: 'Ahora',
+        mensajes: []
+      }
+    };
+
+    updateAndPersistLeads(prev => [newLead, ...prev]);
+    setSelectedWaLeadId(newLead.id);
+    setSelectedSendingLine(pais);
+    setIsNewChatModalOpen(false);
+    setNewChatForm({ telefono: '', contacto: '', empresa: '', pais: 'DO' });
+    setWaNotice(`Chat iniciado con ${newLead.contacto}`);
+    setTimeout(() => setWaNotice(null), 3000);
+  };
+
+  // Limpiar prospectos simulados iniciales
+  const handleClearMockLeads = () => {
+    if (!confirm('¿Deseas eliminar las conversaciones de demostración iniciales para dejar únicamente tus contactos reales?')) return;
+    const mockIds = ['crm-lead-1', 'crm-lead-2', 'crm-lead-3', 'crm-lead-4', 'crm-lead-5'];
+    updateAndPersistLeads(prev => {
+      const filtered = prev.filter(l => !mockIds.includes(l.id));
+      if (filtered.length > 0) setSelectedWaLeadId(filtered[0].id);
+      return filtered;
+    });
+    setWaNotice('Conversaciones de ejemplo eliminadas');
+    setTimeout(() => setWaNotice(null), 3000);
   };
 
   // Change lead stage con persistencia inmediata
@@ -1478,6 +1584,27 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                     className={`px-2 py-0.5 rounded-md transition-colors shrink-0 ${waTemperatureFilter === 'frio' ? 'bg-sky-500/30 text-sky-300 font-semibold border border-sky-500/40' : 'text-slate-400 hover:text-slate-200'}`}
                   >
                     ❄️ Fríos
+                  </button>
+                </div>
+
+                {/* Acciones de Bandeja: Iniciar Chat Real y Limpiar Mockups */}
+                <div className="pt-2 flex items-center justify-between gap-1.5 border-t border-slate-800/80">
+                  <button
+                    type="button"
+                    onClick={() => setIsNewChatModalOpen(true)}
+                    className="flex-1 py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Iniciar Chat Real</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClearMockLeads}
+                    className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-[10px] font-medium transition-colors"
+                    title="Eliminar las conversaciones iniciales de prueba para dejar la bandeja limpia"
+                  >
+                    Limpiar Ejemplos
                   </button>
                 </div>
               </div>
@@ -2267,6 +2394,22 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
 
               return (
                 <div className="p-6 flex flex-col items-center text-center space-y-4">
+                  {backendOfflineNotice && (
+                    <div className="w-full bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 text-xs text-amber-300 text-left space-y-1.5 animate-fadeIn">
+                      <div className="font-bold flex items-center gap-1.5 text-amber-400">
+                        <span>⚠️</span>
+                        <span>Motor de WhatsApp Web Local Requerido</span>
+                      </div>
+                      <p className="text-slate-300 text-[11px] leading-relaxed">
+                        Para operar sin costos de API ($0), la conexión de WhatsApp Web corre a través de Node.js en tu equipo.
+                      </p>
+                      <div className="bg-[#090d16] p-2 rounded-lg border border-slate-800 text-[11px] font-mono text-slate-300 space-y-1">
+                        <div>1. Verifica que la terminal tenga: <strong className="text-emerald-400">npm run dev</strong></div>
+                        <div>2. Abre la app en tu navegador en: <a href="http://localhost:5173" target="_blank" rel="noreferrer" className="text-emerald-400 underline font-bold">http://localhost:5173</a></div>
+                      </div>
+                    </div>
+                  )}
+
                   {isConnected ? (
                     <div className="w-full bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-5 space-y-3">
                       <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-xl">
@@ -2369,6 +2512,105 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                 Tecnología Baileys WebSocket · Datos encriptados localmente · Cero intermediarios
               </span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. MODAL INICIAR NUEVO CHAT REAL DE WHATSAPP */}
+      {isNewChatModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0f1422] border border-slate-700/80 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-4 bg-[#131926] border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm">
+                  <MessageSquare className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-white">Iniciar Nuevo Chat Real</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Desde tu línea {waSessions.DO?.status === 'connected' ? '🇩🇴 Rep. Dominicana (+1829...)' : 'vinculada'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewChatModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleStartNewRealChat} className="p-5 space-y-3.5 text-xs">
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">
+                  Número de WhatsApp <span className="text-emerald-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newChatForm.telefono}
+                  onChange={(e) => setNewChatForm({ ...newChatForm, telefono: e.target.value })}
+                  placeholder="ej: 829 555 1234 o +1 829..."
+                  className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 text-sm font-mono"
+                />
+                <span className="text-[11px] text-slate-500 mt-1 block">
+                  Puedes escribirlo con o sin código de país.
+                </span>
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">
+                  Nombre del Contacto / Prospecto (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={newChatForm.contacto}
+                  onChange={(e) => setNewChatForm({ ...newChatForm, contacto: e.target.value })}
+                  placeholder="ej: Lic. Carlos Pérez"
+                  className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">
+                  Empresa o Proyecto (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={newChatForm.empresa}
+                  onChange={(e) => setNewChatForm({ ...newChatForm, empresa: e.target.value })}
+                  placeholder="ej: Inmobiliaria Santo Domingo"
+                  className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">
+                  Línea Emisora a Utilizar
+                </label>
+                <select
+                  value={newChatForm.pais}
+                  onChange={(e) => setNewChatForm({ ...newChatForm, pais: e.target.value })}
+                  className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="DO">🇩🇴 Rep. Dominicana (+1) {waSessions.DO?.status === 'connected' ? '🟢 Conectada' : '🔴'}</option>
+                  <option value="SV">🇸🇻 El Salvador (+503) {waSessions.SV?.status === 'connected' ? '🟢 Conectada' : '🔴'}</option>
+                </select>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950 transition-all"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Comenzar Conversación</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

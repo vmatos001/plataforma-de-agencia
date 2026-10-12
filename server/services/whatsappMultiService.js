@@ -7,7 +7,7 @@ import pino from 'pino';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { getCrmLeads, addWhatsAppMessage } from './crmStorage.js';
+import { getCrmLeads, saveCrmLeads, addWhatsAppMessage } from './crmStorage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -95,6 +95,15 @@ export async function startWhatsAppSession(countryCode) {
     return { status: 'connected', phoneNumber: session.phoneNumber };
   }
 
+  // Si había un socket previo no conectado, cerrarlo limpiamente
+  if (session.socket) {
+    try {
+      session.socket.ev.removeAllListeners();
+      session.socket.end(undefined);
+    } catch (e) {}
+    session.socket = null;
+  }
+
   const sessionDir = path.join(SESSIONS_BASE_DIR, `whatsapp_${key.toLowerCase()}`);
   if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir, { recursive: true });
@@ -102,76 +111,104 @@ export async function startWhatsAppSession(countryCode) {
 
   session.status = 'connecting';
   session.qrCode = null;
+  session.retryCount = 0;
 
-  try {
-    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
-
-    const sock = makeWASocket({
-      auth: state,
-      logger,
-      printQRInTerminal: false,
-      browser: ['Goglite Agency CRM', 'Chrome', '1.0.0'],
-      syncFullHistory: false
-    });
-
-    session.socket = sock;
-
-    // Manejador de credenciales
-    sock.ev.on('creds.update', saveCreds);
-
-    // Manejador de estado de conexión
-    sock.ev.on('connection.update', async (update) => {
-      const { connection, lastDisconnect, qr } = update;
-
-      if (qr) {
-        try {
-          const qrDataUrl = await QRCode.toDataURL(qr, {
-            margin: 2,
-            width: 320,
-            color: { dark: '#0f172a', light: '#ffffff' }
-          });
-          session.qrCode = qrDataUrl;
-          session.status = 'qr_ready';
-          console.log(`[WhatsApp ${key}] Código QR listo para escanear`);
-        } catch (qrErr) {
-          console.error(`[WhatsApp ${key}] Error generando QR DataURL:`, qrErr);
-        }
+  return new Promise(async (resolve, reject) => {
+    let hasResolved = false;
+    const timeoutTimer = setTimeout(() => {
+      if (!hasResolved) {
+        hasResolved = true;
+        resolve({
+          status: session.status,
+          qrCode: session.qrCode,
+          phoneNumber: session.phoneNumber
+        });
       }
+    }, 4500);
 
-      if (connection === 'open') {
-        session.status = 'connected';
-        session.qrCode = null;
-        session.retryCount = 0;
-        const jid = sock.user?.id || '';
-        const phone = jid.split(':')[0] || jid.split('@')[0];
-        session.phoneNumber = phone;
-        console.log(`[WhatsApp ${key}] Conectado exitosamente con teléfono: +${phone}`);
+    const safeResolve = () => {
+      if (!hasResolved) {
+        hasResolved = true;
+        clearTimeout(timeoutTimer);
+        resolve({
+          status: session.status,
+          qrCode: session.qrCode,
+          phoneNumber: session.phoneNumber
+        });
       }
+    };
 
-      if (connection === 'close') {
-        const statusCode = lastDisconnect?.error?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-        console.warn(`[WhatsApp ${key}] Conexión cerrada. Código: ${statusCode}. Reconectar: ${shouldReconnect}`);
+    try {
+      const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
-        session.status = 'disconnected';
-        session.socket = null;
+      const sock = makeWASocket({
+        auth: state,
+        logger,
+        printQRInTerminal: false,
+        browser: ['Goglite Agency CRM', 'Chrome', '1.0.0'],
+        syncFullHistory: false
+      });
 
-        if (statusCode === DisconnectReason.loggedOut) {
-          // El usuario cerró sesión en su teléfono; limpiamos la carpeta
-          session.phoneNumber = null;
-          session.qrCode = null;
+      session.socket = sock;
+
+      // Manejador de credenciales
+      sock.ev.on('creds.update', saveCreds);
+
+      // Manejador de estado de conexión
+      sock.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
           try {
-            fs.rmSync(sessionDir, { recursive: true, force: true });
-          } catch (e) {}
-        } else if (shouldReconnect && session.retryCount < 5) {
-          session.retryCount++;
-          setTimeout(() => {
-            console.log(`[WhatsApp ${key}] Reintentando conexión (${session.retryCount}/5)...`);
-            startWhatsAppSession(key).catch(() => {});
-          }, 3000);
+            const qrDataUrl = await QRCode.toDataURL(qr, {
+              margin: 2,
+              width: 340,
+              color: { dark: '#0a0f1d', light: '#ffffff' }
+            });
+            session.qrCode = qrDataUrl;
+            session.status = 'qr_ready';
+            console.log(`[WhatsApp ${key}] Código QR listo para escanear`);
+            safeResolve();
+          } catch (qrErr) {
+            console.error(`[WhatsApp ${key}] Error generando QR DataURL:`, qrErr);
+          }
         }
-      }
-    });
+
+        if (connection === 'open') {
+          session.status = 'connected';
+          session.qrCode = null;
+          session.retryCount = 0;
+          const jid = sock.user?.id || '';
+          const phone = jid.split(':')[0] || jid.split('@')[0];
+          session.phoneNumber = phone;
+          console.log(`[WhatsApp ${key}] Conectado exitosamente con teléfono: +${phone}`);
+          safeResolve();
+        }
+
+        if (connection === 'close') {
+          const statusCode = lastDisconnect?.error?.output?.statusCode;
+          const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+          console.warn(`[WhatsApp ${key}] Conexión cerrada. Código: ${statusCode}. Reconectar: ${shouldReconnect}`);
+
+          session.status = 'disconnected';
+          session.socket = null;
+
+          if (statusCode === DisconnectReason.loggedOut) {
+            // El usuario cerró sesión en su teléfono; limpiamos la carpeta
+            session.phoneNumber = null;
+            session.qrCode = null;
+            try {
+              fs.rmSync(sessionDir, { recursive: true, force: true });
+            } catch (e) {}
+          } else if (shouldReconnect && session.retryCount < 8) {
+            session.retryCount++;
+            setTimeout(() => {
+              console.log(`[WhatsApp ${key}] Reintentando conexión (${session.retryCount}/8)...`);
+              startWhatsAppSession(key).catch(() => {});
+            }, 3000);
+          }
+        }
+      });
 
     // Manejador de mensajes entrantes reales
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
@@ -192,7 +229,7 @@ export async function startWhatsAppSession(countryCode) {
 
         console.log(`[WhatsApp ${key}] Mensaje recibido de +${rawPhone}: "${text.slice(0, 40)}..."`);
 
-        // Buscar lead asociado por teléfono
+        // Buscar lead asociado por teléfono o crearlo automáticamente
         try {
           const leads = getCrmLeads();
           const cleanIncoming = rawPhone.replace(/[^0-9]/g, '');
@@ -208,7 +245,37 @@ export async function startWhatsAppSession(countryCode) {
               texto: text,
               origen: `whatsapp_real_${key}`
             });
-            console.log(`[WhatsApp ${key}] Mensaje sincronizado al lead: ${matchingLead.contacto} (${matchingLead.empresa})`);
+            console.log(`[WhatsApp ${key}] Mensaje sincronizado al lead existente: ${matchingLead.contacto} (${matchingLead.empresa})`);
+          } else {
+            // Auto-crear el lead en el CRM para que aparezca de inmediato en la lista
+            const pushName = msg.pushName || `Cliente WhatsApp +${rawPhone}`;
+            const newLead = {
+              id: 'lead-wa-' + cleanIncoming + '-' + Date.now(),
+              empresa: `Contacto WhatsApp (+${rawPhone})`,
+              contacto: pushName,
+              telefono: `+${rawPhone}`,
+              pais: key,
+              etapa: 'nuevo',
+              valorEstimado: 0,
+              createdAt: new Date().toISOString(),
+              whatsappData: {
+                telefono: `+${rawPhone}`,
+                temperatura: 'caliente',
+                estadoSeguimiento: 'primer_contacto',
+                ultimoMensajeFecha: 'Hoy',
+                mensajes: [{
+                  id: 'msg-' + Date.now(),
+                  emisor: 'cliente',
+                  texto: text,
+                  fechaHora: 'Hoy',
+                  leido: false,
+                  origen: `whatsapp_real_${key}`
+                }]
+              }
+            };
+            const updatedLeads = [newLead, ...leads];
+            saveCrmLeads(updatedLeads);
+            console.log(`[WhatsApp ${key}] Nuevo lead creado automáticamente para +${rawPhone}: "${pushName}"`);
           }
         } catch (dbErr) {
           console.warn(`[WhatsApp ${key}] Error guardando mensaje entrante en CRM:`, dbErr.message);
@@ -216,13 +283,56 @@ export async function startWhatsAppSession(countryCode) {
       }
     });
 
-    return { status: session.status, qrCode: session.qrCode };
-  } catch (err) {
-    session.status = 'disconnected';
-    session.socket = null;
-    console.error(`[WhatsApp ${key}] Error iniciando sesión:`, err);
-    throw err;
-  }
+    // Manejador de sincronización de historial de chats de WhatsApp
+    sock.ev.on('messaging-history.set', async ({ chats }) => {
+      console.log(`[WhatsApp ${key}] Historial recibido de WhatsApp: ${chats?.length || 0} chats.`);
+      if (!chats || chats.length === 0) return;
+      try {
+        const leads = getCrmLeads();
+        let added = false;
+        for (const chat of chats.slice(0, 30)) {
+          const jid = chat.id || '';
+          if (!jid.endsWith('@s.whatsapp.net')) continue;
+          const phone = jid.replace('@s.whatsapp.net', '');
+          const clean = phone.replace(/[^0-9]/g, '');
+          const exists = leads.some(l => (l.telefono || '').replace(/[^0-9]/g, '').endsWith(clean));
+          if (!exists) {
+            leads.unshift({
+              id: 'lead-wa-' + clean + '-' + Date.now(),
+              empresa: `WhatsApp (+${phone})`,
+              contacto: chat.name || `Contacto +${phone}`,
+              telefono: `+${phone}`,
+              pais: key,
+              etapa: 'nuevo',
+              valorEstimado: 0,
+              createdAt: new Date().toISOString(),
+              whatsappData: {
+                telefono: `+${phone}`,
+                temperatura: 'tibio',
+                estadoSeguimiento: 'esperando_respuesta',
+                ultimoMensajeFecha: 'Reciente',
+                mensajes: []
+              }
+            });
+            added = true;
+          }
+        }
+        if (added) {
+          saveCrmLeads(leads);
+          console.log(`[WhatsApp ${key}] Chats sincronizados automáticamente al CRM.`);
+        }
+      } catch (err) {
+        console.warn(`[WhatsApp ${key}] Error procesando historial:`, err.message);
+      }
+    });
+
+    } catch (err) {
+      session.status = 'disconnected';
+      session.socket = null;
+      console.error(`[WhatsApp ${key}] Error iniciando sesión:`, err);
+      safeResolve();
+    }
+  });
 }
 
 /**
