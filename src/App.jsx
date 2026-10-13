@@ -79,6 +79,7 @@ export default function App() {
   const [pipelineInput, setPipelineInput] = useState('');
   const [manualSearchInput, setManualSearchInput] = useState('');
   const [leadForPresupuesto, setLeadForPresupuesto] = useState(null);
+  const [presupuestoForFactura, setPresupuestoForFactura] = useState(null);
   
   // State for SERP Results
   const [searchResults, setSearchResults] = useState([]);
@@ -1066,6 +1067,10 @@ export default function App() {
               leadToConvert={leadForPresupuesto}
               onClearLeadConvert={() => setLeadForPresupuesto(null)}
               onNavigateToContratos={() => setActiveModule('contratos_onboarding')}
+              onNavigateToRentabilidad={(presupuesto) => {
+                setPresupuestoForFactura(presupuesto);
+                setActiveModule('gestion_rentabilidad');
+              }}
             />
           ) : activeModule === 'crm_portal' ? (
             <CrmPortalModule
@@ -1077,7 +1082,8 @@ export default function App() {
                   email: lead.email,
                   telefono: lead.telefono,
                   dominio: lead.dominio,
-                  pais: lead.pais
+                  pais: lead.pais,
+                  valorEstimado: lead.valorEstimado
                 });
                 setActiveModule('presupuestos');
               }}
@@ -1086,6 +1092,9 @@ export default function App() {
           ) : activeModule === 'gestion_rentabilidad' ? (
             <GestionRentabilidadModule
               selectedCountry={selectedCountry}
+              presupuestoToBill={presupuestoForFactura}
+              onClearPresupuestoToBill={() => setPresupuestoForFactura(null)}
+              onNavigateToPresupuestos={() => setActiveModule('presupuestos')}
             />
           ) : activeModule === 'seo_geo' ? (
             <SeoGeoToolsModule

@@ -26,11 +26,13 @@ import {
   getResumenFinanciero,
   crearFactura,
   actualizarFactura,
+  eliminarFactura,
   crearGasto,
   eliminarGasto,
   getTimeEntries,
   crearTimeEntry,
-  eliminarTimeEntry
+  eliminarTimeEntry,
+  actualizarConfiguracionFinanzas
 } from './services/finanzasStorage.js';
 import { analyzeOnPageSeo, generateSchemaJsonLd, generateLsiKeywords, getSearchConsoleMetrics } from './services/geoSeoService.js';
 import { getCmsSites, getCmsSiteBySlug, updateCmsSiteContent } from './services/headlessCmsStorage.js';
@@ -1100,6 +1102,17 @@ app.patch('/api/finanzas/facturas/:id', (req, res) => {
   const updated = actualizarFactura(req.params.id, req.body);
   if (!updated) return res.status(404).json({ error: 'Factura no encontrada' });
   res.json(updated);
+});
+
+app.delete('/api/finanzas/facturas/:id', (req, res) => {
+  const ok = eliminarFactura(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Factura no encontrada' });
+  res.json({ success: true });
+});
+
+app.put('/api/finanzas/configuracion', (req, res) => {
+  const updated = actualizarConfiguracionFinanzas(req.body);
+  res.json({ success: true, configuracion: updated });
 });
 
 app.get('/api/finanzas/gastos', (req, res) => {

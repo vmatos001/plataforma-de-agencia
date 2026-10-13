@@ -443,3 +443,22 @@ export function eliminarTimeEntry(id) {
   saveFinanzas(finanzas);
   return true;
 }
+
+export function eliminarFactura(id) {
+  const finanzas = getFinanzas();
+  const len = (finanzas.facturas || []).length;
+  finanzas.facturas = (finanzas.facturas || []).filter(f => f.id !== id);
+  if (finanzas.facturas.length === len) return false;
+  saveFinanzas(finanzas);
+  return true;
+}
+
+export function actualizarConfiguracionFinanzas(newConfig) {
+  const finanzas = getFinanzas();
+  finanzas.configuracion = {
+    ...(finanzas.configuracion || {}),
+    ...newConfig
+  };
+  saveFinanzas(finanzas);
+  return finanzas.configuracion;
+}

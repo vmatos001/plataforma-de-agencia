@@ -10,6 +10,19 @@ jobs:
     steps:
       - name: Checkout del Repositorio
         uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar Dependencias
+        run: npm ci
+
+      - name: Compilar Frontend (dist)
+        run: npm run build
+
       - name: Desplegar en Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:

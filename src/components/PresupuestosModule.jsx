@@ -29,7 +29,92 @@ import {
   TrendingDown
 } from 'lucide-react';
 
-export default function PresupuestosModule({ onSelectLeadToQuote, onNavigateToContratos }) {
+const DEFAULT_VIP_TEMPLATE = {
+  titulo: "PROPUESTA DE DESARROLLO DIGITAL VIP",
+  subtitulo: "(SISTEMA INTEGRAL WEB, PLAN GOOGLE ADS, REPUTACIÓN LOCAL & CÓDIGOS QR)",
+  vigenciaDias: 15,
+  moneda: "USD",
+  simboloMoneda: "$",
+  pais: "SV",
+  emisor: {
+    empresa: "Goglite",
+    ubicacion: "Santa Ana, El Salvador · Santo Domingo, RD",
+    telefono: "(503) 7756-9828",
+    email: "info@goglite.com",
+    responsable: "Víctor Matos",
+    cargo: "Director & Estratega Digital"
+  },
+  portada: {
+    proyecto: "Implementación de un Sistema Digital Integral de Captación Inmediata y Posicionamiento Comercial, transformando su presencia digital en un activo que genera clientes y contactos de alta intención las 24 horas del día.",
+    enfoqueEstrategico: "Arquitectura orientada a la conversión directa con botones de llamada instantánea (Click-to-Call), botón flotante de WhatsApp Business y embudo de respuesta inmediata.",
+    tecnologiaMobileFirst: "Arquitectura ultra-rápida optimizada al 100% para teléfonos inteligentes (velocidad de carga inferior a 1.2 segundos y Core Web Vitals en verde).",
+    geoSeoLocal: "Estructura semántica avanzada (Schema.org LocalBusiness) para asegurar máxima visibilidad en Google Maps, buscadores y motores de IA (ChatGPT / Perplexity)."
+  },
+  modulos: [
+    {
+      id: "mod-1",
+      numero: "MÓDULO 1",
+      titulo: "Plataforma Web Corporativa de Alta Conversión (Mobile-First)",
+      descripcion: "Arquitectura responsive optimizada al 100% para dispositivos móviles. Incluye secciones estratégicas StoryBrand, catálogo de servicios, cobertura y llamado a la acción.",
+      tipo: "precio_cerrado",
+      horas: 10,
+      precio: 150
+    },
+    {
+      id: "mod-2",
+      numero: "MÓDULO 2",
+      titulo: "Canales de Cierre y Contacto Directo (WhatsApp & Click-to-Call)",
+      descripcion: "Integración de botón flotante inteligente de WhatsApp Business con mensaje preconfigurado y marcado directo de un solo toque.",
+      tipo: "precio_cerrado",
+      horas: 3,
+      precio: 50
+    },
+    {
+      id: "mod-3",
+      numero: "MÓDULO 3",
+      titulo: "Optimización del Perfil de Google Negocio & SEO/GEO Local",
+      descripcion: "Configuración técnica de Schema.org JSON-LD, categorización en Google Maps y ecosistema de códigos QR para captación de reseñas 5 estrellas.",
+      tipo: "precio_cerrado",
+      horas: 5,
+      precio: 50
+    }
+  ],
+  fases: [
+    {
+      fase: "Fase 1",
+      plazo: "Días 1 a 4",
+      detalle: "Configuración de activos digitales, arquitectura de información StoryBrand, ficha de Google Maps y códigos QR vectoriales."
+    },
+    {
+      fase: "Fase 2",
+      plazo: "Días 5 a 10",
+      detalle: "Desarrollo de la plataforma web Mobile-First, integración de canales de cierre en WhatsApp y optimización SEO/GEO."
+    },
+    {
+      fase: "Fase 3",
+      plazo: "Días 11 a 15",
+      detalle: "Auditoría de velocidad móvil, revisión conjunta con el cliente, ajustes finales y despliegue en producción."
+    }
+  ],
+  inversion: {
+    precioMercadoReferencial: 750,
+    precioTotal: 250,
+    descuentoEspecial: 500,
+    anticipo: 125,
+    contraEntrega: 125,
+    beneficioExclusivo: "1 mes de soporte técnico, supervisión y acompañamiento gratuito tras el lanzamiento oficial.",
+    revisiones: "Dos (2) rondas completas de ajustes de diseño y contenido.",
+    requisitosInicio: "Logotipo, fotografías del negocio/servicios, número oficial de WhatsApp y datos de contacto."
+  }
+};
+
+export default function PresupuestosModule({
+  selectedCountry = 'SV',
+  leadToConvert,
+  onClearLeadConvert,
+  onNavigateToContratos,
+  onNavigateToRentabilidad
+}) {
   const [presupuestos, setPresupuestos] = useState([]);
   const [plantillas, setPlantillas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +150,43 @@ export default function PresupuestosModule({ onSelectLeadToQuote, onNavigateToCo
     fetchPresupuestos();
     fetchPlantillas();
   }, []);
+
+  // Recibir prospecto desde el Módulo 2 (CRM & WhatsApp) o Módulo 1
+  useEffect(() => {
+    if (leadToConvert) {
+      const base = plantillas[0]?.datos || DEFAULT_VIP_TEMPLATE;
+      const precioAcordado = Number(leadToConvert.valorEstimado) > 0 ? Number(leadToConvert.valorEstimado) : (base.inversion?.precioTotal || 250);
+      const anticipoMitad = Math.round(precioAcordado * 0.5);
+      const nextNum = presupuestos.length + 1;
+      const convertedProp = {
+        ...JSON.parse(JSON.stringify(base)),
+        id: 'prop-' + Date.now(),
+        codigo: `P-2026-${String(nextNum).padStart(3, '0')}`,
+        fecha: new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
+        estado: 'borrador',
+        pais: leadToConvert.pais || selectedCountry || 'SV',
+        cliente: {
+          nombre: leadToConvert.responsable || 'Director / Propietario',
+          empresa: leadToConvert.nombreEmpresa || 'Empresa Cliente',
+          telefono: leadToConvert.telefono || (leadToConvert.pais === 'DO' ? '+1 809 ' : '+503 '),
+          email: leadToConvert.email || '',
+          actividad: leadToConvert.dominio ? `Presencia Digital (${leadToConvert.dominio})` : 'Servicios Comerciales',
+          ubicacion: leadToConvert.pais === 'DO' ? 'Santo Domingo / República Dominicana' : 'San Salvador / El Salvador'
+        },
+        inversion: {
+          ...(base.inversion || DEFAULT_VIP_TEMPLATE.inversion),
+          precioMercadoReferencial: Math.max(750, Math.round(precioAcordado * 2)),
+          precioTotal: precioAcordado,
+          descuentoEspecial: Math.max(0, Math.round(precioAcordado * 2) - precioAcordado),
+          anticipo: anticipoMitad,
+          contraEntrega: precioAcordado - anticipoMitad
+        }
+      };
+      setActivePresupuesto(convertedProp);
+      setViewMode('editor');
+      if (onClearLeadConvert) onClearLeadConvert();
+    }
+  }, [leadToConvert]);
 
   const fetchPresupuestos = async () => {
     try {
@@ -109,21 +231,22 @@ export default function PresupuestosModule({ onSelectLeadToQuote, onNavigateToCo
 
   // Create new proposal from template
   const handleCreateNew = (templateData = null) => {
-    const base = templateData || (plantillas[0]?.datos || {});
+    const base = templateData || plantillas[0]?.datos || DEFAULT_VIP_TEMPLATE;
     const nextNum = presupuestos.length + 1;
     const newProp = {
-      ...base,
+      ...JSON.parse(JSON.stringify(base)),
       id: 'prop-' + Date.now(),
       codigo: `P-2026-${String(nextNum).padStart(3, '0')}`,
       fecha: new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
       estado: 'borrador',
+      pais: selectedCountry || 'SV',
       cliente: {
         nombre: 'Nuevo Cliente',
         empresa: 'Empresa / Negocio',
-        telefono: '+503 ',
+        telefono: selectedCountry === 'DO' ? '+1 809 ' : '+503 ',
         email: '',
         actividad: 'Servicios Comerciales',
-        ubicacion: 'San Salvador / El Salvador'
+        ubicacion: selectedCountry === 'DO' ? 'Santo Domingo / Rep. Dominicana' : 'San Salvador / El Salvador'
       }
     };
     setActivePresupuesto(newProp);
@@ -285,6 +408,17 @@ export default function PresupuestosModule({ onSelectLeadToQuote, onNavigateToCo
       {/* VIEW 1: LISTADO DE PRESUPUESTOS */}
       {viewMode === 'list' && (
         <div className="space-y-5">
+          {/* Action Button Above the 4th Card */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => handleCreateNew()}
+              className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-glow-sm transition-all shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Crear Propuesta</span>
+            </button>
+          </div>
+
           {/* Top Bar with KPI Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="p-4 rounded-xl bg-[#0e131d] border border-slate-800">
@@ -304,18 +438,9 @@ export default function PresupuestosModule({ onSelectLeadToQuote, onNavigateToCo
               <div className="text-2xl font-extrabold text-emerald-400">{totalAceptadas}</div>
             </div>
 
-            <div className="p-4 rounded-xl bg-[#0e131d] border border-slate-800 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-mono uppercase text-slate-400 font-semibold mb-1">Plantilla Oficial</div>
-                <div className="text-xs text-slate-200 font-bold truncate">Portada Goglite VIP</div>
-              </div>
-              <button
-                onClick={() => handleCreateNew()}
-                className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-glow-sm transition-all shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Crear Propuesta</span>
-              </button>
+            <div className="p-4 rounded-xl bg-[#0e131d] border border-slate-800 flex flex-col justify-center">
+              <div className="text-[11px] font-mono uppercase text-slate-400 font-semibold mb-1">Plantilla Oficial</div>
+              <div className="text-sm text-slate-100 font-bold truncate">Portada Goglite VIP</div>
             </div>
           </div>
 
@@ -426,6 +551,16 @@ export default function PresupuestosModule({ onSelectLeadToQuote, onNavigateToCo
 
                       <td className="px-4 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
+                          {onNavigateToRentabilidad && (
+                            <button
+                              onClick={() => onNavigateToRentabilidad(prop)}
+                              className="px-2 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1 transition-colors"
+                              title="Emitir Factura Proforma y Auditar Rentabilidad en Módulo 4"
+                            >
+                              <DollarSign className="w-3 h-3" />
+                              <span>Facturar M4</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               setActivePresupuesto(prop);
@@ -518,6 +653,20 @@ export default function PresupuestosModule({ onSelectLeadToQuote, onNavigateToCo
                 <span>Guardar</span>
               </button>
 
+              {onNavigateToRentabilidad && (
+                <button
+                  onClick={async () => {
+                    await handleSavePresupuesto();
+                    onNavigateToRentabilidad(activePresupuesto);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 text-xs font-bold transition-all shadow-sm"
+                  title="Enviar a Módulo 4 (Rentabilidad & Factura Proforma)"
+                >
+                  <DollarSign className="w-3.5 h-3.5" />
+                  <span>Facturar en Módulo 4 →</span>
+                </button>
+              )}
+
               {onNavigateToContratos && (
                 <button
                   onClick={async () => {
@@ -528,9 +677,9 @@ export default function PresupuestosModule({ onSelectLeadToQuote, onNavigateToCo
                     onNavigateToContratos();
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all shadow-sm"
-                  title="Formalizar con Contrato y Onboarding (Módulo 3)"
+                  title="Formalizar con Contrato y Onboarding"
                 >
-                  <span>Contrato Módulo 3 →</span>
+                  <span>Contrato SOW →</span>
                 </button>
               )}
             </div>
