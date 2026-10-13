@@ -585,3 +585,15 @@ export function actualizarConfiguracionFinanzas(newConfig) {
   saveFinanzas(finanzas);
   return finanzas.configuracion;
 }
+
+export function resetFinanzasData() {
+  const finanzas = getFinanzas();
+  const resetState = {
+    facturas: [],
+    gastos: [],
+    timeEntries: [],
+    configuracion: finanzas.configuracion || {}
+  };
+  saveFinanzas(resetState);
+  return resetState;
+}

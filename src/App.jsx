@@ -570,6 +570,41 @@ export default function App() {
     }
   ];
 
+  // Limpieza integral de datos de prueba para ejecución manual de Fase 1 a Fase 4
+  const handleResetAllPlatformData = async () => {
+    if (!window.confirm('¿Deseas LIMPIAR TODOS LOS DATOS de prueba de las Fases 1 a 4?\n\n• Fase 1: Limpiará leads y búsquedas del Scrapper.\n• Fase 2: Limpiará leads y chats del CRM.\n• Fase 3: Limpiará presupuestos y propuestas.\n• Fase 4: Limpiará facturas, gastos y registros de horas.\n\n(Tus cuentas bancarias oficiales y claves API se mantendrán a salvo).')) {
+      return;
+    }
+
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('goglite_outbound_leads');
+        localStorage.removeItem('goglite_crm_leads');
+        localStorage.removeItem('goglite_crm_leads_v3');
+        localStorage.removeItem('goglite_presupuestos');
+        localStorage.removeItem('goglite_finanzas_v1');
+        localStorage.removeItem('goglite_live_timer_v1');
+        localStorage.removeItem('goglite_proyectos');
+        localStorage.setItem('goglite_active_module', 'lead_scrapper');
+      }
+
+      setLeads([]);
+      setSearchResults([]);
+      setSelectedResults(new Set());
+      setLeadForPresupuesto(null);
+      setPresupuestoForFactura(null);
+
+      try {
+        await fetch(getBackendEndpoint('/api/finanzas/reset'), { method: 'POST' });
+      } catch {}
+
+      alert('✓ Plataforma limpia con éxito. Se reiniciará en la Fase 1 (Lead Scrapper) para tu prueba manual.');
+      window.location.reload();
+    } catch (e) {
+      console.error('Error al resetear plataforma:', e);
+    }
+  };
+
   if (clientPortalToken) {
     return (
       <PublicClientPortal
@@ -729,6 +764,17 @@ export default function App() {
 
         {/* Right Header Options */}
         <div className="flex items-center gap-3">
+          {/* Botón Reset / Limpieza para Prueba Manual */}
+          <button
+            onClick={handleResetAllPlatformData}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-semibold transition-all shadow-sm"
+            title="Limpiar datos de prueba y dejar la plataforma lista para prueba manual de Fase 1 a Fase 4"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+            <span className="hidden sm:inline">Limpiar Demo (Fases 1-4)</span>
+            <span className="sm:hidden">Limpiar</span>
+          </button>
+
           {/* Country Selector */}
           <div className="flex items-center bg-[#131926] border border-slate-800 rounded-lg p-0.5 text-xs">
             <button

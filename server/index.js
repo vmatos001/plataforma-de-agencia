@@ -32,7 +32,8 @@ import {
   getTimeEntries,
   crearTimeEntry,
   eliminarTimeEntry,
-  actualizarConfiguracionFinanzas
+  actualizarConfiguracionFinanzas,
+  resetFinanzasData
 } from './services/finanzasStorage.js';
 import { analyzeOnPageSeo, generateSchemaJsonLd, generateLsiKeywords, getSearchConsoleMetrics } from './services/geoSeoService.js';
 import { getCmsSites, getCmsSiteBySlug, updateCmsSiteContent } from './services/headlessCmsStorage.js';
@@ -1147,6 +1148,12 @@ app.delete('/api/finanzas/horas/:id', (req, res) => {
   const ok = eliminarTimeEntry(req.params.id);
   if (!ok) return res.status(404).json({ error: 'Registro de tiempo no encontrado' });
   res.json({ success: true });
+});
+
+app.post('/api/finanzas/reset', (req, res) => {
+  const cleanFinanzas = resetFinanzasData();
+  saveProyectos([]);
+  res.json({ success: true, finanzas: cleanFinanzas });
 });
 
 // ==========================================

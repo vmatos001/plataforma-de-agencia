@@ -238,174 +238,9 @@ const DEFAULT_CONFIGURACION = {
 };
 
 const INITIAL_SEED_STATE = {
-  facturas: [
-    {
-      id: 'fac-prop-2026-001',
-      numeroFactura: 'FAC-2026-001',
-      presupuestoId: 'prop-2026-001',
-      codigoPresupuesto: 'P-2026-001',
-      proyectoId: 'proj-001',
-      codigoProyecto: 'CON-2026-001',
-      origenModulo: 'Módulo 3 · Presupuesto VIP',
-      cliente: {
-        empresa: 'Grúas Andrea / Grúas Andrés',
-        contacto: 'Brayan Muñoz',
-        email: 'contacto@gruasandrea.com',
-        telefono: '+1 (323) 901-3886',
-        identificacion: 'ID Comercial · Los Ángeles / SV',
-        pais: 'SV'
-      },
-      concepto: 'Sistema Integral Web Mobile-First, Plan Google Ads, Google Maps & Códigos QR',
-      fechaEmision: '2026-10-10',
-      fechaVencimiento: '2026-10-25',
-      subtotal: 250,
-      impuestoPorcentaje: 0,
-      impuestoTotal: 0,
-      total: 250,
-      moneda: 'USD',
-      montoCobrado: 100,
-      saldoPendiente: 150,
-      estado: 'parcial',
-      metodoPago: 'Banco Agrícola El Salvador (Transferencia365)',
-      horasInvertidasEstimadas: 5,
-      items: [
-        {
-          descripcion: 'MÓDULO 1 & 2: Plataforma Web Corporativa Mobile-First + Canales WhatsApp & Click-to-Call',
-          cantidad: 1,
-          precioUnitario: 135,
-          total: 135
-        },
-        {
-          descripcion: 'MÓDULO 3 & 4: Optimización Google Maps (Local Pack) + Ecosistema Redes Sociales',
-          cantidad: 1,
-          precioUnitario: 60,
-          total: 60
-        },
-        {
-          descripcion: 'MÓDULO 5 & 6: Plan Estratégico Google Ads + Códigos QR Inteligentes (Flota y Reseñas)',
-          cantidad: 1,
-          precioUnitario: 55,
-          total: 55
-        }
-      ]
-    },
-    {
-      id: 'fac-crm-caribes',
-      numeroFactura: 'FAC-2026-002',
-      presupuestoId: null,
-      proyectoId: 'proj-002',
-      codigoProyecto: 'CON-2026-002',
-      origenModulo: 'Módulo 2 · CRM WhatsApp DO',
-      cliente: {
-        empresa: 'Caribes Tours',
-        contacto: 'Sr. Peña Lavia',
-        email: 'gerencia@caribestours.com.do',
-        telefono: '+1 809 221-4422',
-        identificacion: 'RNC: 1-01-58291-2',
-        pais: 'DO'
-      },
-      concepto: 'Plataforma Web de Reservas, Optimización GEO IA & Automatización WhatsApp',
-      fechaEmision: '2026-10-11',
-      fechaVencimiento: '2026-10-26',
-      subtotal: 1800,
-      impuestoPorcentaje: 0,
-      impuestoTotal: 0,
-      total: 1800,
-      moneda: 'USD',
-      montoCobrado: 900,
-      saldoPendiente: 900,
-      estado: 'parcial',
-      metodoPago: 'Banco Popular Dominicano (LBTR)',
-      horasInvertidasEstimadas: 22,
-      items: [
-        {
-          descripcion: 'Arquitectura Web Mobile-First de Alta Conversión & Consulta de Rutas',
-          cantidad: 1,
-          precioUnitario: 1200,
-          total: 1200
-        },
-        {
-          descripcion: 'Optimización Schema.org TravelAgency, GEO IA & Embudo WhatsApp Directo',
-          cantidad: 1,
-          precioUnitario: 600,
-          total: 600
-        }
-      ]
-    }
-  ],
-  gastos: [
-    {
-      id: 'gas-001',
-      concepto: 'Servidor VPS Cloud NVMe (Hospedaje Multi-Sitio Agencia)',
-      categoria: 'infraestructura',
-      proveedor: 'Hetzner Cloud / Autohosteado',
-      monto: 14.50,
-      fecha: '2026-10-01',
-      proyectoId: null,
-      clienteAsociado: 'General Agencia',
-      frecuencia: 'mensual',
-      pagado: true
-    },
-    {
-      id: 'gas-002',
-      concepto: 'Dominio .com + SSL y DNS Cloudflare (Grúas Andrea)',
-      categoria: 'infraestructura',
-      proveedor: 'Porkbun Registrar',
-      monto: 12.00,
-      fecha: '2026-10-05',
-      proyectoId: 'proj-001',
-      clienteAsociado: 'Grúas Andrea / Grúas Andrés',
-      frecuencia: 'unico',
-      pagado: true
-    },
-    {
-      id: 'gas-003',
-      concepto: 'Consumo API Modelos IA (Auditorías GEO & Pitches)',
-      categoria: 'software',
-      proveedor: 'Google Gemini Flash Free/Tier',
-      monto: 0.00,
-      fecha: '2026-10-08',
-      proyectoId: null,
-      clienteAsociado: 'General Agencia',
-      frecuencia: 'mensual',
-      pagado: true
-    }
-  ],
-  timeEntries: [
-    {
-      id: 'time-001',
-      proyectoId: 'proj-001',
-      cliente: 'Grúas Andrea / Grúas Andrés',
-      concepto: 'Diseño UX Hero de Emergencia & Estructura StoryBrand',
-      categoria: 'diseño',
-      horas: 2.0,
-      costoHora: 20,
-      fecha: '2026-10-10',
-      responsable: 'Director UX'
-    },
-    {
-      id: 'time-002',
-      proyectoId: 'proj-001',
-      cliente: 'Grúas Andrea / Grúas Andrés',
-      concepto: 'Maquetación Mobile-First, Botón WhatsApp & Códigos QR',
-      categoria: 'desarrollo',
-      horas: 3.0,
-      costoHora: 20,
-      fecha: '2026-10-11',
-      responsable: 'Senior Dev'
-    },
-    {
-      id: 'time-003',
-      proyectoId: 'proj-002',
-      cliente: 'Caribes Tours',
-      concepto: 'Arquitectura Frontend, Catálogo de Rutas & Schema JSON-LD',
-      categoria: 'desarrollo',
-      horas: 14.0,
-      costoHora: 20,
-      fecha: '2026-10-12',
-      responsable: 'Senior Dev'
-    }
-  ],
+  facturas: [],
+  gastos: [],
+  timeEntries: [],
   configuracion: DEFAULT_CONFIGURACION
 };
 
@@ -819,8 +654,16 @@ export default function GestionRentabilidadModule({
         const saved = localStorage.getItem(STORAGE_KEY_FINANZAS);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (parsed && Array.isArray(parsed.facturas) && parsed.facturas.length > 0) {
-            return parsed;
+          if (parsed && typeof parsed === 'object') {
+            return {
+              facturas: Array.isArray(parsed.facturas) ? parsed.facturas : [],
+              gastos: Array.isArray(parsed.gastos) ? parsed.gastos : [],
+              timeEntries: Array.isArray(parsed.timeEntries) ? parsed.timeEntries : [],
+              configuracion: {
+                ...DEFAULT_CONFIGURACION,
+                ...(parsed.configuracion || {})
+              }
+            };
           }
         }
       }
@@ -1128,9 +971,9 @@ export default function GestionRentabilidadModule({
           ];
 
           return {
-            facturas: mergedFacturas.length > 0 ? mergedFacturas : INITIAL_SEED_STATE.facturas,
-            gastos: mergedGastos.length > 0 ? mergedGastos : INITIAL_SEED_STATE.gastos,
-            timeEntries: mergedTimes.length > 0 ? mergedTimes : INITIAL_SEED_STATE.timeEntries,
+            facturas: mergedFacturas,
+            gastos: mergedGastos,
+            timeEntries: mergedTimes,
             configuracion: {
               ...DEFAULT_CONFIGURACION,
               ...(json.configuracion || {}),
@@ -1896,6 +1739,29 @@ export default function GestionRentabilidadModule({
     showToast('Cronómetro restablecido a 00:00:00');
   };
 
+  // Limpiar todas las facturas, gastos y registros de horas para prueba limpia manual
+  const handleClearFinanzasData = () => {
+    if (!window.confirm('¿Deseas vaciar todas las facturas, gastos y registros de horas para comenzar una prueba limpia? Tus cuentas bancarias configuradas se mantendrán intactas.')) return;
+    const cleanState = {
+      facturas: [],
+      gastos: [],
+      timeEntries: [],
+      configuracion: finanzasState.configuracion || DEFAULT_CONFIGURACION
+    };
+    setFinanzasState(cleanState);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_FINANZAS, JSON.stringify(cleanState));
+        localStorage.removeItem(STORAGE_KEY_TIMER);
+      }
+    } catch {}
+    setActiveTimer(DEFAULT_TIMER_STATE);
+    showToast('✓ Módulo 4 limpio para tu prueba manual.');
+    try {
+      fetch(getBackendEndpoint('/api/finanzas/reset'), { method: 'POST' });
+    } catch {}
+  };
+
   // Print or Save PDF using Corporate Automated HTML Invoice Template ($0 Cost)
   const handlePrintInvoicePdf = (invoice) => {
     const html = buildCorporateInvoiceHtml(invoice, configuracion);
@@ -2195,6 +2061,16 @@ export default function GestionRentabilidadModule({
             <span>CSV</span>
           </button>
 
+          {/* Limpiar Pruebas */}
+          <button
+            onClick={handleClearFinanzasData}
+            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700 hover:border-rose-500/40"
+            title="Vaciar facturas, gastos y horas para prueba manual limpia"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+            <span>Limpiar Pruebas</span>
+          </button>
+
           {/* Mini Stopwatch Live Pill if timer is running or has elapsed time */}
           {(activeTimer.isRunning || displaySeconds > 0) && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-mono">
@@ -2381,6 +2257,17 @@ export default function GestionRentabilidadModule({
                       </td>
                     </tr>
                   ))}
+                  {filteredRentabilidad.length === 0 && (
+                    <tr>
+                      <td colSpan="9" className="p-8 text-center text-slate-500">
+                        <FileText className="w-8 h-8 mx-auto mb-2 opacity-30 text-slate-400" />
+                        <p className="font-semibold text-slate-300">Sin proyectos ni facturas registradas</p>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          Crea una nueva factura o acepta una propuesta en el Módulo 3 para comenzar la auditoría de rentabilidad.
+                        </p>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -2484,6 +2371,17 @@ export default function GestionRentabilidadModule({
                     </td>
                   </tr>
                 ))}
+                {filteredFacturas.length === 0 && (
+                  <tr>
+                    <td colSpan="8" className="p-8 text-center text-slate-500">
+                      <FileText className="w-8 h-8 mx-auto mb-2 opacity-30 text-slate-400" />
+                      <p className="font-semibold text-slate-300">No hay facturas emitidas</p>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Pulsa el botón "Nueva Factura" o sincroniza con presupuestos aceptados del Módulo 3.
+                      </p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -2555,6 +2453,17 @@ export default function GestionRentabilidadModule({
                     </td>
                   </tr>
                 ))}
+                {gastos.length === 0 && (
+                  <tr>
+                    <td colSpan="8" className="p-8 text-center text-slate-500">
+                      <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-30 text-slate-400" />
+                      <p className="font-semibold text-slate-300">Sin gastos operativos registrados</p>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Registra dominios, servidores o costos directos por cliente con el botón "Registrar Gasto".
+                      </p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -2860,6 +2769,17 @@ export default function GestionRentabilidadModule({
                       </td>
                     </tr>
                   ))}
+                  {proyectosRentabilidad.length === 0 && (
+                    <tr>
+                      <td colSpan="7" className="p-8 text-center text-slate-500">
+                        <Clock className="w-8 h-8 mx-auto mb-2 opacity-30 text-slate-400" />
+                        <p className="font-semibold text-slate-300">Sin proyectos activos para auditar</p>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          Al facturar un cliente o aceptar un presupuesto se habilitará el cálculo de tarifa horaria y dilución.
+                        </p>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -2917,6 +2837,17 @@ export default function GestionRentabilidadModule({
                       </td>
                     </tr>
                   ))}
+                  {timeEntries.length === 0 && (
+                    <tr>
+                      <td colSpan="7" className="p-8 text-center text-slate-500">
+                        <Timer className="w-8 h-8 mx-auto mb-2 opacity-30 text-slate-400" />
+                        <p className="font-semibold text-slate-300">Bitácora de tiempos vacía</p>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          Inicia el Cronómetro de 1-Clic o pulsa "Registrar Horas" para asentar tu primera sesión de trabajo.
+                        </p>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
