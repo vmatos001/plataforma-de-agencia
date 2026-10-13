@@ -30,10 +30,47 @@ import {
   Copy,
   Star,
   Globe,
-  ShieldCheck
+  ShieldCheck,
+  Play,
+  Pause,
+  Square,
+  RotateCcw,
+  Timer
 } from 'lucide-react';
 
 const STORAGE_KEY_FINANZAS = 'goglite_finanzas_v1';
+const STORAGE_KEY_TIMER = 'goglite_live_timer_v1';
+
+const DEFAULT_TIMER_STATE = {
+  isRunning: false,
+  isPaused: false,
+  startTime: null,
+  accumulatedSeconds: 0,
+  proyectoId: '',
+  cliente: '',
+  concepto: '',
+  categoria: 'desarrollo',
+  responsable: 'Senior Dev'
+};
+
+function getElapsedSeconds(timer) {
+  if (!timer) return 0;
+  let secs = Number(timer.accumulatedSeconds) || 0;
+  if (timer.isRunning && !timer.isPaused && timer.startTime) {
+    const delta = Math.floor((Date.now() - timer.startTime) / 1000);
+    if (delta > 0) secs += delta;
+  }
+  return secs;
+}
+
+function formatTime(totalSeconds) {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const hrs = Math.floor(s / 3600);
+  const mins = Math.floor((s % 3600) / 60);
+  const secs = s % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+}
 
 export const DEFAULT_CUENTAS_BANCARIAS = [
   {
@@ -881,6 +918,54 @@ export default function GestionRentabilidadModule({
     predeterminada: false
   });
 
+  // Live 1-Click Interactive Stopwatch State (Option 2)
+  const [activeTimer, setActiveTimer] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem(STORAGE_KEY_TIMER);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object') {
+            return { ...DEFAULT_TIMER_STATE, ...parsed };
+          }
+        }
+      }
+    } catch {}
+    return DEFAULT_TIMER_STATE;
+  });
+
+  const [displaySeconds, setDisplaySeconds] = useState(() => getElapsedSeconds(activeTimer));
+  const [stopTimerModalOpen, setStopTimerModalOpen] = useState(false);
+  const [stopTimerForm, setStopTimerForm] = useState({
+    horas: 1,
+    cliente: '',
+    proyectoId: '',
+    concepto: '',
+    categoria: 'desarrollo',
+    responsable: 'Senior Dev'
+  });
+
+  // Live Stopwatch 1s Tick Interval
+  useEffect(() => {
+    setDisplaySeconds(getElapsedSeconds(activeTimer));
+    if (!activeTimer.isRunning || activeTimer.isPaused) return;
+
+    const interval = setInterval(() => {
+      setDisplaySeconds(getElapsedSeconds(activeTimer));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeTimer]);
+
+  // Persist Stopwatch State in localStorage
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_TIMER, JSON.stringify(activeTimer));
+      }
+    } catch {}
+  }, [activeTimer]);
+
   const getBackendEndpoint = (endpoint) => {
     if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
       return `http://localhost:3001${endpoint}`;
@@ -1716,6 +1801,101 @@ export default function GestionRentabilidadModule({
     } catch {}
   };
 
+  // Handlers del Cronómetro de 1-Clic (Opción 2 · Time Tracking en Tiempo Real)
+  const handleStartTimer = (targetProject = null) => {
+    setActiveTimer(prev => {
+      const now = Date.now();
+      let updated = { ...prev };
+
+      if (targetProject) {
+        updated.proyectoId = targetProject.proyectoId || targetProject.facturaId || '';
+        updated.cliente = targetProject.cliente || targetProject.cliente?.empresa || '';
+        if (!updated.concepto) updated.concepto = 'Desarrollo & Configuración';
+      } else if (!updated.cliente && facturas.length > 0) {
+        updated.cliente = facturas[0].cliente?.empresa || 'General Agencia';
+        updated.proyectoId = facturas[0].proyectoId || null;
+      }
+
+      return {
+        ...updated,
+        isRunning: true,
+        isPaused: false,
+        startTime: now
+      };
+    });
+
+    const name = targetProject?.cliente || activeTimer.cliente || 'Sesión de trabajo';
+    showToast(`⏱️ Cronómetro en marcha para: ${name}`);
+  };
+
+  const handlePauseTimer = () => {
+    const total = getElapsedSeconds(activeTimer);
+    setActiveTimer(prev => ({
+      ...prev,
+      isRunning: true,
+      isPaused: true,
+      startTime: null,
+      accumulatedSeconds: total
+    }));
+    showToast(`⏸️ Cronómetro pausado (${formatTime(total)})`);
+  };
+
+  const handleOpenStopModal = () => {
+    const totalSecs = getElapsedSeconds(activeTimer);
+    const horasDecimal = Math.max(0.1, Math.round((totalSecs / 3600) * 100) / 100);
+
+    setStopTimerForm({
+      horas: horasDecimal,
+      cliente: activeTimer.cliente || (facturas[0]?.cliente?.empresa || 'General Agencia'),
+      proyectoId: activeTimer.proyectoId || null,
+      concepto: activeTimer.concepto || 'Implementación & Desarrollo Web',
+      categoria: activeTimer.categoria || 'desarrollo',
+      responsable: activeTimer.responsable || 'Senior Dev'
+    });
+    setStopTimerModalOpen(true);
+  };
+
+  const handleConfirmSaveTimer = async (e) => {
+    e.preventDefault();
+    const nuevo = {
+      id: 'time-' + Date.now(),
+      proyectoId: stopTimerForm.proyectoId || null,
+      cliente: stopTimerForm.cliente || 'General Agencia',
+      concepto: stopTimerForm.concepto || 'Sesión de trabajo cronometrada',
+      categoria: stopTimerForm.categoria || 'desarrollo',
+      horas: Number(stopTimerForm.horas) || 1,
+      costoHora: configuracion.costoHoraInterno || 20,
+      fecha: new Date().toISOString().split('T')[0],
+      responsable: stopTimerForm.responsable || 'Senior Dev'
+    };
+
+    setFinanzasState(prev => ({
+      ...prev,
+      timeEntries: [nuevo, ...(prev.timeEntries || [])]
+    }));
+
+    setActiveTimer(DEFAULT_TIMER_STATE);
+    setStopTimerModalOpen(false);
+    showToast(`✓ Registradas ${nuevo.horas}h para ${nuevo.cliente} en la bitácora contable.`);
+
+    try {
+      await fetch(getBackendEndpoint('/api/finanzas/horas'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nuevo)
+      });
+    } catch {}
+  };
+
+  const handleResetTimer = () => {
+    const total = getElapsedSeconds(activeTimer);
+    if (total > 60 && !confirm('¿Deseas reiniciar el cronómetro a cero? El tiempo actual se descartará.')) {
+      return;
+    }
+    setActiveTimer(DEFAULT_TIMER_STATE);
+    showToast('Cronómetro restablecido a 00:00:00');
+  };
+
   // Print or Save PDF using Corporate Automated HTML Invoice Template ($0 Cost)
   const handlePrintInvoicePdf = (invoice) => {
     const html = buildCorporateInvoiceHtml(invoice, configuracion);
@@ -1936,10 +2116,13 @@ export default function GestionRentabilidadModule({
           </button>
           <button
             onClick={() => setActiveTab('horas')}
-            className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors ${activeTab === 'horas' ? 'bg-slate-800 text-orange-400 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+            className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors relative ${activeTab === 'horas' ? 'bg-slate-800 text-orange-400 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
           >
             <Clock className="w-3.5 h-3.5" />
             <span>Time Tracking ({timeEntries.length})</span>
+            {activeTimer.isRunning && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping absolute -top-0.5 -right-0.5" />
+            )}
           </button>
           <button
             onClick={() => setActiveTab('config')}
@@ -2011,6 +2194,45 @@ export default function GestionRentabilidadModule({
             <Download className="w-3.5 h-3.5 text-emerald-400" />
             <span>CSV</span>
           </button>
+
+          {/* Mini Stopwatch Live Pill if timer is running or has elapsed time */}
+          {(activeTimer.isRunning || displaySeconds > 0) && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-mono">
+              <span className={`w-2 h-2 rounded-full ${activeTimer.isRunning && !activeTimer.isPaused ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+              <button
+                onClick={() => setActiveTab('horas')}
+                className="flex items-center gap-1 font-bold hover:text-white transition-colors"
+                title="Ir a pestaña Time Tracking"
+              >
+                <Timer className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{formatTime(displaySeconds)}</span>
+              </button>
+              {activeTimer.isRunning && !activeTimer.isPaused ? (
+                <button
+                  onClick={handlePauseTimer}
+                  title="Pausar cronómetro"
+                  className="p-0.5 hover:text-white"
+                >
+                  <Pause className="w-3 h-3 text-amber-300" />
+                </button>
+              ) : activeTimer.isPaused ? (
+                <button
+                  onClick={() => handleStartTimer()}
+                  title="Reanudar cronómetro"
+                  className="p-0.5 hover:text-white"
+                >
+                  <Play className="w-3 h-3 text-emerald-400" />
+                </button>
+              ) : null}
+              <button
+                onClick={handleOpenStopModal}
+                title="Detener y registrar en bitácora"
+                className="p-0.5 hover:text-white"
+              >
+                <Square className="w-3 h-3 text-rose-400" />
+              </button>
+            </div>
+          )}
 
           {/* Primary CTA depending on active tab */}
           {(activeTab === 'resumen' || activeTab === 'facturas') && (
@@ -2342,6 +2564,163 @@ export default function GestionRentabilidadModule({
       {/* 6. TAB 4: CONTROL DE HORAS & TIME TRACKING */}
       {activeTab === 'horas' && (
         <div className="space-y-6">
+          {/* CRONÓMETRO DE 1-CLIC INTEGRADO EN LA PLATAFORMA (Opción 2 · Live In-App Stopwatch) */}
+          <div className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-[#0e1626] via-[#0c121d] to-[#0a0e17] border border-emerald-500/30 shadow-xl">
+            {/* Resplandor ambiental */}
+            <div className="absolute top-0 right-0 w-80 h-40 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+              {/* Columna Izquierda: Reloj Digital y Estado en Vivo */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 shrink-0 flex items-center justify-center">
+                  <Timer className={`w-8 h-8 ${activeTimer.isRunning && !activeTimer.isPaused ? 'animate-pulse text-emerald-300' : 'text-slate-400'}`} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold">
+                      Cronómetro de 1-Clic · Goglite Live Tracker
+                    </span>
+                    {activeTimer.isRunning && !activeTimer.isPaused ? (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/40 animate-pulse">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        EN VIVO
+                      </span>
+                    ) : activeTimer.isPaused ? (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/40">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                        PAUSADO
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-bold border border-slate-700">
+                        LISTO PARA INICIAR
+                      </span>
+                    )}
+                  </div>
+                  {/* Dígitos Grandes */}
+                  <div className="flex items-baseline gap-3">
+                    <span className={`text-4xl sm:text-5xl font-black font-mono tracking-tight ${activeTimer.isRunning && !activeTimer.isPaused ? 'text-emerald-300' : activeTimer.isPaused ? 'text-amber-300' : 'text-white'}`}>
+                      {formatTime(displaySeconds)}
+                    </span>
+                    <span className="text-xs font-mono text-slate-400">
+                      ≈ {(displaySeconds / 3600).toFixed(2)} hrs contables
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Columna Derecha: Configuración Rápida y Controles de Acción */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                {/* Selectores Rápidos */}
+                <div className="flex flex-col gap-1.5 text-xs">
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={activeTimer.cliente}
+                      onChange={(e) => {
+                        const cl = e.target.value;
+                        const match = facturas.find(f => f.cliente?.empresa === cl);
+                        setActiveTimer(prev => ({
+                          ...prev,
+                          cliente: cl,
+                          proyectoId: match?.proyectoId || prev.proyectoId
+                        }));
+                      }}
+                      className="bg-[#131926] border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 max-w-[190px]"
+                    >
+                      <option value="">Seleccionar Proyecto...</option>
+                      {facturas.map(f => (
+                        <option key={f.id} value={f.cliente?.empresa}>
+                          {f.cliente?.empresa || 'Cliente'} ({f.numeroFactura})
+                        </option>
+                      ))}
+                      <option value="General Agencia">General Agencia / I+D</option>
+                    </select>
+
+                    <select
+                      value={activeTimer.categoria}
+                      onChange={(e) => setActiveTimer(prev => ({ ...prev, categoria: e.target.value }))}
+                      className="bg-[#131926] border border-slate-700/80 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="desarrollo">Desarrollo Web / App</option>
+                      <option value="diseño">Diseño UI/UX</option>
+                      <option value="geo_ia">GEO & Posicionamiento</option>
+                      <option value="reunion">Reunión de Cierre</option>
+                      <option value="soporte">Soporte Técnico</option>
+                    </select>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={activeTimer.concepto}
+                    onChange={(e) => setActiveTimer(prev => ({ ...prev, concepto: e.target.value }))}
+                    placeholder="Actividad actual (ej: Maquetación Hero...)"
+                    className="bg-[#131926] border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Botones Principales del Cronómetro */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {!activeTimer.isRunning || activeTimer.isPaused ? (
+                    <button
+                      onClick={() => handleStartTimer()}
+                      className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950/40 transition-all"
+                    >
+                      <Play className="w-4 h-4 fill-white" />
+                      <span>{activeTimer.isPaused ? 'Reanudar' : 'Iniciar'}</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handlePauseTimer}
+                      className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-amber-950/40 transition-all"
+                    >
+                      <Pause className="w-4 h-4" />
+                      <span>Pausar</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={handleOpenStopModal}
+                    disabled={displaySeconds < 1}
+                    className="px-3.5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all"
+                    title="Detener y asentar en la bitácora contable"
+                  >
+                    <Square className="w-4 h-4 fill-white" />
+                    <span>Guardar</span>
+                  </button>
+
+                  <button
+                    onClick={handleResetTimer}
+                    disabled={displaySeconds === 0}
+                    className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 transition-all"
+                    title="Reiniciar cronómetro a cero"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Barra de Impacto Contable y Persistencia */}
+            <div className="mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-[11px] font-mono text-slate-400">
+              <div className="flex items-center gap-4">
+                <span>
+                  Coste interno acumulado:{' '}
+                  <strong className="text-purple-300 font-bold">
+                    ${((displaySeconds / 3600) * (Number(configuracion.costoHoraInterno) || 20)).toFixed(2)} USD
+                  </strong>
+                </span>
+                <span>
+                  Valor comercial objetivo:{' '}
+                  <strong className="text-emerald-300 font-bold">
+                    ${((displaySeconds / 3600) * (Number(configuracion.tarifaObjetivoHora) || 50)).toFixed(2)} USD
+                  </strong>
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-sans">
+                ⚡ Persistencia local garantizada: si recargas o cierras la pestaña, el tiempo continúa intacto.
+              </span>
+            </div>
+          </div>
+
           {/* Top Metrics Cards for Time Tracking */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 shadow-sm">
@@ -2406,6 +2785,7 @@ export default function GestionRentabilidadModule({
                     <th className="p-3">Horas Dedicadas</th>
                     <th className="p-3">Tarifa Efectiva ($/h)</th>
                     <th className="p-3">Estado de Rentabilidad</th>
+                    <th className="p-3 text-right">Track 1-Clic</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-sans">
@@ -2449,6 +2829,33 @@ export default function GestionRentabilidadModule({
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
                             <span>RENTABILIDAD ACEPTABLE</span>
                           </span>
+                        )}
+                      </td>
+                      <td className="p-3 text-right">
+                        {activeTimer.isRunning && activeTimer.cliente === p.cliente ? (
+                          <button
+                            onClick={handleOpenStopModal}
+                            className="px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold flex items-center gap-1 ml-auto animate-pulse"
+                            title="Cronómetro activo en este proyecto. Clic para detener y guardar."
+                          >
+                            <Square className="w-3 h-3 fill-amber-300" />
+                            <span>Detener</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              handleStartTimer({
+                                proyectoId: p.proyectoId,
+                                facturaId: p.facturaId,
+                                cliente: p.cliente
+                              });
+                            }}
+                            className="px-2.5 py-1 rounded-md bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1 ml-auto transition-all"
+                            title={`Iniciar cronómetro para ${p.cliente}`}
+                          >
+                            <Play className="w-3 h-3 fill-current" />
+                            <span>Track 1-Clic</span>
+                          </button>
                         )}
                       </td>
                     </tr>
@@ -3665,6 +4072,138 @@ export default function GestionRentabilidadModule({
                   className="px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold shadow-glow-sm"
                 >
                   {editingAccountId ? 'Actualizar Cuenta' : 'Guardar Nueva Cuenta'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ASENTAR SESIÓN CRONOMETRADA EN BITÁCORA CONTABLE */}
+      {stopTimerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#0f1420] border border-emerald-500/40 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-400">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Registrar Sesión Cronometrada</h3>
+                  <p className="text-xs text-slate-400 font-mono">Asentar horas en la bitácora contable P&L</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setStopTimerModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmSaveTimer} className="space-y-3 text-xs">
+              <div>
+                <label className="text-slate-400 block mb-1">Cliente / Proyecto Asociado</label>
+                <select
+                  required
+                  value={stopTimerForm.cliente}
+                  onChange={(e) => {
+                    const cl = e.target.value;
+                    const match = facturas.find(f => f.cliente?.empresa === cl);
+                    setStopTimerForm({
+                      ...stopTimerForm,
+                      cliente: cl,
+                      proyectoId: match?.proyectoId || stopTimerForm.proyectoId
+                    });
+                  }}
+                  className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                >
+                  {facturas.map(f => (
+                    <option key={f.id} value={f.cliente?.empresa}>
+                      {f.cliente?.empresa} ({f.numeroFactura})
+                    </option>
+                  ))}
+                  <option value="General Agencia">General Agencia / I+D</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-slate-400 block mb-1">Horas Calculadas (Decimal)</label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0.05"
+                    required
+                    value={stopTimerForm.horas}
+                    onChange={(e) => setStopTimerForm({ ...stopTimerForm, horas: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white font-mono font-bold text-sm"
+                  />
+                  <span className="text-[10px] text-emerald-400 font-mono mt-0.5 block">
+                    Tiempo real: {formatTime(displaySeconds)}
+                  </span>
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Categoría</label>
+                  <select
+                    value={stopTimerForm.categoria}
+                    onChange={(e) => setStopTimerForm({ ...stopTimerForm, categoria: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                  >
+                    <option value="desarrollo">Desarrollo Web / App</option>
+                    <option value="diseño">Diseño UI / UX</option>
+                    <option value="geo_ia">GEO & Posicionamiento IA</option>
+                    <option value="reunion">Reunión de Cierre / Brief</option>
+                    <option value="soporte">Soporte & Mantenimiento</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Concepto / Descripción del Trabajo</label>
+                <textarea
+                  required
+                  rows={2}
+                  value={stopTimerForm.concepto}
+                  onChange={(e) => setStopTimerForm({ ...stopTimerForm, concepto: e.target.value })}
+                  placeholder="ej: Integración de pasarelas, maquetación responsive..."
+                  className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Responsable</label>
+                <input
+                  type="text"
+                  value={stopTimerForm.responsable}
+                  onChange={(e) => setStopTimerForm({ ...stopTimerForm, responsable: e.target.value })}
+                  className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                />
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-emerald-950/20 border border-emerald-500/20 text-[11px] text-slate-300">
+                <div className="flex justify-between font-mono">
+                  <span>Impacto en Coste de Mano de Obra:</span>
+                  <span className="text-purple-300 font-bold">
+                    +${(Number(stopTimerForm.horas || 0) * (Number(configuracion.costoHoraInterno) || 20)).toFixed(2)} USD
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setStopTimerModalOpen(false)}
+                  className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Confirmar & Asentar</span>
                 </button>
               </div>
             </form>
