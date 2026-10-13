@@ -175,20 +175,56 @@
     "monedaPrincipal": "USD",
     "tasaIvaSV": 13,
     "tasaItbisDO": 18,
-    "cuentasBancarias": {
-      "SV": {
+    "cuentasBancarias": [
+      {
+        "id": "cta-sv-agricola",
+        "pais": "SV",
         "banco": "Banco Agrícola El Salvador",
-        "tipo": "Cuenta Corriente Empresarial",
+        "tipo": "Cuenta Corriente Empresarial (Transferencia365)",
         "numero": "0031-0029-4821",
-        "titular": "Goglite Agency SV"
+        "titular": "Goglite Agency SV · Víctor Matos",
+        "moneda": "USD",
+        "instrucciones": "Transferencia directa Transferencia365 o ACH",
+        "activa": true,
+        "predeterminada": true
       },
-      "DO": {
+      {
+        "id": "cta-do-popular",
+        "pais": "DO",
         "banco": "Banco Popular Dominicano",
-        "tipo": "Cuenta Corriente",
+        "tipo": "Cuenta Corriente Comercial (LBTR / ACH)",
         "numero": "7829-1928-3011",
-        "titular": "Goglite Digital DO"
+        "titular": "Goglite Digital DO · Víctor Matos",
+        "moneda": "USD",
+        "instrucciones": "Transferencia LBTR en USD o ACH interbancario",
+        "activa": true,
+        "predeterminada": true
+      },
+      {
+        "id": "cta-do-banreservas",
+        "pais": "DO",
+        "banco": "Banreservas (Banco de Reservas)",
+        "tipo": "Cuenta de Ahorros / Corriente",
+        "numero": "960-0012948-1",
+        "titular": "Víctor Matos",
+        "moneda": "DOP",
+        "instrucciones": "Transferencia local en pesos dominicanos (DOP) vía red ACH",
+        "activa": true,
+        "predeterminada": false
+      },
+      {
+        "id": "cta-us-uglycash",
+        "pais": "US",
+        "banco": "uglyCash (Remesas Instantáneas EE.UU.)",
+        "tipo": "uglyCash Tag / Billetera Digital",
+        "numero": "$victormatos",
+        "titular": "Víctor Matos",
+        "moneda": "USD",
+        "instrucciones": "Envío instantáneo de remesas sin comisiones desde EE.UU. vía app uglyCash con tag $victormatos",
+        "activa": true,
+        "predeterminada": true
       }
-    }
+    ]
   },
   "timeEntries": [
     {

@@ -26,10 +26,162 @@ import {
   Wallet,
   Settings,
   Sparkles,
-  Link2
+  Link2,
+  Copy,
+  Star,
+  Globe,
+  ShieldCheck
 } from 'lucide-react';
 
 const STORAGE_KEY_FINANZAS = 'goglite_finanzas_v1';
+
+export const DEFAULT_CUENTAS_BANCARIAS = [
+  {
+    id: 'cta-sv-agricola',
+    pais: 'SV',
+    banco: 'Banco Agrícola El Salvador',
+    tipo: 'Cuenta Corriente Empresarial (Transferencia365)',
+    numero: '0031-0029-4821',
+    titular: 'Goglite Agency SV · Víctor Matos',
+    moneda: 'USD',
+    instrucciones: 'Transferencia directa Transferencia365 o ACH interbancario en El Salvador',
+    activa: true,
+    predeterminada: true
+  },
+  {
+    id: 'cta-do-popular',
+    pais: 'DO',
+    banco: 'Banco Popular Dominicano',
+    tipo: 'Cuenta Corriente Comercial (LBTR / ACH)',
+    numero: '7829-1928-3011',
+    titular: 'Goglite Digital DO · Víctor Matos',
+    moneda: 'USD',
+    instrucciones: 'Transferencia LBTR en USD o ACH interbancario',
+    activa: true,
+    predeterminada: true
+  },
+  {
+    id: 'cta-do-banreservas',
+    pais: 'DO',
+    banco: 'Banreservas (Banco de Reservas)',
+    tipo: 'Cuenta de Ahorros / Corriente',
+    numero: '960-0012948-1',
+    titular: 'Víctor Matos',
+    moneda: 'DOP',
+    instrucciones: 'Transferencia local en pesos dominicanos (DOP) vía red ACH / Banreservas',
+    activa: true,
+    predeterminada: false
+  },
+  {
+    id: 'cta-us-uglycash',
+    pais: 'US',
+    banco: 'uglyCash (Remesas Instantáneas EE.UU.)',
+    tipo: 'uglyCash Tag / Billetera Digital',
+    numero: '$victormatos',
+    titular: 'Víctor Matos',
+    moneda: 'USD',
+    instrucciones: 'Envío instantáneo de remesas sin comisiones desde EE.UU. a través de la app uglyCash con tag $victormatos',
+    activa: true,
+    predeterminada: true
+  }
+];
+
+export function normalizeCuentasBancarias(raw) {
+  let list = [];
+  if (Array.isArray(raw) && raw.length > 0) {
+    list = raw.map(c => ({
+      id: c.id || `cta-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      pais: c.pais || 'DO',
+      banco: c.banco || 'Banco Comercial',
+      tipo: c.tipo || 'Cuenta Bancaria',
+      numero: c.numero || '',
+      titular: c.titular || 'Víctor Matos',
+      moneda: c.moneda || (c.pais === 'DO' && c.banco?.toLowerCase().includes('reservas') ? 'DOP' : 'USD'),
+      instrucciones: c.instrucciones || '',
+      activa: c.activa !== undefined ? c.activa : true,
+      predeterminada: !!c.predeterminada
+    }));
+
+    // Asegurar que uglyCash siempre esté incluido si aún no existe
+    const hasUglyCash = list.some(c => c.pais === 'US' || (c.banco && c.banco.toLowerCase().includes('uglycash')));
+    if (!hasUglyCash) {
+      list.push({
+        id: 'cta-us-uglycash',
+        pais: 'US',
+        banco: 'uglyCash (Remesas Instantáneas EE.UU.)',
+        tipo: 'uglyCash Tag / Billetera Digital',
+        numero: '$victormatos',
+        titular: 'Víctor Matos',
+        moneda: 'USD',
+        instrucciones: 'Envío instantáneo de remesas sin comisiones desde EE.UU. a través de la app uglyCash con tag $victormatos',
+        activa: true,
+        predeterminada: true
+      });
+    }
+  } else if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    list = [
+      {
+        id: 'cta-sv-agricola',
+        pais: 'SV',
+        banco: raw.SV?.banco || 'Banco Agrícola El Salvador',
+        tipo: raw.SV?.tipo || 'Cuenta Corriente Empresarial (Transferencia365)',
+        numero: raw.SV?.numero || '0031-0029-4821',
+        titular: raw.SV?.titular || 'Goglite Agency SV · Víctor Matos',
+        moneda: 'USD',
+        instrucciones: 'Transferencia directa Transferencia365 o ACH',
+        activa: true,
+        predeterminada: true
+      },
+      {
+        id: 'cta-do-popular',
+        pais: 'DO',
+        banco: raw.DO?.banco || 'Banco Popular Dominicano',
+        tipo: raw.DO?.tipo || 'Cuenta Corriente Comercial (LBTR / ACH)',
+        numero: raw.DO?.numero || '7829-1928-3011',
+        titular: raw.DO?.titular || 'Goglite Digital DO · Víctor Matos',
+        moneda: 'USD',
+        instrucciones: 'Transferencia LBTR en USD o ACH',
+        activa: true,
+        predeterminada: true
+      },
+      {
+        id: 'cta-do-banreservas',
+        pais: 'DO',
+        banco: raw.DO?.banco || 'Banreservas (Banco de Reservas)',
+        tipo: 'Cuenta de Ahorros / Corriente',
+        numero: '960-0012948-1',
+        titular: 'Víctor Matos',
+        moneda: 'DOP',
+        instrucciones: 'Transferencia local en pesos dominicanos (DOP) vía red ACH',
+        activa: true,
+        predeterminada: false
+      },
+      {
+        id: 'cta-us-uglycash',
+        pais: 'US',
+        banco: 'uglyCash (Remesas Instantáneas EE.UU.)',
+        tipo: 'uglyCash Tag / Billetera Digital',
+        numero: '$victormatos',
+        titular: 'Víctor Matos',
+        moneda: 'USD',
+        instrucciones: 'Envío instantáneo de remesas sin comisiones desde EE.UU. a través de la app uglyCash con tag $victormatos',
+        activa: true,
+        predeterminada: true
+      }
+    ];
+  } else {
+    list = [...DEFAULT_CUENTAS_BANCARIAS];
+  }
+
+  // Compatibilidad hacia atrás: permitir también acceso directo .SV y .DO
+  const svDefault = list.find(c => c.pais === 'SV' && c.activa) || list[0] || {};
+  const doDefault = list.find(c => c.pais === 'DO' && c.activa) || list[1] || {};
+  const usDefault = list.find(c => c.pais === 'US' && c.activa) || list[3] || {};
+  list.SV = svDefault;
+  list.DO = doDefault;
+  list.US = usDefault;
+  return list;
+}
 
 const DEFAULT_CONFIGURACION = {
   costoHoraInterno: 20,
@@ -45,20 +197,7 @@ const DEFAULT_CONFIGURACION = {
     telefono: '+503 7756-9828 · +1 (829) 528-4713',
     ubicacion: 'San Salvador, SV · Santo Domingo, DO'
   },
-  cuentasBancarias: {
-    SV: {
-      banco: 'Banco Agrícola El Salvador (Transferencia365)',
-      tipo: 'Cuenta Corriente Empresarial',
-      numero: '0031-0029-4821',
-      titular: 'Goglite Agency SV · Víctor Matos'
-    },
-    DO: {
-      banco: 'Banco Popular Dominicano (LBTR / ACH)',
-      tipo: 'Cuenta Corriente Comercial',
-      numero: '7829-1928-3011',
-      titular: 'Goglite Digital DO · Víctor Matos'
-    }
-  }
+  cuentasBancarias: normalizeCuentasBancarias(DEFAULT_CUENTAS_BANCARIAS)
 };
 
 const INITIAL_SEED_STATE = {
@@ -248,16 +387,7 @@ function computeFinanzasSummary(rawState) {
       ...DEFAULT_CONFIGURACION.emisor,
       ...(rawState?.configuracion?.emisor || {})
     },
-    cuentasBancarias: {
-      SV: {
-        ...DEFAULT_CONFIGURACION.cuentasBancarias.SV,
-        ...(rawState?.configuracion?.cuentasBancarias?.SV || {})
-      },
-      DO: {
-        ...DEFAULT_CONFIGURACION.cuentasBancarias.DO,
-        ...(rawState?.configuracion?.cuentasBancarias?.DO || {})
-      }
-    }
+    cuentasBancarias: normalizeCuentasBancarias(rawState?.configuracion?.cuentasBancarias)
   };
 
   const costoHora = Number(configuracion.costoHoraInterno) || 20;
@@ -430,9 +560,16 @@ function buildInvoiceFromPresupuesto(prop, existingCount = 0, configuracion = DE
     montoCobrado: anticipo,
     saldoPendiente: Math.max(0, subtotal - anticipo),
     estado: anticipo >= subtotal ? 'cobrada' : anticipo > 0 ? 'parcial' : 'pendiente',
-    metodoPago: pais === 'DO'
-      ? (configuracion?.cuentasBancarias?.DO?.banco || 'Banco Popular Dominicano')
-      : (configuracion?.cuentasBancarias?.SV?.banco || 'Banco Agrícola El Salvador'),
+    metodoPago: (() => {
+      const c = normalizeCuentasBancarias(configuracion?.cuentasBancarias);
+      const m = c.find(item => item.pais === pais && item.activa && item.predeterminada) || c.find(item => item.pais === pais && item.activa) || c[0];
+      return m?.banco || 'Transferencia Bancaria';
+    })(),
+    cuentaBancariaId: (() => {
+      const c = normalizeCuentasBancarias(configuracion?.cuentasBancarias);
+      const m = c.find(item => item.pais === pais && item.activa && item.predeterminada) || c.find(item => item.pais === pais && item.activa) || c[0];
+      return m?.id || null;
+    })(),
     horasInvertidasEstimadas,
     items
   };
@@ -445,9 +582,24 @@ function buildInvoiceFromPresupuesto(prop, existingCount = 0, configuracion = DE
 function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFIGURACION) {
   const emisor = configuracion?.emisor || DEFAULT_CONFIGURACION.emisor;
   const pais = invoice.cliente?.pais || 'SV';
-  const cuenta = pais === 'DO'
-    ? (configuracion?.cuentasBancarias?.DO || DEFAULT_CONFIGURACION.cuentasBancarias.DO)
-    : (configuracion?.cuentasBancarias?.SV || DEFAULT_CONFIGURACION.cuentasBancarias.SV);
+  const cuentas = normalizeCuentasBancarias(configuracion?.cuentasBancarias);
+
+  let cuenta = null;
+  if (invoice.cuentaBancariaId) {
+    cuenta = cuentas.find(c => c.id === invoice.cuentaBancariaId);
+  }
+  if (!cuenta && invoice.metodoPago) {
+    cuenta = cuentas.find(c => c.banco?.toLowerCase().includes(invoice.metodoPago.toLowerCase()) || invoice.metodoPago.toLowerCase().includes(c.banco?.toLowerCase()));
+  }
+  if (!cuenta) {
+    cuenta = cuentas.find(c => c.pais === pais && c.activa && c.predeterminada)
+      || cuentas.find(c => c.pais === pais && c.activa)
+      || cuentas.find(c => c.activa)
+      || cuentas[0];
+  }
+
+  const uglyCashCuenta = cuentas.find(c => (c.pais === 'US' || c.banco?.toLowerCase().includes('uglycash')) && c.activa);
+  const cuentasAlternativas = cuentas.filter(c => c.pais === pais && c.activa && c.id !== cuenta?.id);
 
   const estadoLabel = invoice.estado === 'cobrada'
     ? 'PAGADA 100%'
@@ -596,10 +748,21 @@ function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFIGURACIO
     </div>
 
     <div class="confirmation-box">
-      <strong style="color: #1A1A1A; display: block; margin-bottom: 4px;">CONFIRMACIÓN DEL SISTEMA & DATOS BANCARIOS DE PAGO:</strong>
-      • <strong>Método / Banco:</strong> ${cuenta.banco} (${cuenta.tipo})<br/>
-      • <strong>Número de Cuenta:</strong> <span style="font-family: monospace; font-weight: 700; color: #1A1A1A;">${cuenta.numero}</span> · <strong>Titular:</strong> ${cuenta.titular}<br/>
-      • <strong>Condiciones:</strong> Anticipo del 50% al inicio y 50% contra entrega final verificada. Referencia de sistema: <span style="font-family: monospace;">${invoice.id}</span> (${invoice.origenModulo || 'Goglite ERP'}).
+      <strong style="color: #1A1A1A; display: block; margin-bottom: 6px;">CONFIRMACIÓN DEL SISTEMA & DATOS BANCARIOS DE PAGO:</strong>
+      • <strong>Método de Cobro Principal:</strong> ${cuenta?.banco || 'Transferencia Bancaria'} (${cuenta?.tipo || 'Cuenta Oficial'})<br/>
+      • <strong>Número de Cuenta / Tag:</strong> <span style="font-family: monospace; font-weight: 700; color: #1A1A1A;">${cuenta?.numero || 'N/A'}</span> · <strong>Moneda:</strong> ${cuenta?.moneda || 'USD'} · <strong>Titular:</strong> ${cuenta?.titular || 'Víctor Matos'}<br/>
+      ${cuenta?.instrucciones ? `• <strong>Instrucciones:</strong> ${cuenta.instrucciones}<br/>` : ''}
+      ${(pais === 'US' || uglyCashCuenta) && uglyCashCuenta?.id !== cuenta?.id ? `
+      <div style="margin-top: 6px; padding: 6px 10px; background: #FFF7ED; border-left: 3px solid #FF6B00; border-radius: 4px; font-size: 12px; color: #9A3412;">
+        ⚡ <strong>Clientes en Estados Unidos (Remesa Instantánea):</strong> Puede transferir de forma inmediata y sin comisiones desde EE.UU. mediante la app <strong>uglyCash</strong> al tag <span style="font-family: monospace; font-weight: 800; color: #FF6B00;">${uglyCashCuenta.numero}</span> (${uglyCashCuenta.titular}).
+      </div>` : ''}
+      ${cuentasAlternativas.length > 0 ? `
+      <div style="margin-top: 5px; color: #555555; font-size: 11.5px;">
+        • <strong>Otras Cuentas en ${pais === 'DO' ? 'Rep. Dominicana' : pais}:</strong> ${cuentasAlternativas.map(ca => `${ca.banco} (${ca.tipo}): Nº ${ca.numero} [${ca.moneda}]`).join(' · ')}
+      </div>` : ''}
+      <div style="margin-top: 5px;">
+        • <strong>Condiciones Comerciales:</strong> Anticipo del 50% al inicio y 50% contra entrega final verificada. Referencia de sistema: <span style="font-family: monospace;">${invoice.id}</span> (${invoice.origenModulo || 'Goglite ERP'}).
+      </div>
     </div>
   </div>
 </body>
@@ -657,6 +820,7 @@ export default function GestionRentabilidadModule({
     telefono: '',
     identificacion: '',
     pais: selectedCountry || 'SV',
+    cuentaBancariaId: '',
     concepto: 'Desarrollo Web & GEO IA',
     subtotal: 1500,
     impuestoPorcentaje: 0,
@@ -693,11 +857,29 @@ export default function GestionRentabilidadModule({
     responsable: 'Senior Dev'
   });
 
-  // Config Form State
+  // Config Form State & Multi-Account State
   const [configForm, setConfigForm] = useState(() => ({
     ...DEFAULT_CONFIGURACION,
-    ...(finanzasState?.configuracion || {})
+    ...(finanzasState?.configuracion || {}),
+    cuentasBancarias: normalizeCuentasBancarias(finanzasState?.configuracion?.cuentasBancarias)
   }));
+
+  // Account Modal & Filters
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const [editingAccountId, setEditingAccountId] = useState(null);
+  const [accountFilterCountry, setAccountFilterCountry] = useState('ALL'); // 'ALL' | 'DO' | 'US' | 'SV' | 'INT'
+  const [accountForm, setAccountForm] = useState({
+    id: '',
+    pais: 'DO',
+    banco: '',
+    tipo: 'Cuenta Corriente',
+    numero: '',
+    titular: 'Víctor Matos',
+    moneda: 'USD',
+    instrucciones: '',
+    activa: true,
+    predeterminada: false
+  });
 
   const getBackendEndpoint = (endpoint) => {
     if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
@@ -1158,8 +1340,8 @@ export default function GestionRentabilidadModule({
       moneda: 'USD',
       montoCobrado,
       saldoPendiente: Math.max(0, total - montoCobrado),
-      estado: montoCobrado >= total ? 'cobrada' : montoCobrado > 0 ? 'parcial' : 'pendiente',
       metodoPago: newInvoiceForm.metodoPago || 'Transferencia Bancaria',
+      cuentaBancariaId: newInvoiceForm.cuentaBancariaId || null,
       horasInvertidasEstimadas: Number(newInvoiceForm.horasInvertidasEstimadas) || 10,
       items: Array.isArray(newInvoiceForm.itemsCustom) && newInvoiceForm.itemsCustom.length > 0
         ? newInvoiceForm.itemsCustom
@@ -1319,6 +1501,217 @@ export default function GestionRentabilidadModule({
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(configForm)
+      });
+    } catch {}
+  };
+
+  // Handlers para Administración Multi-Cuenta Bancaria (DO, US uglyCash, SV)
+  const handleOpenAddAccount = (presetKey = null) => {
+    let initial = {
+      id: `cta-${Date.now()}`,
+      pais: 'DO',
+      banco: '',
+      tipo: 'Cuenta Corriente Comercial',
+      numero: '',
+      titular: configForm.emisor?.empresa || 'Víctor Matos',
+      moneda: 'USD',
+      instrucciones: '',
+      activa: true,
+      predeterminada: false
+    };
+
+    if (presetKey === 'uglycash') {
+      initial = {
+        id: `cta-us-uglycash-${Date.now()}`,
+        pais: 'US',
+        banco: 'uglyCash (Remesas Instantáneas EE.UU.)',
+        tipo: 'uglyCash Tag / Billetera Digital',
+        numero: '$victormatos',
+        titular: 'Víctor Matos',
+        moneda: 'USD',
+        instrucciones: 'Envío instantáneo de remesas sin comisiones desde EE.UU. a través de la app uglyCash con tag $victormatos',
+        activa: true,
+        predeterminada: true
+      };
+    } else if (presetKey === 'banreservas') {
+      initial = {
+        id: `cta-do-banreservas-${Date.now()}`,
+        pais: 'DO',
+        banco: 'Banreservas (Banco de Reservas)',
+        tipo: 'Cuenta de Ahorros / Corriente',
+        numero: '960-0012948-1',
+        titular: 'Víctor Matos',
+        moneda: 'DOP',
+        instrucciones: 'Transferencia local en pesos dominicanos (DOP) vía red ACH / Banreservas',
+        activa: true,
+        predeterminada: false
+      };
+    } else if (presetKey === 'popular') {
+      initial = {
+        id: `cta-do-popular-${Date.now()}`,
+        pais: 'DO',
+        banco: 'Banco Popular Dominicano',
+        tipo: 'Cuenta Corriente Comercial (LBTR / ACH)',
+        numero: '7829-1928-3011',
+        titular: 'Goglite Digital DO · Víctor Matos',
+        moneda: 'USD',
+        instrucciones: 'Transferencia LBTR en USD o ACH interbancario',
+        activa: true,
+        predeterminada: true
+      };
+    } else if (presetKey === 'agricola') {
+      initial = {
+        id: `cta-sv-agricola-${Date.now()}`,
+        pais: 'SV',
+        banco: 'Banco Agrícola El Salvador',
+        tipo: 'Cuenta Corriente Empresarial (Transferencia365)',
+        numero: '0031-0029-4821',
+        titular: 'Goglite Agency SV · Víctor Matos',
+        moneda: 'USD',
+        instrucciones: 'Transferencia directa Transferencia365 o ACH en El Salvador',
+        activa: true,
+        predeterminada: true
+      };
+    }
+
+    setEditingAccountId(null);
+    setAccountForm(initial);
+    setAccountModalOpen(true);
+  };
+
+  const handleOpenEditAccount = (acc) => {
+    setEditingAccountId(acc.id);
+    setAccountForm({ ...acc });
+    setAccountModalOpen(true);
+  };
+
+  const handleSaveAccountModal = (e) => {
+    e.preventDefault();
+    const currentList = normalizeCuentasBancarias(configForm.cuentasBancarias);
+    let updatedList;
+    if (editingAccountId) {
+      updatedList = currentList.map(item => item.id === editingAccountId ? { ...accountForm } : item);
+    } else {
+      updatedList = [...currentList, { ...accountForm, id: accountForm.id || `cta-${Date.now()}` }];
+    }
+
+    if (accountForm.predeterminada) {
+      const targetId = editingAccountId || accountForm.id;
+      updatedList = updatedList.map(item => {
+        if (item.pais === accountForm.pais && item.id !== targetId) {
+          return { ...item, predeterminada: false };
+        }
+        return item;
+      });
+    }
+
+    const normalized = normalizeCuentasBancarias(updatedList);
+    const newConfig = {
+      ...configForm,
+      cuentasBancarias: normalized
+    };
+
+    setConfigForm(newConfig);
+    setFinanzasState(prev => ({
+      ...prev,
+      configuracion: newConfig
+    }));
+    setAccountModalOpen(false);
+    showToast(`Cuenta "${accountForm.banco}" guardada correctamente.`);
+
+    try {
+      fetch(getBackendEndpoint('/api/finanzas/configuracion'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfig)
+      });
+    } catch {}
+  };
+
+  const handleToggleAccountActive = (accId) => {
+    const currentList = normalizeCuentasBancarias(configForm.cuentasBancarias);
+    const updatedList = currentList.map(item => {
+      if (item.id === accId) {
+        return { ...item, activa: !item.activa };
+      }
+      return item;
+    });
+
+    const normalized = normalizeCuentasBancarias(updatedList);
+    const newConfig = {
+      ...configForm,
+      cuentasBancarias: normalized
+    };
+
+    setConfigForm(newConfig);
+    setFinanzasState(prev => ({ ...prev, configuracion: newConfig }));
+    showToast('Estado de cuenta actualizado.');
+
+    try {
+      fetch(getBackendEndpoint('/api/finanzas/configuracion'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfig)
+      });
+    } catch {}
+  };
+
+  const handleToggleAccountDefault = (accId) => {
+    const currentList = normalizeCuentasBancarias(configForm.cuentasBancarias);
+    const target = currentList.find(a => a.id === accId);
+    if (!target) return;
+
+    const updatedList = currentList.map(item => {
+      if (item.pais === target.pais) {
+        return { ...item, predeterminada: item.id === accId };
+      }
+      return item;
+    });
+
+    const normalized = normalizeCuentasBancarias(updatedList);
+    const newConfig = {
+      ...configForm,
+      cuentasBancarias: normalized
+    };
+
+    setConfigForm(newConfig);
+    setFinanzasState(prev => ({ ...prev, configuracion: newConfig }));
+    showToast(`Cuenta "${target.banco}" establecida como predeterminada.`);
+
+    try {
+      fetch(getBackendEndpoint('/api/finanzas/configuracion'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfig)
+      });
+    } catch {}
+  };
+
+  const handleDeleteAccount = (accId) => {
+    const currentList = normalizeCuentasBancarias(configForm.cuentasBancarias);
+    if (currentList.length <= 1) {
+      alert('Debes mantener al menos una cuenta bancaria registrada.');
+      return;
+    }
+    const acc = currentList.find(a => a.id === accId);
+    if (!window.confirm(`¿Estás seguro de eliminar la cuenta "${acc?.banco}"?`)) return;
+
+    const updatedList = currentList.filter(item => item.id !== accId);
+    const normalized = normalizeCuentasBancarias(updatedList);
+    const newConfig = {
+      ...configForm,
+      cuentasBancarias: normalized
+    };
+
+    setConfigForm(newConfig);
+    setFinanzasState(prev => ({ ...prev, configuracion: newConfig }));
+    showToast('Cuenta eliminada.');
+
+    try {
+      fetch(getBackendEndpoint('/api/finanzas/configuracion'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfig)
       });
     } catch {}
   };
@@ -1590,6 +1983,12 @@ export default function GestionRentabilidadModule({
               className={`px-2.5 py-1 rounded-md transition-colors ${countryFilter === 'DO' ? 'bg-orange-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
             >
               🇩🇴 DO
+            </button>
+            <button
+              onClick={() => setCountryFilter('US')}
+              className={`px-2.5 py-1 rounded-md transition-colors ${countryFilter === 'US' ? 'bg-orange-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              🇺🇸 US (uglyCash)
             </button>
           </div>
 
@@ -2204,87 +2603,222 @@ export default function GestionRentabilidadModule({
             </div>
           </div>
 
-          {/* Cuentas Bancarias Regionales */}
+          {/* Cuentas Bancarias & Métodos de Pago Multi-País (DO, US uglyCash, SV) */}
           <div className="p-5 rounded-xl bg-[#0c1017] border border-slate-800 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
               <div>
-                <h3 className="font-bold text-sm text-white">Cuentas Bancarias Oficiales (SV & DO)</h3>
-                <p className="text-[11px] text-slate-400">Se incrustan automáticamente en la Caja de Confirmación de cada factura PDF.</p>
+                <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-emerald-400" />
+                  <span>Cuentas Bancarias & Pasarelas de Cobro</span>
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Manejo de múltiples cuentas para República Dominicana, El Salvador y remesas directas desde EE.UU. con uglyCash.
+                </p>
               </div>
-              <Building2 className="w-4 h-4 text-emerald-400" />
+              <button
+                type="button"
+                onClick={() => handleOpenAddAccount()}
+                className="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Agregar Cuenta</span>
+              </button>
             </div>
 
-            {/* El Salvador */}
-            <div className="p-3.5 rounded-xl bg-[#111726] border border-slate-800 space-y-2">
-              <div className="font-bold text-orange-400">🇸🇻 Cuenta Bancaria El Salvador</div>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  value={configForm.cuentasBancarias?.SV?.banco || ''}
-                  onChange={(e) => setConfigForm({
-                    ...configForm,
-                    cuentasBancarias: {
-                      ...configForm.cuentasBancarias,
-                      SV: { ...(configForm.cuentasBancarias?.SV || {}), banco: e.target.value }
-                    }
-                  })}
-                  placeholder="Banco"
-                  className="bg-[#0b0f19] border border-slate-700 rounded-lg p-2 text-white"
-                />
-                <input
-                  type="text"
-                  value={configForm.cuentasBancarias?.SV?.numero || ''}
-                  onChange={(e) => setConfigForm({
-                    ...configForm,
-                    cuentasBancarias: {
-                      ...configForm.cuentasBancarias,
-                      SV: { ...(configForm.cuentasBancarias?.SV || {}), numero: e.target.value }
-                    }
-                  })}
-                  placeholder="Número de cuenta"
-                  className="bg-[#0b0f19] border border-slate-700 rounded-lg p-2 text-white font-mono"
-                />
+            {/* Presets de 1-Clic */}
+            <div className="bg-[#101625] border border-slate-800/80 rounded-xl p-2.5 space-y-1.5">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
+                Carga Rápida de Cuentas / Pasarelas Oficiales:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleOpenAddAccount('uglycash')}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold flex items-center gap-1 transition-all"
+                  title="Cargar cuenta de uglyCash para recibir remesas instantáneas desde EE.UU."
+                >
+                  <span>⚡ uglyCash ($victormatos) · EE.UU.</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenAddAccount('popular')}
+                  className="px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 text-[11px] font-medium flex items-center gap-1 transition-all"
+                >
+                  <span>🇩🇴 Banco Popular (USD)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenAddAccount('banreservas')}
+                  className="px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[11px] font-medium flex items-center gap-1 transition-all"
+                >
+                  <span>🇩🇴 Banreservas (DOP)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenAddAccount('agricola')}
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[11px] font-medium flex items-center gap-1 transition-all"
+                >
+                  <span>🇸🇻 Banco Agrícola (SV)</span>
+                </button>
               </div>
             </div>
 
-            {/* República Dominicana */}
-            <div className="p-3.5 rounded-xl bg-[#111726] border border-slate-800 space-y-2">
-              <div className="font-bold text-sky-400">🇩🇴 Cuenta Bancaria República Dominicana</div>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  value={configForm.cuentasBancarias?.DO?.banco || ''}
-                  onChange={(e) => setConfigForm({
-                    ...configForm,
-                    cuentasBancarias: {
-                      ...configForm.cuentasBancarias,
-                      DO: { ...(configForm.cuentasBancarias?.DO || {}), banco: e.target.value }
-                    }
-                  })}
-                  placeholder="Banco"
-                  className="bg-[#0b0f19] border border-slate-700 rounded-lg p-2 text-white"
-                />
-                <input
-                  type="text"
-                  value={configForm.cuentasBancarias?.DO?.numero || ''}
-                  onChange={(e) => setConfigForm({
-                    ...configForm,
-                    cuentasBancarias: {
-                      ...configForm.cuentasBancarias,
-                      DO: { ...(configForm.cuentasBancarias?.DO || {}), numero: e.target.value }
-                    }
-                  })}
-                  placeholder="Número de cuenta"
-                  className="bg-[#0b0f19] border border-slate-700 rounded-lg p-2 text-white font-mono"
-                />
-              </div>
+            {/* Filtros por País */}
+            <div className="flex items-center gap-1.5 bg-[#121828] p-1 rounded-lg border border-slate-800 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setAccountFilterCountry('ALL')}
+                className={`px-2.5 py-1 rounded-md transition-all ${accountFilterCountry === 'ALL' ? 'bg-orange-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+              >
+                Todas ({normalizeCuentasBancarias(configForm.cuentasBancarias).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAccountFilterCountry('DO')}
+                className={`px-2.5 py-1 rounded-md transition-all ${accountFilterCountry === 'DO' ? 'bg-orange-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+              >
+                🇩🇴 Rep. Dominicana
+              </button>
+              <button
+                type="button"
+                onClick={() => setAccountFilterCountry('US')}
+                className={`px-2.5 py-1 rounded-md transition-all ${accountFilterCountry === 'US' ? 'bg-orange-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+              >
+                🇺🇸 EE.UU. (uglyCash)
+              </button>
+              <button
+                type="button"
+                onClick={() => setAccountFilterCountry('SV')}
+                className={`px-2.5 py-1 rounded-md transition-all ${accountFilterCountry === 'SV' ? 'bg-orange-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+              >
+                🇸🇻 El Salvador
+              </button>
+            </div>
+
+            {/* Lista de Cuentas */}
+            <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+              {normalizeCuentasBancarias(configForm.cuentasBancarias)
+                .filter(acc => accountFilterCountry === 'ALL' || acc.pais === accountFilterCountry)
+                .map(acc => {
+                  const isUgly = acc.pais === 'US' || acc.banco?.toLowerCase().includes('uglycash');
+                  const countryFlag = acc.pais === 'DO' ? '🇩🇴' : acc.pais === 'US' ? '🇺🇸' : acc.pais === 'SV' ? '🇸🇻' : '🌐';
+
+                  return (
+                    <div
+                      key={acc.id}
+                      className={`p-3.5 rounded-xl border transition-all ${
+                        isUgly
+                          ? 'bg-gradient-to-r from-[#0d1c18] to-[#111726] border-emerald-500/40 shadow-sm'
+                          : acc.activa
+                          ? 'bg-[#111726] border-slate-800'
+                          : 'bg-[#0a0e17] border-slate-900 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{countryFlag}</span>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-white text-xs">{acc.banco}</span>
+                              {acc.predeterminada && (
+                                <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                                  <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                                  <span>Predeterminada</span>
+                                </span>
+                              )}
+                              <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
+                                acc.moneda === 'DOP' ? 'bg-sky-500/20 text-sky-300' : 'bg-emerald-500/20 text-emerald-300'
+                              }`}>
+                                {acc.moneda || 'USD'}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-slate-400 block">{acc.tipo}</span>
+                          </div>
+                        </div>
+
+                        {/* Switch Activa */}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleAccountActive(acc.id)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all border ${
+                              acc.activa
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                                : 'bg-slate-800 text-slate-500 border-slate-700 hover:text-slate-300'
+                            }`}
+                            title={acc.activa ? 'Desactivar para facturas' : 'Activar para facturas'}
+                          >
+                            {acc.activa ? '✓ Activa' : 'Inactiva'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Detalles: Número / Tag / Titular */}
+                      <div className="mt-2.5 pt-2 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400">{isUgly ? 'uglyCash Tag:' : 'Nº Cuenta:'}</span>
+                          <span className={`font-mono font-bold px-1.5 py-0.5 rounded ${
+                            isUgly
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : 'bg-slate-800/80 text-orange-400'
+                          }`}>
+                            {acc.numero}
+                          </span>
+                        </div>
+                        <div className="text-slate-300 truncate">
+                          <span className="text-slate-400">Titular: </span>
+                          <span className="font-medium text-slate-200">{acc.titular}</span>
+                        </div>
+                      </div>
+
+                      {acc.instrucciones && (
+                        <div className="mt-1.5 text-[10.5px] text-slate-400 bg-black/20 p-1.5 rounded border border-slate-800/50">
+                          <span className="text-slate-300 font-semibold">Instrucciones: </span>
+                          {acc.instrucciones}
+                        </div>
+                      )}
+
+                      {/* Botones de acción */}
+                      <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
+                        {!acc.predeterminada ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleAccountDefault(acc.id)}
+                            className="text-slate-400 hover:text-amber-300 flex items-center gap-1 transition-colors"
+                          >
+                            <Star className="w-3 h-3" />
+                            <span>Hacer predeterminada {countryFlag}</span>
+                          </button>
+                        ) : <div />}
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditAccount(acc)}
+                            className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAccount(acc.id)}
+                            className="p-1 rounded text-slate-500 hover:text-rose-400 transition-colors"
+                            title="Eliminar cuenta"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
 
             <button
               type="submit"
               className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs shadow-glow-sm transition-all"
             >
-              Guardar Configuración Financiera
+              Guardar Configuración Financiera Completa
             </button>
           </div>
         </form>
@@ -2465,21 +2999,64 @@ export default function GestionRentabilidadModule({
                   </div>
                 </div>
 
-                {/* 5. Caja de Confirmación del Sistema */}
-                <div className="bg-[#FAFAFA] border-l-4 border-[#FF6B00] p-4 rounded-r-lg text-xs text-[#444444] space-y-1">
-                  <div className="font-extrabold text-[#1A1A1A]">
-                    CONFIRMACIÓN DEL SISTEMA & INSTRUCCIONES BANCARIAS:
-                  </div>
-                  <div>
-                    • <strong>Cuenta Oficial:</strong>{' '}
-                    {selectedInvoice.cliente?.pais === 'DO'
-                      ? `${configuracion.cuentasBancarias?.DO?.banco} — Nº ${configuracion.cuentasBancarias?.DO?.numero} (${configuracion.cuentasBancarias?.DO?.titular})`
-                      : `${configuracion.cuentasBancarias?.SV?.banco} — Nº ${configuracion.cuentasBancarias?.SV?.numero} (${configuracion.cuentasBancarias?.SV?.titular})`}
-                  </div>
-                  <div>
-                    • <strong>Condiciones Comerciales:</strong> Anticipo 50% al inicio · Saldo 50% contra entrega final verificada.
-                  </div>
-                </div>
+                {/* 5. Caja de Confirmación del Sistema & Datos Bancarios */}
+                {(() => {
+                  const cuentas = normalizeCuentasBancarias(configuracion.cuentasBancarias);
+                  const p = selectedInvoice.cliente?.pais || 'SV';
+                  let activeAcc = null;
+                  if (selectedInvoice.cuentaBancariaId) {
+                    activeAcc = cuentas.find(c => c.id === selectedInvoice.cuentaBancariaId);
+                  }
+                  if (!activeAcc && selectedInvoice.metodoPago) {
+                    activeAcc = cuentas.find(c => c.banco?.toLowerCase().includes(selectedInvoice.metodoPago.toLowerCase()) || selectedInvoice.metodoPago.toLowerCase().includes(c.banco?.toLowerCase()));
+                  }
+                  if (!activeAcc) {
+                    activeAcc = cuentas.find(c => c.pais === p && c.activa && c.predeterminada)
+                      || cuentas.find(c => c.pais === p && c.activa)
+                      || cuentas.find(c => c.activa)
+                      || cuentas[0];
+                  }
+                  const uglyCashAcc = cuentas.find(c => (c.pais === 'US' || c.banco?.toLowerCase().includes('uglycash')) && c.activa);
+                  const extraAccounts = cuentas.filter(c => c.pais === p && c.activa && c.id !== activeAcc?.id);
+
+                  return (
+                    <div className="bg-[#FAFAFA] border-l-4 border-[#FF6B00] p-4 rounded-r-lg text-xs text-[#444444] space-y-2">
+                      <div className="font-extrabold text-[#1A1A1A] flex items-center justify-between">
+                        <span>CONFIRMACIÓN DEL SISTEMA & INSTRUCCIONES BANCARIAS:</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-orange-100 text-[#FF6B00] font-mono font-bold">
+                          {activeAcc?.moneda || 'USD'}
+                        </span>
+                      </div>
+                      <div>
+                        • <strong>Método Principal:</strong> {activeAcc?.banco} ({activeAcc?.tipo}) — <span className="font-mono font-bold text-[#1A1A1A]">{activeAcc?.numero}</span> ({activeAcc?.titular})
+                        {activeAcc?.instrucciones && <span className="block text-[#666666] text-[11px] mt-0.5">• Instrucciones: {activeAcc.instrucciones}</span>}
+                      </div>
+
+                      {/* uglyCash Remesa Instantánea Callout */}
+                      {(p === 'US' || uglyCashAcc) && uglyCashAcc?.id !== activeAcc?.id && (
+                        <div className="p-2.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11.5px] space-y-0.5">
+                          <div className="font-bold flex items-center gap-1 text-emerald-800">
+                            <span>⚡ Clientes en EE.UU. (Remesa Instantánea $0 comisión):</span>
+                          </div>
+                          <div>
+                            Envío directo sin recargos vía app <strong>uglyCash</strong> al tag <span className="font-mono font-bold text-orange-600 bg-white px-1.5 py-0.5 rounded border border-orange-200">{uglyCashAcc?.numero || '$victormatos'}</span> ({uglyCashAcc?.titular || 'Víctor Matos'}).
+                          </div>
+                        </div>
+                      )}
+
+                      {extraAccounts.length > 0 && (
+                        <div className="text-[11px] text-[#555555] pt-1 border-t border-slate-200">
+                          • <strong>Cuentas alternativas en {p === 'DO' ? 'Rep. Dominicana' : p}:</strong>{' '}
+                          {extraAccounts.map(ea => `${ea.banco}: Nº ${ea.numero} (${ea.moneda})`).join(' · ')}
+                        </div>
+                      )}
+
+                      <div className="text-[11px] text-[#666666]">
+                        • <strong>Condiciones Comerciales:</strong> Anticipo 50% al inicio · Saldo 50% contra entrega final verificada.
+                      </div>
+                    </div>
+                  );
+                })()}
 
               </div>
             </div>
@@ -2572,14 +3149,27 @@ export default function GestionRentabilidadModule({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-slate-400 block mb-1">País & Cuenta Destino</label>
+                  <label className="text-slate-400 block mb-1">País del Cliente</label>
                   <select
                     value={newInvoiceForm.pais}
-                    onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, pais: e.target.value })}
+                    onChange={(e) => {
+                      const newPais = e.target.value;
+                      const cuentas = normalizeCuentasBancarias(configuracion.cuentasBancarias);
+                      const defaultAcc = cuentas.find(c => c.pais === newPais && c.activa && c.predeterminada)
+                        || cuentas.find(c => c.pais === newPais && c.activa);
+                      setNewInvoiceForm({
+                        ...newInvoiceForm,
+                        pais: newPais,
+                        cuentaBancariaId: defaultAcc ? defaultAcc.id : newInvoiceForm.cuentaBancariaId,
+                        metodoPago: defaultAcc ? defaultAcc.banco : newInvoiceForm.metodoPago
+                      });
+                    }}
                     className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
                   >
-                    <option value="SV">🇸🇻 El Salvador (Banco Agrícola)</option>
-                    <option value="DO">🇩🇴 Rep. Dominicana (Banco Popular)</option>
+                    <option value="DO">🇩🇴 Rep. Dominicana</option>
+                    <option value="US">🇺🇸 EE.UU. (uglyCash / Remesas)</option>
+                    <option value="SV">🇸🇻 El Salvador</option>
+                    <option value="INT">🌐 Internacional</option>
                   </select>
                 </div>
                 <div>
@@ -2594,11 +3184,48 @@ export default function GestionRentabilidadModule({
                     }}
                     className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
                   >
-                    <option value={0}>0% Exento / Servicio Digital</option>
+                    <option value={0}>0% Exento / Exportación / Digital</option>
                     <option value={configuracion.tasaIvaSV || 13}>{configuracion.tasaIvaSV || 13}% IVA (El Salvador)</option>
                     <option value={configuracion.tasaItbisDO || 18}>{configuracion.tasaItbisDO || 18}% ITBIS (Rep. Dominicana)</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1 flex items-center justify-between">
+                  <span>Método de Pago / Cuenta Asignada</span>
+                  <span className="text-[10px] text-orange-400">Multi-cuenta activa</span>
+                </label>
+                <select
+                  value={newInvoiceForm.cuentaBancariaId || ''}
+                  onChange={(e) => {
+                    const selId = e.target.value;
+                    const cuentas = normalizeCuentasBancarias(configuracion.cuentasBancarias);
+                    const acc = cuentas.find(c => c.id === selId);
+                    if (acc) {
+                      setNewInvoiceForm({
+                        ...newInvoiceForm,
+                        cuentaBancariaId: acc.id,
+                        metodoPago: acc.banco,
+                        pais: acc.pais
+                      });
+                    } else {
+                      setNewInvoiceForm({
+                        ...newInvoiceForm,
+                        cuentaBancariaId: '',
+                        metodoPago: 'Transferencia Bancaria'
+                      });
+                    }
+                  }}
+                  className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white text-xs font-medium"
+                >
+                  <option value="">Selección Predeterminada por País ({newInvoiceForm.pais})</option>
+                  {normalizeCuentasBancarias(configuracion.cuentasBancarias).filter(c => c.activa).map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.pais === 'DO' ? '🇩🇴' : c.pais === 'US' ? '🇺🇸' : c.pais === 'SV' ? '🇸🇻' : '🌐'} {c.banco} ({c.numero}) — [{c.moneda}]
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -2882,6 +3509,164 @@ export default function GestionRentabilidadModule({
               >
                 Guardar Horas en Bitácora
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD / EDIT BANK ACCOUNT OR PAYMENT METHOD (uglyCash, RD, SV) */}
+      {accountModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0e1320] border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-[#121828]">
+              <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-emerald-400" />
+                <span>{editingAccountId ? 'Editar Cuenta o Método de Pago' : 'Nueva Cuenta o Pasarela de Cobro'}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setAccountModalOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAccountModal} className="p-5 space-y-3.5 text-xs overflow-y-auto">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-slate-400 block mb-1">País / Región</label>
+                  <select
+                    value={accountForm.pais}
+                    onChange={(e) => {
+                      const newPais = e.target.value;
+                      setAccountForm({
+                        ...accountForm,
+                        pais: newPais,
+                        moneda: newPais === 'DO' && accountForm.banco?.toLowerCase().includes('reservas') ? 'DOP' : 'USD'
+                      });
+                    }}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                  >
+                    <option value="DO">🇩🇴 República Dominicana</option>
+                    <option value="US">🇺🇸 Estados Unidos (uglyCash / Remesas)</option>
+                    <option value="SV">🇸🇻 El Salvador</option>
+                    <option value="INT">🌐 Internacional</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Moneda de la Cuenta</label>
+                  <select
+                    value={accountForm.moneda}
+                    onChange={(e) => setAccountForm({ ...accountForm, moneda: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white font-mono"
+                  >
+                    <option value="USD">USD ($ Dólares)</option>
+                    <option value="DOP">DOP (RD$ Pesos Dominicanos)</option>
+                    <option value="EUR">EUR (€ Euros)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Entidad Bancaria o Billetera</label>
+                <input
+                  type="text"
+                  required
+                  value={accountForm.banco}
+                  onChange={(e) => setAccountForm({ ...accountForm, banco: e.target.value })}
+                  placeholder="ej: uglyCash (Remesas Instantáneas EE.UU.), Banco Popular Dominicano, Banreservas"
+                  className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-slate-400 block mb-1">Tipo de Cuenta / Servicio</label>
+                  <input
+                    type="text"
+                    required
+                    value={accountForm.tipo}
+                    onChange={(e) => setAccountForm({ ...accountForm, tipo: e.target.value })}
+                    placeholder="ej: uglyCash Tag, Corriente Comercial, Ahorros, ACH"
+                    className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">
+                    {accountForm.pais === 'US' || accountForm.banco?.toLowerCase().includes('uglycash') ? 'uglyCash Tag / Usuario' : 'Número de Cuenta o IBAN'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={accountForm.numero}
+                    onChange={(e) => setAccountForm({ ...accountForm, numero: e.target.value })}
+                    placeholder={accountForm.pais === 'US' ? 'ej: $victormatos' : 'ej: 7829-1928-3011'}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Titular Oficial de la Cuenta</label>
+                <input
+                  type="text"
+                  required
+                  value={accountForm.titular}
+                  onChange={(e) => setAccountForm({ ...accountForm, titular: e.target.value })}
+                  placeholder="ej: Víctor Matos · Goglite Digital"
+                  className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Instrucciones de Pago para el Cliente (Opcional)</label>
+                <textarea
+                  rows={2}
+                  value={accountForm.instrucciones}
+                  onChange={(e) => setAccountForm({ ...accountForm, instrucciones: e.target.value })}
+                  placeholder="ej: Envío instantáneo $0 comisiones desde EE.UU. a través de la aplicación móvil uglyCash hacia el tag $victormatos"
+                  className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white resize-none"
+                />
+              </div>
+
+              <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={accountForm.activa}
+                    onChange={(e) => setAccountForm({ ...accountForm, activa: e.target.checked })}
+                    className="rounded bg-slate-900 border-slate-700 text-orange-500 focus:ring-0"
+                  />
+                  <span>Cuenta activa para facturación</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-amber-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={accountForm.predeterminada}
+                    onChange={(e) => setAccountForm({ ...accountForm, predeterminada: e.target.checked })}
+                    className="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0"
+                  />
+                  <span>Predeterminada ({accountForm.pais})</span>
+                </label>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAccountModalOpen(false)}
+                  className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold shadow-glow-sm"
+                >
+                  {editingAccountId ? 'Actualizar Cuenta' : 'Guardar Nueva Cuenta'}
+                </button>
+              </div>
             </form>
           </div>
         </div>

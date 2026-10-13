@@ -130,20 +130,56 @@ function initializeFinanzasData() {
       monedaPrincipal: 'USD',
       tasaIvaSV: 13,
       tasaItbisDO: 18,
-      cuentasBancarias: {
-        SV: {
+      cuentasBancarias: [
+        {
+          id: 'cta-sv-agricola',
+          pais: 'SV',
           banco: 'Banco Agrícola El Salvador',
-          tipo: 'Cuenta Corriente Empresarial',
+          tipo: 'Cuenta Corriente Empresarial (Transferencia365)',
           numero: '0031-0029-4821',
-          titular: 'Goglite Agency SV'
+          titular: 'Goglite Agency SV · Víctor Matos',
+          moneda: 'USD',
+          instrucciones: 'Transferencia directa Transferencia365 o ACH',
+          activa: true,
+          predeterminada: true
         },
-        DO: {
+        {
+          id: 'cta-do-popular',
+          pais: 'DO',
           banco: 'Banco Popular Dominicano',
-          tipo: 'Cuenta Corriente',
+          tipo: 'Cuenta Corriente Comercial (LBTR / ACH)',
           numero: '7829-1928-3011',
-          titular: 'Goglite Digital DO'
+          titular: 'Goglite Digital DO · Víctor Matos',
+          moneda: 'USD',
+          instrucciones: 'Transferencia LBTR en USD o ACH interbancario',
+          activa: true,
+          predeterminada: true
+        },
+        {
+          id: 'cta-do-banreservas',
+          pais: 'DO',
+          banco: 'Banreservas (Banco de Reservas)',
+          tipo: 'Cuenta de Ahorros / Corriente',
+          numero: '960-0012948-1',
+          titular: 'Víctor Matos',
+          moneda: 'DOP',
+          instrucciones: 'Transferencia local en pesos dominicanos (DOP) vía red ACH',
+          activa: true,
+          predeterminada: false
+        },
+        {
+          id: 'cta-us-uglycash',
+          pais: 'US',
+          banco: 'uglyCash (Remesas Instantáneas EE.UU.)',
+          tipo: 'uglyCash Tag / Billetera Digital',
+          numero: '$victormatos',
+          titular: 'Víctor Matos',
+          moneda: 'USD',
+          instrucciones: 'Envío instantáneo de remesas sin comisiones desde EE.UU. vía app uglyCash con tag $victormatos',
+          activa: true,
+          predeterminada: true
         }
-      }
+      ]
     }
   };
 
@@ -156,6 +192,90 @@ function initializeFinanzasData() {
   return initialData;
 }
 
+export function normalizeCuentasBancarias(raw) {
+  if (Array.isArray(raw) && raw.length > 0) {
+    const list = raw.map(c => ({
+      id: c.id || `cta-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      pais: c.pais || 'DO',
+      banco: c.banco || 'Banco Comercial',
+      tipo: c.tipo || 'Cuenta Bancaria',
+      numero: c.numero || '',
+      titular: c.titular || 'Víctor Matos',
+      moneda: c.moneda || 'USD',
+      instrucciones: c.instrucciones || '',
+      activa: c.activa !== undefined ? c.activa : true,
+      predeterminada: !!c.predeterminada
+    }));
+    const hasUglyCash = list.some(c => c.pais === 'US' || (c.banco && c.banco.toLowerCase().includes('uglycash')));
+    if (!hasUglyCash) {
+      list.push({
+        id: 'cta-us-uglycash',
+        pais: 'US',
+        banco: 'uglyCash (Remesas Instantáneas EE.UU.)',
+        tipo: 'uglyCash Tag / Billetera Digital',
+        numero: '$victormatos',
+        titular: 'Víctor Matos',
+        moneda: 'USD',
+        instrucciones: 'Envío instantáneo de remesas sin comisiones desde EE.UU. vía app uglyCash con tag $victormatos',
+        activa: true,
+        predeterminada: true
+      });
+    }
+    return list;
+  }
+
+  return [
+    {
+      id: 'cta-sv-agricola',
+      pais: 'SV',
+      banco: raw?.SV?.banco || 'Banco Agrícola El Salvador',
+      tipo: raw?.SV?.tipo || 'Cuenta Corriente Empresarial (Transferencia365)',
+      numero: raw?.SV?.numero || '0031-0029-4821',
+      titular: raw?.SV?.titular || 'Goglite Agency SV · Víctor Matos',
+      moneda: 'USD',
+      instrucciones: 'Transferencia directa Transferencia365 o ACH',
+      activa: true,
+      predeterminada: true
+    },
+    {
+      id: 'cta-do-popular',
+      pais: 'DO',
+      banco: raw?.DO?.banco || 'Banco Popular Dominicano',
+      tipo: raw?.DO?.tipo || 'Cuenta Corriente Comercial (LBTR / ACH)',
+      numero: raw?.DO?.numero || '7829-1928-3011',
+      titular: raw?.DO?.titular || 'Goglite Digital DO · Víctor Matos',
+      moneda: 'USD',
+      instrucciones: 'Transferencia LBTR en USD o ACH',
+      activa: true,
+      predeterminada: true
+    },
+    {
+      id: 'cta-do-banreservas',
+      pais: 'DO',
+      banco: 'Banreservas (Banco de Reservas)',
+      tipo: 'Cuenta de Ahorros / Corriente',
+      numero: '960-0012948-1',
+      titular: 'Víctor Matos',
+      moneda: 'DOP',
+      instrucciones: 'Transferencia local en pesos dominicanos (DOP) vía red ACH',
+      activa: true,
+      predeterminada: false
+    },
+    {
+      id: 'cta-us-uglycash',
+      pais: 'US',
+      banco: 'uglyCash (Remesas Instantáneas EE.UU.)',
+      tipo: 'uglyCash Tag / Billetera Digital',
+      numero: '$victormatos',
+      titular: 'Víctor Matos',
+      moneda: 'USD',
+      instrucciones: 'Envío instantáneo de remesas sin comisiones desde EE.UU. vía app uglyCash con tag $victormatos',
+      activa: true,
+      predeterminada: true
+    }
+  ];
+}
+
 export function getFinanzas() {
   try {
     if (!fs.existsSync(FINANZAS_PATH)) {
@@ -165,6 +285,9 @@ export function getFinanzas() {
     const parsed = JSON.parse(data);
     if (!parsed || !Array.isArray(parsed.facturas)) {
       return initializeFinanzasData();
+    }
+    if (parsed.configuracion) {
+      parsed.configuracion.cuentasBancarias = normalizeCuentasBancarias(parsed.configuracion.cuentasBancarias);
     }
     return parsed;
   } catch (err) {
