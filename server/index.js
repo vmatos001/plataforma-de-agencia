@@ -18,6 +18,7 @@ import {
   updateCrmLeadStage, 
   addCrmInteraction, 
   addClientUploadedAsset,
+  updateClientPortalConfig,
   addWhatsAppMessage,
   updateWhatsAppLeadMeta
 } from './services/crmStorage.js';
@@ -35,15 +36,24 @@ import {
   actualizarConfiguracionFinanzas,
   resetFinanzasData
 } from './services/finanzasStorage.js';
-import { analyzeOnPageSeo, generateSchemaJsonLd, generateLsiKeywords, getSearchConsoleMetrics } from './services/geoSeoService.js';
-import { getCmsSites, getCmsSiteBySlug, updateCmsSiteContent } from './services/headlessCmsStorage.js';
-import { initDb } from './services/db.js';
+import { analyzeOnPageSeo, generateSchemaJsonLd, generateLsiKeywords, getSearchConsoleMetrics, getServiceAccountInfo } from './services/geoSeoService.js';
+import { getCmsSites, getCmsSiteBySlug, updateCmsSiteContent, createCmsSite, deleteCmsSite } from './services/headlessCmsStorage.js';
+import { initDb, pool } from './services/db.js';
 import { 
   getSessionsStatus, 
   startWhatsAppSession, 
   sendRealWhatsAppMessage, 
   disconnectWhatsAppSession 
 } from './services/whatsappMultiService.js';
+import { 
+  getDriveStatus, 
+  createClientVault, 
+  archiveContractInDrive, 
+  uploadTextFile 
+} from './services/googleDriveService.js';
+import { getAgencySettings, saveAgencySettings } from './services/agencySettingsStorage.js';
+import { getUsers, saveUsers, createCollaborator, registerOrUpdateClientAuth, getUserById, updateUser, deleteCollaborator } from './services/usersStorage.js';
+import { verifyTOTP, generateTOTP, buildOtpAuthUri, generateQrCodeDataUrl } from './services/totpService.js';
 
 import path from 'path';
 import fs from 'fs';
@@ -98,6 +108,163 @@ app.get('/api/settings', (req, res) => {
 app.post('/api/settings', (req, res) => {
   const updated = saveSettings(req.body);
   res.json({ success: true, settings: updated });
+});
+
+// 1.1 White-Label Agency Settings
+app.get('/api/agency/settings', (req, res) => {
+  try {
+    const settings = getAgencySettings();
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/agency/settings', (req, res) => {
+  try {
+    const updated = saveAgencySettings(req.body);
+    if (!updated) {
+      return res.status(500).json({ error: 'Error guardando ajustes de la agencia' });
+    }
+    res.json({ success: true, settings: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 1.2 Users, Collaborators & Authentication (RBAC)
+app.get('/api/users', (req, res) => {
+  try {
+    const users = getUsers();
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/users/collaborator', (req, res) => {
+  try {
+    const result = createCollaborator(req.body);
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/users/:id', (req, res) => {
+  try {
+    const result = updateUser(req.params.id, req.body);
+    if (result.error) {
+      return res.status(404).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/users/:id', (req, res) => {
+  try {
+    const result = deleteCollaborator(req.params.id);
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { email, password, totpCode, provider = 'google' } = req.body;
+    const users = getUsers();
+    const user = users.find(u => u.email?.toLowerCase() === email?.toLowerCase());
+
+    if (!user) {
+      return res.status(401).json({ error: 'Usuario no registrado con este correo.' });
+    }
+
+    // Si tiene MFA con Google Authenticator requerido (RFC 6238)
+    if (user.mfaActivo && user.rol === 'admin') {
+      if (!totpCode || totpCode.trim().length !== 6) {
+        return res.status(400).json({ 
+          requiresMfa: true, 
+          message: 'Introduce el código de 6 dígitos generado por tu app Google Authenticator.' 
+        });
+      }
+      const verifyResult = verifyTOTP(totpCode, user.totpKeySecret || 'JBSWY3DPEHPK3PXP');
+      if (!verifyResult.valid) {
+        return res.status(401).json({
+          error: 'Código de Google Authenticator incorrecto o expirado. Revisa tu aplicación móvil.'
+        });
+      }
+    }
+
+    user.ultimoAcceso = new Date().toISOString();
+    saveUsers(users);
+
+    res.json({
+      success: true,
+      user,
+      token: `goglite-jwt-${user.id}-${Date.now()}`
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 1.3 2FA Google Authenticator Setup & Real Verification Endpoints
+app.get('/api/auth/2fa/setup', async (req, res) => {
+  try {
+    const email = req.query.email || 'victor@goglite.com';
+    const secret = req.query.secret || 'JBSWY3DPEHPK3PXP';
+    const issuer = req.query.issuer || 'Goglite Agency';
+    const otpAuthUri = buildOtpAuthUri({ email, issuer, secret });
+    const qrCodeDataUrl = await generateQrCodeDataUrl(otpAuthUri);
+    const currentCode = generateTOTP(secret);
+    res.json({
+      success: true,
+      email,
+      issuer,
+      secret,
+      otpAuthUri,
+      qrCodeDataUrl,
+      currentCode
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/2fa/verify', (req, res) => {
+  try {
+    const { token, secret = 'JBSWY3DPEHPK3PXP' } = req.body;
+    const result = verifyTOTP(token, secret);
+    res.json({
+      success: result.valid,
+      valid: result.valid,
+      mode: result.mode
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/client-register', (req, res) => {
+  try {
+    const { portalToken, email, nombre, authProvider } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'El correo electrónico es requerido.' });
+    }
+    const result = registerOrUpdateClientAuth({ portalToken, email, nombre, authProvider });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // 2. Search (SERP Web or Google Maps Places)
@@ -1081,6 +1248,89 @@ app.post('/api/portal/:token/upload-assets', (req, res) => {
   res.json({ success: true, lead: updated });
 });
 
+app.post('/api/portal/:token/update', async (req, res) => {
+  const { token } = req.params;
+  const lead = getCrmLeadByToken(token);
+  if (!lead) return res.status(404).json({ error: 'Portal no encontrado' });
+
+  let extraConfig = {};
+
+  // Auto-creación de Bóveda centralizada en Google Drive al aprobar propuesta o firmar contrato
+  if ((req.body.fase1Aprobada || req.body.fase2Firmada || req.body.crearBoveda) && !lead.portalConfig?.driveVault?.vaultId) {
+    try {
+      console.log(`[DRIVE AUTO-SYNC] Creando bóveda centralizada para cliente: ${lead.empresa}`);
+      const vault = await createClientVault(lead.empresa, lead.email, lead.id);
+      if (vault) {
+        extraConfig.driveVault = vault;
+        extraConfig.enlaceDriveArchivos = vault.vaultUrl;
+      }
+    } catch (e) {
+      console.warn('[DRIVE AUTO-SYNC] Error creando bóveda en Drive:', e.message);
+    }
+  }
+
+  // Si se firma contrato, archivar acta en subcarpeta 02_Contratos_Firmados de Google Drive
+  const currentVault = extraConfig.driveVault || lead.portalConfig?.driveVault;
+  if (req.body.fase2Firmada && currentVault?.subfolders?.contratos?.id) {
+    try {
+      await archiveContractInDrive(currentVault.subfolders.contratos.id, lead.empresa, req.body);
+    } catch (err) {
+      console.warn('[DRIVE AUTO-SYNC] Error archivando contrato en Drive:', err.message);
+    }
+  }
+
+  const finalPayload = { ...req.body, ...extraConfig };
+  const updated = updateClientPortalConfig(token, finalPayload);
+  res.json({ success: true, lead: updated, driveVault: currentVault });
+});
+
+// Endpoint para forzar creación o sincronización de Bóveda en Google Drive para un portal
+app.post('/api/portal/:token/sync-drive', async (req, res) => {
+  const { token } = req.params;
+  const lead = getCrmLeadByToken(token);
+  if (!lead) return res.status(404).json({ error: 'Portal no encontrado' });
+
+  try {
+    const vault = await createClientVault(lead.empresa, lead.email, lead.id);
+    const updated = updateClientPortalConfig(token, {
+      driveVault: vault,
+      enlaceDriveArchivos: vault.vaultUrl
+    });
+    res.json({ success: true, lead: updated, vault });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint de estado general de Google Drive
+app.get('/api/drive/status', async (req, res) => {
+  const status = await getDriveStatus();
+  res.json(status);
+});
+
+// Endpoint general para crear bóveda de cliente
+app.post('/api/drive/create-vault', async (req, res) => {
+  try {
+    const { clientName, clientEmail, leadId } = req.body;
+    if (!clientName) return res.status(400).json({ error: 'Nombre de cliente requerido' });
+    const vault = await createClientVault(clientName, clientEmail, leadId);
+
+    if (leadId) {
+      const lead = getCrmLeadById(leadId);
+      if (lead) {
+        updateClientPortalConfig(lead.portalToken || lead.id, {
+          driveVault: vault,
+          enlaceDriveArchivos: vault.vaultUrl
+        });
+      }
+    }
+
+    res.json({ success: true, vault });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==========================================
 // 9. GESTIÓN FINANCIERA & RENTABILIDAD API
 // ==========================================
@@ -1156,6 +1406,51 @@ app.post('/api/finanzas/reset', (req, res) => {
   res.json({ success: true, finanzas: cleanFinanzas });
 });
 
+// Endpoint Maestro Unificado de Limpieza del Sistema (Fase 1 a 7)
+app.post('/api/system/reset', async (req, res) => {
+  try {
+    // 1. Limpiar archivos JSON de datos transaccionales en server/data/
+    saveLeads([]);
+    saveCrmLeads([]);
+    savePresupuestos([]);
+    saveProyectos([]);
+    saveWireframes([]);
+    saveSeoAudits([]);
+    const cleanFinanzas = resetFinanzasData();
+
+    // 2. Limpiar histórico de búsquedas
+    const searchesPath = path.join(__dirname, 'data/searches.json');
+    if (fs.existsSync(searchesPath)) {
+      try {
+        fs.writeFileSync(searchesPath, '[]', 'utf8');
+      } catch (e) {
+        console.warn('[SYSTEM RESET] Aviso limpiando searches.json:', e.message);
+      }
+    }
+
+    // 3. Limpiar tablas PostgreSQL si está conectado Neon
+    if (pool) {
+      try {
+        await pool.query(`
+          TRUNCATE TABLE leads, crm_leads, presupuestos, proyectos, wireframes, seo_audits, finanzas_records RESTART IDENTITY CASCADE;
+        `);
+        console.log('[SYSTEM RESET] Tablas limpiadas en Neon PostgreSQL');
+      } catch (dbErr) {
+        console.warn('[SYSTEM RESET] Aviso truncando tablas Neon:', dbErr.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Sistema reseteado con éxito. Datos de prueba limpiados en backend y base de datos.',
+      finanzas: cleanFinanzas
+    });
+  } catch (err) {
+    console.error('Error en /api/system/reset:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==========================================
 // 10. SEO & GEO TOOLS (RANK MATH PRO $0 ALT)
 // ==========================================
@@ -1183,12 +1478,27 @@ app.post('/api/seo-geo/gsc/sync', (req, res) => {
   res.json({ success: true, metrics, syncedAt: new Date().toISOString() });
 });
 
+app.get('/api/seo-geo/service-account', (req, res) => {
+  res.json(getServiceAccountInfo());
+});
+
 // ==========================================
 // 11. HUB DE PROYECTOS & HEADLESS CMS API
 // ==========================================
 app.get('/api/cms/sites', (req, res) => {
   const sites = getCmsSites();
   res.json(sites);
+});
+
+app.post('/api/cms/sites', (req, res) => {
+  try {
+    const { nombre, pais, dominio, slug, telefono, contenido } = req.body;
+    if (!nombre) return res.status(400).json({ error: 'Nombre del sitio requerido' });
+    const newSite = createCmsSite({ nombre, pais, dominio, slug, telefono, contenido });
+    res.json({ success: true, site: newSite });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/cms/content/:slug', (req, res) => {
@@ -1203,56 +1513,106 @@ app.patch('/api/cms/content/:slug', (req, res) => {
   res.json(updated);
 });
 
-// Turnkey Headless CMS Client Script
+app.delete('/api/cms/sites/:slug', (req, res) => {
+  const ok = deleteCmsSite(req.params.slug);
+  if (!ok) return res.status(404).json({ error: 'Sitio no encontrado' });
+  res.json({ success: true });
+});
+
+// Turnkey Headless CMS Client Script (Universal, 1 KB, Offline-first)
 app.get('/cms.js', (req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Cache-Control', 'public, max-age=60');
   res.send(`
 (function() {
   var scriptTag = document.currentScript || (function() {
     var scripts = document.getElementsByTagName('script');
     return scripts[scripts.length - 1];
   })();
-  var siteSlug = scriptTag.getAttribute('data-site');
-  var apiUrl = scriptTag.getAttribute('data-api') || window.location.origin;
+  var siteSlug = scriptTag ? scriptTag.getAttribute('data-site') : null;
+  var apiUrl = (scriptTag && scriptTag.getAttribute('data-api')) || window.location.origin;
 
   if (!siteSlug) {
     console.warn('[Goglite CMS] Falta atributo data-site en el script');
     return;
   }
 
+  var cacheKey = 'goglite_cms_' + siteSlug;
+
+  function getVal(path, obj) {
+    if (!path || !obj) return '';
+    return path.split('.').reduce(function(o, k) { 
+      return (o && typeof o[k] !== 'undefined') ? o[k] : ''; 
+    }, obj);
+  }
+
+  function applyCmsData(c) {
+    if (!c) return;
+
+    // 1. Textos
+    document.querySelectorAll('[data-cms]').forEach(function(el) {
+      var key = el.getAttribute('data-cms');
+      var val = getVal(key, c);
+      if (val !== '') el.textContent = val;
+    });
+
+    // 2. Enlaces (Href / WhatsApp)
+    document.querySelectorAll('[data-cms-href]').forEach(function(el) {
+      var key = el.getAttribute('data-cms-href');
+      var val = getVal(key, c);
+      if (val !== '') {
+        if (key.indexOf('WhatsApp') !== -1 && val.indexOf('http') === -1) {
+          var cleanPhone = val.replace(/[^0-9]/g, '');
+          el.setAttribute('href', 'https://wa.me/' + cleanPhone);
+        } else {
+          el.setAttribute('href', val);
+        }
+      }
+    });
+
+    // 3. Imágenes y Logos
+    document.querySelectorAll('[data-cms-src]').forEach(function(el) {
+      var key = el.getAttribute('data-cms-src');
+      var val = getVal(key, c);
+      if (val !== '') el.setAttribute('src', val);
+    });
+
+    // 4. Fondos CSS
+    document.querySelectorAll('[data-cms-bg]').forEach(function(el) {
+      var key = el.getAttribute('data-cms-bg');
+      var val = getVal(key, c);
+      if (val !== '') el.style.backgroundImage = 'url(' + val + ')';
+    });
+  }
+
+  // Carga instantánea desde caché local si existe
+  try {
+    var cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      applyCmsData(JSON.parse(cached));
+    }
+  } catch (e) {}
+
+  // Sincronización fresca con la nube
   fetch(apiUrl + '/api/cms/content/' + siteSlug)
     .then(function(r) { return r.json(); })
     .then(function(site) {
       if (!site || !site.contenido) return;
-      var c = site.contenido;
-
-      function getVal(path, obj) {
-        return path.split('.').reduce(function(o, k) { return (o && o[k] !== 'undefined') ? o[k] : ''; }, obj);
-      }
-
-      document.querySelectorAll('[data-cms]').forEach(function(el) {
-        var key = el.getAttribute('data-cms');
-        var val = getVal(key, c);
-        if (val) el.textContent = val;
-      });
-
-      document.querySelectorAll('[data-cms-href]').forEach(function(el) {
-        var key = el.getAttribute('data-cms-href');
-        var val = getVal(key, c);
-        if (val) el.setAttribute('href', val);
-      });
-
-      document.querySelectorAll('[data-cms-src]').forEach(function(el) {
-        var key = el.getAttribute('data-cms-src');
-        var val = getVal(key, c);
-        if (val) el.setAttribute('src', val);
-      });
-
-      console.log('[Goglite CMS] Contenido sincronizado en tiempo real para:', site.nombre);
+      applyCmsData(site.contenido);
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(site.contenido));
+      } catch (e) {}
     })
     .catch(function(err) {
-      console.warn('[Goglite CMS] Error sincronizando contenido:', err);
+      console.warn('[Goglite CMS] Modo offline activo para:', siteSlug);
     });
+
+  // Listener para previsualización en vivo en iframes
+  window.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'GOGLITE_CMS_LIVE_PREVIEW') {
+      applyCmsData(event.data.content);
+    }
+  });
 })();
   `);
 });

@@ -54,3 +54,5 @@ client_secret*.json
 # Registros y volcados
 *.sql
 *.dump
+
+*.mp3

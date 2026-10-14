@@ -38,6 +38,8 @@ import {
   Timer
 } from 'lucide-react';
 
+import { getStoredCrmLeads } from '../services/localStore';
+
 const STORAGE_KEY_FINANZAS = 'goglite_finanzas_v1';
 const STORAGE_KEY_TIMER = 'goglite_live_timer_v1';
 
@@ -810,8 +812,13 @@ export default function GestionRentabilidadModule({
   }, [activeTimer]);
 
   const getBackendEndpoint = (endpoint) => {
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      return `http://localhost:3001${endpoint}`;
+    if (typeof window !== 'undefined') {
+      if (window.location.protocol === 'https:') {
+        return endpoint;
+      }
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        return `http://localhost:3001${endpoint}`;
+      }
     }
     return endpoint;
   };
@@ -846,15 +853,14 @@ export default function GestionRentabilidadModule({
       const parsedM3 = rawM3 ? JSON.parse(rawM3) : [];
       if (Array.isArray(parsedM3)) setM3Presupuestos(parsedM3);
 
-      const rawM2 = localStorage.getItem('goglite_crm_leads_v3');
-      const parsedM2 = rawM2 ? JSON.parse(rawM2) : [];
+      const parsedM2 = getStoredCrmLeads();
       if (Array.isArray(parsedM2)) setM2CrmLeads(parsedM2);
 
       const rawM1 = localStorage.getItem('goglite_outbound_leads');
       const parsedM1 = rawM1 ? JSON.parse(rawM1) : [];
       if (Array.isArray(parsedM1)) setM1ScrapperLeads(parsedM1);
 
-      // Auto-importar presupuestos aceptados del Módulo 3 que aún no tengan factura en Módulo 4
+      // Auto-importar presupuestos aceptados del Módulo 3 que aún no tengan factura en Módulo 7
       if (Array.isArray(parsedM3) && parsedM3.length > 0) {
         setFinanzasState(prev => {
           const currentFacturas = [...(prev.facturas || [])];
@@ -1021,8 +1027,8 @@ export default function GestionRentabilidadModule({
       // 2. Revisar prospectos en etapa 'ganado' o 'propuesta_enviada' en Módulo 2 (CRM)
       let listM2 = m2CrmLeads;
       try {
-        const raw = localStorage.getItem('goglite_crm_leads_v3');
-        if (raw) listM2 = JSON.parse(raw);
+        const stored = getStoredCrmLeads();
+        if (stored && stored.length > 0) listM2 = stored;
       } catch {}
 
       if (Array.isArray(listM2)) {
@@ -1756,7 +1762,7 @@ export default function GestionRentabilidadModule({
       }
     } catch {}
     setActiveTimer(DEFAULT_TIMER_STATE);
-    showToast('✓ Módulo 4 limpio para tu prueba manual.');
+    showToast('✓ Módulo 7 (Rentabilidad & P&L) limpio para tu prueba manual.');
     try {
       fetch(getBackendEndpoint('/api/finanzas/reset'), { method: 'POST' });
     } catch {}
@@ -3567,7 +3573,47 @@ export default function GestionRentabilidadModule({
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">Descripción / Concepto Principal</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-400">Descripción / Concepto Principal</label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewInvoiceForm({
+                          ...newInvoiceForm,
+                          itemDescripcion: 'Goglite Care · Retainer Mensual de Mantenimiento & Headless CMS',
+                          concepto: 'Goglite Care · Retainer Mensual de Mantenimiento & Headless CMS',
+                          subtotal: 99,
+                          total: 99,
+                          montoCobrado: 99,
+                          horasInvertidasEstimadas: 2,
+                          itemsCustom: null
+                        });
+                      }}
+                      className="text-[10px] bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 px-2 py-0.5 rounded font-mono font-bold transition-colors"
+                    >
+                      ⚡ Goglite Care ($99)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewInvoiceForm({
+                          ...newInvoiceForm,
+                          itemDescripcion: 'Desarrollo Web Ultra-Rápido Antigravity & SEO Local',
+                          concepto: 'Desarrollo Web Ultra-Rápido Antigravity & SEO Local',
+                          subtotal: 650,
+                          total: 650,
+                          montoCobrado: 325,
+                          horasInvertidasEstimadas: 16,
+                          itemsCustom: null
+                        });
+                      }}
+                      className="text-[10px] bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 px-2 py-0.5 rounded font-mono font-bold transition-colors"
+                    >
+                      🌐 Web ($650)
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="text"
                   required

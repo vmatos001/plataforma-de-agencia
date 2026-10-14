@@ -77,22 +77,70 @@ function generateMapsNoWebAudit(domain, queryKeyword = '', country = 'SV', optio
   };
 }
 
+function isSafePublicHost(rawHost) {
+  if (!rawHost || typeof rawHost !== 'string') return false;
+  const clean = rawHost.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
+  if (!clean || clean.length > 253) return false;
+
+  // Bloqueo de localhost y nombres reservados
+  if (clean === 'localhost' || clean.endsWith('.local') || clean.endsWith('.internal') || clean.endsWith('.onion')) {
+    return false;
+  }
+
+  // Bloqueo de rangos de IPs privadas y especiales (SSRF)
+  const isIpv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(clean);
+  if (isIpv4) {
+    const [_, o1, o2, o3, o4] = isIpv4.map(Number);
+    if (o1 === 10) return false; // 10.0.0.0/8
+    if (o1 === 127) return false; // 127.0.0.0/8
+    if (o1 === 169 && o2 === 254) return false; // 169.254.0.0/16
+    if (o1 === 172 && o2 >= 16 && o2 <= 31) return false; // 172.16.0.0/12
+    if (o1 === 192 && o2 === 168) return false; // 192.168.0.0/16
+    if (o1 === 0 || o1 >= 224) return false; // Multicast / Reservado
+  }
+
+  if (clean.includes(':') || clean === '::1') return false; // IPv6 local/especial
+
+  // Validación de formato de dominio estándar
+  return /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(clean);
+}
+
 async function inspectSite(domain) {
+  const cleanDomain = (domain || '').replace(/^https?:\/\//, '').split('/')[0].trim();
+  if (!isSafePublicHost(cleanDomain)) {
+    console.warn(`[AUDITOR SSRF] Dominio descartado por validación de seguridad: "${cleanDomain}"`);
+    return {
+      reachable: false,
+      title: '',
+      metaDesc: '',
+      h1: '',
+      hasSchema: false,
+      hasFAQ: false,
+      hasWhatsApp: false,
+      pageSizeKb: 0
+    };
+  }
+
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(`https://${domain}`, {
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const res = await fetch(`https://${cleanDomain}`, {
       signal: controller.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) GogliteAuditorBot/1.0'
+      }
     });
     clearTimeout(timeoutId);
 
     if (res.ok) {
-      const html = await res.text();
+      // Limitar descarga a máximo 2.5 MB para prevenir agotamiento de memoria
+      const rawText = await res.text();
+      const html = rawText.slice(0, 2500000);
       const $ = cheerio.load(html);
 
-      const title = $('title').text().trim();
-      const metaDesc = $('meta[name="description"]').attr('content')?.trim() || '';
+      const title = $('title').text().trim().slice(0, 200);
+      const metaDesc = ($('meta[name="description"]').attr('content') || '').trim().slice(0, 400);
       const h1s = $('h1').map((i, el) => $(el).text().trim()).get();
       const hasSchema = html.includes('application/ld+json');
       const hasFAQ = html.toLowerCase().includes('faq') || html.toLowerCase().includes('preguntas frecuentes');
@@ -102,15 +150,15 @@ async function inspectSite(domain) {
         reachable: true,
         title,
         metaDesc,
-        h1: h1s[0] || '',
+        h1: (h1s[0] || '').slice(0, 200),
         hasSchema,
         hasFAQ,
         hasWhatsApp,
         pageSizeKb: Math.round(html.length / 1024)
       };
     }
-  } catch {
-    // unreachable or error
+  } catch (err) {
+    // Dominio inaccesible o timeout
   }
 
   return {

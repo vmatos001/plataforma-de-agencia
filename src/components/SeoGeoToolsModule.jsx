@@ -67,6 +67,25 @@ export default function SeoGeoToolsModule({ selectedCountry = 'SV' }) {
   const [gscData, setGscData] = useState(null);
   const [gscLoading, setGscLoading] = useState(false);
   const [gscSynced, setGscSynced] = useState(false);
+  const [crmClients, setCrmClients] = useState([]);
+  const [showSaModal, setShowSaModal] = useState(false);
+  const [copiedSaEmail, setCopiedSaEmail] = useState(false);
+  const [customDomainInput, setCustomDomainInput] = useState('');
+  const [showAddDomain, setShowAddDomain] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('goglite_crm_leads');
+      if (raw) {
+        const leads = JSON.parse(raw);
+        if (Array.isArray(leads)) {
+          setCrmClients(leads);
+        }
+      }
+    } catch (e) {
+      console.error('Error loading CRM leads for GSC:', e);
+    }
+  }, []);
 
   const fetchGscMetrics = async () => {
     try {
@@ -595,34 +614,119 @@ Sitemap: https://cliente-oficial.com/sitemap.xml`;
       {/* 5. TAB 4: GOOGLE SEARCH CONSOLE & GA4 LIVE METRICS */}
       {activeTab === 'gsc_live' && (
         <div className="space-y-6">
-          {/* Domain Selector & Sync Bar */}
-          <div className="p-4 rounded-xl bg-[#0e1320] border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <Globe className="w-5 h-5 text-orange-400 shrink-0" />
+          {/* SERVICE ACCOUNT GOGLITE-MASTER-SA MASTER SHIELD BAR */}
+          <div className="p-4 rounded-xl bg-gradient-to-r from-orange-500/10 via-[#0e1422] to-cyan-500/10 border border-orange-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
               <div>
-                <label className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block">
-                  Propiedad Web Analizada
-                </label>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <select
-                    value={gscDomain}
-                    onChange={(e) => setGscDomain(e.target.value)}
-                    className="bg-[#131926] border border-slate-700 text-white font-mono text-xs rounded-lg px-2.5 py-1"
-                  >
-                    <option value="gruasandrea.com">gruasandrea.com (El Salvador 🇸🇻)</option>
-                    <option value="puntacanaprime.com">puntacanaprime.com (Rep. Dominicana 🇩🇴)</option>
-                    <option value="clinicadentalescalon.com">clinicadentalescalon.com (El Salvador 🇸🇻)</option>
-                  </select>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono font-semibold">
-                    Conectado a Google API
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-white">Google Search Console Multi-Cliente Oficial</span>
+                  <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                    $0 APIs Externas · Service Account
                   </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-slate-300 font-mono">
+                  <span>Cuenta:</span>
+                  <code className="text-orange-400 bg-black/40 px-2 py-0.5 rounded border border-slate-800">
+                    goglite-master-sa@goglite-agency-suite.iam.gserviceaccount.com
+                  </code>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText('goglite-master-sa@goglite-agency-suite.iam.gserviceaccount.com');
+                      setCopiedSaEmail(true);
+                      setTimeout(() => setCopiedSaEmail(false), 2000);
+                    }}
+                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-sans font-semibold flex items-center gap-1 transition-colors"
+                  >
+                    {copiedSaEmail ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedSaEmail ? '¡Copiado!' : 'Copiar Email'}</span>
+                  </button>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setShowSaModal(true)}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>¿Cómo Conectar un Cliente?</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Domain Selector & Sync Bar */}
+          <div className="p-4 rounded-xl bg-[#0e1320] border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <Globe className="w-5 h-5 text-orange-400 shrink-0" />
+              <div className="w-full">
+                <label className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block">
+                  Propiedad Web Analizada (Multi-Cliente)
+                </label>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <select
+                    value={gscDomain}
+                    onChange={(e) => setGscDomain(e.target.value)}
+                    className="bg-[#131926] border border-slate-700 text-white font-mono text-xs rounded-lg px-2.5 py-1.5 cursor-pointer max-w-xs truncate"
+                  >
+                    <optgroup label="Clientes Activos del CRM">
+                      {crmClients.filter(c => c.dominio).map(c => (
+                        <option key={c.id} value={c.dominio}>
+                          {c.empresa} ({c.dominio})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Sitios de Referencia Goglite">
+                      <option value="gruasandrea.com">gruasandrea.com (El Salvador 🇸🇻)</option>
+                      <option value="puntacanaprime.com">puntacanaprime.com (Rep. Dominicana 🇩🇴)</option>
+                      <option value="clinicadentalescalon.com">clinicadentalescalon.com (El Salvador 🇸🇻)</option>
+                    </optgroup>
+                  </select>
+
+                  <button
+                    onClick={() => setShowAddDomain(!showAddDomain)}
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold border border-slate-700"
+                  >
+                    {showAddDomain ? 'Cerrar' : '+ Dominio Manual'}
+                  </button>
+
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono font-semibold">
+                    ✓ Google API Activa
+                  </span>
+                </div>
+
+                {showAddDomain && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <input
+                      type="text"
+                      value={customDomainInput}
+                      onChange={(e) => setCustomDomainInput(e.target.value)}
+                      placeholder="ej: misitio.com"
+                      className="bg-[#131926] border border-slate-700 text-white text-xs px-2.5 py-1 rounded-lg font-mono"
+                    />
+                    <button
+                      onClick={() => {
+                        if (customDomainInput.trim()) {
+                          setGscDomain(customDomainInput.trim());
+                          setCustomDomainInput('');
+                          setShowAddDomain(false);
+                        }
+                      }}
+                      className="px-2.5 py-1 rounded bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold"
+                    >
+                      Cargar
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
               <span className="text-[11px] font-mono text-slate-400">
-                Última sincronización: {gscData?.ultimaActualizacion || 'Reciente'}
+                Última sync: {gscData?.ultimaActualizacion || 'Reciente'}
               </span>
               <button
                 onClick={handleSyncGsc}
@@ -812,8 +916,113 @@ Sitemap: https://cliente-oficial.com/sitemap.xml`;
                   </div>
                 </div>
               </div>
+
+              {/* Tarjeta de Indexación & Cobertura Googlebot */}
+              <div className="p-4 rounded-xl bg-[#0c1017] border border-cyan-500/20 space-y-3">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-200">
+                  <div className="flex items-center gap-1.5 text-cyan-400 font-mono">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Salud de Indexación Googlebot</span>
+                  </div>
+                  <span className="text-[10px] font-mono bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded font-bold">
+                    {gscData?.indexacion?.cobertura || '100% OK'}
+                  </span>
+                </div>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between p-2 rounded bg-slate-900/60 border border-slate-800">
+                    <span className="text-slate-400">Páginas Indexadas:</span>
+                    <span className="font-mono text-emerald-400 font-bold">{gscData?.indexacion?.paginasIndexadas || 28} URLs</span>
+                  </div>
+                  <div className="flex justify-between p-2 rounded bg-slate-900/60 border border-slate-800">
+                    <span className="text-slate-400">Sitemap XML:</span>
+                    <span className="font-mono text-slate-200 text-[11px]">{gscData?.indexacion?.sitemapEstado || 'Procesado'}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 pt-1 font-mono">
+                    • {gscData?.indexacion?.ultimoRastreo || 'Googlebot Smartphone activo'}
+                  </div>
+                </div>
+              </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CONFIGURAR SERVICE ACCOUNT GSC */}
+      {showSaModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[#0e1320] border border-slate-800 rounded-2xl p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Conectar Google Search Console sin Coste ($0)</h3>
+                  <p className="text-[11px] text-slate-400">Protocolo oficial de Service Account de Google Cloud</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSaModal(false)}
+                className="text-slate-500 hover:text-white text-xs font-bold p-1 rounded-lg hover:bg-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-300">
+              <p className="leading-relaxed">
+                Para que Goglite extraiga clics, impresiones, CTR, palabras clave e indexación de tus clientes <strong className="text-white">sin pagar APIs externas de terceros</strong> (SEMrush, RankMath o Ahrefs), agrega la cuenta de servicio oficial a la consola del cliente:
+              </p>
+
+              <div className="p-3 rounded-xl bg-[#141b2a] border border-slate-700/80 space-y-1.5 font-mono">
+                <span className="text-[10px] uppercase text-slate-400 block">Correo de la Service Account Oficial:</span>
+                <div className="flex items-center justify-between gap-2">
+                  <strong className="text-orange-400 text-xs break-all">
+                    goglite-master-sa@goglite-agency-suite.iam.gserviceaccount.com
+                  </strong>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText('goglite-master-sa@goglite-agency-suite.iam.gserviceaccount.com');
+                      setCopiedSaEmail(true);
+                      setTimeout(() => setCopiedSaEmail(false), 2000);
+                    }}
+                    className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-sans font-semibold shrink-0"
+                  >
+                    {copiedSaEmail ? '¡Copiado!' : 'Copiar'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <span className="text-[11px] font-bold text-white font-mono uppercase block">Pasos Rápidos en 1 Minuto:</span>
+                <div className="flex items-start gap-2 text-slate-300 text-[11px]">
+                  <span className="w-4 h-4 rounded-full bg-slate-800 text-orange-400 flex items-center justify-center shrink-0 font-mono font-bold text-[10px]">1</span>
+                  <span>Abre <a href="https://search.google.com/search-console" target="_blank" rel="noreferrer" className="text-orange-400 hover:underline">Google Search Console</a> con la cuenta del cliente.</span>
+                </div>
+                <div className="flex items-start gap-2 text-slate-300 text-[11px]">
+                  <span className="w-4 h-4 rounded-full bg-slate-800 text-orange-400 flex items-center justify-center shrink-0 font-mono font-bold text-[10px]">2</span>
+                  <span>Entra a <strong>Ajustes &gt; Usuarios y permisos &gt; Agregar usuario</strong>.</span>
+                </div>
+                <div className="flex items-start gap-2 text-slate-300 text-[11px]">
+                  <span className="w-4 h-4 rounded-full bg-slate-800 text-orange-400 flex items-center justify-center shrink-0 font-mono font-bold text-[10px]">3</span>
+                  <span>Pega el correo copiado y asígnale permiso de <strong>"Restringido"</strong> (solo lectura).</span>
+                </div>
+                <div className="flex items-start gap-2 text-slate-300 text-[11px]">
+                  <span className="w-4 h-4 rounded-full bg-slate-800 text-emerald-400 flex items-center justify-center shrink-0 font-mono font-bold text-[10px]">✓</span>
+                  <span>¡Listo! La suite leerá automáticamente el tráfico y las palabras clave de la web.</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => setShowSaModal(false)}
+                className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs shadow-lg shadow-orange-950 transition-all"
+              >
+                Entendido, Cerrar Guía
+              </button>
+            </div>
           </div>
         </div>
       )}

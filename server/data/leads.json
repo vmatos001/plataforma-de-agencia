@@ -1,1 +1,401 @@
-[]
+[
+  {
+    "id": "lead-1791934803097-y0n7",
+    "dominio": "sv.siman.com",
+    "nombreEmpresa": "Ferreteria - Siman El Salvador",
+    "pais": "SV",
+    "email": "vtex.render-server@8.181.1",
+    "responsable": "Gerencia General",
+    "cargo": "Director / Representante",
+    "telefono": "7142857143",
+    "posicionGoogle": 4,
+    "resenas": 0,
+    "calificacion": 0,
+    "sinWeb": false,
+    "tipoFuente": "google_serp",
+    "estado": "nuevo",
+    "actualizado": "2026-10-13",
+    "auditoria": {
+      "fecha": "2026-10-13 23:40",
+      "siteData": {
+        "reachable": true,
+        "title": "Tienda Online de Almacenes SIMAN El Salvador | Siman.com",
+        "metaDesc": "Tienda Online de Almacenes SIMAN El Salvador | Siman.com",
+        "h1": "Tienda Online de Almacenes SIMAN El Salvador | Siman.com",
+        "hasSchema": true,
+        "hasFAQ": true,
+        "hasWhatsApp": true,
+        "pageSizeKb": 1891
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Marcado de entidad semántica incompleto para motores de IA",
+          "problema": "sv.siman.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de ferreterias, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Desconexión entre Title ('Tienda Online de Almacenes SIM...') y H1 sin keyword transaccional",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Velocidad & CRO",
+          "prioridad": "MEDIA",
+          "titulo": "Carga móvil no optimizada (LCP superior a 3.8s) y fricción en móviles",
+          "problema": "Se detecta una sobrecarga de scripts y fuentes no cacheadas que retrasan el First Contentful Paint en conexiones móviles locales de San Salvador.",
+          "porQueImporta": "El 82% de las búsquedas en El Salvador se realizan desde smartphones; un segundo adicional de retraso incrementa el abandono en un 32%.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Gerencia,\n\nEstuve analizando la presencia digital de Ferreteria - Siman El Salvador frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Marcado de entidad semántica incompleto para motores de IA: Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Desconexión entre Title ('Tienda Online de Almacenes SIM...') y H1 sin keyword transaccional: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791934805862-5ub7",
+    "dominio": "facebook.com",
+    "nombreEmpresa": "Ferreterías El Baratillo",
+    "pais": "SV",
+    "email": "direccion@facebook.com",
+    "responsable": "Dra. Marcela Quintanilla",
+    "cargo": "Socia Directora",
+    "telefono": "+503 3391-2191",
+    "posicionGoogle": 5,
+    "resenas": 0,
+    "calificacion": 0,
+    "sinWeb": false,
+    "tipoFuente": "google_serp",
+    "estado": "nuevo",
+    "actualizado": "2026-10-13",
+    "auditoria": {
+      "fecha": "2026-10-13 23:40",
+      "siteData": {
+        "reachable": true,
+        "title": "Facebook",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": true,
+        "hasWhatsApp": true,
+        "pageSizeKb": 452
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "facebook.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de ferreterias, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Velocidad & CRO",
+          "prioridad": "MEDIA",
+          "titulo": "Carga móvil no optimizada (LCP superior a 3.8s) y fricción en móviles",
+          "problema": "Se detecta una sobrecarga de scripts y fuentes no cacheadas que retrasan el First Contentful Paint en conexiones móviles locales de San Salvador.",
+          "porQueImporta": "El 82% de las búsquedas en El Salvador se realizan desde smartphones; un segundo adicional de retraso incrementa el abandono en un 32%.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Dra.,\n\nEstuve analizando la presencia digital de Ferreterías El Baratillo frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791934806825-7n0b",
+    "dominio": "sv.epaenlinea.com",
+    "nombreEmpresa": "Compre en Epaenlinea",
+    "pais": "SV",
+    "email": "ventaenlinea@sv.epa.biz",
+    "responsable": "Gerencia General",
+    "cargo": "Director / Representante",
+    "telefono": "1790266651",
+    "posicionGoogle": 6,
+    "resenas": 0,
+    "calificacion": 0,
+    "sinWeb": false,
+    "tipoFuente": "google_serp",
+    "estado": "nuevo",
+    "actualizado": "2026-10-13",
+    "auditoria": {
+      "fecha": "2026-10-13 23:40",
+      "siteData": {
+        "reachable": true,
+        "title": "Compre en Epaenlinea | Ferretería EPA  | El Salvador",
+        "metaDesc": "Ferretería EPA: Encuentre todo lo que necesita para sus proyectos de construcción, decoración y remodelación. Contamos con un amplio catálogo de productos, calidad y asesoría experta.",
+        "h1": "",
+        "hasSchema": true,
+        "hasFAQ": true,
+        "hasWhatsApp": true,
+        "pageSizeKb": 599
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Marcado de entidad semántica incompleto para motores de IA",
+          "problema": "sv.epaenlinea.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de ferreterias, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Velocidad & CRO",
+          "prioridad": "MEDIA",
+          "titulo": "Carga móvil no optimizada (LCP superior a 3.8s) y fricción en móviles",
+          "problema": "Se detecta una sobrecarga de scripts y fuentes no cacheadas que retrasan el First Contentful Paint en conexiones móviles locales de San Salvador.",
+          "porQueImporta": "El 82% de las búsquedas en El Salvador se realizan desde smartphones; un segundo adicional de retraso incrementa el abandono en un 32%.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Gerencia,\n\nEstuve analizando la presencia digital de Compre en Epaenlinea frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Marcado de entidad semántica incompleto para motores de IA: Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791934819231-l11f",
+    "dominio": "lemus.com.sv",
+    "nombreEmpresa": "Ferreterías Lemus",
+    "pais": "SV",
+    "email": "gerencia@lemus.com.sv",
+    "responsable": "Dr. Roberto Villalobos",
+    "cargo": "Director Médico / Gerente",
+    "telefono": "+503 3394-2194",
+    "posicionGoogle": 7,
+    "resenas": 0,
+    "calificacion": 0,
+    "sinWeb": false,
+    "tipoFuente": "google_serp",
+    "estado": "nuevo",
+    "actualizado": "2026-10-13",
+    "auditoria": {
+      "fecha": "2026-10-13 23:40",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "lemus.com.sv no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de ferreterias, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de ferreterias, dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Dr.,\n\nEstuve analizando la presencia digital de Ferreterías Lemus frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791934821114-qy2i",
+    "dominio": "freundferreteria.com",
+    "nombreEmpresa": "Freund: La ferretería de los salvadoreños",
+    "pais": "SV",
+    "email": "autocomplete-theme-classic@1.17.5",
+    "responsable": "Gerencia General",
+    "cargo": "Director / Representante",
+    "telefono": "36890530765",
+    "posicionGoogle": 8,
+    "resenas": 0,
+    "calificacion": 0,
+    "sinWeb": false,
+    "tipoFuente": "google_serp",
+    "estado": "nuevo",
+    "actualizado": "2026-10-13",
+    "auditoria": {
+      "fecha": "2026-10-13 23:40",
+      "siteData": {
+        "reachable": true,
+        "title": "Freund: La ferretería de los salvadoreños | Todo en construcción y hogar",
+        "metaDesc": "Compra en línea herramientas, materiales y pinturas con entrega rápida en todo El Salvador. Soluciones prácticas para tus proyectos de construcción y hogar.",
+        "h1": "Freund: La ferretería de los salvadoreños",
+        "hasSchema": false,
+        "hasFAQ": true,
+        "hasWhatsApp": false,
+        "pageSizeKb": 220
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "freundferreteria.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de ferreterias, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Desconexión entre Title ('Freund: La ferretería de los s...') y H1 sin keyword transaccional",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Velocidad & CRO",
+          "prioridad": "MEDIA",
+          "titulo": "Carga móvil no optimizada (LCP superior a 3.8s) y fricción en móviles",
+          "problema": "Se detecta una sobrecarga de scripts y fuentes no cacheadas que retrasan el First Contentful Paint en conexiones móviles locales de San Salvador.",
+          "porQueImporta": "El 82% de las búsquedas en El Salvador se realizan desde smartphones; un segundo adicional de retraso incrementa el abandono en un 32%.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Gerencia,\n\nEstuve analizando la presencia digital de Freund: La ferretería de los salvadoreños frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Desconexión entre Title ('Freund: La ferretería de los s...') y H1 sin keyword transaccional: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791934842063-9erh",
+    "dominio": "almacenesbousa.com",
+    "nombreEmpresa": "Almacenes Bou",
+    "pais": "SV",
+    "email": "mauricio.palacios@almacenesbousa.com",
+    "responsable": "Lic. Mauricio Palacios",
+    "cargo": "Director General",
+    "telefono": "+503 4040-2840",
+    "posicionGoogle": 9,
+    "resenas": 0,
+    "calificacion": 0,
+    "sinWeb": false,
+    "tipoFuente": "google_serp",
+    "estado": "nuevo",
+    "actualizado": "2026-10-13",
+    "auditoria": {
+      "fecha": "2026-10-13 23:40",
+      "siteData": {
+        "reachable": false,
+        "title": "",
+        "metaDesc": "",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": false,
+        "hasWhatsApp": false,
+        "pageSizeKb": 0
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "almacenesbousa.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de ferreterias, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Contenido / FAQs",
+          "prioridad": "MEDIA",
+          "titulo": "Ausencia de sección de Preguntas Frecuentes (FAQ) para capturar tráfico long-tail",
+          "problema": "No responden en su web las dudas más habituales sobre tarifas, garantías y tiempos de atención de ferreterias, dejando sin responder la intención de búsqueda de cola larga.",
+          "porQueImporta": "Las FAQs estructuradas permiten adueñarse de los 'Featured Snippets' de Google y alimentar a los motores de IA con respuestas rápidas.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Lic.,\n\nEstuve analizando la presencia digital de Almacenes Bou frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  },
+  {
+    "id": "lead-1791934845212-fvgd",
+    "dominio": "instagram.com",
+    "nombreEmpresa": "Vidrí Ferretería (@vidriferreteria) · San Salvador",
+    "pais": "SV",
+    "email": "direccion@instagram.com",
+    "responsable": "Dra. Marcela Quintanilla",
+    "cargo": "Socia Directora",
+    "telefono": "+503 3531-2331",
+    "posicionGoogle": 10,
+    "resenas": 0,
+    "calificacion": 0,
+    "sinWeb": false,
+    "tipoFuente": "google_serp",
+    "estado": "nuevo",
+    "actualizado": "2026-10-13",
+    "auditoria": {
+      "fecha": "2026-10-13 23:40",
+      "siteData": {
+        "reachable": true,
+        "title": "Instagram",
+        "metaDesc": "Create an account or log in to Instagram - Share what you're into with the people who get you.",
+        "h1": "",
+        "hasSchema": false,
+        "hasFAQ": true,
+        "hasWhatsApp": true,
+        "pageSizeKb": 406
+      },
+      "puntos": [
+        {
+          "categoria": "GEO / IA",
+          "prioridad": "ALTA",
+          "titulo": "Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity)",
+          "problema": "instagram.com no implementa esquemas estructurados de organización ni de servicios locales. Cuando usuarios en San Salvador consultan a Perplexity o SearchGPT por proveedores confiables de ferreterias, el modelo de lenguaje carece de datos estructurados para citar la marca.",
+          "porQueImporta": "Más del 35% de compradores B2B y clientes premium ya consultan IAs antes de buscar en Google. La falta de presencia semántica cede el 100% de estas recomendaciones a la competencia.",
+          "competidores": "Los competidores que ocupan la posición #1 cuentan con Schema Organization y FAQPage verificados, logrando ser referenciados en respuestas directas de IA."
+        },
+        {
+          "categoria": "SEO",
+          "prioridad": "ALTA",
+          "titulo": "Title y H1 genéricos sin intención de búsqueda comercial en San Salvador",
+          "problema": "El sitio web omite términos transaccionales de alto valor en su etiqueta Title principal y su encabezado H1. Google prioriza páginas que alinean explícitamente la consulta del usuario con su estructura jerárquica.",
+          "porQueImporta": "Esto penaliza el Click-Through Rate (CTR) orgánico y relega al negocio a la posición actual fuera del podio principal de Google en El Salvador.",
+          "competidores": "Los sitios en las 3 primeras posiciones alinean el término exacto con su oferta de valor en menos de 60 caracteres."
+        },
+        {
+          "categoria": "Velocidad & CRO",
+          "prioridad": "MEDIA",
+          "titulo": "Carga móvil no optimizada (LCP superior a 3.8s) y fricción en móviles",
+          "problema": "Se detecta una sobrecarga de scripts y fuentes no cacheadas que retrasan el First Contentful Paint en conexiones móviles locales de San Salvador.",
+          "porQueImporta": "El 82% de las búsquedas en El Salvador se realizan desde smartphones; un segundo adicional de retraso incrementa el abandono en un 32%.",
+          "competidores": "Webs construidas con arquitecturas modernas de alto rendimiento alcanzan 95+ en Google PageSpeed y reducen la tasa de rebote a la mitad."
+        }
+      ]
+    },
+    "pitch": "Hola Dra.,\n\nEstuve analizando la presencia digital de Vidrí Ferretería (@vidriferreteria) · San Salvador frente a los principales referentes de su sector en El Salvador.\n\nDetectamos 3 puntos críticos que están frenando la captación directa de clientes y pacientes potenciales:\n\n1. Ausencia total de Schema JSON-LD (Invisible en ChatGPT y Perplexity): Su sitio carece de arquitectura semántica para los nuevos buscadores de IA (Perplexity, SearchGPT), por lo que las recomendaciones automáticas están yendo a competidores.\n2. Title y H1 genéricos sin intención de búsqueda comercial en San Salvador: La estructura actual de encabezados no responde a la intención de compra directa que Google premia en las primeras 3 posiciones.\n3. Tiempo de respuesta móvil: Su web presenta fricciones de carga que elevan el porcentaje de rebote en smartphones.\n\nEn Goglite ayudamos a marcas líderes a dominar tanto el posicionamiento clásico como la optimización para motores de IA (GEO) mediante infraestructuras web de alto impacto y cero lentitud.\n\n¿Tiene 10 minutos disponibles esta semana para compartirle el diagnóstico comparativo completo y cómo resolverlo?\n\nSaludos cordiales,\nVíctor Matos\nGoglite — Agencia Web & Inteligencia Artificial\nWhatsApp: +1 (809) 000-0000 | goglite.com"
+  }
+]

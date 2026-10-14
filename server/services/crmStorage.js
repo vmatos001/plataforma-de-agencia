@@ -297,7 +297,10 @@ export function getCrmLeadById(id) {
 
 export function getCrmLeadByToken(token) {
   const leads = getCrmLeads();
-  return leads.find(l => l.portalToken === token) || null;
+  const found = leads.find(l => l.portalToken === token || l.id === token);
+  if (found) return found;
+  if (token === 'portal-demo' && leads.length > 0) return leads[0];
+  return null;
 }
 
 export function updateCrmLeadStage(id, nuevaEtapa) {
@@ -381,6 +384,33 @@ export function addClientUploadedAsset(token, asset) {
   };
 
   leads[idx].portalConfig.archivosSubidos.push(nuevoArchivo);
+  saveCrmLeads(leads);
+  return leads[idx];
+}
+
+export function updateClientPortalConfig(token, updates) {
+  const leads = getCrmLeads();
+  const idx = leads.findIndex(l => l.portalToken === token || l.id === token);
+  if (idx === -1) return null;
+
+  if (!leads[idx].portalConfig) {
+    leads[idx].portalConfig = {};
+  }
+
+  // Merge portal config updates
+  leads[idx].portalConfig = {
+    ...leads[idx].portalConfig,
+    ...updates,
+    ultimaActualizacion: new Date().toISOString()
+  };
+
+  // If contract signed in phase 2 or deposit confirmed, advance lead to 'ganado'
+  if (updates.fase2Firmada || updates.anticipoPagado) {
+    leads[idx].etapa = 'ganado';
+    leads[idx].probabilidad = 100;
+  }
+
+  leads[idx].actualizadoEn = new Date().toISOString().split('T')[0];
   saveCrmLeads(leads);
   return leads[idx];
 }

@@ -1,0 +1,53 @@
+[
+  {
+    "id": "user-admin-victor",
+    "nombre": "Víctor Matos",
+    "email": "victor@goglite.com",
+    "cargo": "CEO & Director General",
+    "rol": "admin",
+    "avatar": "VM",
+    "authProvider": "google_authenticator",
+    "mfaActivo": true,
+    "totpKeySecret": "JBSWY3DPEHPK3PXP",
+    "permisos": [
+      "all"
+    ],
+    "creadoEn": "2026-10-01T00:00:00Z",
+    "ultimoAcceso": "2026-10-14T08:30:09.855Z"
+  },
+  {
+    "id": "user-colab-carlos",
+    "nombre": "Carlos Méndez",
+    "email": "carlos.dev@goglite.com",
+    "cargo": "Desarrollador Web Antigravity & QA",
+    "rol": "colaborador",
+    "avatar": "CM",
+    "authProvider": "google",
+    "mfaActivo": false,
+    "permisos": [
+      "desarrollo_prd",
+      "seo_motor",
+      "headless_cms"
+    ],
+    "creadoEn": "2026-10-05T00:00:00Z",
+    "ultimoAcceso": "2026-10-14T08:30:09.855Z"
+  },
+  {
+    "id": "user-colab-sofia",
+    "nombre": "Sofía Valiente",
+    "email": "sofia.copy@goglite.com",
+    "cargo": "Estratega de Contenidos & StoryBrand",
+    "rol": "colaborador",
+    "avatar": "SV",
+    "authProvider": "google",
+    "mfaActivo": false,
+    "permisos": [
+      "lead_scrapper",
+      "crm_portal",
+      "presupuestos",
+      "headless_cms"
+    ],
+    "creadoEn": "2026-10-08T00:00:00Z",
+    "ultimoAcceso": "2026-10-14T08:30:09.855Z"
+  }
+]

@@ -42,8 +42,18 @@ import {
   QrCode,
   Wifi,
   WifiOff,
-  RefreshCw
+  RefreshCw,
+  UserPlus,
+  Download,
+  Layers,
+  MapPin,
+  Star,
+  Crown
 } from 'lucide-react';
+import {
+  getStoredCrmLeads,
+  saveStoredCrmLeads
+} from '../services/localStore';
 
 const PIPELINE_STAGES = [
   { id: 'nuevo', label: 'Nuevo Lead', color: 'border-slate-600', badge: 'bg-slate-700/50 text-slate-300', dot: 'bg-slate-400' },
@@ -422,19 +432,14 @@ const SEED_CRM_LEADS = [
   }
 ];
 
-export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato }) {
+export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato, onOpenPrd }) {
   // Persistencia local resiliente: Si recargas (F5), se lee de localStorage
   const [leads, setLeads] = useState(() => {
     try {
-      if (typeof window !== 'undefined') {
-        const cached = localStorage.getItem('goglite_crm_leads');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-      }
+      const cached = getStoredCrmLeads();
+      if (Array.isArray(cached) && cached.length > 0) return cached;
     } catch (e) {
-      console.warn('Error leyendo goglite_crm_leads de localStorage:', e);
+      console.warn('Error leyendo leads de CRM:', e);
     }
     return SEED_CRM_LEADS;
   });
@@ -461,6 +466,141 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       localStorage.setItem('goglite_crm_country', selectedCountry);
     }
   }, [selectedCountry]);
+
+  // Estados para Base de Datos & Fichas de Clientes 360°
+  const [fichasFilter, setFichasFilter] = useState('todos'); // 'todos' | 'ganado' | 'negociacion' | 'scrapper' | 'manual'
+  const [isImportScrapperModalOpen, setIsImportScrapperModalOpen] = useState(false);
+  const [scrapperLeadsList, setScrapperLeadsList] = useState([]);
+  const [selectedScrapperIds, setSelectedScrapperIds] = useState(new Set());
+  const [scrapperAvailableCount, setScrapperAvailableCount] = useState(0);
+
+  const refreshScrapperAvailableCount = () => {
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = localStorage.getItem('goglite_outbound_leads');
+        const parsed = raw ? JSON.parse(raw) : [];
+        setScrapperAvailableCount(parsed.length);
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    refreshScrapperAvailableCount();
+  }, []);
+
+  const handleOpenImportScrapperModal = () => {
+    try {
+      const raw = localStorage.getItem('goglite_outbound_leads');
+      const parsed = raw ? JSON.parse(raw) : [];
+      setScrapperLeadsList(parsed);
+      
+      const existingPhones = new Set(leads.map(l => (l.telefono || '').replace(/\D/g, '')).filter(Boolean));
+      const existingNames = new Set(leads.map(l => (l.empresa || '').toLowerCase().trim()).filter(Boolean));
+      const toSelect = new Set();
+      parsed.forEach(sl => {
+        const cleanP = (sl.telefono || '').replace(/\D/g, '');
+        const cleanN = (sl.nombreEmpresa || sl.dominio || '').toLowerCase().trim();
+        if (!existingPhones.has(cleanP) && !existingNames.has(cleanN)) {
+          toSelect.add(sl.id);
+        }
+      });
+      setSelectedScrapperIds(toSelect);
+    } catch (e) {
+      setScrapperLeadsList([]);
+    }
+    setIsImportScrapperModalOpen(true);
+  };
+
+  const handleToggleSelectScrapper = (id) => {
+    setSelectedScrapperIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAllScrapper = (selectAll = true) => {
+    if (!selectAll) {
+      setSelectedScrapperIds(new Set());
+      return;
+    }
+    const existingPhones = new Set(leads.map(l => (l.telefono || '').replace(/\D/g, '')).filter(Boolean));
+    const existingNames = new Set(leads.map(l => (l.empresa || '').toLowerCase().trim()).filter(Boolean));
+    const toSelect = new Set();
+    scrapperLeadsList.forEach(sl => {
+      const cleanP = (sl.telefono || '').replace(/\D/g, '');
+      const cleanN = (sl.nombreEmpresa || sl.dominio || '').toLowerCase().trim();
+      if (!existingPhones.has(cleanP) && !existingNames.has(cleanN)) {
+        toSelect.add(sl.id);
+      }
+    });
+    setSelectedScrapperIds(toSelect);
+  };
+
+  const handleExecuteImportFromScrapper = async () => {
+    const toImport = scrapperLeadsList.filter(sl => selectedScrapperIds.has(sl.id));
+    if (toImport.length === 0) {
+      alert('Selecciona al menos un prospecto para importar.');
+      return;
+    }
+
+    const newConverted = toImport.map(sl => ({
+      id: 'crm-scrapper-' + (sl.id || Date.now() + '-' + Math.random().toString(36).substring(2, 6)),
+      leadId: sl.id || null,
+      empresa: sl.nombreEmpresa || sl.dominio || 'Negocio Scrapper',
+      contacto: sl.responsable || 'Dirección Comercial',
+      cargo: sl.cargo || 'Propietario / Gerente',
+      email: sl.email && !sl.email.endsWith('.negocio') ? sl.email : '',
+      telefono: sl.telefono || '',
+      pais: sl.pais || selectedCountry === 'ALL' ? 'SV' : selectedCountry,
+      dominio: sl.sinWeb ? '' : (sl.dominio || ''),
+      sinWeb: Boolean(sl.sinWeb),
+      resenas: sl.resenas || 0,
+      calificacion: sl.calificacion || 4.8,
+      etapa: sl.estado === 'cliente' ? 'ganado' : 'nuevo',
+      valorEstimado: sl.estado === 'cliente' ? 2400 : 1500,
+      probabilidad: sl.estado === 'cliente' ? 100 : 35,
+      fuente: `Lead Scrapper (${sl.sinWeb || sl.dominio?.startsWith('maps-') ? 'Google Maps Sin Web' : 'SERP Web'})`,
+      portalToken: 'portal-' + (sl.id || Date.now()) + '-' + Math.random().toString(36).substring(2, 6),
+      interacciones: [
+        {
+          id: 'int-scr-' + Date.now() + Math.random(),
+          tipo: 'nota',
+          titulo: 'Importado de Lead Scrapper Fase 1',
+          detalle: `Prospecto importado desde Fase 1. ${sl.auditoria ? `Auditoría inicial con ${sl.auditoria.puntos?.length || 0} oportunidades.` : 'Prospección activa.'}`,
+          fecha: new Date().toISOString().split('T')[0],
+          proximoPaso: 'Primer contacto / WhatsApp consultivo',
+          fechaProximoPaso: ''
+        }
+      ],
+      whatsappData: {
+        telefono: sl.telefono || '',
+        temperatura: 'caliente',
+        estadoSeguimiento: 'primer_contacto',
+        ultimoMensajeFecha: 'Hoy',
+        mensajes: []
+      },
+      creadoEn: new Date().toISOString().split('T')[0]
+    }));
+
+    updateAndPersistLeads(prev => [...newConverted, ...prev]);
+
+    // Guardar en backend
+    for (const nl of newConverted) {
+      try {
+        await fetch(getBackendEndpoint('/api/crm/leads'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(nl)
+        });
+      } catch (e) {}
+    }
+
+    setIsImportScrapperModalOpen(false);
+    setActiveTab('fichas_clientes');
+    alert(`🎉 ¡${newConverted.length} prospectos importados con éxito a la Base de Datos de Clientes del CRM!`);
+  };
 
   const [dragOverStage, setDragOverStage] = useState(null);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
@@ -536,8 +676,13 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
 
   // Helper para resolver URL del backend (local o producción)
   const getBackendEndpoint = (endpoint) => {
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      return `http://localhost:3001${endpoint}`;
+    if (typeof window !== 'undefined') {
+      if (window.location.protocol === 'https:') {
+        return endpoint;
+      }
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        return `http://localhost:3001${endpoint}`;
+      }
     }
     return endpoint;
   };
@@ -581,9 +726,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   const updateAndPersistLeads = (updater) => {
     setLeads(prev => {
       const nextLeads = typeof updater === 'function' ? updater(prev) : updater;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('goglite_crm_leads', JSON.stringify(nextLeads));
-      }
+      saveStoredCrmLeads(nextLeads);
       return nextLeads;
     });
   };
@@ -1074,14 +1217,29 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     const tempLead = {
       id: 'lead-local-' + Date.now(),
       ...newLeadForm,
-      interacciones: [],
+      fuente: 'Registro Manual',
+      portalToken: 'portal-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      probabilidad: newLeadForm.etapa === 'ganado' ? 100 : newLeadForm.etapa === 'negociacion' ? 70 : 35,
+      interacciones: [
+        {
+          id: 'int-' + Date.now(),
+          tipo: 'nota',
+          titulo: 'Ficha Creada Manualmente en CRM',
+          detalle: newLeadForm.notasIniciales || 'Registro manual de cliente en el sistema.',
+          fecha: new Date().toISOString().split('T')[0],
+          proximoPaso: newLeadForm.etapa === 'ganado' ? 'Iniciar Onboarding y Contrato SOW' : 'Seguimiento comercial',
+          fechaProximoPaso: ''
+        }
+      ],
       whatsappData: {
         telefono: newLeadForm.telefono,
         mensajes: [],
         ultimoMensajeFecha: 'Ahora',
-        etapaConversacion: 'primer_contacto'
+        temperatura: newLeadForm.etapa === 'ganado' ? 'caliente' : 'tibio',
+        estadoSeguimiento: newLeadForm.etapa === 'ganado' ? 'cerrado_ganado' : 'primer_contacto'
       },
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      creadoEn: new Date().toISOString().split('T')[0]
     };
 
     // 1. Persistencia local inmediata
@@ -1093,7 +1251,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       cargo: '',
       email: '',
       telefono: '',
-      pais: 'SV',
+      pais: selectedCountry === 'ALL' ? 'SV' : selectedCountry,
       dominio: '',
       valorEstimado: 1500,
       etapa: 'nuevo',
@@ -1105,7 +1263,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       const res = await fetch('/api/crm/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newLeadForm)
+        body: JSON.stringify(tempLead)
       });
       if (res.ok) {
         const created = await res.json();
@@ -1149,6 +1307,18 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   const leadsGanadosCount = filteredLeads.filter(l => l.etapa === 'ganado').length;
   const tasaConversion = filteredLeads.length > 0 ? Math.round((leadsGanadosCount / filteredLeads.length) * 100) : 0;
   const leadsEnProspeccion = filteredLeads.filter(l => ['nuevo', 'contactado', 'reunion', 'reunion_demo'].includes(l.etapa)).length;
+  const leadsEnNegociacionCount = filteredLeads.filter(l => ['negociacion', 'propuesta_enviada', 'propuesta'].includes(l.etapa)).length;
+  const leadsDeScrapperCount = filteredLeads.filter(l => (l.fuente && l.fuente.toLowerCase().includes('scrapper')) || l.leadId || l.sinWeb).length;
+  const leadsManualesCount = Math.max(0, filteredLeads.length - leadsDeScrapperCount);
+
+  // Filtrado de Fichas de Clientes 360°
+  const fichasLeads = filteredLeads.filter(l => {
+    if (fichasFilter === 'ganado') return l.etapa === 'ganado';
+    if (fichasFilter === 'negociacion') return ['negociacion', 'propuesta_enviada', 'propuesta'].includes(l.etapa);
+    if (fichasFilter === 'scrapper') return (l.fuente && l.fuente.toLowerCase().includes('scrapper')) || l.leadId || l.sinWeb;
+    if (fichasFilter === 'manual') return !(l.fuente && l.fuente.toLowerCase().includes('scrapper')) && !l.leadId && !l.sinWeb;
+    return true; // 'todos'
+  });
 
   // Selected lead for portal preview
   const currentPortalLead = leads.find(l => l.id === selectedPortalLeadId) || leads[0];
@@ -1250,7 +1420,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
         </div>
 
         {/* View Switch & Action */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex items-center bg-[#131926] border border-slate-800 rounded-lg p-0.5 text-xs">
             <button
               onClick={() => setActiveTab('kanban')}
@@ -1258,6 +1428,16 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
             >
               <Kanban className="w-3.5 h-3.5" />
               <span>Kanban</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('fichas_clientes')}
+              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors ${activeTab === 'fichas_clientes' ? 'bg-orange-600/25 text-orange-400 border border-orange-500/40 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <Users className="w-3.5 h-3.5 text-orange-400" />
+              <span>Base de Datos & Fichas</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                👑 {leadsGanadosCount} Clientes
+              </span>
             </button>
             <button
               onClick={() => setActiveTab('tabla')}
@@ -1276,13 +1456,29 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
             </button>
           </div>
 
-          <button
-            onClick={() => setCreateLeadModalOpen(true)}
-            className="px-3.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md shadow-orange-950 transition-all shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>+ Nuevo Lead</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleOpenImportScrapperModal}
+              className="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 font-semibold text-xs flex items-center gap-1.5 transition-all shrink-0"
+              title="Importar prospectos capturados en Fase 1 (Google Maps / SERP)"
+            >
+              <Download className="w-3.5 h-3.5 text-sky-400" />
+              <span>📥 Importar de Scrapper</span>
+              {scrapperAvailableCount > 0 && (
+                <span className="text-[10px] bg-sky-500/30 text-sky-200 px-1 rounded-full font-mono font-bold">
+                  {scrapperAvailableCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setCreateLeadModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md shadow-orange-950 transition-all shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Registrar Ficha Manual</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1546,6 +1742,392 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* 3.1 BASE DE DATOS DE CLIENTES & FICHAS TÉCNICAS 360° */}
+      {activeTab === 'fichas_clientes' && (
+        <div className="space-y-5">
+          {/* Header de la Base de Datos */}
+          <div className="p-5 rounded-2xl bg-[#0c1017] border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center font-bold">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-white flex items-center gap-2">
+                    <span>Base de Datos Centralizada de Clientes & Fichas 360°</span>
+                    <span className="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-mono border border-emerald-500/30 font-bold">
+                      👑 {leadsGanadosCount} Clientes Ganados
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Expedientes de clientes cerrados y prospectos calificados. Conecta directamente con presupuestos VIP, contratos SOW, PRD técnico y WhatsApp CRM.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleOpenImportScrapperModal}
+                className="px-3.5 py-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 font-semibold text-xs flex items-center gap-2 transition-all shadow-sm"
+              >
+                <Download className="w-4 h-4" />
+                <span>📥 Importar desde Scrapper ({scrapperAvailableCount})</span>
+              </button>
+
+              <button
+                onClick={() => setCreateLeadModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs flex items-center gap-2 transition-all shadow-md shadow-orange-950"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Nueva Ficha Manual</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Sub-tarjetas Métricas del Directorio */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl bg-[#0e1320] border border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="text-[11px] font-mono text-slate-400 uppercase">Clientes Ganados</div>
+                <div className="text-xl font-black text-emerald-400 mt-0.5">${totalGanado.toLocaleString()} USD</div>
+                <div className="text-[10px] text-slate-500">{leadsGanadosCount} contratos firmados</div>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
+                <Crown className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-[#0e1320] border border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="text-[11px] font-mono text-slate-400 uppercase">En Negociación</div>
+                <div className="text-xl font-black text-amber-400 mt-0.5">{leadsEnNegociacionCount} leads</div>
+                <div className="text-[10px] text-slate-500">Propuestas en curso</div>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold">
+                <Flame className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-[#0e1320] border border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="text-[11px] font-mono text-slate-400 uppercase">Total en Base de Datos</div>
+                <div className="text-xl font-black text-white mt-0.5">{filteredLeads.length} fichas</div>
+                <div className="text-[10px] text-slate-500">Prospectos y clientes</div>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold">
+                <Users className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-[#0e1320] border border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="text-[11px] font-mono text-slate-400 uppercase">Origen de Datos</div>
+                <div className="text-xl font-black text-sky-400 mt-0.5">{leadsDeScrapperCount} de Scrapper</div>
+                <div className="text-[10px] text-slate-500">{leadsManualesCount} creados a mano</div>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold">
+                <Download className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+
+          {/* Filtros por Píldoras */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-[#0c1017] border border-slate-800">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="text-slate-500 font-mono text-[11px] mr-1">Filtrar:</span>
+              <button
+                onClick={() => setFichasFilter('todos')}
+                className={`px-3 py-1 rounded-lg transition-all font-medium ${
+                  fichasFilter === 'todos'
+                    ? 'bg-orange-600 text-white font-semibold shadow-sm'
+                    : 'bg-slate-800/80 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Todos ({filteredLeads.length})
+              </button>
+              <button
+                onClick={() => setFichasFilter('ganado')}
+                className={`px-3 py-1 rounded-lg transition-all font-medium flex items-center gap-1.5 ${
+                  fichasFilter === 'ganado'
+                    ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                    : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                }`}
+              >
+                <Crown className="w-3 h-3" />
+                <span>👑 Clientes Cerrados ({leadsGanadosCount})</span>
+              </button>
+              <button
+                onClick={() => setFichasFilter('negociacion')}
+                className={`px-3 py-1 rounded-lg transition-all font-medium flex items-center gap-1.5 ${
+                  fichasFilter === 'negociacion'
+                    ? 'bg-amber-600 text-white font-semibold shadow-sm'
+                    : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+                }`}
+              >
+                <Flame className="w-3 h-3" />
+                <span>En Propuesta / Cierre ({leadsEnNegociacionCount})</span>
+              </button>
+              <button
+                onClick={() => setFichasFilter('scrapper')}
+                className={`px-3 py-1 rounded-lg transition-all font-medium flex items-center gap-1.5 ${
+                  fichasFilter === 'scrapper'
+                    ? 'bg-sky-600 text-white font-semibold shadow-sm'
+                    : 'bg-sky-500/10 text-sky-400 hover:bg-sky-500/20'
+                }`}
+              >
+                <Download className="w-3 h-3" />
+                <span>Desde Scrapper ({leadsDeScrapperCount})</span>
+              </button>
+              <button
+                onClick={() => setFichasFilter('manual')}
+                className={`px-3 py-1 rounded-lg transition-all font-medium flex items-center gap-1.5 ${
+                  fichasFilter === 'manual'
+                    ? 'bg-purple-600 text-white font-semibold shadow-sm'
+                    : 'bg-purple-500/10 text-purple-400 hover:bg-purple-500/20'
+                }`}
+              >
+                <UserPlus className="w-3 h-3" />
+                <span>Manuales ({leadsManualesCount})</span>
+              </button>
+            </div>
+
+            <div className="text-[11px] font-mono text-slate-400">
+              Mostrando <span className="text-white font-bold">{fichasLeads.length}</span> expedientes
+            </div>
+          </div>
+
+          {/* Grid de Fichas de Cliente 360° */}
+          {fichasLeads.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl bg-[#0c1017] border border-slate-800/80 space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-slate-800/80 text-slate-500 flex items-center justify-center mx-auto">
+                <Users className="w-7 h-7" />
+              </div>
+              <h4 className="text-base font-bold text-white">No hay expedientes con este filtro</h4>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                No se encontraron fichas de cliente que coincidan. Puedes importar prospectos del Lead Scrapper de Fase 1 o registrar un nuevo cliente manualmente.
+              </p>
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <button
+                  onClick={handleOpenImportScrapperModal}
+                  className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Importar desde Scrapper</span>
+                </button>
+                <button
+                  onClick={() => setCreateLeadModalOpen(true)}
+                  className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Crear Ficha Manual</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {fichasLeads.map(lead => {
+                const stageObj = PIPELINE_STAGES.find(s => s.id === lead.etapa) || PIPELINE_STAGES[0];
+                const isGanado = lead.etapa === 'ganado';
+                const cleanPhone = (lead.whatsappData?.telefono || lead.telefono || '').replace(/[^\d]/g, '');
+                const isScrapper = (lead.fuente && lead.fuente.toLowerCase().includes('scrapper')) || lead.leadId || lead.sinWeb;
+
+                return (
+                  <div
+                    key={lead.id}
+                    className={`rounded-2xl p-5 border transition-all duration-200 flex flex-col justify-between gap-4 ${
+                      isGanado
+                        ? 'bg-[#0a1612] border-emerald-500/40 shadow-lg shadow-emerald-950/20'
+                        : 'bg-[#0c1017] border-slate-800 hover:border-slate-700 shadow-md'
+                    }`}
+                  >
+                    {/* Header Card */}
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 ${
+                            isGanado 
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                              : stageObj.badge
+                          }`}>
+                            {isGanado ? '👑 Cliente Ganado' : stageObj.label}
+                          </span>
+
+                          <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                            {lead.pais === 'SV' ? '🇸🇻 SV' : '🇩🇴 DO'}
+                          </span>
+
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800/80 text-slate-400 font-mono">
+                            {isScrapper ? '📥 Scrapper' : '✍️ Manual'}
+                          </span>
+                        </div>
+
+                        <div className="text-right">
+                          <div className={`text-base font-black font-mono ${isGanado ? 'text-emerald-400' : 'text-orange-400'}`}>
+                            ${Number(lead.presupuestoMonto || lead.valorEstimado || 0).toLocaleString()} <span className="text-[10px] font-normal text-slate-400">USD</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Info Empresa */}
+                      <div>
+                        <h4 className="font-bold text-white text-base leading-snug truncate" title={lead.empresa}>
+                          {lead.empresa}
+                        </h4>
+
+                        <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          {lead.sinWeb || lead.origenMaps || lead.dominio?.startsWith('maps-') ? (
+                            <span className="text-[11px] bg-amber-500/10 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30 flex items-center gap-1 font-medium">
+                              <MapPin className="w-3 h-3 text-amber-400" />
+                              <span>Google Maps {lead.resenas ? `· ${lead.resenas} reseñas (${lead.calificacion || 4.8}★)` : '· Sin Web'}</span>
+                            </span>
+                          ) : lead.dominio ? (
+                            <a
+                              href={`https://${lead.dominio}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-slate-400 hover:text-orange-400 flex items-center gap-1 truncate font-mono text-[11px]"
+                            >
+                              <Globe className="w-3 h-3 shrink-0" />
+                              <span className="truncate">{lead.dominio}</span>
+                              <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                            </a>
+                          ) : (
+                            <span className="text-slate-600 text-[11px] italic">Sin dominio registrado</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Contacto & Decisor */}
+                      <div className="p-3 rounded-xl bg-[#121826]/70 border border-slate-800/80 space-y-1.5 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-slate-200 flex items-center gap-1.5 truncate">
+                            <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate">{lead.contacto || 'Contacto Principal'}</span>
+                          </span>
+                          <span className="text-[11px] text-slate-500 shrink-0">{lead.cargo || 'Dirección'}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60 font-mono text-[11px]">
+                          {cleanPhone ? (
+                            <a
+                              href={`https://wa.me/${cleanPhone}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 hover:underline truncate"
+                              title="Chatear en WhatsApp"
+                            >
+                              <Phone className="w-3 h-3 shrink-0" />
+                              <span>{lead.telefono}</span>
+                            </a>
+                          ) : (
+                            <span className="text-slate-600 italic">Sin teléfono</span>
+                          )}
+
+                          {lead.email ? (
+                            <a
+                              href={`mailto:${lead.email}`}
+                              className="text-slate-400 hover:text-sky-400 flex items-center gap-1 hover:underline truncate"
+                              title={lead.email}
+                            >
+                              <Mail className="w-3 h-3 shrink-0" />
+                              <span className="truncate max-w-[120px]">{lead.email}</span>
+                            </a>
+                          ) : (
+                            <span className="text-slate-600 italic">Sin email</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Selector Rápido de Etapa */}
+                      <div className="flex items-center justify-between gap-2 text-xs pt-1">
+                        <span className="text-slate-500 font-mono text-[10px]">Etapa Comercial:</span>
+                        <select
+                          value={lead.etapa}
+                          onChange={(e) => handleStageChange(lead.id, e.target.value)}
+                          className={`text-xs rounded-lg px-2 py-1 font-semibold border cursor-pointer ${
+                            lead.etapa === 'ganado'
+                              ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/50'
+                              : 'bg-[#131926] text-slate-200 border-slate-700'
+                          }`}
+                        >
+                          {PIPELINE_STAGES.map(s => (
+                            <option key={s.id} value={s.id}>{s.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Footer Actions: Integración 360° con el flujo de la agencia */}
+                    <div className="space-y-2 pt-3 border-t border-slate-800/80">
+                      <button
+                        onClick={() => setActiveLeadModal(lead)}
+                        className="w-full py-2 px-3 rounded-xl bg-orange-600/15 hover:bg-orange-600/25 text-orange-400 border border-orange-500/30 hover:border-orange-500/60 font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>📇 Ver Ficha Completa 360°</span>
+                      </button>
+
+                      <div className="grid grid-cols-5 gap-1.5">
+                        <button
+                          onClick={() => onConvertToPresupuesto && onConvertToPresupuesto(lead)}
+                          className="p-1.5 rounded-lg bg-[#131926] hover:bg-orange-600/20 text-slate-300 hover:text-orange-400 border border-slate-800 hover:border-orange-500/40 text-[11px] font-medium flex flex-col items-center justify-center gap-0.5 transition-colors"
+                          title="Fase 3: Crear Presupuesto VIP"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-amber-400" />
+                          <span className="text-[9px] uppercase font-mono">Cotizar</span>
+                        </button>
+
+                        <button
+                          onClick={() => onOpenContrato && onOpenContrato(lead)}
+                          className="p-1.5 rounded-lg bg-[#131926] hover:bg-emerald-600/20 text-slate-300 hover:text-emerald-400 border border-slate-800 hover:border-emerald-500/40 text-[11px] font-medium flex flex-col items-center justify-center gap-0.5 transition-colors"
+                          title="Fase 3: Contrato SOW & Firma"
+                        >
+                          <Briefcase className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-[9px] uppercase font-mono">SOW</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            if (onOpenPrd) onOpenPrd(lead);
+                          }}
+                          className="p-1.5 rounded-lg bg-[#131926] hover:bg-indigo-600/20 text-slate-300 hover:text-indigo-400 border border-slate-800 hover:border-indigo-500/40 text-[11px] font-medium flex flex-col items-center justify-center gap-0.5 transition-colors"
+                          title="Fase 4: Centro de Desarrollo & PRD Técnico"
+                        >
+                          <Zap className="w-3.5 h-3.5 text-indigo-400" />
+                          <span className="text-[9px] uppercase font-mono">PRD</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setSelectedWaLeadId(lead.id);
+                            setActiveTab('whatsapp_crm');
+                          }}
+                          className="p-1.5 rounded-lg bg-[#131926] hover:bg-emerald-600/20 text-slate-300 hover:text-emerald-400 border border-slate-800 hover:border-emerald-500/40 text-[11px] font-medium flex flex-col items-center justify-center gap-0.5 transition-colors"
+                          title="Fase 2: Abrir en WhatsApp CRM"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-[9px] uppercase font-mono">Chat</span>
+                        </button>
+
+                        <button
+                          onClick={(e) => handleDeleteLead(lead.id, lead.empresa, e)}
+                          className="p-1.5 rounded-lg bg-[#131926] hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-500/40 text-[11px] font-medium flex flex-col items-center justify-center gap-0.5 transition-colors"
+                          title="Eliminar Lead"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                          <span className="text-[9px] uppercase font-mono">Borrar</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -2231,140 +2813,357 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
         </div>
       )}
 
-      {/* MODAL: LEAD DETAILS & INTERACTION TIMELINE */}
+      {/* MODAL: FICHA COMPLETA DE CLIENTE 360° & ACCIONES DEL FLUJO */}
       {activeLeadModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0e1320] border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+          <div className="bg-[#0e1320] border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
             
             {/* Modal Header */}
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-base text-white">{activeLeadModal.empresa}</h3>
-                <p className="text-xs text-slate-400">
-                  {activeLeadModal.contacto} ({activeLeadModal.cargo}) · {activeLeadModal.pais === 'SV' ? '🇸🇻 El Salvador' : '🇩🇴 República Dominicana'}
-                </p>
-              </div>
-              <button
-                onClick={() => setActiveLeadModal(null)}
-                className="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-5 overflow-y-auto space-y-6 flex-1">
-              
-              {/* Quick Status Bar */}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-[#131926] border border-slate-800 text-xs">
+            <div className="p-5 border-b border-slate-800 bg-[#121826] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg ${
+                  activeLeadModal.etapa === 'ganado'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                    : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+                }`}>
+                  {activeLeadModal.etapa === 'ganado' ? '👑' : <Building2 className="w-5 h-5" />}
+                </div>
                 <div>
-                  <span className="text-slate-400">Etapa Actual: </span>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-lg text-white leading-tight">{activeLeadModal.empresa}</h3>
+                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                      {activeLeadModal.pais === 'SV' ? '🇸🇻 El Salvador' : '🇩🇴 República Dominicana'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Decisor: <span className="text-slate-200 font-semibold">{activeLeadModal.contacto || 'Contacto Principal'}</span> ({activeLeadModal.cargo || 'Dirección'}) · Fuente: <span className="text-sky-400">{activeLeadModal.fuente || 'Manual'}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 bg-[#090d15] px-3 py-1.5 rounded-xl border border-slate-700/80">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase">Etapa:</span>
                   <select
                     value={activeLeadModal.etapa}
                     onChange={(e) => handleStageChange(activeLeadModal.id, e.target.value)}
-                    className="bg-[#1b2336] text-orange-400 font-semibold rounded px-2 py-0.5 border border-slate-700 ml-1"
+                    className={`text-xs font-bold rounded-lg px-2 py-1 border cursor-pointer ${
+                      activeLeadModal.etapa === 'ganado'
+                        ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/60'
+                        : 'bg-[#131926] text-orange-400 border-slate-700'
+                    }`}
                   >
                     {PIPELINE_STAGES.map(s => (
                       <option key={s.id} value={s.id}>{s.label}</option>
                     ))}
                   </select>
                 </div>
-                <div>
-                  <span className="text-slate-400">Valor Estimado: </span>
-                  <span className="font-mono font-bold text-white">${Number(activeLeadModal.valorEstimado).toLocaleString()} USD</span>
-                </div>
-              </div>
-
-              {/* Form to Add New Interaction */}
-              <form onSubmit={handleAddInteraction} className="p-4 rounded-xl bg-[#131926] border border-slate-800 space-y-3">
-                <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                  <Plus className="w-3.5 h-3.5 text-orange-400" />
-                  <span>Registrar Nueva Actividad / Interacción</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    value={interactionForm.tipo}
-                    onChange={(e) => setInteractionForm({ ...interactionForm, tipo: e.target.value })}
-                    className="bg-[#0c1017] border border-slate-700 rounded-lg p-2 text-xs text-slate-200"
-                  >
-                    <option value="whatsapp">💬 Mensaje WhatsApp</option>
-                    <option value="llamada">📞 Llamada Telefónica</option>
-                    <option value="reunion">🤝 Videollamada / Reunión</option>
-                    <option value="email">✉️ Correo Electrónico</option>
-                    <option value="nota">📝 Nota Interna</option>
-                  </select>
-
-                  <input
-                    type="text"
-                    placeholder="Título breve (ej: Feedback propuesta)"
-                    value={interactionForm.titulo}
-                    onChange={(e) => setInteractionForm({ ...interactionForm, titulo: e.target.value })}
-                    className="bg-[#0c1017] border border-slate-700 rounded-lg p-2 text-xs text-slate-200"
-                    required
-                  />
-                </div>
-
-                <textarea
-                  placeholder="Detalles de la conversación, acuerdos alcanzados o preguntas del prospecto..."
-                  value={interactionForm.detalle}
-                  onChange={(e) => setInteractionForm({ ...interactionForm, detalle: e.target.value })}
-                  rows={2}
-                  className="w-full bg-[#0c1017] border border-slate-700 rounded-lg p-2 text-xs text-slate-200"
-                ></textarea>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    placeholder="Próximo paso (ej: Llamar para confirmar firma)"
-                    value={interactionForm.proximoPaso}
-                    onChange={(e) => setInteractionForm({ ...interactionForm, proximoPaso: e.target.value })}
-                    className="bg-[#0c1017] border border-slate-700 rounded-lg p-2 text-xs text-slate-200"
-                  />
-                  <input
-                    type="date"
-                    value={interactionForm.fechaProximoPaso}
-                    onChange={(e) => setInteractionForm({ ...interactionForm, fechaProximoPaso: e.target.value })}
-                    className="bg-[#0c1017] border border-slate-700 rounded-lg p-2 text-xs text-slate-200"
-                  />
-                </div>
 
                 <button
-                  type="submit"
-                  className="w-full py-2 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs transition-colors shadow-sm"
+                  onClick={() => setActiveLeadModal(null)}
+                  className="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
                 >
-                  Guardar en Bitácora
+                  <X className="w-4 h-4" />
                 </button>
-              </form>
+              </div>
+            </div>
 
-              {/* Interactions Timeline */}
-              <div className="space-y-3">
-                <div className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">
-                  Historial Cronológico de Interacciones ({activeLeadModal.interacciones?.length || 0})
-                </div>
+            {/* Quick KPI Strip */}
+            <div className="grid grid-cols-4 border-b border-slate-800/80 bg-[#0a0e17] text-xs px-5 py-2.5">
+              <div>
+                <span className="text-slate-500 font-mono text-[10px] block uppercase">Monto Acordado / Estimado</span>
+                <span className="font-mono font-black text-sm text-emerald-400">${Number(activeLeadModal.presupuestoMonto || activeLeadModal.valorEstimado || 0).toLocaleString()} USD</span>
+              </div>
+              <div>
+                <span className="text-slate-500 font-mono text-[10px] block uppercase">Probabilidad de Cierre</span>
+                <span className="font-mono font-bold text-sm text-sky-400">{activeLeadModal.etapa === 'ganado' ? '100%' : `${activeLeadModal.probabilidad || 35}%`}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 font-mono text-[10px] block uppercase">Fecha de Registro</span>
+                <span className="font-mono text-slate-300 text-xs">{activeLeadModal.creadoEn || 'Reciente'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 font-mono text-[10px] block uppercase">Bitácora Activa</span>
+                <span className="font-mono text-orange-400 text-xs font-bold">{activeLeadModal.interacciones?.length || 0} registros</span>
+              </div>
+            </div>
 
-                <div className="space-y-2.5">
-                  {activeLeadModal.interacciones?.map((item, idx) => (
-                    <div key={item.id || idx} className="p-3 rounded-xl bg-[#131926] border border-slate-800 text-xs space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-200 flex items-center gap-1.5">
-                          {item.tipo === 'whatsapp' ? '💬 WhatsApp' :
-                           item.tipo === 'llamada' ? '📞 Llamada' :
-                           item.tipo === 'reunion' ? '🤝 Reunión' :
-                           item.tipo === 'email' ? '✉️ Email' : '📝 Nota'}: {item.titulo}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-500">{item.fecha}</span>
-                      </div>
-                      <p className="text-slate-300 leading-relaxed text-[11px]">{item.detalle}</p>
-                      {item.proximoPaso && (
-                        <div className="pt-1 border-t border-slate-800/80 text-[10px] text-orange-400 flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          <span>Próximo paso: {item.proximoPaso} {item.fechaProximoPaso ? `(${item.fechaProximoPaso})` : ''}</span>
-                        </div>
+            {/* Modal Content: 2 Columnas 360° */}
+            <div className="p-5 overflow-y-auto space-y-6 flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 bg-[#0c1017]">
+              
+              {/* COLUMNA 1: EXPEDIENTE, ACCIONES DEL FLUJO Y PORTAL */}
+              <div className="space-y-4">
+                
+                {/* 1. Datos de Contacto Directo */}
+                <div className="p-4 rounded-xl bg-[#121826] border border-slate-800 space-y-2.5">
+                  <div className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Datos de Contacto & Canales</span>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-[#0c1017] border border-slate-800/60">
+                      <span className="text-slate-400 font-medium">WhatsApp / Teléfono:</span>
+                      {activeLeadModal.telefono ? (
+                        <a
+                          href={`https://wa.me/${(activeLeadModal.whatsappData?.telefono || activeLeadModal.telefono || '').replace(/[^\d]/g, '')}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-mono font-bold text-emerald-400 hover:underline flex items-center gap-1"
+                        >
+                          <Phone className="w-3 h-3" />
+                          <span>{activeLeadModal.telefono}</span>
+                        </a>
+                      ) : (
+                        <span className="text-slate-500 italic">No registrado</span>
                       )}
                     </div>
-                  ))}
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-[#0c1017] border border-slate-800/60">
+                      <span className="text-slate-400 font-medium">Correo Electrónico:</span>
+                      {activeLeadModal.email ? (
+                        <a
+                          href={`mailto:${activeLeadModal.email}`}
+                          className="font-mono text-sky-400 hover:underline flex items-center gap-1 truncate max-w-[200px]"
+                        >
+                          <Mail className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{activeLeadModal.email}</span>
+                        </a>
+                      ) : (
+                        <span className="text-slate-500 italic">No registrado</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-[#0c1017] border border-slate-800/60">
+                      <span className="text-slate-400 font-medium">Sitio Web / Presencia:</span>
+                      {activeLeadModal.sinWeb || activeLeadModal.origenMaps || activeLeadModal.dominio?.startsWith('maps-') ? (
+                        <span className="text-amber-400 font-mono text-[11px] flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          <span>Google Maps (Sin Web)</span>
+                        </span>
+                      ) : activeLeadModal.dominio ? (
+                        <a
+                          href={`https://${activeLeadModal.dominio}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-mono text-slate-300 hover:text-orange-400 flex items-center gap-1 hover:underline"
+                        >
+                          <Globe className="w-3 h-3" />
+                          <span>{activeLeadModal.dominio}</span>
+                        </a>
+                      ) : (
+                        <span className="text-slate-500 italic">Sin sitio web</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
+
+                {/* 2. Conexiones Directas del Flujo Goglite Suite */}
+                <div className="p-4 rounded-xl bg-[#121826] border border-slate-800 space-y-2.5">
+                  <div className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Conexiones del Flujo Goglite Suite</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        if (onConvertToPresupuesto) onConvertToPresupuesto(activeLeadModal);
+                        setActiveLeadModal(null);
+                      }}
+                      className="p-2.5 rounded-xl bg-[#0c1017] hover:bg-orange-500/20 border border-slate-800 hover:border-orange-500/40 text-left transition-all group"
+                    >
+                      <div className="text-amber-400 font-bold text-xs flex items-center gap-1.5 group-hover:translate-x-0.5 transition-transform">
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Presupuesto VIP</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">Generar propuesta StoryBrand en Fase 3</p>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (onOpenContrato) onOpenContrato(activeLeadModal);
+                        setActiveLeadModal(null);
+                      }}
+                      className="p-2.5 rounded-xl bg-[#0c1017] hover:bg-emerald-500/20 border border-slate-800 hover:border-emerald-500/40 text-left transition-all group"
+                    >
+                      <div className="text-emerald-400 font-bold text-xs flex items-center gap-1.5 group-hover:translate-x-0.5 transition-transform">
+                        <Briefcase className="w-3.5 h-3.5" />
+                        <span>Contrato SOW</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">Formalizar acuerdo legal y onboarding</p>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (onOpenPrd) onOpenPrd(activeLeadModal);
+                        setActiveLeadModal(null);
+                      }}
+                      className="p-2.5 rounded-xl bg-[#0c1017] hover:bg-indigo-500/20 border border-slate-800 hover:border-indigo-500/40 text-left transition-all group"
+                    >
+                      <div className="text-indigo-400 font-bold text-xs flex items-center gap-1.5 group-hover:translate-x-0.5 transition-transform">
+                        <Zap className="w-3.5 h-3.5" />
+                        <span>Centro de Desarrollo</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">PRD técnico, kanban y horas en Fase 4</p>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setSelectedWaLeadId(activeLeadModal.id);
+                        setActiveTab('whatsapp_crm');
+                        setActiveLeadModal(null);
+                      }}
+                      className="p-2.5 rounded-xl bg-[#0c1017] hover:bg-emerald-500/20 border border-slate-800 hover:border-emerald-500/40 text-left transition-all group"
+                    >
+                      <div className="text-emerald-400 font-bold text-xs flex items-center gap-1.5 group-hover:translate-x-0.5 transition-transform">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>WhatsApp CRM</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">Abrir chat en vivo con guiones persuasivos</p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Portal de Cliente Exclusivo */}
+                <div className="p-4 rounded-xl bg-[#121826] border border-slate-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Portal Privado de Cliente</span>
+                    </span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-mono">
+                      Token Activo
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-[#0c1017] border border-slate-800 flex items-center justify-between gap-2 text-xs">
+                    <span className="font-mono text-slate-300 truncate text-[11px]">
+                      {`${window.location.origin}/portal/${activeLeadModal.portalToken || 'portal-' + activeLeadModal.id}`}
+                    </span>
+                    <button
+                      onClick={() => handleCopyPortalLink(activeLeadModal.portalToken || 'portal-' + activeLeadModal.id)}
+                      className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1 shrink-0 transition-colors"
+                    >
+                      {portalCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{portalCopied ? '¡Copiado!' : 'Copiar'}</span>
+                    </button>
+                  </div>
+
+                  <a
+                    href={`/portal/${activeLeadModal.portalToken || 'portal-' + activeLeadModal.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Abrir Vista Previa del Portal de Cliente</span>
+                  </a>
+                </div>
+
+              </div>
+
+              {/* COLUMNA 2: BITÁCORA DE INTERACCIONES & REGISTRO */}
+              <div className="space-y-4">
+                
+                {/* Form to Add New Interaction */}
+                <form onSubmit={handleAddInteraction} className="p-4 rounded-xl bg-[#121826] border border-slate-800 space-y-3">
+                  <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Plus className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Registrar Nueva Actividad / Interacción</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={interactionForm.tipo}
+                      onChange={(e) => setInteractionForm({ ...interactionForm, tipo: e.target.value })}
+                      className="bg-[#0c1017] border border-slate-700 rounded-lg p-2 text-xs text-slate-200"
+                    >
+                      <option value="whatsapp">💬 Mensaje WhatsApp</option>
+                      <option value="llamada">📞 Llamada Telefónica</option>
+                      <option value="reunion">🤝 Videollamada / Reunión</option>
+                      <option value="email">✉️ Correo Electrónico</option>
+                      <option value="nota">📝 Nota Interna</option>
+                    </select>
+
+                    <input
+                      type="text"
+                      placeholder="Título breve (ej: Feedback propuesta)"
+                      value={interactionForm.titulo}
+                      onChange={(e) => setInteractionForm({ ...interactionForm, titulo: e.target.value })}
+                      className="bg-[#0c1017] border border-slate-700 rounded-lg p-2 text-xs text-slate-200"
+                      required
+                    />
+                  </div>
+
+                  <textarea
+                    placeholder="Detalles de la conversación, acuerdos alcanzados o preguntas del cliente..."
+                    value={interactionForm.detalle}
+                    onChange={(e) => setInteractionForm({ ...interactionForm, detalle: e.target.value })}
+                    rows={2}
+                    className="w-full bg-[#0c1017] border border-slate-700 rounded-lg p-2 text-xs text-slate-200"
+                  ></textarea>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Próximo paso (ej: Enviar contrato)"
+                      value={interactionForm.proximoPaso}
+                      onChange={(e) => setInteractionForm({ ...interactionForm, proximoPaso: e.target.value })}
+                      className="bg-[#0c1017] border border-slate-700 rounded-lg p-2 text-xs text-slate-200"
+                    />
+                    <input
+                      type="date"
+                      value={interactionForm.fechaProximoPaso}
+                      onChange={(e) => setInteractionForm({ ...interactionForm, fechaProximoPaso: e.target.value })}
+                      className="bg-[#0c1017] border border-slate-700 rounded-lg p-2 text-xs text-slate-200"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs transition-colors shadow-sm"
+                  >
+                    Guardar en Bitácora
+                  </button>
+                </form>
+
+                {/* Interactions Timeline */}
+                <div className="space-y-3">
+                  <div className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center justify-between">
+                    <span>Historial Cronológico ({activeLeadModal.interacciones?.length || 0})</span>
+                  </div>
+
+                  <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
+                    {(!activeLeadModal.interacciones || activeLeadModal.interacciones.length === 0) ? (
+                      <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 text-center text-xs text-slate-500">
+                        No hay interacciones registradas aún.
+                      </div>
+                    ) : (
+                      activeLeadModal.interacciones.map((item, idx) => (
+                        <div key={item.id || idx} className="p-3 rounded-xl bg-[#121826] border border-slate-800 text-xs space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                              {item.tipo === 'whatsapp' ? '💬 WhatsApp' :
+                               item.tipo === 'llamada' ? '📞 Llamada' :
+                               item.tipo === 'reunion' ? '🤝 Reunión' :
+                               item.tipo === 'email' ? '✉️ Email' : '📝 Nota'}: {item.titulo}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-500">{item.fecha}</span>
+                          </div>
+                          <p className="text-slate-300 leading-relaxed text-[11px]">{item.detalle}</p>
+                          {item.proximoPaso && (
+                            <div className="pt-1 border-t border-slate-800/80 text-[10px] text-orange-400 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              <span>Próximo paso: {item.proximoPaso} {item.fechaProximoPaso ? `(${item.fechaProximoPaso})` : ''}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
               </div>
 
             </div>
@@ -2372,36 +3171,41 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
         </div>
       )}
 
-      {/* MODAL: CREATE NEW LEAD */}
+      {/* MODAL: REGISTRAR CLIENTE / FICHA MANUAL */}
       {createLeadModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0e1320] border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <Plus className="w-4 h-4 text-orange-400" />
-                <span>Crear Nuevo Lead en Pipeline</span>
-              </h3>
-              <button onClick={() => setCreateLeadModalOpen(false)} className="text-slate-400 hover:text-white">
+            <div className="p-5 border-b border-slate-800 bg-[#121826] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-white">Registrar Ficha de Cliente Manual</h3>
+                  <p className="text-[11px] text-slate-400">Añade prospectos o clientes cerrados a la Base de Datos</p>
+                </div>
+              </div>
+              <button onClick={() => setCreateLeadModalOpen(false)} className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateLead} className="p-5 space-y-3 text-xs">
+            <form onSubmit={handleCreateLead} className="p-5 space-y-3.5 text-xs">
               <div>
-                <label className="text-slate-400 block mb-1">Nombre de la Empresa</label>
+                <label className="text-slate-400 block mb-1 font-medium">Nombre de la Empresa / Razón Social *</label>
                 <input
                   type="text"
                   required
                   value={newLeadForm.empresa}
                   onChange={(e) => setNewLeadForm({ ...newLeadForm, empresa: e.target.value })}
                   placeholder="ej: Clínica Dental San Salvador"
-                  className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                  className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-orange-500"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="text-slate-400 block mb-1">Nombre del Contacto</label>
+                  <label className="text-slate-400 block mb-1 font-medium">Contacto / Decisor</label>
                   <input
                     type="text"
                     value={newLeadForm.contacto}
@@ -2411,20 +3215,20 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1">Cargo</label>
+                  <label className="text-slate-400 block mb-1 font-medium">Cargo</label>
                   <input
                     type="text"
                     value={newLeadForm.cargo}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, cargo: e.target.value })}
-                    placeholder="ej: Director Médico"
+                    placeholder="ej: Propietario / Director"
                     className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="text-slate-400 block mb-1">País</label>
+                  <label className="text-slate-400 block mb-1 font-medium">País</label>
                   <select
                     value={newLeadForm.pais}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, pais: e.target.value })}
@@ -2435,29 +3239,35 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                   </select>
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1">Valor Estimado ($ USD)</label>
-                  <input
-                    type="number"
-                    value={newLeadForm.valorEstimado}
-                    onChange={(e) => setNewLeadForm({ ...newLeadForm, valorEstimado: Number(e.target.value) })}
-                    className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
-                  />
+                  <label className="text-slate-400 block mb-1 font-medium">Etapa Inicial</label>
+                  <select
+                    value={newLeadForm.etapa}
+                    onChange={(e) => setNewLeadForm({ ...newLeadForm, etapa: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-orange-400 font-semibold"
+                  >
+                    <option value="nuevo">Nuevo Lead</option>
+                    <option value="contactado">Contactado</option>
+                    <option value="reunion">Reunión / Demo</option>
+                    <option value="propuesta_enviada">Propuesta Enviada</option>
+                    <option value="negociacion">En Negociación</option>
+                    <option value="ganado">👑 Cerrado Ganado (Cliente Oficial)</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="text-slate-400 block mb-1">Teléfono / WhatsApp</label>
+                  <label className="text-slate-400 block mb-1 font-medium">Teléfono / WhatsApp</label>
                   <input
                     type="text"
                     value={newLeadForm.telefono}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, telefono: e.target.value })}
-                    placeholder="+503 7000 0000"
+                    placeholder="+503 7000 0000 o +1 809..."
                     className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1">Correo Electrónico</label>
+                  <label className="text-slate-400 block mb-1 font-medium">Correo Electrónico</label>
                   <input
                     type="email"
                     value={newLeadForm.email}
@@ -2468,13 +3278,202 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-slate-400 block mb-1 font-medium">Sitio Web / Dominio</label>
+                  <input
+                    type="text"
+                    value={newLeadForm.dominio}
+                    onChange={(e) => setNewLeadForm({ ...newLeadForm, dominio: e.target.value })}
+                    placeholder="ej: clinicadental.com"
+                    className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1 font-medium">Valor Estimado ($ USD)</label>
+                  <input
+                    type="number"
+                    value={newLeadForm.valorEstimado}
+                    onChange={(e) => setNewLeadForm({ ...newLeadForm, valorEstimado: Number(e.target.value) })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1 font-medium">Notas Iniciales / Diagnóstico</label>
+                <textarea
+                  rows={2}
+                  value={newLeadForm.notasIniciales}
+                  onChange={(e) => setNewLeadForm({ ...newLeadForm, notasIniciales: e.target.value })}
+                  placeholder="Dolores detectados, requerimientos, alcance o notas de la reunión..."
+                  className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
+                />
+              </div>
+
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs mt-3 shadow-md"
+                className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs mt-2 shadow-lg shadow-orange-950 transition-all flex items-center justify-center gap-2"
               >
-                Crear Lead en CRM
+                <Plus className="w-4 h-4" />
+                <span>Guardar Ficha en Base de Datos</span>
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: IMPORTAR LEADS DESDE SCRAPPER (FASE 1) */}
+      {isImportScrapperModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0e1320] border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-slate-800 bg-[#121826] flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold">
+                  <Download className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                    <span>Importar Prospectos desde el Lead Scrapper (Fase 1)</span>
+                    <span className="text-[11px] bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-full font-mono border border-sky-500/30">
+                      {scrapperLeadsList.length} disponibles
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Transforma los prospectos scrapeados en fichas completas de clientes en el CRM
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsImportScrapperModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-4 flex-1">
+              {scrapperLeadsList.length === 0 ? (
+                <div className="p-8 text-center bg-[#0c1017] rounded-xl border border-slate-800 space-y-2">
+                  <p className="text-xs text-slate-400">
+                    No hay prospectos almacenados en el Lead Scrapper todavía.
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Ve a la <strong>Fase 1: Motor Outbound & Scrapper</strong> para prospectar negocios en Google Maps o SERP y capturar leads.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between text-xs pb-1 border-b border-slate-800">
+                    <span className="text-slate-400 font-mono">
+                      Seleccionados: <strong className="text-sky-400">{selectedScrapperIds.size}</strong> de {scrapperLeadsList.length}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleSelectAllScrapper(true)}
+                        className="text-[11px] text-sky-400 hover:underline font-medium"
+                      >
+                        Seleccionar Nuevos
+                      </button>
+                      <span className="text-slate-600">|</span>
+                      <button
+                        onClick={() => handleSelectAllScrapper(false)}
+                        className="text-[11px] text-slate-400 hover:underline font-medium"
+                      >
+                        Deseleccionar
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                    {scrapperLeadsList.map(sl => {
+                      const cleanP = (sl.telefono || '').replace(/\D/g, '');
+                      const cleanN = (sl.nombreEmpresa || sl.dominio || '').toLowerCase().trim();
+                      const alreadyInCrm = leads.some(l => 
+                        (l.telefono && cleanP && (l.telefono || '').replace(/\D/g, '') === cleanP) ||
+                        (l.empresa && cleanN && (l.empresa || '').toLowerCase().trim() === cleanN)
+                      );
+                      const isChecked = selectedScrapperIds.has(sl.id);
+
+                      return (
+                        <div
+                          key={sl.id}
+                          onClick={() => {
+                            if (!alreadyInCrm) handleToggleSelectScrapper(sl.id);
+                          }}
+                          className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                            alreadyInCrm
+                              ? 'bg-[#090d15] border-slate-800/50 opacity-60 cursor-not-allowed'
+                              : isChecked
+                              ? 'bg-sky-950/20 border-sky-500/50 cursor-pointer shadow-sm'
+                              : 'bg-[#0c1017] border-slate-800 hover:border-slate-700 cursor-pointer'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              disabled={alreadyInCrm}
+                              onChange={() => handleToggleSelectScrapper(sl.id)}
+                              className="rounded border-slate-700 text-sky-600 focus:ring-0 cursor-pointer"
+                            />
+                            <div className="min-w-0">
+                              <div className="font-bold text-xs text-white truncate flex items-center gap-1.5">
+                                <span>{sl.nombreEmpresa || sl.dominio}</span>
+                                <span className="text-[10px] font-mono px-1 rounded bg-slate-800 text-slate-400">
+                                  {sl.pais === 'DO' ? '🇩🇴' : '🇸🇻'}
+                                </span>
+                                {alreadyInCrm && (
+                                  <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-sans font-medium border border-emerald-500/30">
+                                    Ya en CRM
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-400 truncate mt-0.5 flex items-center gap-2">
+                                <span>{sl.responsable || 'Dirección'}</span>
+                                {sl.telefono && <span className="text-emerald-400 font-mono">{sl.telefono}</span>}
+                                {sl.sinWeb && (
+                                  <span className="text-amber-400 text-[10px] flex items-center gap-0.5">
+                                    <MapPin className="w-2.5 h-2.5" />
+                                    <span>Google Maps</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className="text-[11px] font-mono font-bold text-orange-400">
+                              {sl.estado === 'cliente' ? 'Cliente' : 'Prospecto'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="p-4 bg-[#121826] border-t border-slate-800 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setIsImportScrapperModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExecuteImportFromScrapper}
+                disabled={selectedScrapperIds.size === 0}
+                className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-sky-950 transition-all"
+              >
+                <Download className="w-4 h-4" />
+                <span>Importar {selectedScrapperIds.size} Prospectos al CRM</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

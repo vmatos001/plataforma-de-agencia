@@ -4,13 +4,23 @@ import { getSettings } from './storage.js';
  * Searches Google for a query, prioritizing positions 4-20
  * Supports Serper API when key is configured, or realistic localized simulation/scraping
  */
+const MASTER_SERPER_KEY = 'baf795126893267f72efe62337f625075df6693a';
+
+function getValidKey(key) {
+  if (key && typeof key === 'string' && key.trim().length > 20 && !key.includes('active') && !key.includes('mock')) {
+    return key.trim();
+  }
+  return process.env.SERPER_API_KEY || MASTER_SERPER_KEY;
+}
+
 export async function searchGoogleSERP(query, country = 'SV') {
   const settings = getSettings();
-  const serperKey = process.env.SERPER_API_KEY || settings.serperApiKey;
+  const serperKey = getValidKey(settings.serperApiKey);
 
   // Country gl mapping
   const gl = country.toLowerCase() === 'do' ? 'do' : (country.toLowerCase() === 'sv' ? 'sv' : 'us');
   const hl = 'es';
+
 
   if (serperKey && serperKey.trim()) {
     try {
@@ -120,7 +130,7 @@ function slugify(text) {
  */
 export async function searchGooglePlaces(query, country = 'SV') {
   const settings = getSettings();
-  const serperKey = process.env.SERPER_API_KEY || settings.serperApiKey;
+  const serperKey = getValidKey(settings.serperApiKey);
   const gl = country.toLowerCase() === 'do' ? 'do' : (country.toLowerCase() === 'sv' ? 'sv' : 'us');
   const hl = 'es';
 

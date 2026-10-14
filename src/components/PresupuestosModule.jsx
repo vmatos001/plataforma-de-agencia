@@ -129,8 +129,13 @@ export default function PresupuestosModule({
   const [savedNotification, setSavedNotification] = useState(false);
 
   const getBackendEndpoint = (endpoint) => {
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      return `http://localhost:3001${endpoint}`;
+    if (typeof window !== 'undefined') {
+      if (window.location.protocol === 'https:') {
+        return endpoint;
+      }
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        return `http://localhost:3001${endpoint}`;
+      }
     }
     return endpoint;
   };

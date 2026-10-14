@@ -191,3 +191,89 @@ export function updateCmsSiteContent(slug, newContent) {
   saveCmsSites(sites);
   return sites[idx];
 }
+
+export function createCmsSite(siteData) {
+  const sites = getCmsSites();
+  const baseSlug = (siteData.slug || siteData.nombre || 'sitio-cliente')
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  
+  let finalSlug = baseSlug || 'sitio-' + Date.now();
+  let counter = 1;
+  while (sites.some(s => s.slug === finalSlug)) {
+    finalSlug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+
+  const newSite = {
+    id: 'cms-' + Date.now(),
+    slug: finalSlug,
+    nombre: siteData.nombre || 'Nuevo Sitio Cliente',
+    pais: siteData.pais || 'SV',
+    dominio: siteData.dominio || `${finalSlug}.com`,
+    estado: 'publicado',
+    ultimaActualizacion: new Date().toISOString().split('T')[0],
+    contenido: siteData.contenido || {
+      branding: {
+        nombreMarca: siteData.nombre || 'Marca del Cliente',
+        slogan: 'Soluciones Profesionales Garantizadas',
+        colorPrimario: '#FF6B00',
+        telefonoWhatsApp: siteData.telefono || '+1 (829) 986-2000',
+        ciudadPrincipal: siteData.pais === 'DO' ? 'Santo Domingo / Santiago' : 'San Salvador / Santa Tecla'
+      },
+      hero: {
+        badge: '⚡ Servicio Garantizado 24/7',
+        titulo: `La Solución Integral y Confiable para ${siteData.nombre || 'tu Negocio'}`,
+        subtitulo: 'Atención personalizada, cotizaciones sin compromiso y respuesta inmediata por WhatsApp.',
+        botonTexto: 'Contactar por WhatsApp',
+        botonSubtexto: 'Respuesta en menos de 15 minutos'
+      },
+      servicios: [
+        {
+          id: 's-1',
+          titulo: 'Servicio Principal',
+          descripcion: 'Solución directa diseñada a la medida con entrega garantizada.',
+          precio: 'Desde $50 USD'
+        },
+        {
+          id: 's-2',
+          titulo: 'Asesoría Especializada',
+          descripcion: 'Diagnóstico express y acompañamiento profesional para tu caso.',
+          precio: 'Sin costo inicial'
+        }
+      ],
+      testimonios: [
+        {
+          id: 't-1',
+          cliente: 'Cliente Satisfecho',
+          comentario: 'Excelente servicio, muy recomendado por su rapidez y profesionalismo.',
+          estrellas: 5
+        }
+      ],
+      faqs: [
+        {
+          pregunta: '¿Cómo puedo agendar un servicio?',
+          respuesta: 'Puedes escribirnos directamente a nuestro botón de WhatsApp oficial en cualquier momento.'
+        }
+      ]
+    }
+  };
+
+  sites.push(newSite);
+  saveCmsSites(sites);
+  return newSite;
+}
+
+export function deleteCmsSite(slug) {
+  let sites = getCmsSites();
+  const initialLen = sites.length;
+  sites = sites.filter(s => s.slug !== slug);
+  if (sites.length < initialLen) {
+    saveCmsSites(sites);
+    return true;
+  }
+  return false;
+}

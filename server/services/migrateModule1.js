@@ -51,3 +51,16 @@ export async function migrateLeadsToNeon() {
   console.log(`[MIGRATE] ¡Completado! ${insertedCount} leads migrados a Neon.`);
   return { success: true, count: insertedCount };
 }
+
+// Ejecución directa por CLI
+if (process.argv[1] && process.argv[1].replace(/\\/g, '/').includes('migrateModule1')) {
+  migrateLeadsToNeon()
+    .then((res) => {
+      console.log('[MIGRATE CLI] Finalizado con éxito:', res);
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error('[MIGRATE CLI] Error fatal:', err);
+      process.exit(1);
+    });
+}

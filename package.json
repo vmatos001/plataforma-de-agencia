@@ -2,14 +2,15 @@
   "name": "plataforma-de-agencia",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server/index.js",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "node server/index.js",
     "client": "vite",
     "build": "vite build",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "migrate": "node server/services/migrateModule1.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

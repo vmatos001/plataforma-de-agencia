@@ -1,5 +1,18 @@
 // Motor autónomo de búsqueda y enriquecimiento de leads para el frontend (Edge / Firebase Hosting)
-// Permite que la plataforma funcione al 100% de manera autónoma en línea sin depender de un túnel local.
+// Conexión directa y en vivo a Google Maps (Places) y Google SERP vía Serper API
+
+function getValidSerperKey(key) {
+  if (key && typeof key === 'string' && key.trim().length > 20 && !key.includes('active') && !key.includes('mock')) {
+    return key.trim();
+  }
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SERPER_API_KEY) {
+      const envKey = import.meta.env.VITE_SERPER_API_KEY.trim();
+      if (envKey.length > 20) return envKey;
+    }
+  } catch (e) {}
+  return null;
+}
 
 function extractDomain(url) {
   try {
@@ -8,10 +21,6 @@ function extractDomain(url) {
   } catch {
     return (url || '').replace('https://', '').replace('http://', '').split('/')[0];
   }
-}
-
-function capitalize(str) {
-  return (str || '').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 function slugify(text) {
@@ -28,29 +37,60 @@ function slugify(text) {
 export async function clientSearch(query, country = 'SV', searchMode = 'maps', serperKey = '') {
   const gl = country.toLowerCase() === 'do' ? 'do' : (country.toLowerCase() === 'sv' ? 'sv' : 'us');
   const hl = 'es';
+  const effectiveKey = getValidSerperKey(serperKey);
 
-  // Si tenemos API Key de Serper configurada en los ajustes del usuario
-  if (serperKey && serperKey.trim()) {
+  if (effectiveKey) {
     try {
-      const endpoint = searchMode === 'maps' ? 'https://google.serper.dev/places' : 'https://google.serper.dev/search';
-      const bodyPayload = searchMode === 'maps' 
-        ? { q: query, gl, hl }
-        : { q: query, gl, hl, num: 20 };
+      if (searchMode === 'maps') {
+        // Consulta principal a Google Places en vivo
+        const primaryPromise = fetch('https://google.serper.dev/places', {
+          method: 'POST',
+          headers: {
+            'X-API-KEY': effectiveKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ q: query, gl, hl })
+        }).then(r => r.ok ? r.json() : null).catch(() => null);
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'X-API-KEY': serperKey.trim(),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(bodyPayload)
-      });
+        // Si la búsqueda es de alta intención (e.g. renta car), lanzamos consulta complementaria en paralelo para máxima cobertura de negocios
+        let compQuery = null;
+        const qLow = query.toLowerCase();
+        if (qLow.includes('renta car') || qLow.includes('car rental')) {
+          compQuery = qLow.replace(/renta car|car rental/g, 'renta de autos');
+        } else if (qLow.includes('dentista')) {
+          compQuery = qLow.replace('dentista', 'clinica dental');
+        } else if (qLow.includes('abogado')) {
+          compQuery = qLow.replace('abogado', 'bufete de abogados');
+        }
 
-      if (response.ok) {
-        const data = await response.json();
-        if (searchMode === 'maps') {
-          const places = data.places || [];
-          return places.map((place, idx) => {
+        const compPromise = compQuery && compQuery !== qLow
+          ? fetch('https://google.serper.dev/places', {
+              method: 'POST',
+              headers: { 'X-API-KEY': effectiveKey, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ q: compQuery, gl, hl })
+            }).then(r => r.ok ? r.json() : null).catch(() => null)
+          : Promise.resolve(null);
+
+        const [dataPrimary, dataComp] = await Promise.all([primaryPromise, compPromise]);
+
+        const rawPlaces = [
+          ...(dataPrimary?.places || []),
+          ...(dataComp?.places || [])
+        ];
+
+        if (rawPlaces.length > 0) {
+          // Deduplicar por título
+          const seen = new Set();
+          const uniquePlaces = [];
+          for (const p of rawPlaces) {
+            const norm = (p.title || '').toLowerCase().trim();
+            if (norm && !seen.has(norm)) {
+              seen.add(norm);
+              uniquePlaces.push(p);
+            }
+          }
+
+          return uniquePlaces.map((place, idx) => {
             const rawWeb = (place.website || '').trim();
             const isSocialOrMissing = !rawWeb || 
               rawWeb.includes('facebook.com') || 
@@ -68,7 +108,17 @@ export async function clientSearch(query, country = 'SV', searchMode = 'maps', s
 
             const resenas = place.ratingCount || 0;
             const calificacion = place.rating || 0;
-            const esProspectoOro = !hasRealWeb && (resenas >= 3 || calificacion >= 4.0 || resenas > 0);
+            const esProspectoOro = !hasRealWeb; // Negocio en Google Maps sin sitio web profesional propio
+
+            // Formatear teléfono si es necesario
+            let cleanPhone = (place.phoneNumber || '').trim();
+            if (cleanPhone && !cleanPhone.startsWith('+')) {
+              if (country.toUpperCase() === 'SV' && cleanPhone.replace(/\D/g, '').length === 8) {
+                cleanPhone = '+503 ' + cleanPhone;
+              } else if (country.toUpperCase() === 'DO' && cleanPhone.replace(/\D/g, '').length === 10) {
+                cleanPhone = '+1 ' + cleanPhone;
+              }
+            }
 
             return {
               posicion: place.position || (idx + 1),
@@ -82,102 +132,52 @@ export async function clientSearch(query, country = 'SV', searchMode = 'maps', s
               resenas: resenas,
               calificacion: calificacion,
               categoria: place.category || 'Negocio Local',
-              telefono: place.phoneNumber || '',
+              telefono: cleanPhone,
               direccion: place.address || '',
               cid: place.cid || '',
               tipoFuente: 'google_maps',
               snippet: `${place.category || 'Negocio'} · ${resenas} reseñas (${calificacion}★) en Google Maps. ${!hasRealWeb ? '⚠️ SIN PÁGINA WEB PROPIA (Oportunidad Alta de Venta)' : 'Web: ' + rawWeb}`,
-              recomendadoOutbound: esProspectoOro
+              recomendadoOutbound: esProspectoOro || idx < 3
             };
           }).sort((a, b) => {
             if (a.esProspectoOro && !b.esProspectoOro) return -1;
             if (!a.esProspectoOro && b.esProspectoOro) return 1;
             return (b.resenas || 0) - (a.resenas || 0);
           });
-        } else {
+        }
+      } else {
+        // Búsqueda orgánica Google SERP (#4-#20)
+        const response = await fetch('https://google.serper.dev/search', {
+          method: 'POST',
+          headers: {
+            'X-API-KEY': effectiveKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ q: query, gl, hl, num: 20 })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
           const organic = data.organic || [];
-          return organic.map((item, index) => ({
-            posicion: item.position || (index + 1),
-            titulo: item.title,
-            link: item.link,
-            dominio: extractDomain(item.link),
-            snippet: item.snippet || '',
-            recomendadoOutbound: (index + 1) >= 4 && (index + 1) <= 20
-          }));
+          if (organic.length > 0) {
+            return organic.map((item, index) => ({
+              posicion: item.position || (index + 1),
+              titulo: item.title,
+              link: item.link,
+              dominio: extractDomain(item.link),
+              snippet: item.snippet || '',
+              recomendadoOutbound: (index + 1) >= 4 && (index + 1) <= 20
+            }));
+          }
         }
       }
     } catch (err) {
-      console.warn('Serper API en cliente falló, activando motor de simulación realista:', err);
+      console.warn('Error conectando a Serper API en vivo:', err);
     }
   }
 
-  // Generador inteligente / simulación de prospectos de alta conversión por nicho
-  const isDO = country.toUpperCase() === 'DO';
-  const cName = isDO ? 'República Dominicana' : 'El Salvador';
-  const cCity = isDO ? 'Santo Domingo' : 'San Salvador';
-  const cTld = isDO ? '.do' : '.sv';
-  const qClean = capitalize(query.toLowerCase().replace(/en |de |la |el |los |las /g, '').trim());
-
-  if (searchMode === 'maps') {
-    const nichosData = [
-      { name: `${qClean} Premier & Especialistas`, resenas: 310, calif: 4.9, web: '', tel: isDO ? '+1 809 555-0192' : '+503 2289-4411', cat: 'Servicios Profesionales' },
-      { name: `Centro Integral ${qClean} ${cCity}`, resenas: 245, calif: 4.8, web: 'https://instagram.com/centro', tel: isDO ? '+1 809 555-8821' : '+503 7812-9900', cat: 'Especialistas' },
-      { name: `${qClean} Express & Urgencias`, resenas: 180, calif: 4.7, web: '', tel: isDO ? '+1 809 555-3344' : '+503 2501-1122', cat: 'Atención Inmediata' },
-      { name: `Grupo ${qClean} ${isDO ? 'Caribe' : 'Cuscatlán'}`, resenas: 135, calif: 4.9, web: 'https://facebook.com/grupo', tel: isDO ? '+1 809 555-7766' : '+503 7654-3210', cat: 'Empresarial' },
-      { name: `Soluciones ${qClean} Modernas`, resenas: 95, calif: 4.6, web: '', tel: isDO ? '+1 809 555-9900' : '+503 2260-8800', cat: 'Comercial' },
-      { name: `${qClean} Tradición & Calidad`, resenas: 420, calif: 4.8, web: '', tel: isDO ? '+1 809 555-1212' : '+503 2244-6688', cat: 'Negocio Local' }
-    ];
-
-    return nichosData.map((p, idx) => {
-      const isSocialOrMissing = !p.web || p.web.includes('facebook.com') || p.web.includes('instagram.com');
-      const hasRealWeb = Boolean(p.web && !isSocialOrMissing);
-      const domain = hasRealWeb ? extractDomain(p.web) : `maps-${slugify(p.name)}-${idx + 1}.negocio`;
-      const esProspectoOro = !hasRealWeb && p.resenas >= 5;
-
-      return {
-        posicion: idx + 1,
-        titulo: `${p.name} | ${p.cat} en ${cCity}`,
-        link: hasRealWeb ? p.web : `https://maps.google.com`,
-        dominio: domain,
-        webOriginal: p.web || null,
-        tieneWeb: hasRealWeb,
-        sinWeb: !hasRealWeb,
-        esProspectoOro: esProspectoOro,
-        resenas: p.resenas,
-        calificacion: p.calif,
-        categoria: p.cat,
-        telefono: p.tel,
-        direccion: `${cCity}, ${cName}`,
-        cid: 'sim-' + (idx + 1),
-        tipoFuente: 'google_maps',
-        snippet: `${p.cat} en Google Maps con ${p.resenas} reseñas (${p.calif}★). ${!hasRealWeb ? '⚠️ SIN PÁGINA WEB PROPIA (Prospecto Oro)' : 'Web: ' + p.web}`,
-        recomendadoOutbound: esProspectoOro
-      };
-    });
-  } else {
-    // Modo Google SERP (#4-#20)
-    const organicSlugs = [
-      { name: `Líder en ${qClean} ${cCity}`, tld: '.com', desc: `Servicios y soluciones con trayectoria comprobada en ${cName}.` },
-      { name: `${qClean} Prime ${cCity}`, tld: cTld, desc: `Especialistas certificados en ${cCity}. Atención personalizada.` },
-      { name: `Portal Central ${qClean}`, tld: '.net', desc: `Directorio de referencia y profesionales destacados en ${cCity}.` },
-      { name: `${qClean} Moderno & Soluciones`, tld: cTld, desc: `Vanguardia tecnológica y calidad asegurada en cada servicio.` },
-      { name: `Grupo ${qClean} ${isDO ? 'Caribe' : 'Cuscatlán'}`, tld: '.com', desc: `Soluciones a la medida de empresas y particulares.` },
-      { name: `Expertos en ${qClean}`, tld: cTld, desc: `Consulta y atención inmediata con los mejores profesionales del sector.` }
-    ];
-
-    return organicSlugs.map((item, idx) => {
-      const pos = idx + 4; // Posiciones #4-#9 recomendadas para outbound
-      const cleanDomain = item.name.toLowerCase().replace(/[^a-z0-9]/g, '') + item.tld;
-      return {
-        posicion: pos,
-        titulo: `${item.name} | ${cCity}`,
-        link: `https://${cleanDomain}`,
-        dominio: cleanDomain,
-        snippet: item.desc,
-        recomendadoOutbound: true
-      };
-    });
-  }
+  // Si no se encontraron resultados reales, no inventamos datos simulados. Retornamos array vacío
+  return [];
 }
 
 export function generateClientLead(item, query, country = 'SV') {
