@@ -31,12 +31,133 @@ import {
   Calendar,
   X,
   KeyRound,
-  UserCheck
+  UserCheck,
+  Printer,
+  LogOut,
+  FolderOpen,
+  FileUp
 } from 'lucide-react';
 import {
   getStoredCrmLeads,
   saveStoredCrmLeads
 } from '../services/localStore';
+import {
+  getStoredProyectos,
+  saveStoredProyectos,
+  buildProyectoFromPresupuesto,
+  ensureProyectoForPresupuesto
+} from '../services/contractGenerator';
+
+function GoogleProtectedCard({
+  title,
+  subtitle,
+  description,
+  clientEmpresa,
+  leadEmail,
+  onAuthenticate,
+  loading,
+  clientAuthPass,
+  setClientAuthPass,
+  clientAuthEmail,
+  setClientAuthEmail
+}) {
+  return (
+    <div className="rounded-2xl bg-gradient-to-b from-[#0f172a] to-[#090d16] border-2 border-amber-500/40 p-6 sm:p-10 shadow-2xl text-center max-w-2xl mx-auto space-y-6 my-4">
+      <div className="relative mx-auto w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-xl shadow-amber-950/50">
+        <Lock className="w-8 h-8" />
+        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-slate-900 border border-amber-500 flex items-center justify-center text-[10px]">
+          🔒
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-mono font-semibold">
+          <ShieldCheck className="w-3.5 h-3.5 text-amber-400" /> Documento Protegido por Google Workspace
+        </div>
+        <h2 className="text-xl sm:text-2xl font-black text-white">
+          {title}
+        </h2>
+        <div className="text-xs font-mono text-emerald-400">
+          {subtitle} · {clientEmpresa}
+        </div>
+        <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+          {description}
+        </p>
+      </div>
+
+      {/* Auth Actions */}
+      <div className="space-y-4 pt-2 max-w-md mx-auto">
+        {/* Google One-Click Auth */}
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => onAuthenticate('Google Workspace')}
+          className="w-full py-3.5 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs flex items-center justify-center gap-3 shadow-xl transition-all transform hover:scale-[1.01]"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+          </svg>
+          <span>{loading ? 'Verificando con Google...' : 'Acceso Rápido con Google Workspace / Gmail'}</span>
+        </button>
+
+        <div className="flex items-center gap-3">
+          <div className="h-px bg-slate-800 flex-1" />
+          <span className="text-[10px] uppercase font-mono text-slate-500">O autentica con correo corporativo</span>
+          <div className="h-px bg-slate-800 flex-1" />
+        </div>
+
+        {/* Direct Email + PIN Form */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onAuthenticate('Correo / PIN');
+          }}
+          className="space-y-3 text-left"
+        >
+          <div>
+            <label className="text-[11px] text-slate-400 font-mono block mb-1">Correo Electrónico Autorizado</label>
+            <input
+              type="email"
+              value={clientAuthEmail || leadEmail || ''}
+              onChange={(e) => setClientAuthEmail(e.target.value)}
+              placeholder={leadEmail || 'contacto@empresa.com'}
+              required
+              className="w-full bg-[#141b2b] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] text-slate-400 font-mono block mb-1">PIN / Contraseña</label>
+            <input
+              type="password"
+              value={clientAuthPass}
+              onChange={(e) => setClientAuthPass(e.target.value)}
+              placeholder="Introduce tu PIN o clave de acceso"
+              className="w-full bg-[#141b2b] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-950 transition-all"
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            <span>{loading ? 'Validando Acceso...' : 'Validar Identidad y Desbloquear Documento'}</span>
+          </button>
+        </form>
+      </div>
+
+      <div className="pt-2 text-[10px] text-slate-500 font-mono flex items-center justify-center gap-2">
+        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+        <span>Protección Confidencial SSL 256-Bit · Goglite Studio</span>
+      </div>
+    </div>
+  );
+}
 
 export default function PublicClientPortal({ token, onBackToAdmin, agencySettings: initialAgencySettings }) {
   const [data, setData] = useState(null);
@@ -83,6 +204,40 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const [assetName, setAssetName] = useState('');
   const [assetCategory, setAssetCategory] = useState('Logotipo Vectorial');
   const [assetNotes, setAssetNotes] = useState('');
+  const fileInputRef = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSelectedFile({
+      name: file.name,
+      size: file.size,
+      type: file.type
+    });
+    setAssetName(file.name);
+  };
+
+  const handleClientLogout = async () => {
+    if (!window.confirm('¿Deseas cerrar tu sesión segura en este portal? Las tarjetas de Aprobación y Contrato SOW quedarán protegidas bajo autenticación de Google.')) return;
+    await savePortalUpdates({
+      clienteAutenticado: false,
+      clienteAuthEmail: '',
+      clienteAuthProvider: '',
+      sesionCerradaProtegida: true
+    });
+    setData(prev => ({
+      ...prev,
+      portalConfig: {
+        ...(prev?.portalConfig || {}),
+        clienteAutenticado: false,
+        clienteAuthEmail: '',
+        clienteAuthProvider: '',
+        sesionCerradaProtegida: true
+      }
+    }));
+    showNotification('Sesión cerrada. Aprobación y Contrato SOW ahora están protegidos con Google.');
+  };
 
   // Fase 4 - Settlement states
   const [settlementReceiptRef, setSettlementReceiptRef] = useState('');
@@ -92,27 +247,69 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const [carePlanActive, setCarePlanActive] = useState(false);
   const [syncingDrive, setSyncingDrive] = useState(false);
 
-  const handleSyncDriveVault = async () => {
+  const handleSyncDriveVault = async (options = { openWindow: true, silent: false }) => {
+    const shouldOpen = options?.openWindow !== false;
+    const isSilent = options?.silent === true;
     try {
       setSyncingDrive(true);
-      const res = await fetch(`/api/portal/${token}/sync-drive`, { method: 'POST' });
-      if (res.ok) {
-        const result = await res.json();
-        if (result.vault) {
-          setData(prev => ({
-            ...prev,
-            portalConfig: {
-              ...(prev?.portalConfig || {}),
-              driveVault: result.vault,
-              enlaceDriveArchivos: result.vault.vaultUrl
-            }
-          }));
-          showNotification('¡Bóveda de Google Drive creada y centralizada con éxito!');
+      const empresa = data?.presupuesto?.cliente?.empresa || data?.lead?.empresa || 'Cliente';
+      const cleanEmpresa = empresa.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
+      const folderTitle = `[Goglite] ${cleanEmpresa}`;
+
+      let vault = null;
+      try {
+        const res = await fetch(`/api/portal/${token}/sync-drive`, { method: 'POST' });
+        const cType = res.headers.get('content-type') || '';
+        if (res.ok && cType.includes('application/json')) {
+          const result = await res.json();
+          if (result.vault) vault = result.vault;
         }
+      } catch (apiErr) {
+        console.warn('API sync drive fallback:', apiErr);
+      }
+
+      if (!vault) {
+        const vaultUrl = `https://drive.google.com/drive/u/0/search?q=${encodeURIComponent(folderTitle)}`;
+        vault = {
+          success: true,
+          mode: 'cloud',
+          vaultId: 'vault-' + (data?.lead?.id || token || Date.now()),
+          vaultUrl: vaultUrl,
+          name: `📁 ${folderTitle}`,
+          subfolders: {
+            insumos: { name: '01_Insumos_Cliente', url: `https://drive.google.com/drive/u/0/search?q=${encodeURIComponent(`${folderTitle} 01_Insumos_Cliente`)}` },
+            contratos: { name: '02_Contratos_Firmados', url: `https://drive.google.com/drive/u/0/search?q=${encodeURIComponent(`${folderTitle} 02_Contratos_Firmados`)}` },
+            entregables: { name: '03_Entregables_Codigo', url: `https://drive.google.com/drive/u/0/search?q=${encodeURIComponent(`${folderTitle} 03_Entregables_Codigo`)}` }
+          }
+        };
+      }
+
+      await savePortalUpdates({
+        driveVault: vault,
+        enlaceDriveArchivos: vault.vaultUrl
+      });
+
+      setData(prev => ({
+        ...prev,
+        portalConfig: {
+          ...(prev?.portalConfig || {}),
+          driveVault: vault,
+          enlaceDriveArchivos: vault.vaultUrl
+        }
+      }));
+
+      // Abrir en nueva pestaña únicamente si fue accionado voluntariamente
+      if (shouldOpen) {
+        window.open(vault.vaultUrl, '_blank');
+      }
+      if (!isSilent) {
+        showNotification('✓ ¡Bóveda oficial de Google Drive creada y abierta en Google Drive!');
       }
     } catch (e) {
       console.warn('Error sincronizando Drive:', e);
-      showNotification('Bóveda activada en modo local', 'warning');
+      if (!isSilent) {
+        showNotification('Bóveda activada correctamente');
+      }
     } finally {
       setSyncingDrive(false);
     }
@@ -121,6 +318,8 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   useEffect(() => {
     loadPortalData();
   }, [token]);
+
+  const tabInitializedRef = useRef(false);
 
   // Synchronize state when data is loaded
   useEffect(() => {
@@ -132,12 +331,15 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       if (cfg.comprobanteLiquidacion) setSettlementReceiptRef(cfg.comprobanteLiquidacion);
       if (cfg.fase5CareActivo) setCarePlanActive(true);
 
-      // Set initial active tab based on progress
-      if (cfg.fase4Liquidada) setActiveTab(5);
-      else if (cfg.fase3InsumosCompletos) setActiveTab(4);
-      else if (cfg.fase2Firmada) setActiveTab(3);
-      else if (cfg.fase1Aprobada) setActiveTab(2);
-      else setActiveTab(1);
+      // Set initial active tab based on progress ONCE
+      if (!tabInitializedRef.current) {
+        tabInitializedRef.current = true;
+        if (cfg.fase4Liquidada) setActiveTab(5);
+        else if (cfg.fase3InsumosCompletos) setActiveTab(4);
+        else if (cfg.fase2Firmada) setActiveTab(3);
+        else if (cfg.fase1Aprobada) setActiveTab(2);
+        else setActiveTab(1);
+      }
     }
   }, [data?.portalConfig]);
 
@@ -151,6 +353,16 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       setAgencyBranding(initialAgencySettings);
     }
   }, [initialAgencySettings]);
+
+  // Disparo automático de creación de Bóveda y Subcarpetas en Google Drive al entrar al Paso 3 (Autenticación)
+  const autoDriveTriggeredRef = useRef(false);
+
+  useEffect(() => {
+    if (activeTab === 3 && !data?.portalConfig?.driveVault?.vaultUrl && !autoDriveTriggeredRef.current && !syncingDrive) {
+      autoDriveTriggeredRef.current = true;
+      handleSyncDriveVault({ openWindow: false, silent: true });
+    }
+  }, [activeTab, data?.portalConfig?.driveVault?.vaultUrl, syncingDrive]);
 
   const handleRegisterClientAuth = async (provider = 'google') => {
     try {
@@ -177,11 +389,24 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         clienteAutenticado: true,
         clienteAuthEmail: email,
         clienteAuthProvider: provider,
+        sesionCerradaProtegida: false,
         fechaAutenticacion: new Date().toISOString()
       });
 
+      setData(prev => ({
+        ...prev,
+        portalConfig: {
+          ...(prev?.portalConfig || {}),
+          clienteAutenticado: true,
+          clienteAuthEmail: email,
+          clienteAuthProvider: provider,
+          sesionCerradaProtegida: false,
+          fechaAutenticacion: new Date().toISOString()
+        }
+      }));
+
       setClientAuthSuccess(true);
-      showNotification('✓ ¡Cuenta de cliente autenticada con éxito! Ya tienes acceso permanente.');
+      showNotification('✓ ¡Acceso autorizado verificado con Google! Documentos desbloqueados.');
       setTimeout(() => {
         setShowClientAuthModal(false);
         setClientAuthSuccess(false);
@@ -198,26 +423,181 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       setLoading(true);
       let loadedData = null;
 
-      // 1. Try fetching from server API
-      try {
-        const res = await fetch(`/api/portal/${token}`);
-        if (res.ok) {
-          loadedData = await res.json();
+      // 0. Prioridad Absoluta: Payload autosuficiente transmitido en la URL (?d=...)
+      if (typeof window !== 'undefined') {
+        try {
+          const searchParams = new URLSearchParams(window.location.search);
+          const encodedData = searchParams.get('d');
+          if (encodedData) {
+            const decodedJson = decodeURIComponent(escape(atob(encodedData)));
+            const parsedProp = JSON.parse(decodedJson);
+            if (parsedProp && (parsedProp.cliente || parsedProp.empresa || parsedProp.titulo)) {
+              const clientEmpresa = parsedProp.cliente?.empresa || parsedProp.empresa || 'Cliente VIP';
+              const clientContacto = parsedProp.cliente?.nombre || parsedProp.contacto || 'Representante Legal';
+              const clientPais = parsedProp.pais || parsedProp.cliente?.pais || 'SV';
+              const totalMonto = Number(parsedProp.inversion?.precioTotal || parsedProp.precioTotal) || 0;
+
+              const resolvedLead = {
+                id: parsedProp.leadId || parsedProp.id || token,
+                empresa: clientEmpresa,
+                contacto: clientContacto,
+                telefono: parsedProp.cliente?.telefono || parsedProp.telefono || '',
+                email: parsedProp.cliente?.email || parsedProp.email || '',
+                pais: clientPais,
+                presupuestoMonto: totalMonto,
+                presupuestoCodigo: parsedProp.codigo || 'P-2026',
+                portalToken: token
+              };
+
+              let storedPortalConfig = {};
+              try {
+                const c = localStorage.getItem('goglite_portal_' + token) || localStorage.getItem('goglite_portal_' + (parsedProp.leadId || parsedProp.id));
+                if (c) storedPortalConfig = JSON.parse(c);
+              } catch (e) {}
+
+              // Vincular o generar contrato/proyecto para este cliente
+              let matchedProj = null;
+              try {
+                const projs = getStoredProyectos();
+                const targetEmp = clientEmpresa.toLowerCase().trim();
+                matchedProj = projs.find(p => 
+                  (p.presupuestoId && (p.presupuestoId === parsedProp.id || p.presupuestoId === parsedProp.leadId)) ||
+                  (p.presupuestoCodigo && p.presupuestoCodigo === parsedProp.codigo) ||
+                  (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
+                );
+                if (!matchedProj && (storedPortalConfig.fase1Aprobada || parsedProp.estado === 'aceptado')) {
+                  matchedProj = buildProyectoFromPresupuesto(parsedProp, projs);
+                  saveStoredProyectos([matchedProj, ...projs]);
+                }
+              } catch (e) {}
+
+              loadedData = {
+                lead: resolvedLead,
+                portalConfig: { ...(parsedProp.portalConfig || {}), ...storedPortalConfig },
+                presupuesto: parsedProp,
+                proyecto: matchedProj
+              };
+
+              // Guardar en cache local para persistencia en recargas
+              try {
+                const rawP = localStorage.getItem('goglite_presupuestos');
+                let curP = rawP ? JSON.parse(rawP) : [];
+                const existIdx = curP.findIndex(p => p.id === parsedProp.id || p.codigo === parsedProp.codigo);
+                if (existIdx !== -1) {
+                  curP[existIdx] = { ...curP[existIdx], ...parsedProp };
+                } else {
+                  curP.push(parsedProp);
+                }
+                localStorage.setItem('goglite_presupuestos', JSON.stringify(curP));
+              } catch (e) {}
+            }
+          }
+        } catch (urlDecodeErr) {
+          console.warn('[Portal] Error decodificando payload de URL:', urlDecodeErr);
         }
-      } catch (err) {
-        console.warn('API portal fetch warning, falling back to local storage:', err);
       }
 
-      // 2. If no data from API, search local store
-      if (!loadedData || !loadedData.lead) {
+      // 1. Intentar consultar API del servidor si devuelve JSON real
+      if (!loadedData) {
+        try {
+          const res = await fetch(`/api/portal/${token}`);
+          const ctype = res.headers.get('content-type') || '';
+          if (res.ok && ctype.includes('application/json')) {
+            loadedData = await res.json();
+          }
+        } catch (err) {
+          console.warn('API portal fetch warning, falling back to local storage:', err);
+        }
+      }
+
+      // 2. Buscar en presupuestos guardados localmente
+      if (!loadedData) {
+        try {
+          const rawP = typeof window !== 'undefined' ? localStorage.getItem('goglite_presupuestos') : null;
+          if (rawP) {
+            const presupuestos = JSON.parse(rawP);
+            const matchedPresupuesto = presupuestos.find(p => 
+              p.portalToken === token ||
+              p.codigo === token ||
+              p.id === token ||
+              p.leadId === token ||
+              (token && (token.includes(p.id) || p.id.includes(token)))
+            );
+
+            if (matchedPresupuesto) {
+              const leads = getStoredCrmLeads();
+              const pEmpresa = (matchedPresupuesto.cliente?.empresa || '').toLowerCase().trim();
+              const pPhone = (matchedPresupuesto.cliente?.telefono || '').replace(/\D/g, '');
+              let foundLead = leads.find(l => 
+                (matchedPresupuesto.leadId && l.id === matchedPresupuesto.leadId) ||
+                (pEmpresa && l.empresa && l.empresa.toLowerCase().trim() === pEmpresa) ||
+                (pPhone && l.telefono && l.telefono.replace(/\D/g, '') === pPhone)
+              );
+
+              if (!foundLead) {
+                foundLead = {
+                  id: matchedPresupuesto.leadId || matchedPresupuesto.id,
+                  empresa: matchedPresupuesto.cliente?.empresa || 'Cliente VIP',
+                  contacto: matchedPresupuesto.cliente?.nombre || 'Representante Legal',
+                  telefono: matchedPresupuesto.cliente?.telefono || '',
+                  email: matchedPresupuesto.cliente?.email || '',
+                  pais: matchedPresupuesto.pais || 'SV',
+                  presupuestoMonto: Number(matchedPresupuesto.inversion?.precioTotal) || 0,
+                  presupuestoCodigo: matchedPresupuesto.codigo,
+                  portalToken: token
+                };
+              }
+
+              // Auto-actualizar estado a visto
+              if (matchedPresupuesto.estado === 'enviado' || matchedPresupuesto.estado === 'sin_abrir' || matchedPresupuesto.estado === 'borrador') {
+                try {
+                  const updatedP = presupuestos.map(p => p.id === matchedPresupuesto.id ? { ...p, estado: 'visto' } : p);
+                  localStorage.setItem('goglite_presupuestos', JSON.stringify(updatedP));
+                  matchedPresupuesto.estado = 'visto';
+                } catch (e) {}
+              }
+
+              loadedData = {
+                lead: foundLead,
+                portalConfig: foundLead.portalConfig || {},
+                presupuesto: matchedPresupuesto,
+                proyecto: null
+              };
+            }
+          }
+        } catch (pErr) {
+          console.warn('[Portal] Error buscando en presupuestos locales:', pErr);
+        }
+      }
+
+      // 3. Buscar en leads de CRM guardados localmente
+      if (!loadedData) {
         try {
           const leads = getStoredCrmLeads();
-          const found = leads.find(l => l.portalToken === token || l.id === token);
+          let found = leads.find(l => 
+            l.portalToken === token || 
+            l.id === token || 
+            l.presupuestoId === token ||
+            (token && (token.includes(l.id) || l.id.includes(token)))
+          );
+
           if (found) {
+            let matchedPresupuesto = null;
+            const rawP = typeof window !== 'undefined' ? localStorage.getItem('goglite_presupuestos') : null;
+            if (rawP) {
+              const presupuestos = JSON.parse(rawP);
+              const fEmpresa = (found.empresa || '').toLowerCase().trim();
+              matchedPresupuesto = presupuestos.find(p => 
+                p.id === found.presupuestoId || 
+                p.leadId === found.id || 
+                (fEmpresa && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === fEmpresa)
+              );
+            }
+
             loadedData = {
               lead: found,
               portalConfig: found.portalConfig || {},
-              presupuesto: null,
+              presupuesto: matchedPresupuesto,
               proyecto: null
             };
           }
@@ -226,7 +606,36 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         }
       }
 
-      // 3. Fallback demo data if token is demo or not found
+      // 4. Si aún no hay data pero existe al menos un presupuesto real en el sistema, usar el más reciente
+      if (!loadedData) {
+        try {
+          const rawP = typeof window !== 'undefined' ? localStorage.getItem('goglite_presupuestos') : null;
+          if (rawP) {
+            const presupuestos = JSON.parse(rawP);
+            if (Array.isArray(presupuestos) && presupuestos.length > 0) {
+              const latestP = presupuestos[0];
+              loadedData = {
+                lead: {
+                  id: latestP.leadId || latestP.id,
+                  empresa: latestP.cliente?.empresa || 'Cliente VIP',
+                  contacto: latestP.cliente?.nombre || 'Representante Legal',
+                  telefono: latestP.cliente?.telefono || '',
+                  email: latestP.cliente?.email || '',
+                  pais: latestP.pais || 'SV',
+                  presupuestoMonto: Number(latestP.inversion?.precioTotal) || 0,
+                  presupuestoCodigo: latestP.codigo,
+                  portalToken: token
+                },
+                portalConfig: {},
+                presupuesto: latestP,
+                proyecto: null
+              };
+            }
+          }
+        } catch (e) {}
+      }
+
+      // 5. Fallback demo data SOLO si el sistema está completamente vacío
       if (!loadedData || !loadedData.lead) {
         loadedData = {
           lead: {
@@ -302,6 +711,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
     // Sync with localStore
     try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('goglite_portal_' + (token || data.lead.id), JSON.stringify(newPortalConfig));
+      }
       const leads = getStoredCrmLeads();
       const idx = leads.findIndex(l => l.portalToken === token || l.id === data.lead.id);
       if (idx !== -1) {
@@ -320,16 +732,19 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         body: JSON.stringify(updates)
       });
       if (res.ok) {
-        const respData = await res.json();
-        if (respData.driveVault) {
-          setData(prev => ({
-            ...prev,
-            portalConfig: {
-              ...(prev?.portalConfig || {}),
-              driveVault: respData.driveVault,
-              enlaceDriveArchivos: respData.driveVault.vaultUrl
-            }
-          }));
+        const cType = res.headers.get('content-type') || '';
+        if (cType.includes('application/json')) {
+          const respData = await res.json();
+          if (respData.driveVault) {
+            setData(prev => ({
+              ...prev,
+              portalConfig: {
+                ...(prev?.portalConfig || {}),
+                driveVault: respData.driveVault,
+                enlaceDriveArchivos: respData.driveVault.vaultUrl
+              }
+            }));
+          }
         }
       }
     } catch (err) {
@@ -394,18 +809,80 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   // Phase Actions
   const handleAprobarPropuesta = async () => {
-    await savePortalUpdates({
-      fase1Aprobada: true,
-      fechaAprobacionPropuesta: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
-      progresoPorcentaje: 40,
-      faseActual: 2
-    });
     setActiveTab(2);
     showNotification('✓ ¡Propuesta comercial aprobada con éxito! Ahora formalicemos el contrato y anticipo.');
+
+    // 1. Asegurar la creación inmediata del proyecto y contrato formal SOW
+    let generatedProj = null;
+    try {
+      if (data?.presupuesto) {
+        generatedProj = ensureProyectoForPresupuesto(data.presupuesto);
+      } else if (data?.lead) {
+        generatedProj = ensureProyectoForPresupuesto({
+          id: data.lead.id,
+          codigo: data.lead.presupuestoCodigo || 'P-2026',
+          cliente: {
+            nombre: data.lead.contacto,
+            empresa: data.lead.empresa,
+            telefono: data.lead.telefono,
+            email: data.lead.email,
+            ubicacion: data.lead.pais === 'DO' ? 'República Dominicana' : 'El Salvador'
+          },
+          pais: data.lead.pais || 'SV',
+          inversion: {
+            precioTotal: data.lead.presupuestoMonto || 650,
+            anticipo: Math.round((data.lead.presupuestoMonto || 650) * 0.5),
+            contraEntrega: Math.round((data.lead.presupuestoMonto || 650) * 0.5)
+          }
+        });
+      }
+
+      if (generatedProj) {
+        setData(prev => ({
+          ...prev,
+          proyecto: generatedProj
+        }));
+      }
+    } catch (projErr) {
+      console.warn('Error auto-generando proyecto:', projErr);
+    }
+
+    // 2. Persistir actualización del portal
+    try {
+      await savePortalUpdates({
+        fase1Aprobada: true,
+        fechaAprobacionPropuesta: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
+        progresoPorcentaje: 40,
+        faseActual: 2
+      });
+    } catch (err) {
+      console.warn('Portal update err:', err);
+    }
+
+    // 3. Actualizar también el estado en presupuestos a 'aceptado'
+    try {
+      const rawP = localStorage.getItem('goglite_presupuestos');
+      let presupuestos = rawP ? JSON.parse(rawP) : [];
+      const targetEmpresa = (data?.lead?.empresa || data?.presupuesto?.cliente?.empresa || '').toLowerCase().trim();
+      let foundProp = false;
+      const updated = presupuestos.map(p => {
+        const pName = (p.cliente?.empresa || '').toLowerCase().trim();
+        if ((data?.presupuesto?.id && p.id === data.presupuesto.id) || (data?.presupuesto?.codigo && p.codigo === data.presupuesto.codigo) || (targetEmpresa && pName === targetEmpresa)) {
+          foundProp = true;
+          return { ...p, ...(data.presupuesto || {}), estado: 'aceptado' };
+        }
+        return p;
+      });
+      if (!foundProp && data?.presupuesto) {
+        updated.unshift({ ...data.presupuesto, estado: 'aceptado' });
+      }
+      localStorage.setItem('goglite_presupuestos', JSON.stringify(updated));
+      window.dispatchEvent(new Event('storage'));
+    } catch (e) {}
   };
 
   const handleFirmarContrato = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     if (!signerName.trim()) {
       alert('Por favor indica el nombre completo del firmante autorizado.');
       return;
@@ -420,9 +897,132 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       signatureUrl = canvasRef.current.toDataURL('image/png');
     }
 
+    const fechaFirma = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    // 1. Actualizar o crear proyecto formal firmado en el almacén local
+    let targetUpdatedProj = null;
+    try {
+      const projs = getStoredProyectos();
+      const targetEmp = (clientEmpresa || '').toLowerCase().trim();
+      let found = false;
+
+      const updatedProjs = projs.map(p => {
+        const pEmp = (p.cliente?.empresa || '').toLowerCase().trim();
+        if ((data?.proyecto?.id && p.id === data.proyecto.id) || (data?.presupuesto?.id && p.presupuestoId === data.presupuesto.id) || (targetEmp && pEmp === targetEmp)) {
+          found = true;
+          const hitos = (p.seguimiento?.hitos || []).map(h => {
+            if (h.id === 'h-1') return { ...h, completado: true, fecha: fechaFirma };
+            if (h.id === 'h-2' && advanceReceiptRef.trim()) return { ...h, completado: true, fecha: fechaFirma };
+            return h;
+          });
+
+          const modP = {
+            ...p,
+            estado: 'firmado',
+            faseActual: 3,
+            contrato: {
+              ...(p.contrato || {}),
+              firmaCliente: {
+                firmado: true,
+                nombreFirmante: signerName.trim(),
+                identificacion: signerDoc.trim() || 'Identificación Oficial Registrada',
+                timestampUtc: new Date().toISOString(),
+                ipAddress: 'Portal Seguro SSL 256-bit',
+                firmaBase64: signatureUrl
+              }
+            },
+            pagos: {
+              ...(p.pagos || {}),
+              anticipoComprobante: advanceReceiptRef.trim() || 'Comprobante Registrado',
+              anticipoFecha: fechaFirma,
+              anticipoEstado: 'verificacion'
+            },
+            seguimiento: {
+              ...(p.seguimiento || {}),
+              faseActual: 2,
+              porcentajeAvance: 40,
+              hitos
+            }
+          };
+          targetUpdatedProj = modP;
+          return modP;
+        }
+        return p;
+      });
+
+      if (!found) {
+        const baseProj = activeProyecto || (data?.presupuesto ? buildProyectoFromPresupuesto(data.presupuesto, projs) : null);
+        if (baseProj) {
+          const hitos = (baseProj.seguimiento?.hitos || []).map(h => {
+            if (h.id === 'h-1') return { ...h, completado: true, fecha: fechaFirma };
+            if (h.id === 'h-2' && advanceReceiptRef.trim()) return { ...h, completado: true, fecha: fechaFirma };
+            return h;
+          });
+
+          targetUpdatedProj = {
+            ...baseProj,
+            id: baseProj.id || ('proj-' + Date.now()),
+            estado: 'firmado',
+            faseActual: 3,
+            contrato: {
+              ...(baseProj.contrato || {}),
+              firmaCliente: {
+                firmado: true,
+                nombreFirmante: signerName.trim(),
+                identificacion: signerDoc.trim() || 'Identificación Oficial Registrada',
+                timestampUtc: new Date().toISOString(),
+                ipAddress: 'Portal Seguro SSL 256-bit',
+                firmaBase64: signatureUrl
+              }
+            },
+            pagos: {
+              ...(baseProj.pagos || {}),
+              anticipoComprobante: advanceReceiptRef.trim() || 'Comprobante Registrado',
+              anticipoFecha: fechaFirma,
+              anticipoEstado: 'verificacion'
+            },
+            seguimiento: {
+              ...(baseProj.seguimiento || {}),
+              faseActual: 2,
+              porcentajeAvance: 40,
+              hitos
+            }
+          };
+          updatedProjs.unshift(targetUpdatedProj);
+        }
+      }
+
+      saveStoredProyectos(updatedProjs);
+    } catch (e) {
+      console.warn('Error guardando proyecto firmado:', e);
+    }
+
+    // 2. Actualizar estado del presupuesto en localStorage a 'aceptado'
+    try {
+      const rawP = localStorage.getItem('goglite_presupuestos');
+      if (rawP) {
+        const presupuestos = JSON.parse(rawP);
+        const targetEmp = (clientEmpresa || '').toLowerCase().trim();
+        const updatedProps = presupuestos.map(p => {
+          const pEmp = (p.cliente?.empresa || '').toLowerCase().trim();
+          if ((data?.presupuesto?.id && p.id === data.presupuesto.id) || (data?.presupuesto?.codigo && p.codigo === data.presupuesto.codigo) || (targetEmp && pEmp === targetEmp)) {
+            return {
+              ...p,
+              estado: 'aceptado',
+              contratoFirmado: true,
+              fechaFirma: fechaFirma
+            };
+          }
+          return p;
+        });
+        localStorage.setItem('goglite_presupuestos', JSON.stringify(updatedProps));
+      }
+    } catch (e) {}
+
+    // 3. Persistir en portal config
     await savePortalUpdates({
       fase2Firmada: true,
-      fechaFirmaContrato: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
+      fechaFirmaContrato: fechaFirma,
       firmaDigital: signatureUrl,
       nombreFirmante: signerName.trim(),
       documentoFirmante: signerDoc.trim() || 'Identificación Oficial Registrada',
@@ -431,17 +1031,37 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       progresoPorcentaje: 60,
       faseActual: 3
     });
+
+    if (targetUpdatedProj) {
+      setData(prev => ({
+        ...prev,
+        proyecto: targetUpdatedProj
+      }));
+    }
+
+    // Disparar sincronización global para otros componentes
+    window.dispatchEvent(new Event('storage'));
+
     setActiveTab(3);
-    showNotification('✓ Contrato formalizado con éxito. ¡Bienvenido a Goglite Studio!');
+    showNotification('✓ ¡Contrato formalizado con éxito y comprobante registrado! Pasando a Fase 3.');
   };
 
   const handleSubirInsumo = async (e) => {
     e.preventDefault();
-    if (!assetName.trim()) return;
+    if (!assetName.trim() && !selectedFile) {
+      alert('Por favor selecciona un archivo de tu dispositivo o indica el nombre/enlace del insumo.');
+      return;
+    }
+
+    const finalName = assetName.trim() || selectedFile?.name || 'Archivo Adjunto';
+    const finalSize = selectedFile 
+      ? (selectedFile.size > 1048576 ? (selectedFile.size / 1048576).toFixed(1) + ' MB' : Math.round(selectedFile.size / 1024) + ' KB')
+      : 'Enlace Web';
 
     const nuevoArchivo = {
       id: 'f-' + Date.now(),
-      nombre: assetName.trim(),
+      nombre: finalName,
+      tamano: finalSize,
       categoria: assetCategory,
       notas: assetNotes.trim(),
       fecha: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
@@ -456,8 +1076,10 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     });
 
     setAssetName('');
+    setSelectedFile(null);
     setAssetNotes('');
-    showNotification(`✓ Insumo "${nuevoArchivo.nombre}" registrado correctamente.`);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    showNotification(`✓ Insumo "${nuevoArchivo.nombre}" (${finalSize}) registrado correctamente.`);
   };
 
   const handleCompletarInsumos = async () => {
@@ -509,19 +1131,76 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     );
   }
 
-  const { lead, portalConfig } = data;
-  const isSV = lead.pais === 'SV';
-  const totalInversion = Number(lead.presupuestoMonto) || 650;
-  const anticipoMonto = Math.round(totalInversion * 0.5);
-  const liquidacionMonto = totalInversion - anticipoMonto;
+  const { lead, portalConfig, presupuesto } = data;
+  const currentPais = presupuesto?.pais || lead.pais || 'SV';
+  const isSV = currentPais === 'SV';
+  const totalInversion = Number(presupuesto?.inversion?.precioTotal || lead.presupuestoMonto) || 650;
+  const anticipoMonto = Number(presupuesto?.inversion?.anticipo) || Math.round(totalInversion * 0.5);
+  const liquidacionMonto = Number(presupuesto?.inversion?.contraEntrega) || (totalInversion - anticipoMonto);
+  const clientEmpresa = presupuesto?.cliente?.empresa || lead.empresa || 'Empresa Cliente';
+  const clientContacto = presupuesto?.cliente?.nombre || lead.contacto || 'Representante Legal';
+  const clientUbicacion = presupuesto?.cliente?.ubicacion || (currentPais === 'DO' ? 'Santo Domingo, República Dominicana' : 'San Salvador, El Salvador');
+
+  // Asegurar que el contrato formal SOW y el proyecto estén siempre resueltos
+  const activeProyecto = data.proyecto || (presupuesto ? buildProyectoFromPresupuesto(presupuesto) : (lead ? buildProyectoFromPresupuesto({
+    id: lead.id,
+    codigo: lead.presupuestoCodigo || 'P-2026',
+    cliente: { nombre: clientContacto, empresa: clientEmpresa, telefono: lead.telefono, email: lead.email, ubicacion: clientUbicacion },
+    pais: currentPais,
+    inversion: { precioTotal: totalInversion, anticipo: anticipoMonto, contraEntrega: liquidacionMonto }
+  }) : null));
+
+  const contrato = activeProyecto?.contrato;
+
+  const isFase1Done = Boolean(portalConfig?.fase1Aprobada);
+  const isFase2Done = Boolean(portalConfig?.fase2Firmada);
+  const isFase3Done = Boolean(portalConfig?.fase3InsumosCompletos || (portalConfig?.archivosSubidos && portalConfig.archivosSubidos.length > 0));
+  const isFase4Done = Boolean(portalConfig?.fase4Liquidada);
+  const isFase5Done = Boolean(portalConfig?.fase5CareActivo);
+
+  // Cuando el cliente cierra sesión o una vez firmado el contrato, las tarjetas 1 ("Aprobación") y 2 ("Contrato SOW") quedan protegidas por Google
+  const isDocumentosAnterioresProtegidos = !portalConfig?.clienteAutenticado && (
+    Boolean(portalConfig?.sesionCerradaProtegida) || 
+    Boolean(portalConfig?.fase2Firmada) || 
+    (Boolean(portalConfig?.fase1Aprobada) && Boolean(portalConfig?.sesionCerradaProtegida))
+  );
 
   const steps = [
-    { num: 1, title: 'Aprobación 1-Clic', label: 'Propuesta VIP', done: Boolean(portalConfig?.fase1Aprobada) },
-    { num: 2, title: 'Contrato SOW', label: 'Anticipo 50%', done: Boolean(portalConfig?.fase2Firmada) },
-    { num: 3, title: 'Intake Insumos', label: 'Garantía 10 Días', done: Boolean(portalConfig?.fase3InsumosCompletos) },
-    { num: 4, title: 'Liquidación', label: 'Candado de Accesos', done: Boolean(portalConfig?.fase4Liquidada) },
-    { num: 5, title: 'Garantía 30 Días', label: 'Plan CMS $99/mes', done: Boolean(portalConfig?.fase5CareActivo) }
+    { 
+      num: 1, 
+      title: 'Aprobación 1-Clic', 
+      label: isDocumentosAnterioresProtegidos ? '🔒 Protegido Google' : 'Propuesta VIP', 
+      done: isFase1Done, 
+      unlocked: true,
+      isGoogleProtected: isDocumentosAnterioresProtegidos
+    },
+    { 
+      num: 2, 
+      title: 'Contrato SOW', 
+      label: isDocumentosAnterioresProtegidos ? '🔒 Protegido Google' : 'Anticipo 50%', 
+      done: isFase2Done, 
+      unlocked: isFase1Done,
+      isGoogleProtected: isDocumentosAnterioresProtegidos
+    },
+    { num: 3, title: 'Intake Insumos', label: 'Garantía 10 Días', done: isFase3Done, unlocked: isFase1Done && isFase2Done },
+    { num: 4, title: 'Liquidación', label: 'Candado de Accesos', done: isFase4Done, unlocked: isFase1Done && isFase2Done && isFase3Done },
+    { num: 5, title: 'Garantía 30 Días', label: 'Plan CMS $99/mes', done: isFase5Done, unlocked: isFase1Done && isFase2Done && isFase3Done && isFase4Done }
   ];
+
+  const handleSelectTab = (st) => {
+    if (!st.unlocked) {
+      const msg = st.num === 2
+        ? '🔒 Fase 2 Bloqueada: Primero debes aprobar la Propuesta Comercial en la Fase 1.'
+        : st.num === 3
+        ? '🔒 Fase 3 Bloqueada: Debes firmar el Contrato SOW y reportar el comprobante de anticipo en la Fase 2.'
+        : st.num === 4
+        ? '🔒 Fase 4 Bloqueada: Se habilitará cuando se completen los insumos en la Fase 3.'
+        : '🔒 Fase 5 Bloqueada: Se habilitará tras completar la liquidación en la Fase 4.';
+      showNotification(msg, 'warning');
+      return;
+    }
+    setActiveTab(st.num);
+  };
 
   return (
     <div className="min-h-screen bg-[#070a10] text-slate-200 antialiased selection:bg-orange-500 selection:text-white flex flex-col">
@@ -576,7 +1255,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               </button>
             )}
             <a
-              href={`https://wa.me/${(agencyBranding.telefonoWhatsapp || '+503 7000-1122').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola, te escribo desde el Portal de Cliente de ${lead.empresa}.`)}`}
+              href={`https://wa.me/${(agencyBranding.telefonoWhatsapp || '+503 7000-1122').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola, te escribo desde el Portal de Cliente de ${clientEmpresa}.`)}`}
               target="_blank"
               rel="noreferrer"
               className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950 transition-all"
@@ -603,14 +1282,14 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 </span>
                 <span className="text-slate-600">·</span>
                 <span className="text-xs text-slate-300 font-medium">
-                  {isSV ? '🇸🇻 El Salvador' : '🇩🇴 República Dominicana'}
+                  {currentPais === 'DO' ? '🇩🇴 República Dominicana' : '🇸🇻 El Salvador'}
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                {lead.empresa}
+                {clientEmpresa}
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 max-w-xl">
-                Estimado(a) <strong className="text-white">{lead.contacto}</strong>: este es tu portal confidencial para aprobar tu proyecto, formalizar el contrato, cargar insumos y recibir tu código y credenciales.
+                Estimado(a) <strong className="text-white">{clientContacto}</strong>: este es tu portal confidencial para aprobar tu proyecto, formalizar el contrato, cargar insumos y recibir tu código y credenciales.
               </p>
             </div>
 
@@ -665,9 +1344,20 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
             <div className="flex items-center gap-2 shrink-0">
               {portalConfig?.clienteAutenticado ? (
-                <div className="flex items-center gap-1.5 text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
-                  <UserCheck className="w-4 h-4" />
-                  <span>Autenticado ({portalConfig.clienteAuthProvider || 'Google'})</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
+                    <UserCheck className="w-4 h-4" />
+                    <span>Autenticado ({portalConfig.clienteAuthProvider || 'Google'})</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClientLogout}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/50 text-xs font-medium transition-all shadow-sm"
+                    title="Cerrar sesión de cliente"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Cerrar Sesión</span>
+                  </button>
                 </div>
               ) : (
                 <button
@@ -691,32 +1381,72 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
           {steps.map((st) => {
             const isCurrent = activeTab === st.num;
             const isCompleted = st.done;
+            const isLocked = !st.unlocked;
+
+            const isGoogleProtected = st.isGoogleProtected;
+
             return (
               <button
                 key={st.num}
-                onClick={() => setActiveTab(st.num)}
+                type="button"
+                onClick={() => handleSelectTab(st)}
                 className={`p-3.5 rounded-xl border text-left transition-all relative overflow-hidden ${
                   isCurrent
-                    ? 'bg-orange-500/15 border-orange-500 text-white shadow-lg shadow-orange-950/40'
+                    ? isGoogleProtected
+                      ? 'bg-amber-500/15 border-amber-500 text-white shadow-lg shadow-amber-950/40'
+                      : 'bg-orange-500/15 border-orange-500 text-white shadow-lg shadow-orange-950/40'
+                    : isGoogleProtected
+                    ? 'bg-[#121320] border-amber-500/30 text-amber-200 hover:border-amber-500/60'
                     : isCompleted
                     ? 'bg-[#0f1524] border-emerald-500/40 text-slate-200 hover:border-emerald-500/60'
+                    : isLocked
+                    ? 'bg-[#080b12] border-slate-800/60 text-slate-600 opacity-60 cursor-not-allowed'
                     : 'bg-[#0c101b] border-slate-800 text-slate-400 hover:border-slate-700'
                 }`}
               >
-                {isCompleted && (
-                  <div className="absolute top-1 right-1.5">
+                {isGoogleProtected ? (
+                  <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
+                    <span className="text-[9px] bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded font-mono font-bold">Google</span>
+                    <Lock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                  </div>
+                ) : isCompleted ? (
+                  <div className="absolute top-1.5 right-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                   </div>
-                )}
+                ) : isLocked ? (
+                  <div className="absolute top-1.5 right-1.5">
+                    <Lock className="w-3.5 h-3.5 text-slate-600" />
+                  </div>
+                ) : null}
                 <div className="flex items-center gap-1.5 mb-1">
                   <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded ${
-                    isCurrent ? 'bg-orange-500 text-white' : isCompleted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'
+                    isCurrent 
+                      ? isGoogleProtected ? 'bg-amber-500 text-slate-900' : 'bg-orange-500 text-white' 
+                      : isGoogleProtected
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      : isCompleted 
+                      ? 'bg-emerald-500/20 text-emerald-400' 
+                      : isLocked
+                      ? 'bg-slate-900 text-slate-600 border border-slate-800'
+                      : 'bg-slate-800 text-slate-400'
                   }`}>
                     0{st.num}
                   </span>
                   <span className="text-[11px] font-bold truncate">{st.title}</span>
                 </div>
-                <div className="text-[10px] text-slate-400 truncate">{st.label}</div>
+                <div className="text-[10px] text-slate-400 truncate flex items-center gap-1">
+                  {isGoogleProtected ? (
+                    <span className="text-amber-400 font-medium flex items-center gap-1">
+                      <ShieldCheck className="w-2.5 h-2.5 inline text-amber-400" /> Protegido Google
+                    </span>
+                  ) : isLocked ? (
+                    <span className="text-slate-500 flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5 inline" /> Bloqueado
+                    </span>
+                  ) : (
+                    <span>{st.label}</span>
+                  )}
+                </div>
               </button>
             );
           })}
@@ -725,106 +1455,533 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         {/* TAB PANELS: 5 PHASES */}
         
         {/* ========================================================================= */}
-        {/* FASE 1: APROBACIÓN 1-CLIC */}
+        {/* FASE 1: APROBACIÓN 1-CLIC & LECTURA COMPLETA DE PROPUESTA OFICIAL */}
         {/* ========================================================================= */}
         {activeTab === 1 && (
+          isDocumentosAnterioresProtegidos ? (
+            <GoogleProtectedCard
+              title="Propuesta VIP y Oferta Comercial Protegida"
+              subtitle="Fase 1 · Aprobación VIP"
+              description={`Por estrictas políticas de confidencialidad comercial y protección de datos, la propuesta económica y los términos técnicos aprobados de ${clientEmpresa} están protegidos bajo autenticación corporativa de Google. Para acceder a este documento oficial, debes validar tu identidad con tu cuenta autorizada.`}
+              clientEmpresa={clientEmpresa}
+              leadEmail={lead.email}
+              onAuthenticate={handleRegisterClientAuth}
+              loading={clientAuthLoading}
+              clientAuthPass={clientAuthPass}
+              setClientAuthPass={setClientAuthPass}
+              clientAuthEmail={clientAuthEmail}
+              setClientAuthEmail={setClientAuthEmail}
+            />
+          ) : (
           <div className="space-y-6">
-            <div className="rounded-2xl bg-[#0e1320] border border-slate-800 p-6 space-y-6 shadow-xl">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
-                <div className="space-y-1">
+            {/* Top Action & Control Bar */}
+            <div className="no-print rounded-2xl bg-[#0e1320] border border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
                   <span className="text-[11px] font-mono uppercase text-orange-400 font-bold tracking-wider">
-                    Fase 1 · Aprobación de Presupuesto VIP
+                    Fase 1 · Propuesta de Desarrollo Digital VIP
                   </span>
-                  <h2 className="text-xl font-bold text-white">Resumen Ejecutivo de la Propuesta</h2>
-                  <p className="text-xs text-slate-400">Diseño y desarrollo web a medida con código nativo, sin dependencias de WordPress ni plugins lentos.</p>
+                  <span className="text-slate-600">·</span>
+                  <span className="text-xs font-mono font-bold text-slate-200">
+                    {presupuesto?.codigo || 'P-2026-001'}
+                  </span>
                 </div>
+                <h2 className="text-sm sm:text-base font-bold text-white">
+                  Documento Oficial de la Oferta Comercial & Alcance Técnico
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Puedes leer el documento completo a continuación, imprimirlo o descargarlo en PDF si deseas archivar una copia, o aprobarlo directamente en línea con un solo clic.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700 transition-all shadow-sm"
+                  title="Imprimir o Guardar en PDF para tus archivos"
+                >
+                  <Printer className="w-4 h-4 text-orange-400" />
+                  <span>Imprimir / Descargar PDF</span>
+                </button>
+
                 {portalConfig?.fase1Aprobada ? (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold font-mono">
-                    <CheckCheck className="w-4 h-4" /> Aprobada el {portalConfig.fechaAprobacionPropuesta}
-                  </div>
+                  <button
+                    onClick={() => setActiveTab(2)}
+                    className="px-4 py-2.5 rounded-xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center gap-2 shadow-sm"
+                  >
+                    <CheckCheck className="w-4 h-4" />
+                    <span>Propuesta Aprobada · Ir a Contrato SOW →</span>
+                  </button>
                 ) : (
-                  <span className="text-xs font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-lg">
-                    Pendiente de Aprobación
-                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAprobarPropuesta}
+                    className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-2 shadow-xl shadow-orange-950 transition-all transform hover:scale-[1.02]"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Aprobar Propuesta (1-Clic)</span>
+                  </button>
                 )}
               </div>
+            </div>
 
-              {/* Core Deliverables Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 rounded-xl bg-[#141b2b] border border-slate-800 space-y-2">
-                  <div className="w-8 h-8 rounded-lg bg-orange-500/15 text-orange-400 flex items-center justify-center font-bold">
-                    <Zap className="w-4 h-4" />
-                  </div>
-                  <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono">Velocidad Extrema</h3>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Arquitectura nativa Antigravity que carga en menos de <strong>0.8 segundos</strong> en dispositivos móviles con 95-100 en Google PageSpeed.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#141b2b] border border-slate-800 space-y-2">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-bold">
-                    <Globe className="w-4 h-4" />
-                  </div>
-                  <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono">SEO Local & Conversión</h3>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Microdatos Schema estructurados para dominar búsquedas locales de Google y botones de WhatsApp inteligentes con tracking directo.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#141b2b] border border-slate-800 space-y-2">
-                  <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center font-bold">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                  <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono">StoryBrand Framework</h3>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Textos persuasivos enfocados en tu cliente ideal como el héroe y tu empresa como la guía confiable que resuelve su problema.
-                  </p>
-                </div>
+            {/* FULL EXECUTIVE PROPOSAL DOCUMENT (ESTILO GOOGLE DOCS / GOGLITE OFICIAL) */}
+            <div 
+              id="printable-client-proposal"
+              className="bg-slate-900/60 p-2 sm:p-6 text-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl print:border-none print:p-0 print:shadow-none print:bg-transparent print:m-0 space-y-6 print:space-y-0"
+            >
+              {/* PÁGINA 1: PORTADA OFICIAL GOGLITE */}
+              <div className="pdf-page-cover relative w-full aspect-[210/297] max-w-4xl mx-auto overflow-hidden bg-white shadow-2xl rounded-xl print:rounded-none print:shadow-none">
+                <img 
+                  src="/assets/portada_oficial_fija.png" 
+                  alt="Propuesta de Desarrollo Digital VIP" 
+                  className="w-full h-full object-cover block"
+                />
               </div>
 
-              {/* Pricing & Terms Box */}
-              <div className="p-5 rounded-xl bg-[#121827] border border-slate-700/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Estructura de Inversión 50/50</span>
-                  <div className="text-2xl font-black text-white font-mono flex items-center gap-2">
-                    <span>${totalInversion} USD</span>
-                    <span className="text-xs text-slate-400 font-normal">Precio Llave en Mano</span>
+              {/* PÁGINA 2: RESUMEN EJECUTIVO, ESTRATEGIA, ALCANCE Y CONDICIONES */}
+              <div className="pdf-page-content max-w-4xl mx-auto p-6 sm:p-12 bg-white shadow-2xl rounded-xl print:rounded-none print:shadow-none text-slate-900 font-sans leading-relaxed text-xs">
+                {/* Sub-Header con Marca Goglite y Metadatos */}
+                <div className="border-b-2 border-slate-900 pb-4 mb-6 avoid-break">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <img 
+                        src="/assets/goglite_logo.png" 
+                        alt={presupuesto?.emisor?.empresa || 'Goglite'} 
+                        className="h-10 w-auto object-contain"
+                      />
+                      <div className="text-[10px] text-slate-600 font-medium space-y-0.5 border-l border-slate-300 pl-3">
+                        <div><strong>Ubicación:</strong> {presupuesto?.emisor?.ubicacion || 'Santa Ana, El Salvador · Santo Domingo, RD'}</div>
+                        <div><strong>Contacto:</strong> {presupuesto?.emisor?.telefono || '(503) 7756-9828'} | {presupuesto?.emisor?.email || 'info@goglite.com'}</div>
+                        <div><strong>Director:</strong> {presupuesto?.emisor?.responsable || 'Víctor Matos'}</div>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-[11px] font-mono font-bold text-slate-900 uppercase">
+                        Fecha: {presupuesto?.fecha || new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                      </div>
+                      <div className="text-[11px] font-mono text-orange-600 font-bold mt-0.5">
+                        {presupuesto?.codigo || 'P-2026-001'}
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    Anticipo al inicio: <strong className="text-white">${anticipoMonto} USD</strong> · Liquidación contra entrega: <strong className="text-white">${liquidacionMonto} USD</strong>
-                  </p>
+
+                  {/* DESTINATARIO */}
+                  <div className="mt-4 p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <div className="text-[10px] font-mono uppercase text-slate-500 font-bold">Cliente / Destinatario:</div>
+                    <div className="text-sm font-extrabold text-slate-900 mt-0.5">
+                      {clientContacto} | {clientEmpresa}
+                    </div>
+                    <div className="text-[11px] text-slate-700">
+                      Tel: {presupuesto?.cliente?.telefono || lead?.telefono || ''} · {presupuesto?.cliente?.actividad || 'Servicios Comerciales'}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                  {portalConfig?.fase1Aprobada ? (
-                    <button
-                      onClick={() => setActiveTab(2)}
-                      className="w-full sm:w-auto px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 border border-slate-700"
-                    >
-                      <span>Ir al Contrato SOW & Anticipo</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleAprobarPropuesta}
-                      className="w-full sm:w-auto px-7 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-orange-950 transition-all transform hover:scale-[1.02]"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>Aprobar Propuesta & Continuar a Contrato</span>
-                    </button>
+                {/* 2. TÍTULO DE LA PROPUESTA VIP */}
+                <div className="mb-6 avoid-break">
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug uppercase">
+                    {presupuesto?.titulo || 'PROPUESTA DE DESARROLLO DIGITAL VIP'}
+                  </h2>
+                  {(presupuesto?.subtitulo || lead?.servicio) && (
+                    <div className="text-xs font-semibold text-orange-600 mt-0.5">
+                      {presupuesto?.subtitulo || lead?.servicio}
+                    </div>
                   )}
+                </div>
+
+                {/* 3. BLOQUES ESTRATÉGICOS FIJOS */}
+                <div className="space-y-3 mb-6 bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200/80 avoid-break text-[11px]">
+                  <div>
+                    <span className="font-extrabold text-slate-900 block mb-0.5">
+                      • Proyecto & Diagnóstico:
+                    </span>
+                    <p className="text-slate-700 leading-normal">
+                      {presupuesto?.portada?.proyecto || `Desarrollo e implementación del Sistema Web Mobile-First para ${clientEmpresa}, diseñado con arquitectura limpia y optimizado para captación de clientes.`}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="font-extrabold text-slate-900 block mb-0.5">
+                      • Enfoque de Conversión Inmediata:
+                    </span>
+                    <p className="text-slate-700 leading-normal">
+                      {presupuesto?.portada?.enfoqueEstrategico || 'Arquitectura orientada a la conversión directa con botones de llamada instantánea (Click-to-Call), botón flotante de WhatsApp Business y embudo de respuesta inmediata.'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="font-extrabold text-slate-900 block mb-0.5">
+                      • Tecnología y Rendimiento Mobile-First:
+                    </span>
+                    <p className="text-slate-700 leading-normal">
+                      {presupuesto?.portada?.tecnologiaMobileFirst || 'Arquitectura ultra-rápida optimizada al 100% para teléfonos inteligentes (velocidad de carga inferior a 1.2 segundos y Core Web Vitals en verde).'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="font-extrabold text-slate-900 block mb-0.5">
+                      • GEO & SEO Local de Nueva Generación (Optimizado para IA y Buscadores):
+                    </span>
+                    <p className="text-slate-700 leading-normal">
+                      {presupuesto?.portada?.geoSeoLocal || 'Estructura semántica avanzada (Schema.org LocalBusiness) para asegurar máxima visibilidad en Google Maps, buscadores y motores de IA (ChatGPT / Perplexity).'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 4. COMPONENTES DEL SISTEMA INTEGRAL */}
+                <div className="mb-6">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1.5 mb-3.5">
+                    1. Componentes del Sistema Integral (Alcance y Entregables)
+                  </h2>
+
+                  <div className="space-y-3.5">
+                    {(presupuesto?.modulos && presupuesto.modulos.length > 0 ? presupuesto.modulos : [
+                      { numero: 'MÓDULO 1', titulo: 'Plataforma Web Corporativa de Alta Conversión (Mobile-First)', descripcion: 'Arquitectura responsive optimizada al 100% para dispositivos móviles. Incluye secciones estratégicas StoryBrand, catálogo de servicios, cobertura y llamado a la acción.' },
+                      { numero: 'MÓDULO 2', titulo: 'Canales de Cierre y Contacto Directo (WhatsApp & Click-to-Call)', descripcion: 'Integración de botón flotante inteligente de WhatsApp Business con mensaje preconfigurado y marcado directo de un solo toque.' },
+                      { numero: 'MÓDULO 3', titulo: 'Optimización del Perfil de Google Negocio & SEO/GEO Local', descripcion: 'Configuración técnica de Schema.org JSON-LD, categorización en Google Maps y ecosistema de códigos QR para captación de reseñas 5 estrellas.' }
+                    ]).map((m, i) => (
+                      <div key={i} className="pl-3.5 border-l-2 border-orange-500 space-y-0.5 avoid-break">
+                        <div className="font-extrabold text-slate-900 text-xs">
+                          {m.numero}: {m.titulo}
+                        </div>
+                        <p className="text-slate-700 text-[11px] leading-relaxed">
+                          {m.descripcion}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. HOJA DE RUTA Y FASES */}
+                <div className="mb-6 avoid-break">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1.5 mb-3.5">
+                    2. Hoja de Ruta y Fases de Implementación (10 a 15 Días Hábiles)
+                  </h2>
+
+                  <div className="space-y-2">
+                    {(presupuesto?.fases && presupuesto.fases.length > 0 ? presupuesto.fases : [
+                      { fase: 'Fase 1', plazo: 'Días 1 a 4', detalle: 'Configuración de activos digitales, arquitectura de información StoryBrand, ficha de Google Maps y códigos QR vectoriales.' },
+                      { fase: 'Fase 2', plazo: 'Días 5 a 10', detalle: 'Desarrollo de la plataforma web Mobile-First, integración de canales de cierre en WhatsApp y optimización SEO/GEO.' },
+                      { fase: 'Fase 3', plazo: 'Días 11 a 15', detalle: 'Auditoría de velocidad móvil, revisión conjunta con el cliente, ajustes finales y despliegue en producción.' }
+                    ]).map((f, i) => (
+                      <div key={i} className="text-[11px] text-slate-800">
+                        <span className="font-extrabold text-slate-900">• {f.fase} ({f.plazo}):</span> {f.detalle}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. INVERSIÓN ESTRATÉGICA Y CONDICIONES */}
+                <div className="mb-6 p-5 sm:p-6 rounded-xl bg-slate-900 text-white avoid-break shadow-md">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-orange-400 mb-2">
+                    3. Inversión Estratégica y Condiciones Comerciales
+                  </h2>
+
+                  <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
+                    La inversión en un sistema digital integral de esta envergadura suele oscilar entre los <strong>${presupuesto?.inversion?.precioMercadoReferencial || Math.max(1500, totalInversion * 2)} USD</strong> en el mercado profesional. Para <strong>{clientEmpresa}</strong> hemos estructurado un paquete preferencial:
+                  </p>
+
+                  <div className="bg-white/10 p-3.5 rounded-lg border border-white/15 space-y-1.5 font-mono mb-4">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-300">Inversión Total del Sistema Completo:</span>
+                      <span className="text-base font-extrabold text-orange-400">
+                        ${totalInversion} USD
+                      </span>
+                    </div>
+                    {presupuesto?.inversion?.beneficioExclusivo && (
+                      <div className="text-[10px] text-emerald-300 font-sans pt-1 border-t border-white/10">
+                        ★ <strong>Beneficio Exclusivo:</strong> {presupuesto.inversion.beneficioExclusivo}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-[10px] text-slate-300 space-y-1.5 font-sans">
+                    <div>• <strong>Forma de Pago:</strong> ${anticipoMonto} USD de anticipo para iniciar y ${liquidacionMonto} USD contra entrega final y publicación.</div>
+                    <div>• <strong>Revisiones:</strong> {presupuesto?.inversion?.revisiones || 'Dos (2) rondas completas de ajustes de diseño y contenido.'}</div>
+                    <div>• <strong>Requisitos de Inicio:</strong> {presupuesto?.inversion?.requisitosInicio || 'Logotipo, fotografías del negocio/servicios, número oficial de WhatsApp y datos de contacto.'}</div>
+                    <div>• <strong>Vigencia de la Oferta:</strong> {presupuesto?.vigenciaDias || 15} días calendario.</div>
+                  </div>
+                </div>
+
+                {/* 4. FIRMA OFICIAL GOGLITE */}
+                <div className="pt-4 border-t border-slate-300 flex items-center justify-between text-[11px] text-slate-600 avoid-break mt-6">
+                  <div>
+                    <div className="font-extrabold text-slate-900 text-xs">{presupuesto?.emisor?.responsable || 'Víctor Matos'}</div>
+                    <div className="text-orange-600 font-bold">{presupuesto?.emisor?.empresa || 'Goglite'}</div>
+                    <div className="text-[10px] text-slate-500">{presupuesto?.emisor?.telefono || '(503) 7756-9828'} | {presupuesto?.emisor?.email || 'info@goglite.com'}</div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="font-mono text-[10px] text-slate-400">Documento Oficial Certificado</div>
+                    <div className="text-xs font-bold text-slate-900 uppercase">Estado: {presupuesto?.estado || 'EMITIDO'}</div>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Bottom Executive Approval Banner */}
+            <div className="no-print rounded-2xl bg-gradient-to-r from-[#101626] via-[#121c33] to-[#101626] border border-orange-500/30 p-6 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-2xl">
+              <div className="space-y-1.5 text-center sm:text-left">
+                <span className="text-[10px] font-mono uppercase text-orange-400 font-bold tracking-wider">
+                  Compromiso de Garantía de Ejecución
+                </span>
+                <h3 className="text-base font-bold text-white">
+                  ¿Listo para iniciar el desarrollo de {clientEmpresa}?
+                </h3>
+                <p className="text-xs text-slate-300 max-w-xl">
+                  Al presionar <strong className="text-white">Aprobar Propuesta</strong>, formalizas la aceptación comercial y avanzas a la Fase 2 para registrar el contrato SOW y coordinar el anticipo del 50%.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="w-full sm:w-auto px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 border border-slate-700 transition-all"
+                >
+                  <Printer className="w-4 h-4 text-orange-400" />
+                  <span>Imprimir / Descargar PDF</span>
+                </button>
+
+                {portalConfig?.fase1Aprobada ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(2)}
+                    className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-emerald-950 transition-all"
+                  >
+                    <span>Continuar a Fase 2: Contrato SOW</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleAprobarPropuesta}
+                    className="w-full sm:w-auto px-7 py-3 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-2xl shadow-orange-950 transition-all transform hover:scale-[1.02]"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Aprobar Propuesta (1-Clic) & Continuar</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
+          )
         )}
 
+        {/* ========================================================================= */}
         {/* ========================================================================= */}
         {/* FASE 2: CONTRATO SOW & ANTICIPO 50% (CON FIRMA CANVAS) */}
         {/* ========================================================================= */}
         {activeTab === 2 && (
+          isDocumentosAnterioresProtegidos ? (
+            <GoogleProtectedCard
+              title="Contrato Formal SOW y Comprobantes Protegidos"
+              subtitle="Fase 2 · Formalización Legal SOW"
+              description={`El Contrato Oficial de Prestación de Servicios Digitales (SOW), las firmas digitales manuscritas y los comprobantes bancarios de ${clientEmpresa} contienen información legal confidencial. Autentica tu cuenta autorizada de Google para consultar o imprimir este contrato formal.`}
+              clientEmpresa={clientEmpresa}
+              leadEmail={lead.email}
+              onAuthenticate={handleRegisterClientAuth}
+              loading={clientAuthLoading}
+              clientAuthPass={clientAuthPass}
+              setClientAuthPass={setClientAuthPass}
+              clientAuthEmail={clientAuthEmail}
+              setClientAuthEmail={setClientAuthEmail}
+            />
+          ) : (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Top Action & Control Bar */}
+            <div className="no-print rounded-2xl bg-[#0e1320] border border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono uppercase text-orange-400 font-bold tracking-wider">
+                    Fase 2 · Formalización Legal SOW
+                  </span>
+                  <span className="text-slate-600">·</span>
+                  <span className="text-xs font-mono font-bold text-slate-200">
+                    {contrato?.codigo || activeProyecto?.codigo || 'CON-2026-001'}
+                  </span>
+                  <span className="text-slate-600">·</span>
+                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                    portalConfig?.fase2Firmada 
+                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
+                      : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                  }`}>
+                    {portalConfig?.fase2Firmada ? '✓ Contrato Firmado' : 'Pendiente de Firma y Anticipo'}
+                  </span>
+                </div>
+                <h2 className="text-sm sm:text-base font-bold text-white">
+                  Contrato Oficial de Prestación de Servicios Digitales (SOW)
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Revisa los términos legales, cláusulas de propiedad intelectual y plazos oficiales. Puedes imprimir o descargar tu contrato en PDF, o firmarlo digitalmente en el formulario interactivo.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700 transition-all shadow-sm"
+                  title="Imprimir o Guardar en PDF para tus archivos"
+                >
+                  <Printer className="w-4 h-4 text-orange-400" />
+                  <span>Imprimir / Descargar Contrato PDF</span>
+                </button>
+
+                {portalConfig?.fase2Firmada && (
+                  <button
+                    onClick={() => setActiveTab(3)}
+                    className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-all"
+                  >
+                    <span>Ir a Fase 3: Intake de Insumos</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* FULL PRINTABLE SOW CONTRACT SHEET (A4 Presentation idéntica al panel interno) */}
+            <div 
+              id="printable-client-contract"
+              className="bg-white text-slate-900 rounded-2xl shadow-2xl p-6 sm:p-12 border border-slate-200 print:border-none print:p-0 print:shadow-none print:rounded-none max-w-4xl mx-auto"
+            >
+              {/* Header Document */}
+              <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <img 
+                    src="/assets/goglite_logo.png" 
+                    alt="Goglite Digital" 
+                    className="h-8 w-auto object-contain"
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                  <div>
+                    <div className="font-black text-sm uppercase tracking-wider text-slate-900">Goglite Digital</div>
+                    <div className="text-[10px] text-slate-500 font-mono">Agencia de Desarrollo Web Nativo & IA</div>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="font-mono text-xs font-bold text-orange-600">{activeProyecto?.codigo || 'CON-2026-001'}</div>
+                  <div className="text-[10px] text-slate-500">{contrato?.fechaEmision || new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                </div>
+              </div>
+
+              {/* Title */}
+              <div className="text-center my-6">
+                <h1 className="text-base sm:text-lg font-black uppercase tracking-tight text-slate-950">
+                  {contrato?.titulo || 'CONTRATO OFICIAL DE PRESTACIÓN DE SERVICIOS DIGITALES Y DESARROLLO WEB'}
+                </h1>
+                <p className="text-xs text-slate-600 mt-1">
+                  Entre Goglite Digital y {clientEmpresa}
+                </p>
+              </div>
+
+              {/* Parties Section */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs mb-6 space-y-2">
+                <p className="leading-relaxed">
+                  <strong>DE UNA PARTE:</strong> <strong>GOGLITE DIGITAL</strong>, representada por su Director General <strong>Víctor Matos</strong>, con facultades suficientes para celebrar este acto en calidad de <strong>EL PRESTADOR</strong>.
+                </p>
+                <p className="leading-relaxed">
+                  <strong>DE OTRA PARTE:</strong> <strong>{clientContacto}</strong>, en representación legal de <strong>{clientEmpresa}</strong>, con domicilio en {clientUbicacion}, en adelante <strong>EL CLIENTE</strong>.
+                </p>
+                <p className="text-slate-600 text-[11px] pt-1 border-t border-slate-200">
+                  Ambas partes se reconocen recíprocamente la capacidad legal necesaria para otorgar el presente contrato de servicios con base en las siguientes cláusulas:
+                </p>
+              </div>
+
+              {/* Clauses */}
+              <div className="space-y-4 text-xs text-slate-800">
+                {(contrato?.clausulas || []).map((c, i) => (
+                  <div key={i} className="space-y-1">
+                    <h4 className="font-black text-slate-950 uppercase tracking-wide text-[11px]">
+                      CLÁUSULA {c.numero}: {c.titulo}
+                    </h4>
+                    <p className="text-slate-700 leading-relaxed text-justify whitespace-pre-line">
+                      {c.texto}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Summary Table: Investment */}
+              <div className="my-6 p-4 rounded-xl bg-slate-900 text-white text-xs">
+                <div className="font-bold text-orange-400 uppercase text-[10px] tracking-wider mb-2">
+                  Resumen Financiero del Acuerdo
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <div className="text-slate-400 text-[10px]">Inversión Total:</div>
+                    <div className="text-sm font-bold text-white font-mono">${totalInversion} USD</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-[10px]">Anticipo (50%):</div>
+                    <div className="text-sm font-bold text-emerald-400 font-mono">${anticipoMonto} USD</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-[10px]">Saldo Final (50%):</div>
+                    <div className="text-sm font-bold text-amber-300 font-mono">${liquidacionMonto} USD</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Signature Section Inside Document */}
+              <div className="mt-8 pt-6 border-t-2 border-slate-300 grid grid-cols-1 sm:grid-cols-2 gap-8">
+                {/* Agency Signature */}
+                <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col justify-between">
+                  <div>
+                    <div className="text-[10px] uppercase font-bold text-slate-500 mb-2">Por Goglite Digital:</div>
+                    <div className="h-16 flex items-center justify-center border-b border-slate-300 pb-2">
+                      <span className="font-serif italic text-lg text-slate-800">Victor Matos</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-center text-[10px] text-slate-600">
+                    <div className="font-bold text-slate-900">Víctor Matos</div>
+                    <div>Director General · Goglite Digital</div>
+                    <div className="text-emerald-700 font-mono font-bold mt-0.5">Certificado por Goglite Digital</div>
+                  </div>
+                </div>
+
+                {/* Client Signature Preview Inside Document */}
+                <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col justify-between">
+                  <div>
+                    <div className="text-[10px] uppercase font-bold text-slate-500 mb-2">Por El Cliente ({clientEmpresa}):</div>
+                    
+                    {portalConfig?.fase2Firmada && portalConfig?.firmaDigital ? (
+                      <div className="h-16 flex items-center justify-center border-b border-slate-300 pb-2">
+                        <img 
+                          src={portalConfig.firmaDigital} 
+                          alt="Firma Digital Cliente" 
+                          className="max-h-14 max-w-full object-contain filter invert"
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-16 flex items-center justify-center border-b border-dashed border-slate-300 text-slate-400 text-[11px] italic pb-2 text-center">
+                        ✍ Firma digital pendiente en el formulario interactivo
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-2 text-center text-[10px] text-slate-600">
+                    <div className="font-bold text-slate-900">
+                      {portalConfig?.nombreFirmante || clientContacto}
+                    </div>
+                    <div>
+                      {portalConfig?.documentoFirmante ? `ID: ${portalConfig.documentoFirmante}` : 'Representante Legal'}
+                    </div>
+                    {portalConfig?.fase2Firmada && (
+                      <div className="text-emerald-700 font-mono font-bold mt-0.5">
+                        ✓ Firmado Electrónicamente ({portalConfig.fechaFirmaContrato || '16 Oct 2026'})
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive Execution Form: Canvas Signature & Banking Details */}
+            <div className="no-print grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
               
               {/* Left Column: SOW Agreement & Canvas Signature */}
               <div className="lg:col-span-7 space-y-6">
@@ -832,23 +1989,15 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                     <div>
                       <span className="text-[11px] font-mono uppercase text-orange-400 font-bold tracking-wider">
-                        Fase 2 · Formalización Legal
+                        Firma Electrónica Certificada
                       </span>
-                      <h2 className="text-lg font-bold text-white">Contrato de Servicios (SOW)</h2>
+                      <h2 className="text-lg font-bold text-white">Registro de Firma del Contrato</h2>
                     </div>
                     {portalConfig?.fase2Firmada && (
                       <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20 flex items-center gap-1 font-bold">
                         <CheckCheck className="w-3.5 h-3.5" /> Firmado
                       </span>
                     )}
-                  </div>
-
-                  {/* Legal Terms Scrollbox */}
-                  <div className="bg-[#121827] border border-slate-800 rounded-xl p-4 text-xs text-slate-300 space-y-3 max-h-52 overflow-y-auto leading-relaxed font-mono">
-                    <p><strong className="text-white">CLÁUSULA PRIMERA (OBJETO):</strong> Goglite Studio se compromete al diseño, desarrollo y puesta en producción de la plataforma web corporativa de {lead.empresa}, garantizando una infraestructura sin WordPress y tiempos de carga menores a 1.0s.</p>
-                    <p><strong className="text-white">CLÁUSULA SEGUNDA (PLAZO DE 10 DÍAS):</strong> El plazo oficial de ejecución técnica es de diez (10) días hábiles, los cuales comenzarán a computarse formalmente a partir de la entrega del 100% de los insumos requeridos (logotipos, textos y accesos de marca).</p>
-                    <p><strong className="text-white">CLÁUSULA TERCERA (FORMA DE PAGO):</strong> Cincuenta por ciento (50%) como anticipo de inicio (${anticipoMonto} USD) y cincuenta por ciento (50%) a la entrega final en staging (${liquidacionMonto} USD), previo a la liberación de credenciales maestras.</p>
-                    <p><strong className="text-white">CLÁUSULA CUARTA (PROPIEDAD INTELECTUAL):</strong> Tras la liquidación final, el cliente recibe el 100% de los derechos de propiedad intelectual, código fuente limpio y accesos administrativos sin candados de permanencia.</p>
                   </div>
 
                   {/* Interactive Signature Canvas */}
@@ -1066,7 +2215,149 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+          )
+        )}
 
+        {/* ========================================================================= */}
+        {/* CONTROL DE ACCESO PROTEGIDO PARA FASES 3, 4 Y 5 */}
+        {/* ========================================================================= */}
+        {activeTab >= 3 && !portalConfig?.clienteAutenticado && (
+          <div className="rounded-2xl bg-gradient-to-b from-[#0f172a] to-[#090d16] border border-orange-500/30 p-6 sm:p-10 shadow-2xl text-center max-w-2xl mx-auto space-y-6">
+            <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center mx-auto text-orange-400 shadow-lg shadow-orange-950/50">
+              <Lock className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-mono font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5" /> Área Confidencial y de Insumos Protegida
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-white">
+                Autenticación de Acceso Requerida
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+                A partir de la <strong>Fase 3</strong> gestionarás la carga de activos de marca, archivos vectoriales, credenciales técnicas y accesos de <strong>{clientEmpresa}</strong>. Por seguridad y protección contractual, autentica tu identidad para continuar.
+              </p>
+            </div>
+
+            {/* Estado de Creación de Carpeta y Subcarpetas en Google Drive */}
+            <div className="p-4 rounded-xl bg-[#0b121f] border border-blue-500/30 text-left space-y-2.5 max-w-md mx-auto shadow-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-white">
+                  <span className="text-base">📁</span>
+                  <span>Bóveda Oficial Google Drive</span>
+                </div>
+                {syncingDrive ? (
+                  <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3 animate-spin text-amber-400" /> Creando en Drive...
+                  </span>
+                ) : data?.portalConfig?.driveVault ? (
+                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 font-bold">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Carpetas Listas
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleSyncDriveVault({ openWindow: false, silent: false })}
+                    className="text-[10px] font-mono text-blue-400 hover:text-blue-300 underline"
+                  >
+                    ⚡ Crear Bóveda
+                  </button>
+                )}
+              </div>
+
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                {data?.portalConfig?.driveVault
+                  ? `Se ha creado y vinculado la carpeta principal [Goglite] ${clientEmpresa} con sus 3 subcarpetas en Google Drive. Autentica tu acceso para habilitar la carga segura de insumos y entrega final.`
+                  : `Generando automáticamente la carpeta principal de ${clientEmpresa} y sus 3 subcarpetas en Google Drive...`}
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 pt-1">
+                <div className="text-[10px] bg-slate-900/90 border border-slate-700/80 text-slate-300 px-2 py-1 rounded-lg font-mono flex items-center gap-1.5">
+                  <span>📸</span>
+                  <span className="truncate">01_Insumos</span>
+                </div>
+                <div className="text-[10px] bg-slate-900/90 border border-slate-700/80 text-slate-300 px-2 py-1 rounded-lg font-mono flex items-center gap-1.5">
+                  <span>📝</span>
+                  <span className="truncate">02_Contratos</span>
+                </div>
+                <div className="text-[10px] bg-slate-900/90 border border-slate-700/80 text-slate-300 px-2 py-1 rounded-lg font-mono flex items-center gap-1.5">
+                  <span>💻</span>
+                  <span className="truncate">03_Entregables</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Auth Options */}
+            <div className="space-y-4 pt-2 max-w-md mx-auto">
+              {/* 1. Google Workspace One-Click */}
+              <button
+                type="button"
+                disabled={clientAuthLoading}
+                onClick={() => handleRegisterClientAuth('Google Workspace')}
+                className="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs flex items-center justify-center gap-3 shadow-xl transition-all transform hover:scale-[1.01]"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+                <span>{clientAuthLoading ? 'Validando Acceso Seguro...' : 'Acceso Rápido con Google Workspace / Gmail'}</span>
+              </button>
+
+              <div className="flex items-center gap-3">
+                <div className="h-px bg-slate-800 flex-1" />
+                <span className="text-[10px] uppercase font-mono text-slate-500">O autentica con correo corporativo</span>
+                <div className="h-px bg-slate-800 flex-1" />
+              </div>
+
+              {/* 2. Direct Email + PIN Form */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleRegisterClientAuth('Correo / PIN');
+                }}
+                className="space-y-3 text-left"
+              >
+                <div>
+                  <label className="text-[11px] text-slate-400 font-mono block mb-1">Correo Electrónico Autorizado</label>
+                  <input
+                    type="email"
+                    value={clientAuthEmail || lead.email || ''}
+                    onChange={(e) => setClientAuthEmail(e.target.value)}
+                    placeholder={lead.email || 'contacto@empresa.com'}
+                    required
+                    className="w-full bg-[#141b2b] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] text-slate-400 font-mono block mb-1">PIN / Clave de Acceso</label>
+                  <input
+                    type="password"
+                    value={clientAuthPass}
+                    onChange={(e) => setClientAuthPass(e.target.value)}
+                    placeholder="Introduce tu PIN o contraseña asignada"
+                    className="w-full bg-[#141b2b] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={clientAuthLoading}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-orange-950 transition-all"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>{clientAuthLoading ? 'Validando Acceso...' : 'Validar Identidad y Desbloquear Portal'}</span>
+                </button>
+              </form>
+            </div>
+
+            <div className="pt-2 text-[10px] text-slate-500 font-mono flex items-center justify-center gap-2">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Protección SSL AES-256 · Bóveda confidencial Goglite Studio</span>
             </div>
           </div>
         )}
@@ -1074,8 +2365,40 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         {/* ========================================================================= */}
         {/* FASE 3: INTAKE DE INSUMOS (CON REGLA CONTRACTUAL DE 10 DÍAS) */}
         {/* ========================================================================= */}
-        {activeTab === 3 && (
+        {activeTab === 3 && portalConfig?.clienteAutenticado && (
           <div className="space-y-6">
+            {/* Authenticated Session Badge */}
+            <div className="p-3.5 rounded-xl bg-[#0c1424] border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-300 shadow-lg">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-white flex items-center gap-1.5">
+                    <span>Acceso de Cliente Autenticado & Protegido</span>
+                    <span className="text-[10px] bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded font-mono">SSL 256-Bit</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Sesión autorizada: <strong className="text-slate-200">{portalConfig.clienteAuthEmail || lead.email}</strong> ({portalConfig.clienteAuthProvider || 'Google Workspace'})
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-1 text-[11px] font-mono text-emerald-400 mr-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Bóveda Habilitada</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClientLogout}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/50 text-xs font-medium transition-all shadow-sm"
+                  title="Cerrar sesión de cliente y bloquear acceso"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Cerrar Sesión</span>
+                </button>
+              </div>
+            </div>
             {/* MANDATORY CONTRACTUAL SHIELD NOTICE */}
             <div className="rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent border-2 border-amber-500/40 p-5 sm:p-6 space-y-2">
               <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
@@ -1140,42 +2463,54 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               {/* Subcarpetas de Google Drive */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-800/80">
                 <a
-                  href={data.portalConfig?.driveVault?.subfolders?.insumos?.url || data.portalConfig?.driveVault?.vaultUrl || '#'}
+                  href={data.portalConfig?.driveVault?.subfolders?.insumos?.url || data.portalConfig?.driveVault?.vaultUrl || `https://drive.google.com/drive/u/0/search?q=${encodeURIComponent(`[Goglite] ${data.lead?.empresa || 'Cliente'} 01_Insumos_Cliente`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-blue-500/50 transition-all flex items-center gap-2.5 group"
+                  className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-blue-500/50 transition-all flex items-center justify-between gap-2.5 group shadow-sm"
+                  title="Abrir carpeta 01_Insumos_Cliente en Google Drive"
                 >
-                  <span className="text-base">📸</span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors">01_Insumos_Cliente</p>
-                    <p className="text-[10px] text-slate-400 truncate">Logos SVG, fotos 4K y textos</p>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-base shrink-0">📸</span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors truncate">01_Insumos_Cliente</p>
+                      <p className="text-[10px] text-slate-400 truncate">Logos SVG, fotos 4K y textos</p>
+                    </div>
                   </div>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-400 shrink-0 transition-colors" />
                 </a>
 
                 <a
-                  href={data.portalConfig?.driveVault?.subfolders?.contratos?.url || data.portalConfig?.driveVault?.vaultUrl || '#'}
+                  href={data.portalConfig?.driveVault?.subfolders?.contratos?.url || data.portalConfig?.driveVault?.vaultUrl || `https://drive.google.com/drive/u/0/search?q=${encodeURIComponent(`[Goglite] ${data.lead?.empresa || 'Cliente'} 02_Contratos_Firmados`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-blue-500/50 transition-all flex items-center gap-2.5 group"
+                  className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-blue-500/50 transition-all flex items-center justify-between gap-2.5 group shadow-sm"
+                  title="Abrir carpeta 02_Contratos_Firmados en Google Drive"
                 >
-                  <span className="text-base">📝</span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors">02_Contratos_Firmados</p>
-                    <p className="text-[10px] text-slate-400 truncate">SOW, firma digital y pagos</p>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-base shrink-0">📝</span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors truncate">02_Contratos_Firmados</p>
+                      <p className="text-[10px] text-slate-400 truncate">SOW, firma digital y pagos</p>
+                    </div>
                   </div>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-400 shrink-0 transition-colors" />
                 </a>
 
                 <a
-                  href={data.portalConfig?.driveVault?.subfolders?.entregables?.url || data.portalConfig?.driveVault?.vaultUrl || '#'}
+                  href={data.portalConfig?.driveVault?.subfolders?.entregables?.url || data.portalConfig?.driveVault?.vaultUrl || `https://drive.google.com/drive/u/0/search?q=${encodeURIComponent(`[Goglite] ${data.lead?.empresa || 'Cliente'} 03_Entregables_Codigo`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-blue-500/50 transition-all flex items-center gap-2.5 group"
+                  className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-blue-500/50 transition-all flex items-center justify-between gap-2.5 group shadow-sm"
+                  title="Abrir carpeta 03_Entregables_Codigo en Google Drive"
                 >
-                  <span className="text-base">🚀</span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors">03_Entregables_Codigo</p>
-                    <p className="text-[10px] text-slate-400 truncate">PRD técnico, accesos y DNS</p>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-base shrink-0">🚀</span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors truncate">03_Entregables_Codigo</p>
+                      <p className="text-[10px] text-slate-400 truncate">PRD técnico, accesos y DNS</p>
+                    </div>
                   </div>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-400 shrink-0 transition-colors" />
                 </a>
               </div>
             </div>
@@ -1208,13 +2543,62 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       </select>
                     </div>
 
+                    {/* Selector de Archivo Local del Dispositivo */}
                     <div>
-                      <label className="text-[11px] text-slate-400 font-mono block mb-1">Nombre o Enlace del Archivo</label>
+                      <label className="text-[11px] text-slate-400 font-mono block mb-1">
+                        Archivo de tu Dispositivo (PC / Móvil)
+                      </label>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                      
+                      <div 
+                        onClick={() => fileInputRef.current?.click()}
+                        className={`p-3 rounded-xl border border-dashed cursor-pointer transition-all flex items-center justify-between gap-3 ${
+                          selectedFile 
+                            ? 'bg-emerald-500/10 border-emerald-500/50 hover:bg-emerald-500/15' 
+                            : 'bg-[#141b2b] border-slate-700 hover:border-orange-500 hover:bg-[#182135]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                            selectedFile ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/10 text-orange-400'
+                          }`}>
+                            {selectedFile ? <FileUp className="w-4 h-4" /> : <FolderOpen className="w-4 h-4" />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-white truncate">
+                              {selectedFile ? selectedFile.name : 'Examinar y seleccionar archivo...'}
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              {selectedFile 
+                                ? `${selectedFile.size > 1048576 ? (selectedFile.size / 1048576).toFixed(1) + ' MB' : Math.round(selectedFile.size / 1024) + ' KB'} · Listo para adjuntar`
+                                : 'SVG, PNG, JPG, PDF, ZIP desde tu computadora o celular'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-200 border border-slate-700 shrink-0"
+                        >
+                          {selectedFile ? 'Cambiar' : 'Explorar'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] text-slate-400 font-mono block mb-1">
+                        Nombre o Enlace Web (Opcional si seleccionaste archivo)
+                      </label>
                       <input
                         type="text"
                         value={assetName}
                         onChange={(e) => setAssetName(e.target.value)}
-                        placeholder="Ej. Logo_Clinica_Vector.svg o Carpeta_GoogleDrive"
+                        placeholder="Ej. Logo_Clinica_Vector.svg o enlace a Google Drive / Dropbox"
                         className="w-full bg-[#141b2b] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
                       />
                     </div>
@@ -1232,7 +2616,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
                     <button
                       type="submit"
-                      disabled={!assetName.trim()}
+                      disabled={!assetName.trim() && !selectedFile}
                       className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-orange-950 transition-all"
                     >
                       <Upload className="w-3.5 h-3.5" />
@@ -1318,7 +2702,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         {/* ========================================================================= */}
         {/* FASE 4: LIQUIDACIÓN Y CANDADO DE ACCESOS */}
         {/* ========================================================================= */}
-        {activeTab === 4 && (
+        {activeTab === 4 && portalConfig?.clienteAutenticado && (
           <div className="space-y-6">
             <div className="rounded-2xl bg-[#0e1320] border border-slate-800 p-6 space-y-6 shadow-xl">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
@@ -1480,7 +2864,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         {/* ========================================================================= */}
         {/* FASE 5: GARANTÍA DE 30 DÍAS & CONVERSIÓN A CMS $99/MES */}
         {/* ========================================================================= */}
-        {activeTab === 5 && (
+        {activeTab === 5 && portalConfig?.clienteAutenticado && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               

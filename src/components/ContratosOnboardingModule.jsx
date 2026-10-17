@@ -39,6 +39,11 @@ import {
   FileCheck2,
   RefreshCw
 } from 'lucide-react';
+import {
+  getStoredProyectos,
+  saveStoredProyectos,
+  buildProyectoFromPresupuesto
+} from '../services/contractGenerator';
 
 export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNavigateToPresupuestos }) {
   const [proyectos, setProyectos] = useState([]);
@@ -71,31 +76,103 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
   useEffect(() => {
     fetchProyectos();
     fetchPresupuestos();
+
+    const handleStorageChange = () => {
+      fetchProyectos();
+      fetchPresupuestos();
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const fetchProyectos = async () => {
+    let localList = getStoredProyectos();
+
+    // Auto-generar y vincular contratos para cualquier propuesta que ya haya sido aceptada
+    try {
+      const rawProps = localStorage.getItem('goglite_presupuestos');
+      if (rawProps) {
+        const parsedProps = JSON.parse(rawProps);
+        let createdAny = false;
+        parsedProps.forEach(prop => {
+          if (prop?.estado === 'aceptado') {
+            const targetEmp = (prop.cliente?.empresa || '').toLowerCase().trim();
+            const exists = localList.some(p => 
+              (p.presupuestoId && p.presupuestoId === prop.id) ||
+              (p.presupuestoCodigo && p.presupuestoCodigo === prop.codigo) ||
+              (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
+            );
+            if (!exists) {
+              const newProj = buildProyectoFromPresupuesto(prop, localList);
+              localList.unshift(newProj);
+              createdAny = true;
+            }
+          }
+        });
+        if (createdAny) {
+          saveStoredProyectos(localList);
+        }
+      }
+    } catch (e) {}
+
     try {
       const res = await fetch('/api/proyectos');
-      if (res.ok) {
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
-        setProyectos(data);
+        if (Array.isArray(data) && data.length > 0) {
+          const map = new Map();
+          // localList toma precedencia para preservar firmas y datos offline
+          [...localList, ...data].forEach(p => {
+            if (p?.id && !map.has(p.id)) map.set(p.id, p);
+          });
+          localList = Array.from(map.values());
+          saveStoredProyectos(localList);
+        }
       }
     } catch (err) {
-      console.error('Error fetching proyectos:', err);
+      console.warn('[Contratos] Usando proyectos locales:', err);
     } finally {
+      setProyectos(localList);
+      setActiveProyecto(prev => {
+        if (!prev) return null;
+        const targetEmp = (prev.cliente?.empresa || '').toLowerCase().trim();
+        const found = localList.find(p => 
+          p.id === prev.id || 
+          (prev.presupuestoId && p.presupuestoId === prev.presupuestoId) || 
+          (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
+        );
+        return found || prev;
+      });
       setLoading(false);
     }
   };
 
   const fetchPresupuestos = async () => {
+    let localProps = [];
+    try {
+      const raw = localStorage.getItem('goglite_presupuestos');
+      if (raw) localProps = JSON.parse(raw);
+    } catch (e) {}
+
     try {
       const res = await fetch('/api/presupuestos');
-      if (res.ok) {
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
-        setPresupuestos(data);
+        if (Array.isArray(data) && data.length > 0) {
+          const map = new Map();
+          // localProps toma precedencia para preservar estado 'aceptado'
+          [...localProps, ...data].forEach(p => {
+            if (p?.id && !map.has(p.id)) map.set(p.id, p);
+          });
+          localProps = Array.from(map.values());
+        }
       }
     } catch (err) {
-      console.error('Error fetching presupuestos:', err);
+      console.warn('[Contratos] Usando presupuestos locales:', err);
+    } finally {
+      setPresupuestos(localProps);
     }
   };
 
@@ -111,17 +188,49 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
   // Create project from proposal
   const handleImportProposal = async (propId) => {
     try {
-      const res = await fetch(`/api/proyectos/crear-desde-presupuesto/${propId}`, {
-        method: 'POST'
-      });
-      const data = await res.json();
-      if (data.success) {
-        await fetchProyectos();
-        setShowImportModal(false);
-        handleOpenProyecto(data.proyecto, 'contrato');
-      } else {
-        alert('Error: ' + data.error);
+      const prop = presupuestos.find(p => p.id === propId);
+      if (!prop) {
+        alert('Presupuesto no encontrado');
+        return;
       }
+
+      let createdProj = null;
+
+      // 1. Intentar backend API
+      try {
+        const res = await fetch(`/api/proyectos/crear-desde-presupuesto/${propId}`, {
+          method: 'POST'
+        });
+        const cType = res.headers.get('content-type') || '';
+        if (res.ok && cType.includes('application/json')) {
+          const data = await res.json();
+          if (data.success && data.proyecto) {
+            createdProj = data.proyecto;
+          }
+        }
+      } catch (apiErr) {
+        console.warn('Backend API no disponible para crear proyecto, usando generador local:', apiErr);
+      }
+
+      // 2. Si backend no lo generó, generarlo localmente
+      if (!createdProj) {
+        createdProj = buildProyectoFromPresupuesto(prop, proyectos);
+      }
+
+      // 3. Persistir en estado y localStorage
+      const updatedList = [createdProj, ...proyectos.filter(p => p.id !== createdProj.id)];
+      setProyectos(updatedList);
+      saveStoredProyectos(updatedList);
+
+      // 4. Actualizar estado del presupuesto a 'aceptado' si no lo estaba
+      try {
+        const updatedPresupuestos = presupuestos.map(p => p.id === propId ? { ...p, estado: 'aceptado' } : p);
+        setPresupuestos(updatedPresupuestos);
+        localStorage.setItem('goglite_presupuestos', JSON.stringify(updatedPresupuestos));
+      } catch (e) {}
+
+      setShowImportModal(false);
+      handleOpenProyecto(createdProj, 'contrato');
     } catch (err) {
       alert('Error importando propuesta: ' + err.message);
     }
@@ -132,8 +241,13 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     e?.stopPropagation();
     if (!confirm('¿Seguro que deseas eliminar este proyecto y su contrato?')) return;
     try {
-      await fetch(`/api/proyectos/${id}`, { method: 'DELETE' });
-      await fetchProyectos();
+      try {
+        await fetch(`/api/proyectos/${id}`, { method: 'DELETE' });
+      } catch (e) {}
+      const updated = proyectos.filter(p => p.id !== id);
+      setProyectos(updated);
+      saveStoredProyectos(updated);
+
       if (activeProyecto?.id === id) {
         setViewMode('list');
         setActiveProyecto(null);
@@ -195,31 +309,93 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     }
     const signatureBase64 = canvas.toDataURL('image/png');
 
+    const updatedFirma = {
+      firmado: true,
+      nombreFirmante: signerName || activeProyecto.cliente?.nombre,
+      identificacion: signerDoc || 'Documento no especificado',
+      timestampUtc: new Date().toISOString(),
+      ipAddress: '127.0.0.1 (Panel Interno)',
+      userAgent: navigator.userAgent,
+      firmaBase64: signatureBase64
+    };
+
+    const updatedProj = {
+      ...activeProyecto,
+      estado: activeProyecto.estado === 'contrato_pendiente' ? 'firmado' : activeProyecto.estado,
+      contrato: {
+        ...activeProyecto.contrato,
+        firmaCliente: updatedFirma
+      }
+    };
+
+    const hitoFirma = updatedProj.seguimiento?.hitos?.find(h => h.id === 'h-1');
+    if (hitoFirma) {
+      hitoFirma.completado = true;
+      hitoFirma.fecha = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    setActiveProyecto(updatedProj);
+    setProyectos(prev => {
+      const next = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
+      saveStoredProyectos(next);
+      return next;
+    });
+
     try {
-      const res = await fetch(`/api/proyectos/${activeProyecto.id}/firmar`, {
+      await fetch(`/api/proyectos/${activeProyecto.id}/firmar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nombreFirmante: signerName || activeProyecto.cliente?.nombre,
-          identificacion: signerDoc || 'Documento no especificado',
+          nombreFirmante: updatedFirma.nombreFirmante,
+          identificacion: updatedFirma.identificacion,
           firmaBase64: signatureBase64
         })
       });
-      const data = await res.json();
-      if (data.success) {
-        setActiveProyecto(data.proyecto);
-        fetchProyectos();
-        showNotification();
-      }
     } catch (err) {
-      alert('Error firmando contrato: ' + err.message);
+      console.warn('API firmar warn:', err);
     }
+
+    showNotification();
   };
 
   // Toggle milestone completion
   const handleToggleHito = async (hitoId, currentStatus) => {
+    const updatedHitos = (activeProyecto.seguimiento?.hitos || []).map(h => {
+      if (h.id === hitoId) {
+        return {
+          ...h,
+          completado: !currentStatus,
+          fecha: !currentStatus ? new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Pendiente'
+        };
+      }
+      return h;
+    });
+
+    const completados = updatedHitos.filter(h => h.completado).length;
+    const porcentajeAvance = Math.round((completados / updatedHitos.length) * 100);
+    let nuevoEstado = activeProyecto.estado;
+    if (porcentajeAvance >= 100) nuevoEstado = 'entregado';
+    else if (porcentajeAvance >= 25 && nuevoEstado !== 'en_desarrollo') nuevoEstado = 'en_desarrollo';
+
+    const updatedProj = {
+      ...activeProyecto,
+      estado: nuevoEstado,
+      seguimiento: {
+        ...activeProyecto.seguimiento,
+        porcentajeAvance,
+        hitos: updatedHitos
+      }
+    };
+
+    setActiveProyecto(updatedProj);
+    setProyectos(prev => {
+      const next = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
+      saveStoredProyectos(next);
+      return next;
+    });
+
     try {
-      const res = await fetch(`/api/proyectos/${activeProyecto.id}/hito`, {
+      await fetch(`/api/proyectos/${activeProyecto.id}/hito`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -227,13 +403,8 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
           completado: !currentStatus
         })
       });
-      const data = await res.json();
-      if (data.success) {
-        setActiveProyecto(data.proyecto);
-        fetchProyectos();
-      }
     } catch (err) {
-      console.error(err);
+      console.warn('API hito warn:', err);
     }
   };
 
@@ -253,27 +424,81 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
 
   // Save onboarding
   const handleSaveOnboarding = async () => {
+    const updatedProj = {
+      ...activeProyecto,
+      onboarding: {
+        completado: true,
+        fecha: new Date().toISOString().split('T')[0],
+        datos: activeProyecto.onboarding?.datos || {}
+      }
+    };
+
+    const hitoOnb = updatedProj.seguimiento?.hitos?.find(h => h.id === 'h-3');
+    if (hitoOnb) {
+      hitoOnb.completado = true;
+      hitoOnb.fecha = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    setActiveProyecto(updatedProj);
+    setProyectos(prev => {
+      const next = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
+      saveStoredProyectos(next);
+      return next;
+    });
+
     try {
-      const res = await fetch(`/api/proyectos/${activeProyecto.id}/onboarding`, {
+      await fetch(`/api/proyectos/${activeProyecto.id}/onboarding`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(activeProyecto.onboarding?.datos || {})
       });
-      const data = await res.json();
-      if (data.success) {
-        setActiveProyecto(data.proyecto);
-        fetchProyectos();
-        showNotification();
-      }
     } catch (err) {
-      alert('Error guardando onboarding: ' + err.message);
+      console.warn('API onboarding warn:', err);
     }
+
+    showNotification();
   };
 
   // Confirm payment
   const handleConfirmPayment = async (tipoPago) => {
+    const updatedPagos = { ...(activeProyecto.pagos || {}) };
+    const nowStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    if (tipoPago === 'anticipo') {
+      updatedPagos.anticipoEstado = 'confirmado';
+      updatedPagos.anticipoFecha = nowStr;
+      updatedPagos.anticipoMetodo = 'transferencia_bancaria';
+    } else if (tipoPago === 'saldo') {
+      updatedPagos.saldoEstado = 'confirmado';
+      updatedPagos.saldoFecha = nowStr;
+      updatedPagos.saldoMetodo = 'transferencia_bancaria';
+    }
+
+    const updatedProj = {
+      ...activeProyecto,
+      pagos: updatedPagos
+    };
+
+    const hitoPagoId = tipoPago === 'anticipo' ? 'h-2' : 'h-7';
+    const hitoPago = updatedProj.seguimiento?.hitos?.find(h => h.id === hitoPagoId);
+    if (hitoPago) {
+      hitoPago.completado = true;
+      hitoPago.fecha = nowStr;
+    }
+
+    if (updatedProj.estado === 'firmado' && updatedPagos.anticipoEstado === 'confirmado') {
+      updatedProj.estado = 'en_desarrollo';
+    }
+
+    setActiveProyecto(updatedProj);
+    setProyectos(prev => {
+      const next = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
+      saveStoredProyectos(next);
+      return next;
+    });
+
     try {
-      const res = await fetch(`/api/proyectos/${activeProyecto.id}/pago`, {
+      await fetch(`/api/proyectos/${activeProyecto.id}/pago`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -282,15 +507,11 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
           metodo: 'transferencia_bancaria'
         })
       });
-      const data = await res.json();
-      if (data.success) {
-        setActiveProyecto(data.proyecto);
-        fetchProyectos();
-        showNotification();
-      }
     } catch (err) {
-      alert('Error actualizando pago: ' + err.message);
+      console.warn('API pago warn:', err);
     }
+
+    showNotification();
   };
 
   const showNotification = () => {
@@ -298,8 +519,41 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     setTimeout(() => setSavedNotice(false), 2500);
   };
 
+  const getPortalUrlForProyecto = (proj = null) => {
+    const target = proj || activeProyecto;
+    if (!target) return '';
+    const prop = presupuestos.find(p => 
+      p.id === target.presupuestoId || 
+      p.codigo === target.presupuestoCodigo || 
+      (target.cliente?.empresa && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === target.cliente.empresa.toLowerCase().trim())
+    );
+    const token = target.portalToken || prop?.portalToken || target.codigo || target.id;
+    let payloadQuery = '';
+    if (prop) {
+      try {
+        const compactPayload = {
+          id: prop.id,
+          codigo: prop.codigo,
+          cliente: prop.cliente,
+          titulo: prop.titulo,
+          pais: prop.pais,
+          inversion: prop.inversion,
+          modulos: prop.modulos || [],
+          fases: prop.fases || [],
+          vigenciaDias: prop.vigenciaDias || 15,
+          estado: prop.estado || 'aceptado'
+        };
+        const jsonStr = JSON.stringify(compactPayload);
+        const encoded = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (m, p) => String.fromCharCode('0x' + p)));
+        payloadQuery = `?d=${encodeURIComponent(encoded)}`;
+      } catch (e) {}
+    }
+    return `${window.location.origin}/portal/${token}${payloadQuery}`;
+  };
+
   const copyPortalLink = () => {
-    const url = `${window.location.origin}/#seguimiento-${activeProyecto?.codigo}`;
+    const url = getPortalUrlForProyecto(activeProyecto);
+    if (!url) return;
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
@@ -359,7 +613,11 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
 
               <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => setShowImportModal(true)}
+                  onClick={() => {
+                    fetchPresupuestos();
+                    fetchProyectos();
+                    setShowImportModal(true);
+                  }}
                   className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-2 shadow-glow-sm transition-all"
                 >
                   <Plus className="w-4 h-4" />
@@ -437,7 +695,11 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                   Importa una propuesta aprobada desde el Módulo 2 para generar automáticamente su contrato con cláusulas legales y firma electrónica.
                 </p>
                 <button
-                  onClick={() => setShowImportModal(true)}
+                  onClick={() => {
+                    fetchPresupuestos();
+                    fetchProyectos();
+                    setShowImportModal(true);
+                  }}
                   className="mt-4 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs inline-flex items-center gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -446,10 +708,15 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
               </div>
             ) : (
               filteredProyectos.map(p => {
-                const isFirmado = p.contrato?.firmaCliente?.firmado;
-                const isOnboardingOk = p.onboarding?.completado;
+                const isFirmado = Boolean(p.contrato?.firmaCliente?.firmado || p.estado === 'firmado' || p.estado === 'en_desarrollo' || p.estado === 'entregado');
+                const isOnboardingOk = Boolean(p.onboarding?.completado);
                 const isAnticipoOk = p.pagos?.anticipoEstado === 'confirmado';
-                const avance = p.seguimiento?.porcentajeAvance || 0;
+                const isAnticipoReportado = Boolean(p.pagos?.anticipoComprobante || p.pagos?.anticipoEstado === 'verificacion');
+                const avance = p.seguimiento?.porcentajeAvance || (p.estado === 'entregado' ? 100 : p.estado === 'en_desarrollo' ? 50 : isFirmado ? 35 : 15);
+
+                const displayStatus = p.estado === 'entregado' ? 'entregado' :
+                                      p.estado === 'en_desarrollo' ? 'en_desarrollo' :
+                                      isFirmado ? 'firmado' : 'contrato_pendiente';
 
                 return (
                   <div
@@ -466,14 +733,14 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                         
                         <div className="flex items-center gap-1.5">
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                            p.estado === 'entregado' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
-                            p.estado === 'en_desarrollo' ? 'bg-sky-500/15 text-sky-400 border-sky-500/30' :
-                            p.estado === 'firmado' ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30' :
+                            displayStatus === 'entregado' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
+                            displayStatus === 'en_desarrollo' ? 'bg-sky-500/15 text-sky-400 border-sky-500/30' :
+                            displayStatus === 'firmado' ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30' :
                             'bg-amber-500/15 text-amber-400 border-amber-500/30'
                           }`}>
-                            {p.estado === 'entregado' ? 'Completado' :
-                             p.estado === 'en_desarrollo' ? 'En Desarrollo' :
-                             p.estado === 'firmado' ? 'Firmado' : 'Pendiente de Firma'}
+                            {displayStatus === 'entregado' ? 'Completado' :
+                             displayStatus === 'en_desarrollo' ? 'En Desarrollo' :
+                             displayStatus === 'firmado' ? '✓ Contrato Firmado' : 'Pendiente de Firma'}
                           </span>
 
                           <button
@@ -508,10 +775,12 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                         </div>
 
                         <div className={`p-2 rounded-lg border flex flex-col items-center justify-center text-center ${
-                          isAnticipoOk ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-500'
+                          isAnticipoOk ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300' :
+                          isAnticipoReportado ? 'bg-amber-950/20 border-amber-500/30 text-amber-300' :
+                          'bg-slate-900 border-slate-800 text-slate-500'
                         }`}>
                           <DollarSign className="w-3.5 h-3.5 mb-1" />
-                          <span>{isAnticipoOk ? 'Anticipo Pagado' : 'Anticipo $0'}</span>
+                          <span>{isAnticipoOk ? 'Anticipo Pagado' : isAnticipoReportado ? 'Anticipo Reportado' : 'Anticipo $0'}</span>
                         </div>
 
                         <div className={`p-2 rounded-lg border flex flex-col items-center justify-center text-center ${
@@ -570,12 +839,22 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                 <ArrowLeft className="w-4 h-4" />
               </button>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-mono text-xs font-bold text-orange-400">{activeProyecto.codigo}</span>
                   <span className="text-slate-500">·</span>
                   <h2 className="text-base font-extrabold text-white">
                     {activeProyecto.cliente?.empresa || activeProyecto.cliente?.nombre}
                   </h2>
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                    activeProyecto.estado === 'entregado' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
+                    activeProyecto.estado === 'en_desarrollo' ? 'bg-sky-500/15 text-sky-400 border-sky-500/30' :
+                    (activeProyecto.contrato?.firmaCliente?.firmado || activeProyecto.estado === 'firmado') ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' :
+                    'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                  }`}>
+                    {activeProyecto.estado === 'entregado' ? '✓ Completado' :
+                     activeProyecto.estado === 'en_desarrollo' ? '⚙ En Desarrollo' :
+                     (activeProyecto.contrato?.firmaCliente?.firmado || activeProyecto.estado === 'firmado') ? '✓ Contrato Firmado' : 'Pendiente de Firma'}
+                  </span>
                 </div>
                 <div className="text-xs text-slate-400">
                   {activeProyecto.cliente?.nombre} · {activeProyecto.cliente?.telefono} · {activeProyecto.cliente?.ubicacion}
@@ -584,6 +863,17 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
             </div>
 
             <div className="flex items-center gap-2">
+              <a
+                href={getPortalUrlForProyecto(activeProyecto)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-orange-400 hover:text-orange-300 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700"
+                title="Abrir vista interactiva del portal del cliente en nueva pestaña"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Ver Portal en Vivo</span>
+              </a>
+
               <button
                 onClick={copyPortalLink}
                 className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
@@ -1077,17 +1367,31 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                 </div>
 
                 {/* Public Link Share Box */}
-                <div className="p-3 rounded-xl bg-[#080b11] border border-slate-800 flex items-center justify-between gap-3 text-xs">
-                  <div className="truncate font-mono text-slate-400">
-                    {window.location.origin}/#seguimiento-{activeProyecto.codigo}
+                <div className="p-3.5 rounded-xl bg-[#080b11] border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="space-y-0.5 overflow-hidden">
+                    <div className="text-[10px] text-slate-400 uppercase font-mono font-bold">Enlace Público Oficial del Portal de Cliente:</div>
+                    <div className="truncate font-mono text-orange-400 text-xs">
+                      {getPortalUrlForProyecto(activeProyecto)}
+                    </div>
                   </div>
-                  <button
-                    onClick={copyPortalLink}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs shrink-0 flex items-center gap-1.5 transition-colors"
-                  >
-                    {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedLink ? 'Copiado' : 'Copiar URL'}</span>
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href={getPortalUrlForProyecto(activeProyecto)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-glow-sm"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Abrir Portal</span>
+                    </a>
+                    <button
+                      onClick={copyPortalLink}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                    >
+                      {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedLink ? 'Copiado' : 'Copiar URL'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1212,13 +1516,26 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                     Requerido formalmente para la reserva de agenda y comienzo de la Fase 1.
                   </p>
 
+                  {activeProyecto.pagos?.anticipoComprobante && (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-1">
+                      <div className="font-bold flex items-center gap-1.5 text-amber-400">
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Comprobante Reportado por Cliente:</span>
+                      </div>
+                      <div className="font-mono text-white text-[11px]">{activeProyecto.pagos.anticipoComprobante}</div>
+                      {activeProyecto.pagos?.anticipoFecha && (
+                        <div className="text-[10px] text-slate-400">Reportado el: {activeProyecto.pagos.anticipoFecha}</div>
+                      )}
+                    </div>
+                  )}
+
                   {activeProyecto.pagos?.anticipoEstado !== 'confirmado' ? (
                     <button
                       onClick={() => handleConfirmPayment('anticipo')}
-                      className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-md"
+                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-md"
                     >
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>Marcar Anticipo como Confirmado</span>
+                      <span>{activeProyecto.pagos?.anticipoComprobante ? 'Validar Anticipo y Pasar a Desarrollo' : 'Marcar Anticipo como Confirmado'}</span>
                     </button>
                   ) : (
                     <div className="text-[11px] text-emerald-400 font-mono flex items-center gap-1.5 pt-1">
@@ -1336,37 +1653,57 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
             <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
               {presupuestos.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-500">
-                  No hay presupuestos creados en el Módulo 2.
+                  No hay presupuestos creados en el Módulo 3.
                 </div>
               ) : (
-                presupuestos.map(prop => (
-                  <div
-                    key={prop.id}
-                    onClick={() => handleImportProposal(prop.id)}
-                    className="p-3 rounded-xl bg-[#090d16] border border-slate-800 hover:border-orange-500/50 hover:bg-slate-800/30 transition-all cursor-pointer flex items-center justify-between group"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-orange-400">{prop.codigo}</span>
-                        <span className="text-xs font-bold text-white group-hover:text-orange-300">
-                          {prop.cliente?.empresa || prop.cliente?.nombre}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-400 truncate max-w-sm mt-0.5">
-                        {prop.titulo}
-                      </div>
-                    </div>
+                [...presupuestos]
+                  .sort((a, b) => (b.estado === 'aceptado' ? 1 : 0) - (a.estado === 'aceptado' ? 1 : 0))
+                  .map(prop => {
+                    const isAceptado = prop.estado === 'aceptado';
+                    return (
+                      <div
+                        key={prop.id}
+                        onClick={() => handleImportProposal(prop.id)}
+                        className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between group ${
+                          isAceptado 
+                            ? 'bg-emerald-950/20 border-emerald-500/50 hover:border-emerald-400 hover:bg-emerald-900/30 shadow-md' 
+                            : 'bg-[#090d16] border-slate-800 hover:border-orange-500/50 hover:bg-slate-800/30'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-orange-400">{prop.codigo}</span>
+                            <span className="text-xs font-bold text-white group-hover:text-orange-300">
+                              {prop.cliente?.empresa || prop.cliente?.nombre}
+                            </span>
+                            {isAceptado && (
+                              <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                <span>Aceptado por Cliente</span>
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate max-w-sm mt-0.5">
+                            {prop.titulo}
+                          </div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">
+                            {prop.cliente?.ubicacion || (prop.pais === 'DO' ? 'República Dominicana' : 'El Salvador')} · {prop.cliente?.telefono}
+                          </div>
+                        </div>
 
-                    <div className="text-right shrink-0">
-                      <div className="font-mono font-bold text-xs text-slate-200">
-                        ${prop.inversion?.precioTotal || 300} {prop.moneda || 'USD'}
+                        <div className="text-right shrink-0">
+                          <div className="font-mono font-bold text-xs text-slate-200">
+                            ${prop.inversion?.precioTotal || 300} {prop.moneda || 'USD'}
+                          </div>
+                          <span className={`text-[10px] font-semibold group-hover:underline flex items-center gap-1 justify-end ${
+                            isAceptado ? 'text-emerald-400 font-bold' : 'text-orange-400'
+                          }`}>
+                            Generar Contrato <ChevronRight className="w-3 h-3" />
+                          </span>
+                        </div>
                       </div>
-                      <span className="text-[10px] text-orange-400 font-semibold group-hover:underline flex items-center gap-1 justify-end">
-                        Generar Contrato <ChevronRight className="w-3 h-3" />
-                      </span>
-                    </div>
-                  </div>
-                ))
+                    );
+                  })
               )}
             </div>
 

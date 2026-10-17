@@ -36,6 +36,7 @@ import {
   Share2
 } from 'lucide-react';
 import WireframesStoryBrandModule from './WireframesStoryBrandModule';
+import { getStoredProyectos } from '../services/contractGenerator';
 
 // Plantilla predeterminada de PRD Técnico para proyectos Goglite de alta velocidad (Playbook Maestro 2026)
 const DEFAULT_PRD_CONFIG = {
@@ -293,9 +294,15 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     }
   };
 
-  // Cargar proyectos al iniciar
+  // Cargar proyectos al iniciar y escuchar sincronización de almacenamiento
   useEffect(() => {
     fetchProyectos();
+
+    const handleStorageChange = () => {
+      fetchProyectos();
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // Persistir tareas y bóveda en localStorage
@@ -326,18 +333,27 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   }, [activeTimerTaskId]);
 
   const fetchProyectos = async () => {
+    let list = getStoredProyectos();
     try {
       const res = await fetch('/api/proyectos');
-      if (res.ok) {
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
-        setProyectos(data);
-        if (data.length > 0) {
-          setSelectedProyectoId(data[0].id);
+        if (Array.isArray(data) && data.length > 0) {
+          const map = new Map();
+          [...list, ...data].forEach(p => {
+            if (p?.id && !map.has(p.id)) map.set(p.id, p);
+          });
+          list = Array.from(map.values());
         }
       }
     } catch (err) {
-      console.warn('Usando proyectos locales en demo');
+      console.warn('Usando proyectos locales en demo:', err);
     } finally {
+      setProyectos(list);
+      if (list.length > 0) {
+        setSelectedProyectoId(prev => prev || list[0].id);
+      }
       setLoading(false);
     }
   };

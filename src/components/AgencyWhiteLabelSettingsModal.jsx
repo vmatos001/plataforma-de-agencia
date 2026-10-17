@@ -58,8 +58,7 @@ export default function AgencyWhiteLabelSettingsModal({
     apisIntegraciones: {
       googleSiteKitConnected: true,
       googleDriveVault: 'Goglite Agency Drive Vault',
-      resendApiKey: 're_live_goglite_free_tier',
-      resendFromEmail: 'Goglite Agencia <onboarding@resend.dev>',
+      gmailWorkspaceConnected: true,
       serperApiKey: 'serper_api_active',
       geminiApiKey: 'AIzaSy_storybrand_active',
       whatsappGatewayStatus: 'Conectado (Baileys v6)'
@@ -1071,7 +1070,7 @@ export default function AgencyWhiteLabelSettingsModal({
               <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs">
                 <span className="font-bold">Ecosistema de Integraciones Antigravity:</span>
                 <p className="text-[11px] text-slate-300 mt-0.5">
-                  Conexión directa con Google Workspace, Resend ($0 emails), Gemini IA y WhatsApp Baileys.
+                  Conexión directa con Google Workspace / Gmail Web, Gemini IA y WhatsApp Baileys.
                 </p>
               </div>
 
@@ -1097,25 +1096,25 @@ export default function AgencyWhiteLabelSettingsModal({
                   <span className="text-xs font-mono text-emerald-400 font-bold">Activo</span>
                 </div>
 
-                {/* Resend Email $0 */}
+                {/* Google Workspace & Gmail Direct */}
                 <div className="p-3.5 rounded-xl bg-[#121724] border border-slate-800 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center">
                       <Mail className="w-4 h-4" />
                     </div>
                     <div>
                       <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <span>Resend API (Transaccionales $0.00)</span>
+                        <span>Google Workspace & Gmail Web Direct</span>
                         <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-bold">
-                          Free Tier
+                          Directo
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-400">
-                        Envío de propuestas y avisos automáticos a clientes desde onboarding@resend.dev.
+                        Envío y redacción instantánea de auditorías y cold pitches desde tu cuenta corporativa con 100% de entrega.
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs font-mono text-emerald-400 font-bold">3,000 / mes</span>
+                  <span className="text-xs font-mono text-emerald-400 font-bold">Sin límites</span>
                 </div>
 
                 {/* WhatsApp Baileys */}

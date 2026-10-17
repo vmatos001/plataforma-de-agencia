@@ -1255,8 +1255,8 @@ app.post('/api/portal/:token/update', async (req, res) => {
 
   let extraConfig = {};
 
-  // Auto-creación de Bóveda centralizada en Google Drive al aprobar propuesta o firmar contrato
-  if ((req.body.fase1Aprobada || req.body.fase2Firmada || req.body.crearBoveda) && !lead.portalConfig?.driveVault?.vaultId) {
+  // Auto-creación de Bóveda centralizada en Google Drive al aprobar propuesta, firmar contrato, o entrar a Fase 3
+  if ((req.body.fase1Aprobada || req.body.fase2Firmada || req.body.crearBoveda || req.body.fase3Iniciada || (req.body.faseActual && req.body.faseActual >= 3)) && !lead.portalConfig?.driveVault?.vaultId) {
     try {
       console.log(`[DRIVE AUTO-SYNC] Creando bóveda centralizada para cliente: ${lead.empresa}`);
       const vault = await createClientVault(lead.empresa, lead.email, lead.id);

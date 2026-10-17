@@ -92,25 +92,77 @@ export function removeLocalItem(key) {
 }
 
 /**
+ * Sincroniza dinámicamente los leads del CRM con los presupuestos emitidos en Fase 3
+ */
+export function syncCrmLeadsWithPresupuestos(crmLeads) {
+  if (typeof window === 'undefined' || !Array.isArray(crmLeads)) return crmLeads;
+  try {
+    const rawP = localStorage.getItem(STORAGE_KEYS.PRESUPUESTOS);
+    if (!rawP) return crmLeads;
+    const presupuestos = JSON.parse(rawP);
+    if (!Array.isArray(presupuestos) || presupuestos.length === 0) return crmLeads;
+
+    return crmLeads.map(lead => {
+      const lName = (lead.empresa || '').toLowerCase().trim();
+      const lPhone = (lead.telefono || '').replace(/\D/g, '');
+
+      const matchingP = presupuestos.find(p => {
+        const pName = (p.cliente?.empresa || '').toLowerCase().trim();
+        const pPhone = (p.cliente?.telefono || '').replace(/\D/g, '');
+        return (lName && pName && (lName.includes(pName) || pName.includes(lName))) ||
+               (lPhone && pPhone && (lPhone === pPhone || lPhone.endsWith(pPhone) || pPhone.endsWith(lPhone))) ||
+               (p.leadId && p.leadId === lead.id) ||
+               (p.cliente?.id && p.cliente.id === lead.id);
+      });
+
+      if (matchingP) {
+        const monto = Number(matchingP.inversion?.precioTotal) || 0;
+        return {
+          ...lead,
+          presupuestoId: matchingP.id,
+          presupuestoCodigo: matchingP.codigo || 'P-2026',
+          presupuestoMonto: monto,
+          valorEstimado: monto,
+          presupuestoEstado: matchingP.estado || 'borrador',
+          etapa: (lead.etapa === 'nuevo' || lead.etapa === 'contactado') ? 'propuesta_enviada' : lead.etapa
+        };
+      }
+      return lead;
+    });
+  } catch (e) {
+    console.warn('[LocalStore] Error sincronizando CRM con presupuestos:', e);
+    return crmLeads;
+  }
+}
+
+/**
  * Obtiene los leads de CRM con migración transparente de goglite_crm_leads a goglite_crm_leads_v3
+ * y reconciliación automática con propuestas emitidas
  */
 export function getStoredCrmLeads() {
   if (typeof window === 'undefined') return [];
   try {
+    let leads = [];
     const v3 = localStorage.getItem(STORAGE_KEYS.CRM_LEADS);
     if (v3) {
       const parsed = JSON.parse(v3);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) leads = parsed;
     }
 
-    // Fallback a clave anterior y auto-migración
-    const legacy = localStorage.getItem(STORAGE_KEYS.CRM_LEADS_LEGACY);
-    if (legacy) {
-      const parsed = JSON.parse(legacy);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        setLocalItem(STORAGE_KEYS.CRM_LEADS, parsed);
-        return parsed;
+    if (leads.length === 0) {
+      // Fallback a clave anterior y auto-migración
+      const legacy = localStorage.getItem(STORAGE_KEYS.CRM_LEADS_LEGACY);
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          leads = parsed;
+          setLocalItem(STORAGE_KEYS.CRM_LEADS, parsed);
+        }
       }
+    }
+
+    if (leads.length > 0) {
+      return syncCrmLeadsWithPresupuestos(leads);
     }
   } catch (e) {
     console.warn('[LocalStore] Error leyendo leads de CRM:', e);

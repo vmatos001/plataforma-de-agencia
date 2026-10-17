@@ -29,7 +29,7 @@ import {
   getStoredCrmLeads,
   saveStoredCrmLeads
 } from '../services/localStore';
-import { generateClientLead } from '../services/clientLeadEngine';
+import { clientSearch, generateClientLead, generateClientAudit, generateClientPitch } from '../services/clientLeadEngine';
 
 export default function ProspectorModule({
   selectedCountry = 'SV',
@@ -61,17 +61,32 @@ export default function ProspectorModule({
   const [modalTab, setModalTab] = useState('auditoria'); // 'auditoria' | 'pitch'
   const [copiedPitch, setCopiedPitch] = useState(false);
   const [customRecipient, setCustomRecipient] = useState('');
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
+  // Normalizador defensivo de auditoría y pitch (asegura datos tanto para leads nuevos como en localStorage)
+  const getLeadAudit = (lead) => {
+    if (!lead) return null;
+    if (lead.auditoria && Array.isArray(lead.auditoria.puntos) && lead.auditoria.puntos.length > 0) {
+      return lead.auditoria;
+    }
+    return generateClientAudit(lead, lead.nombreEmpresa || lead.dominio, lead.pais || selectedCountry);
+  };
+
+  const getLeadPitch = (lead, audit) => {
+    if (!lead) return '';
+    if (typeof lead.pitch === 'string' && lead.pitch.trim()) {
+      return lead.pitch;
+    }
+    if (lead.pitch && typeof lead.pitch === 'object' && lead.pitch.cuerpo) {
+      return `${lead.pitch.asunto ? 'Asunto: ' + lead.pitch.asunto + '\n\n' : ''}${lead.pitch.cuerpo}`;
+    }
+    return generateClientPitch(lead, audit, lead.pais || selectedCountry);
+  };
 
   // Ajustes de API
   const [settings, setSettings] = useState({
     geminiApiKey: '',
     serperApiKey: '',
-    apolloApiKey: '',
-    resendApiKey: '',
-    resendFromEmail: 'Goglite Agencia <onboarding@resend.dev>',
-    instantlyApiKey: '',
-    preferredEmailProvider: 'resend'
+    apolloApiKey: ''
   });
   const [settingsSaved, setSettingsSaved] = useState(false);
 
@@ -135,21 +150,29 @@ export default function ProspectorModule({
           query: q,
           country: selectedCountry,
           searchMode
-        }, { timeoutMs: 15000 });
+        }, { timeoutMs: 5000 });
 
         if (res.ok) {
-          const data = await res.json();
-          if (data.success && Array.isArray(data.results)) {
-            results = data.results;
+          const contentType = res.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const data = await res.json();
+            if (data.success && Array.isArray(data.results) && data.results.length > 0) {
+              results = data.results;
+            }
           }
         }
       } catch (backendErr) {
-        console.warn('[Prospector] Backend search offline:', backendErr);
+        console.warn('[Prospector] Backend search offline, usando motor de búsqueda cliente:', backendErr.message);
       }
 
-      setSearchResults(results);
+      // Si el backend no respondió con JSON válido o no devolvió resultados, ejecutar clientSearch en vivo
+      if (!results || results.length === 0) {
+        results = await clientSearch(q, selectedCountry, searchMode, settings.serperApiKey);
+      }
+
+      setSearchResults(results || []);
       const recommended = new Set(
-        results
+        (results || [])
           .filter(r => r.recomendadoOutbound || r.esProspectoOro)
           .map(r => r.dominio)
       );
@@ -181,22 +204,43 @@ export default function ProspectorModule({
           country: selectedCountry,
           limit: 10,
           searchMode
-        }, { timeoutMs: 30000 });
+        }, { timeoutMs: 8000 });
 
         if (res.ok) {
-          const data = await res.json();
-          if (data.success) {
-            setPipelineProgress(`¡Completado! Se generaron ${data.nuevosGuardados || 0} leads nuevos.`);
-            await fetchLeads();
-            completed = true;
+          const contentType = res.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const data = await res.json();
+            if (data.success) {
+              setPipelineProgress(`¡Completado! Se generaron ${data.nuevosGuardados || 0} leads nuevos.`);
+              await fetchLeads();
+              completed = true;
+            }
           }
         }
       } catch (backendErr) {
-        console.warn('[Prospector] Backend pipeline offline:', backendErr);
+        console.warn('[Prospector] Backend pipeline offline, procesando en cliente:', backendErr.message);
+      }
+
+      // Fallback autónomo en cliente si el backend no está disponible
+      if (!completed) {
+        setPipelineProgress('Conectando a motor de prospección en vivo...');
+        const rawResults = await clientSearch(q, selectedCountry, searchMode, settings.serperApiKey);
+        if (rawResults && rawResults.length > 0) {
+          const leadsToCreate = rawResults.slice(0, 10).map(item => generateClientLead(item, q, selectedCountry));
+          setLeads(prev => {
+            const existingDomains = new Set(prev.map(l => l.dominio));
+            const fresh = leadsToCreate.filter(l => !existingDomains.has(l.dominio));
+            const updated = [...fresh, ...prev];
+            setLocalItem(STORAGE_KEYS.OUTBOUND_LEADS, updated);
+            return updated;
+          });
+          setPipelineProgress(`¡Completado en vivo! Se generaron ${leadsToCreate.length} leads calificados.`);
+          completed = true;
+        }
       }
 
       if (!completed) {
-        setPipelineProgress('No fue posible procesar la consulta por falta de conexión al servidor de prospección.');
+        setPipelineProgress('No se encontraron resultados para la consulta ingresada.');
       }
 
       setTimeout(() => {
@@ -325,38 +369,6 @@ export default function ProspectorModule({
     }
   };
 
-  // Enviar email por Resend o Instantly
-  const handleSendEmail = async (leadId, provider = 'resend', overrideEmail = null) => {
-    setIsSendingEmail(true);
-    const targetStatus = provider === 'resend' ? 'enviado_resend' : 'enviado_instantly';
-
-    setLeads(prev => {
-      const updated = prev.map(l => l.id === leadId ? { ...l, estado: targetStatus, actualizado: new Date().toISOString().split('T')[0] } : l);
-      setLocalItem(STORAGE_KEYS.OUTBOUND_LEADS, updated);
-      return updated;
-    });
-
-    if (selectedLeadModal && selectedLeadModal.id === leadId) {
-      setSelectedLeadModal(prev => ({ ...prev, estado: targetStatus }));
-    }
-
-    try {
-      const res = await apiClient.post('/api/send-email', {
-        leadId,
-        provider,
-        targetEmail: overrideEmail || customRecipient || selectedLeadModal?.email
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || data.error);
-      fetchLeads();
-      alert(data.message || `Correo procesado con éxito vía ${provider === 'resend' ? 'Resend ($0.00)' : 'Instantly.ai'}.`);
-    } catch (err) {
-      alert('Aviso de Envío: ' + err.message);
-    } finally {
-      setIsSendingEmail(false);
-    }
-  };
-
   // Eliminar lead
   const handleDeleteLead = async (leadId) => {
     if (!confirm('¿Eliminar este lead de la lista?')) return;
@@ -473,6 +485,7 @@ export default function ProspectorModule({
     const matchesFilter =
       leadFilter === 'todos' ? true :
       leadFilter === 'sin_email' ? (!l.email || l.email.includes('contacto@')) :
+      leadFilter === 'contactado' ? (l.estado === 'contactado' || l.estado === 'enviado_resend' || l.estado === 'enviado_instantly') :
       l.estado === leadFilter;
 
     const term = leadSearchTerm.toLowerCase();
@@ -944,8 +957,6 @@ export default function ProspectorModule({
                 { id: 'todos', label: 'Todos' },
                 { id: 'nuevo', label: 'Nuevo' },
                 { id: 'contactado', label: 'Contactado' },
-                { id: 'enviado_resend', label: '⚡ Enviado Resend ($0.00)' },
-                { id: 'enviado_instantly', label: '🔥 Enviado Instantly' },
                 { id: 'respondio', label: 'Respondió' },
                 { id: 'cliente', label: 'Cliente' },
                 { id: 'descartado', label: 'Descartado' },
@@ -1037,21 +1048,17 @@ export default function ProspectorModule({
 
                       <td className="px-4 py-3">
                         <select
-                          value={lead.estado}
+                          value={(lead.estado === 'enviado_resend' || lead.estado === 'enviado_instantly') ? 'contactado' : lead.estado}
                           onChange={(e) => handleUpdateLeadStatus(lead.id, e.target.value)}
                           className={`text-[10px] font-semibold px-2 py-1 rounded-md border bg-[#0b0f19] focus:outline-none cursor-pointer ${
-                            lead.estado === 'enviado_resend' ? 'border-emerald-500 text-emerald-400 bg-emerald-950/20' :
-                            lead.estado === 'enviado_instantly' ? 'border-sky-500 text-sky-400 bg-sky-950/20' :
                             lead.estado === 'cliente' ? 'border-emerald-500 text-emerald-400' :
-                            lead.estado === 'contactado' ? 'border-amber-500 text-amber-400' :
+                            lead.estado === 'contactado' || lead.estado === 'enviado_resend' || lead.estado === 'enviado_instantly' ? 'border-amber-500 text-amber-400 bg-amber-950/20' :
                             lead.estado === 'respondio' ? 'border-purple-500 text-purple-400' :
                             'border-slate-700 text-slate-300'
                           }`}
                         >
                           <option value="nuevo">Nuevo</option>
                           <option value="contactado">Contactado</option>
-                          <option value="enviado_resend">⚡ Enviado Resend ($0.00)</option>
-                          <option value="enviado_instantly">🔥 Enviado Instantly</option>
                           <option value="respondio">Respondió</option>
                           <option value="cliente">Cliente</option>
                           <option value="descartado">Descartado</option>
@@ -1059,36 +1066,30 @@ export default function ProspectorModule({
                       </td>
 
                       <td className="px-4 py-3">
-                        {lead.auditoria ? (
-                          <button
-                            onClick={() => {
-                              setSelectedLeadModal(lead);
-                              setModalTab('auditoria');
-                            }}
-                            className="text-[11px] font-medium text-emerald-400 hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20"
-                          >
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>Ver Auditoría ({lead.auditoria.puntos?.length || 3})</span>
-                          </button>
-                        ) : (
-                          <span className="text-[10px] text-slate-500 italic">Sin auditar</span>
-                        )}
+                        <button
+                          onClick={() => {
+                            setSelectedLeadModal(lead);
+                            setModalTab('auditoria');
+                          }}
+                          className="text-[11px] font-medium text-emerald-400 hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20"
+                        >
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>Ver Auditoría ({getLeadAudit(lead)?.puntos?.length || 3})</span>
+                        </button>
                       </td>
 
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {lead.pitch && (
-                            <button
-                              onClick={() => {
-                                setSelectedLeadModal(lead);
-                                setModalTab('pitch');
-                              }}
-                              className="p-1.5 rounded hover:bg-slate-700 text-orange-400"
-                              title="Ver Email Pitch"
-                            >
-                              <Mail className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => {
+                              setSelectedLeadModal(lead);
+                              setModalTab('pitch');
+                            }}
+                            className="p-1.5 rounded hover:bg-slate-700 text-orange-400"
+                            title="Ver Email Pitch"
+                          >
+                            <Mail className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={() => handleTransferLeadToCrm(lead)}
                             className="p-1.5 rounded hover:bg-slate-700 text-sky-400 border border-sky-500/20 hover:border-sky-500/50"
@@ -1104,20 +1105,6 @@ export default function ProspectorModule({
                             title="Crear Presupuesto con Portada Goglite"
                           >
                             <FileText className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleSendEmail(lead.id, 'resend')}
-                            className="p-1.5 rounded hover:bg-slate-700 text-emerald-400"
-                            title="Enviar Email con Resend ($0.00 Free Tier)"
-                          >
-                            <Send className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleSendEmail(lead.id, 'instantly')}
-                            className="p-1.5 rounded hover:bg-slate-700 text-sky-400"
-                            title="Enviar a Campaña de Instantly.ai"
-                          >
-                            <Zap className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteLead(lead.id)}
@@ -1157,7 +1144,7 @@ export default function ProspectorModule({
                 <span className="text-xs text-slate-300 font-semibold">Infraestructura Outbound & Web</span>
               </div>
               <p className="text-[11px] text-slate-400">
-                Tu plataforma corre con servicios de nivel corporativo en su tier gratuito: <strong>Firebase Hosting</strong> ($0.00), <strong>Neon PostgreSQL</strong> ($0.00), <strong>Google Gemini AI</strong> ($0.00), <strong>Serper Google SERP</strong> ($0.00) y <strong>Resend</strong> (3,000 correos/mes a $0.00).
+                Tu plataforma corre con servicios de nivel corporativo en su tier gratuito: <strong>Firebase Hosting</strong> ($0.00), <strong>Neon PostgreSQL</strong> ($0.00), <strong>Google Gemini AI</strong> ($0.00), <strong>Serper Google SERP</strong> ($0.00) y envíos directos vía <strong>Gmail Web / Workspace</strong>.
               </p>
             </div>
             <div className="text-right flex-shrink-0">
@@ -1210,105 +1197,10 @@ export default function ProspectorModule({
 
             {/* EMAIL PROVIDERS SECTION */}
             <div className="pt-2 border-t border-slate-800/80 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-200">Motor de Email para Envíos de Prospección</h3>
-                  <p className="text-[11px] text-slate-400">Elige la alternativa gratuita del stack (Resend) o campañas frías (Instantly.ai).</p>
-                </div>
-
-                <div className="flex items-center gap-1 bg-[#080b11] p-1 rounded-xl border border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setSettings({ ...settings, preferredEmailProvider: 'resend' })}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
-                      settings.preferredEmailProvider === 'resend'
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    ⚡ Resend ($0.00)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSettings({ ...settings, preferredEmailProvider: 'instantly' })}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
-                      settings.preferredEmailProvider === 'instantly'
-                        ? 'bg-sky-600 text-white shadow-sm'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    🔥 Instantly.ai
-                  </button>
-                </div>
-              </div>
-
-              {/* RESEND CONFIG */}
-              <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/20 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <label className="text-xs font-bold text-emerald-300">
-                      Resend API Key (Alternativa Gratuita · 3,000 emails/mes gratis)
-                    </label>
-                  </div>
-                  <a
-                    href="https://resend.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-0.5 underline font-medium"
-                  >
-                    Obtener clave gratis en resend.com <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                </div>
-                <input
-                  type="password"
-                  value={settings.resendApiKey || ''}
-                  onChange={(e) => setSettings({ ...settings, resendApiKey: e.target.value })}
-                  placeholder="re_123456789..."
-                  className="w-full bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500"
-                />
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                    Remitente (From Email):
-                  </label>
-                  <input
-                    type="text"
-                    value={settings.resendFromEmail || ''}
-                    onChange={(e) => setSettings({ ...settings, resendFromEmail: e.target.value })}
-                    placeholder="Goglite Agencia <onboarding@resend.dev>"
-                    className="w-full bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500"
-                  />
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Puedes usar <code>onboarding@resend.dev</code> para pruebas de inmediato, o tu dominio verificado.
-                  </p>
-                </div>
-              </div>
-
-              {/* INSTANTLY CONFIG */}
-              <div className="p-3.5 rounded-xl bg-sky-950/20 border border-sky-500/20 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-sky-300">
-                    Instantly.ai API Key (Envío Frío, Campañas & Calentamiento)
-                  </label>
-                  <a
-                    href="https://instantly.ai"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-sky-400 hover:text-sky-300 flex items-center gap-0.5 underline font-medium"
-                  >
-                    instantly.ai <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                </div>
-                <input
-                  type="password"
-                  value={settings.instantlyApiKey || ''}
-                  onChange={(e) => setSettings({ ...settings, instantlyApiKey: e.target.value })}
-                  placeholder="instantly_..."
-                  className="w-full bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-sky-500"
-                />
-                <p className="text-[10px] text-slate-500">
-                  Sincroniza y empuja automáticamente los prospectos a tus secuencias de correo frío en Instantly.
+              <div>
+                <h3 className="text-xs font-bold text-slate-200">Envíos de Correo y Prospección Directa</h3>
+                <p className="text-[11px] text-slate-400">
+                  Los correos de prospección se redactan y envían con 1 clic mediante <strong>Gmail Web</strong> o tu cliente de correo corporativo, garantizando 100% de entrega desde tu propia cuenta sin requerir claves externas.
                 </p>
               </div>
             </div>
@@ -1387,112 +1279,122 @@ export default function ProspectorModule({
             {/* Modal Content */}
             <div className="p-6 overflow-y-auto space-y-4">
               {/* TAB AUDITORIA */}
-              {modalTab === 'auditoria' && (
-                <div className="space-y-4">
-                  <div className="text-xs text-slate-400">
-                    Fecha de auditoría: {selectedLeadModal.auditoria?.fecha || "Reciente"}
-                  </div>
-
-                  {selectedLeadModal.auditoria?.puntos?.map((punto, idx) => (
-                    <div key={idx} className="p-4 rounded-xl bg-[#090d16] border border-slate-800/90 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                            #{idx + 1} {punto.categoria}
-                          </span>
-                          <span className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">
-                            {punto.prioridad}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="text-xs font-bold text-slate-200">{punto.titulo}</div>
-                      <p className="text-xs text-slate-300 leading-relaxed">{punto.problema}</p>
-
-                      <div className="pt-2 border-t border-slate-800/80 space-y-1.5 text-xs">
-                        <div className="text-amber-400/90">
-                          <span className="font-semibold text-amber-300">Por qué importa: </span>
-                          {punto.porQueImporta}
-                        </div>
-                        <div className="text-slate-400">
-                          <span className="font-semibold text-slate-300">Competencia: </span>
-                          {punto.competidores}
-                        </div>
-                      </div>
+              {modalTab === 'auditoria' && (() => {
+                const audit = getLeadAudit(selectedLeadModal);
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>Fecha de auditoría: {audit?.fecha || "Reciente"}</span>
+                      <span className="font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        {audit?.tipoAuditoria === 'google_maps_no_web' ? '📍 Google Maps (Sin Web)' : '🌐 Auditoría Orgánica Google'}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
+
+                    {audit?.puntos?.map((punto, idx) => (
+                      <div key={idx} className="p-4 rounded-xl bg-[#090d16] border border-slate-800/90 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                              #{idx + 1} {punto.categoria}
+                            </span>
+                            <span className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                              {punto.prioridad}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-xs font-bold text-slate-200">{punto.titulo}</div>
+                        <p className="text-xs text-slate-300 leading-relaxed">{punto.problema}</p>
+
+                        <div className="pt-2 border-t border-slate-800/80 space-y-1.5 text-xs">
+                          <div className="text-amber-400/90">
+                            <span className="font-semibold text-amber-300">Por qué importa: </span>
+                            {punto.porQueImporta}
+                          </div>
+                          <div className="text-slate-400">
+                            <span className="font-semibold text-slate-300">Competencia: </span>
+                            {punto.competidores}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
 
               {/* TAB PITCH */}
-              {modalTab === 'pitch' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-400">Plantilla personalizada con Gemini IA:</span>
-                    <button
-                      onClick={() => handleCopyPitch(selectedLeadModal.pitch)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
-                    >
-                      {copiedPitch ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedPitch ? 'Copiado' : 'Copiar Email'}</span>
-                    </button>
-                  </div>
-
-                  {/* Campo de Destinatario Editable */}
-                  <div className="flex items-center gap-2 bg-[#090d16] px-3 py-2 rounded-xl border border-slate-800">
-                    <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">Enviar a (Email):</span>
-                    <input
-                      type="email"
-                      value={customRecipient !== '' ? customRecipient : (selectedLeadModal.email || '')}
-                      onChange={(e) => setCustomRecipient(e.target.value)}
-                      className="flex-1 bg-transparent text-xs text-emerald-400 font-mono focus:outline-none placeholder-slate-600"
-                      placeholder="v.matos.sv@gmail.com"
-                    />
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-[#080b11] border border-slate-800 font-sans text-xs text-slate-200 whitespace-pre-line leading-relaxed">
-                    {selectedLeadModal.pitch}
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-800 gap-2 flex-wrap">
-                    <a
-                      href={`mailto:${customRecipient || selectedLeadModal.email}?subject=Pregunta rápida sobre ${selectedLeadModal.nombreEmpresa || selectedLeadModal.dominio}&body=${encodeURIComponent(selectedLeadModal.pitch || '')}`}
-                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-all"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Abrir en Gmail / Mail</span>
-                    </a>
-
-                    <div className="flex items-center gap-2">
+              {modalTab === 'pitch' && (() => {
+                const audit = getLeadAudit(selectedLeadModal);
+                const pitchText = getLeadPitch(selectedLeadModal, audit);
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-400">Plantilla personalizada con Gemini IA:</span>
                       <button
-                        disabled={isSendingEmail}
-                        onClick={async () => {
-                          await handleSendEmail(selectedLeadModal.id, 'resend', customRecipient || selectedLeadModal.email);
-                          setSelectedLeadModal(null);
-                        }}
-                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md transition-all disabled:opacity-50"
-                        title="Enviar correo real directo mediante Resend ($0.00 Tier)"
+                        onClick={() => handleCopyPitch(pitchText)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
                       >
-                        <Send className="w-3.5 h-3.5" />
-                        <span>{isSendingEmail ? 'Enviando...' : '⚡ Enviar con Resend ($0.00)'}</span>
-                      </button>
-
-                      <button
-                        disabled={isSendingEmail}
-                        onClick={async () => {
-                          await handleSendEmail(selectedLeadModal.id, 'instantly', customRecipient || selectedLeadModal.email);
-                          setSelectedLeadModal(null);
-                        }}
-                        className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md transition-all disabled:opacity-50"
-                        title="Subir lead a secuencia de calentamiento de Instantly"
-                      >
-                        <Zap className="w-3.5 h-3.5" />
-                        <span>Enviar a Instantly</span>
+                        {copiedPitch ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedPitch ? 'Copiado' : 'Copiar Email'}</span>
                       </button>
                     </div>
+
+                    {/* Campo de Destinatario Editable */}
+                    <div className="flex items-center gap-2 bg-[#090d16] px-3 py-2 rounded-xl border border-slate-800">
+                      <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">Enviar a (Email):</span>
+                      <input
+                        type="email"
+                        value={customRecipient !== '' ? customRecipient : (selectedLeadModal.email || '')}
+                        onChange={(e) => setCustomRecipient(e.target.value)}
+                        className="flex-1 bg-transparent text-xs text-emerald-400 font-mono focus:outline-none placeholder-slate-600"
+                        placeholder="v.matos.sv@gmail.com"
+                      />
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-[#080b11] border border-slate-800 font-sans text-xs text-slate-200 whitespace-pre-line leading-relaxed">
+                      {pitchText}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-800 gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(customRecipient !== '' ? customRecipient : (selectedLeadModal.email || ''))}&su=${encodeURIComponent(`Oportunidad digital para ${selectedLeadModal.nombreEmpresa || selectedLeadModal.dominio}`)}&body=${encodeURIComponent(pitchText || '')}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-2 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 font-semibold text-xs flex items-center gap-1.5 transition-all"
+                          title="Abrir redactor web de Gmail en nueva pestaña"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Abrir en Gmail Web</span>
+                        </a>
+
+                        <a
+                          href={`mailto:${customRecipient !== '' ? customRecipient : (selectedLeadModal.email || '')}?subject=Pregunta rápida sobre ${selectedLeadModal.nombreEmpresa || selectedLeadModal.dominio}&body=${encodeURIComponent(pitchText || '')}`}
+                          className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs flex items-center gap-1.5 transition-all"
+                          title="Abrir en cliente de correo predeterminado"
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                          <span>App de Correo</span>
+                        </a>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            handleUpdateLeadStatus(selectedLeadModal.id, 'contactado');
+                            alert(`El prospecto "${selectedLeadModal.nombreEmpresa || selectedLeadModal.dominio}" fue marcado como Contactado.`);
+                          }}
+                          className="px-4 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 font-semibold text-xs flex items-center gap-1.5 transition-all"
+                          title="Marcar estado del prospecto como Contactado"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Marcar como Contactado</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           </div>
         </div>

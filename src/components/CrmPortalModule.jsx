@@ -52,7 +52,8 @@ import {
 } from 'lucide-react';
 import {
   getStoredCrmLeads,
-  saveStoredCrmLeads
+  saveStoredCrmLeads,
+  syncCrmLeadsWithPresupuestos
 } from '../services/localStore';
 
 const PIPELINE_STAGES = [
@@ -466,6 +467,15 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       localStorage.setItem('goglite_crm_country', selectedCountry);
     }
   }, [selectedCountry]);
+
+  // Sincronizar automáticamente CRM con presupuestos de Fase 3
+  useEffect(() => {
+    setLeads(prev => {
+      const synced = syncCrmLeadsWithPresupuestos(prev);
+      saveStoredCrmLeads(synced);
+      return synced;
+    });
+  }, []);
 
   // Estados para Base de Datos & Fichas de Clientes 360°
   const [fichasFilter, setFichasFilter] = useState('todos'); // 'todos' | 'ganado' | 'negociacion' | 'scrapper' | 'manual'
@@ -2064,7 +2074,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                     {/* Footer Actions: Integración 360° con el flujo de la agencia */}
                     <div className="space-y-2 pt-3 border-t border-slate-800/80">
                       <button
-                        onClick={() => setActiveLeadModal(lead)}
+                        onClick={() => setActiveLeadModal(syncCrmLeadsWithPresupuestos([lead])[0])}
                         className="w-full py-2 px-3 rounded-xl bg-orange-600/15 hover:bg-orange-600/25 text-orange-400 border border-orange-500/30 hover:border-orange-500/60 font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
                       >
                         <Users className="w-3.5 h-3.5" />
@@ -2871,8 +2881,19 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
             {/* Quick KPI Strip */}
             <div className="grid grid-cols-4 border-b border-slate-800/80 bg-[#0a0e17] text-xs px-5 py-2.5">
               <div>
-                <span className="text-slate-500 font-mono text-[10px] block uppercase">Monto Acordado / Estimado</span>
-                <span className="font-mono font-black text-sm text-emerald-400">${Number(activeLeadModal.presupuestoMonto || activeLeadModal.valorEstimado || 0).toLocaleString()} USD</span>
+                <span className="text-slate-500 font-mono text-[10px] block uppercase">
+                  {activeLeadModal.presupuestoMonto ? 'Presupuesto Emitido' : 'Monto Estimado Inicial'}
+                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="font-mono font-black text-sm text-emerald-400">
+                    ${Number(activeLeadModal.presupuestoMonto || activeLeadModal.valorEstimado || 0).toLocaleString()} USD
+                  </span>
+                  {activeLeadModal.presupuestoCodigo && (
+                    <span className="text-[9px] font-mono font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30 px-1 py-0.2 rounded">
+                      {activeLeadModal.presupuestoCodigo}
+                    </span>
+                  )}
+                </div>
               </div>
               <div>
                 <span className="text-slate-500 font-mono text-[10px] block uppercase">Probabilidad de Cierre</span>
@@ -2975,9 +2996,11 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                     >
                       <div className="text-amber-400 font-bold text-xs flex items-center gap-1.5 group-hover:translate-x-0.5 transition-transform">
                         <FileText className="w-3.5 h-3.5" />
-                        <span>Presupuesto VIP</span>
+                        <span>{activeLeadModal.presupuestoMonto ? `Propuesta ${activeLeadModal.presupuestoCodigo || ''} ($${Number(activeLeadModal.presupuestoMonto).toLocaleString()} USD)` : 'Presupuesto VIP'}</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-1">Generar propuesta StoryBrand en Fase 3</p>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {activeLeadModal.presupuestoMonto ? 'Propuesta emitida en Fase 3 (Clic para ver/editar)' : 'Generar propuesta StoryBrand en Fase 3'}
+                      </p>
                     </button>
 
                     <button

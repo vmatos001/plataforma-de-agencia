@@ -26,8 +26,14 @@ import {
   BookmarkPlus,
   Eye,
   Sliders,
-  TrendingDown
+  TrendingDown,
+  X,
+  MessageSquare
 } from 'lucide-react';
+import {
+  getStoredCrmLeads,
+  saveStoredCrmLeads
+} from '../services/localStore';
 
 const DEFAULT_VIP_TEMPLATE = {
   titulo: "PROPUESTA DE DESARROLLO DIGITAL VIP",
@@ -127,6 +133,9 @@ export default function PresupuestosModule({
   const [filterStatus, setFilterStatus] = useState('todos');
   const [copiedLink, setCopiedLink] = useState(false);
   const [savedNotification, setSavedNotification] = useState(false);
+  const [showSavedModal, setShowSavedModal] = useState(false);
+  const [savedPortalUrl, setSavedPortalUrl] = useState('');
+  const [savedClientPhone, setSavedClientPhone] = useState('');
 
   const getBackendEndpoint = (endpoint) => {
     if (typeof window !== 'undefined') {
@@ -140,14 +149,33 @@ export default function PresupuestosModule({
     return endpoint;
   };
 
+  // Deduplica presupuestos para evitar múltiples cotizaciones para el mismo cliente/código
+  const deduplicatePresupuestos = (list) => {
+    if (!Array.isArray(list)) return [];
+    const seen = new Map();
+    for (const p of list) {
+      const key = (p.codigo || '') + '|' + (p.cliente?.empresa || '').toLowerCase().trim();
+      if (!seen.has(key)) {
+        seen.set(key, p);
+      }
+    }
+    return Array.from(seen.values());
+  };
+
   useEffect(() => {
-    // Cargar caché local inmediato si existe
+    // Cargar caché local inmediato si existe con deduplicación
     try {
       if (typeof window !== 'undefined') {
         const cached = localStorage.getItem('goglite_presupuestos');
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) setPresupuestos(parsed);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const clean = deduplicatePresupuestos(parsed);
+            setPresupuestos(clean);
+            if (clean.length !== parsed.length) {
+              localStorage.setItem('goglite_presupuestos', JSON.stringify(clean));
+            }
+          }
         }
       }
     } catch (e) {}
@@ -159,20 +187,51 @@ export default function PresupuestosModule({
   // Recibir prospecto desde el Módulo 2 (CRM & WhatsApp) o Módulo 1
   useEffect(() => {
     if (leadToConvert) {
+      const targetEmpresa = (leadToConvert.nombreEmpresa || leadToConvert.empresa || '').toLowerCase().trim();
+      const targetTelefono = (leadToConvert.telefono || '').replace(/\D/g, '');
+
+      // Verificar en la lista actual de presupuestos si este cliente ya tiene propuesta
+      let currentList = presupuestos;
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('goglite_presupuestos');
+          if (raw) currentList = JSON.parse(raw);
+        } catch (e) {}
+      }
+
+      const existingProp = currentList.find(p => {
+        const pEmpresa = (p.cliente?.empresa || '').toLowerCase().trim();
+        const pTelefono = (p.cliente?.telefono || '').replace(/\D/g, '');
+        return (targetEmpresa && pEmpresa && (targetEmpresa === pEmpresa || targetEmpresa.includes(pEmpresa) || pEmpresa.includes(targetEmpresa))) ||
+               (targetTelefono && pTelefono && (targetTelefono === pTelefono || targetTelefono.endsWith(pTelefono) || pTelefono.endsWith(targetTelefono))) ||
+               (leadToConvert.presupuestoId && p.id === leadToConvert.presupuestoId) ||
+               (leadToConvert.id && p.leadId === leadToConvert.id);
+      });
+
+      if (existingProp) {
+        // Cargar propuesta existente para editarla (sin crear duplicados)
+        setActivePresupuesto(existingProp);
+        setViewMode('editor');
+        if (onClearLeadConvert) onClearLeadConvert();
+        return;
+      }
+
+      // Si no existe, crear la primera propuesta
       const base = plantillas[0]?.datos || DEFAULT_VIP_TEMPLATE;
       const precioAcordado = Number(leadToConvert.valorEstimado) > 0 ? Number(leadToConvert.valorEstimado) : (base.inversion?.precioTotal || 250);
       const anticipoMitad = Math.round(precioAcordado * 0.5);
-      const nextNum = presupuestos.length + 1;
+      const nextNum = currentList.length + 1;
       const convertedProp = {
         ...JSON.parse(JSON.stringify(base)),
         id: 'prop-' + Date.now(),
+        leadId: leadToConvert.id || null,
         codigo: `P-2026-${String(nextNum).padStart(3, '0')}`,
         fecha: new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
         estado: 'borrador',
         pais: leadToConvert.pais || selectedCountry || 'SV',
         cliente: {
           nombre: leadToConvert.responsable || 'Director / Propietario',
-          empresa: leadToConvert.nombreEmpresa || 'Empresa Cliente',
+          empresa: leadToConvert.nombreEmpresa || leadToConvert.empresa || 'Empresa Cliente',
           telefono: leadToConvert.telefono || (leadToConvert.pais === 'DO' ? '+1 809 ' : '+503 '),
           email: leadToConvert.email || '',
           actividad: leadToConvert.dominio ? `Presencia Digital (${leadToConvert.dominio})` : 'Servicios Comerciales',
@@ -204,9 +263,10 @@ export default function PresupuestosModule({
       if (res && res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          setPresupuestos(data);
+          const clean = deduplicatePresupuestos(data);
+          setPresupuestos(clean);
           if (typeof window !== 'undefined') {
-            localStorage.setItem('goglite_presupuestos', JSON.stringify(data));
+            localStorage.setItem('goglite_presupuestos', JSON.stringify(clean));
           }
         }
       }
@@ -262,18 +322,61 @@ export default function PresupuestosModule({
   const handleSavePresupuesto = async () => {
     if (!activePresupuesto) return;
     try {
-      const exists = presupuestos.some(p => p.id === activePresupuesto.id);
-      const url = exists ? getBackendEndpoint(`/api/presupuestos/${activePresupuesto.id}`) : getBackendEndpoint('/api/presupuestos');
+      const targetEmpresa = (activePresupuesto.cliente?.empresa || '').toLowerCase().trim();
+      const targetTelefono = (activePresupuesto.cliente?.telefono || '').replace(/\D/g, '');
+
+      // 1. Identificar si ya existe por ID, por Código o por Cliente
+      let existingIdx = presupuestos.findIndex(p => p.id === activePresupuesto.id);
+      if (existingIdx === -1) {
+        existingIdx = presupuestos.findIndex(p => 
+          (p.codigo && activePresupuesto.codigo && p.codigo === activePresupuesto.codigo) ||
+          (targetEmpresa && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmpresa) ||
+          (targetTelefono && p.cliente?.telefono && p.cliente.telefono.replace(/\D/g, '') === targetTelefono) ||
+          (activePresupuesto.leadId && p.leadId && p.leadId === activePresupuesto.leadId)
+        );
+      }
+
+      const exists = existingIdx !== -1;
+      const targetId = exists ? (presupuestos[existingIdx].id || activePresupuesto.id) : (activePresupuesto.id || ('prop-' + Date.now()));
+      const targetCodigo = exists ? (presupuestos[existingIdx].codigo || activePresupuesto.codigo) : (activePresupuesto.codigo || `P-2026-${String(presupuestos.length + 1).padStart(3, '0')}`);
+
+      // Buscar el lead asociado en CRM para asociar portalToken y leadId
+      let targetPortalToken = activePresupuesto.portalToken || (exists ? presupuestos[existingIdx].portalToken : null);
+      let targetLeadId = activePresupuesto.leadId || (exists ? presupuestos[existingIdx].leadId : null);
+      try {
+        const crmLeads = getStoredCrmLeads();
+        const matched = crmLeads.find(cl =>
+          (targetLeadId && cl.id === targetLeadId) ||
+          (targetEmpresa && cl.empresa && cl.empresa.toLowerCase().trim() === targetEmpresa) ||
+          (targetTelefono && cl.telefono && cl.telefono.replace(/\D/g, '') === targetTelefono)
+        );
+        if (matched) {
+          if (!targetLeadId) targetLeadId = matched.id;
+          if (!targetPortalToken && matched.portalToken) targetPortalToken = matched.portalToken;
+        }
+      } catch (e) {}
+      if (!targetPortalToken) targetPortalToken = `portal-${targetId}`;
+
+      const propToSave = {
+        ...activePresupuesto,
+        id: targetId,
+        codigo: targetCodigo,
+        leadId: targetLeadId,
+        portalToken: targetPortalToken
+      };
+
+      const url = exists ? getBackendEndpoint(`/api/presupuestos/${targetId}`) : getBackendEndpoint('/api/presupuestos');
       const method = exists ? 'PATCH' : 'POST';
 
-      // 1. Persistir de inmediato en el estado local y en localStorage
+      // 1. Persistir de inmediato en el estado local y en localStorage deduplicando
       setPresupuestos(prev => {
         let updated;
         if (exists) {
-          updated = prev.map(p => p.id === activePresupuesto.id ? activePresupuesto : p);
+          updated = prev.map((p, idx) => idx === existingIdx ? propToSave : p);
         } else {
-          updated = [activePresupuesto, ...prev];
+          updated = [propToSave, ...prev];
         }
+        updated = deduplicatePresupuestos(updated);
         if (typeof window !== 'undefined') {
           localStorage.setItem('goglite_presupuestos', JSON.stringify(updated));
         }
@@ -285,11 +388,57 @@ export default function PresupuestosModule({
         await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(activePresupuesto)
+          body: JSON.stringify(propToSave)
         });
       } catch (e) {
         console.warn('Backend sync error (usando local):', e);
       }
+
+      // 3. Sincronizar automáticamente con CRM Leads
+      if (typeof window !== 'undefined') {
+        try {
+          const crmLeads = getStoredCrmLeads();
+          const targetName = (activePresupuesto.cliente?.empresa || '').toLowerCase().trim();
+          const targetPhone = (activePresupuesto.cliente?.telefono || '').replace(/\D/g, '');
+          const nuevoMonto = Number(activePresupuesto.inversion?.precioTotal) || 0;
+
+          let updatedCrmFlag = false;
+          const updatedCrm = crmLeads.map(cl => {
+            const clName = (cl.empresa || '').toLowerCase().trim();
+            const clPhone = (cl.telefono || '').replace(/\D/g, '');
+            const isMatch = (targetName && (clName === targetName || clName.includes(targetName) || targetName.includes(clName))) ||
+                            (targetPhone && clPhone && (targetPhone === clPhone || clPhone.endsWith(targetPhone) || targetPhone.endsWith(clPhone))) ||
+                            (activePresupuesto.leadId && cl.id === activePresupuesto.leadId) ||
+                            (activePresupuesto.cliente?.id && cl.id === activePresupuesto.cliente.id);
+
+            if (isMatch) {
+              updatedCrmFlag = true;
+              return {
+                ...cl,
+                presupuestoId: activePresupuesto.id,
+                presupuestoCodigo: activePresupuesto.codigo || 'P-2026',
+                presupuestoMonto: nuevoMonto,
+                valorEstimado: nuevoMonto,
+                presupuestoEstado: activePresupuesto.estado || 'borrador',
+                etapa: (cl.etapa === 'nuevo' || cl.etapa === 'contactado') ? 'propuesta_enviada' : cl.etapa
+              };
+            }
+            return cl;
+          });
+
+          if (updatedCrmFlag) {
+            saveStoredCrmLeads(updatedCrm);
+          }
+        } catch (crmSyncErr) {
+          console.warn('[Presupuestos] Error sincronizando con CRM:', crmSyncErr);
+        }
+      }
+
+      // 4. Generar URL pública y abrir modal interactivo para compartir
+      const publicUrl = getPublicProposalUrl(propToSave);
+      setSavedPortalUrl(publicUrl);
+      setSavedClientPhone(propToSave.cliente?.telefono || '');
+      setShowSavedModal(true);
 
       setSavedNotification(true);
       setTimeout(() => setSavedNotification(false), 2500);
@@ -384,12 +533,73 @@ export default function PresupuestosModule({
     });
   };
 
+  // Helper para obtener el enlace público del portal interactivo
+  const getPublicProposalUrl = (prop = null) => {
+    const target = prop || activePresupuesto;
+    if (!target) return '';
+
+    let portalToken = target.portalToken || target.codigo || target.id;
+    let matchedLead = null;
+    try {
+      const crmLeads = getStoredCrmLeads();
+      const targetEmpresa = (target.cliente?.empresa || '').toLowerCase().trim();
+      const targetTelefono = (target.cliente?.telefono || '').replace(/\D/g, '');
+      matchedLead = crmLeads.find(cl => 
+        (target.leadId && cl.id === target.leadId) ||
+        (targetEmpresa && cl.empresa && cl.empresa.toLowerCase().trim() === targetEmpresa) ||
+        (targetTelefono && cl.telefono && cl.telefono.replace(/\D/g, '') === targetTelefono)
+      );
+      if (matchedLead && matchedLead.portalToken) {
+        portalToken = matchedLead.portalToken;
+      }
+    } catch (e) {}
+
+    // Payload autosuficiente para garantizar que la vista de cliente siempre coincida
+    // al 100% en cualquier dispositivo, móvil o WhatsApp sin depender de bases de datos locales
+    let payloadQuery = '';
+    try {
+      const compactPayload = {
+        id: target.id,
+        leadId: target.leadId || matchedLead?.id || null,
+        portalToken: portalToken,
+        codigo: target.codigo,
+        fecha: target.fecha,
+        pais: target.pais || matchedLead?.pais || 'SV',
+        cliente: target.cliente || {
+          nombre: matchedLead?.contacto || 'Cliente VIP',
+          empresa: matchedLead?.empresa || 'Empresa',
+          telefono: matchedLead?.telefono || '',
+          email: matchedLead?.email || ''
+        },
+        emisor: target.emisor,
+        titulo: target.titulo,
+        subtitulo: target.subtitulo,
+        portada: target.portada,
+        inversion: target.inversion,
+        modulos: target.modulos || [],
+        fases: target.fases || [],
+        vigenciaDias: target.vigenciaDias || 15,
+        estado: target.estado || 'enviado'
+      };
+      const jsonStr = JSON.stringify(compactPayload);
+      const encoded = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (m, p) => String.fromCharCode('0x' + p)));
+      payloadQuery = `?d=${encodeURIComponent(encoded)}`;
+    } catch (encErr) {
+      console.warn('Error encoding proposal payload:', encErr);
+    }
+
+    return `${window.location.origin}/portal/${portalToken}${payloadQuery}`;
+  };
+
   // Copy link
-  const handleCopyLink = () => {
-    const url = `${window.location.origin}/#propuesta-${activePresupuesto?.id}`;
+  const handleCopyLink = (prop = null) => {
+    const url = getPublicProposalUrl(prop);
+    if (!url) return;
     navigator.clipboard.writeText(url);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
+    const targetId = prop?.id || (activePresupuesto?.id || true);
+    setCopiedLink(targetId);
+    setTimeout(() => setCopiedLink(false), 2500);
+    return url;
   };
 
   // Trigger print
@@ -566,6 +776,22 @@ export default function PresupuestosModule({
                               <span>Facturar M4</span>
                             </button>
                           )}
+                          <button
+                            onClick={() => handleCopyLink(prop)}
+                            className="p-1.5 rounded hover:bg-slate-700 text-sky-400 hover:text-sky-300 transition-colors"
+                            title={copiedLink === prop.id ? "¡Enlace copiado al portapapeles!" : "Copiar enlace interactivo para el cliente"}
+                          >
+                            {copiedLink === prop.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                          <a
+                            href={getPublicProposalUrl(prop)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1.5 rounded hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 transition-colors"
+                            title="Abrir vista interactiva del cliente (Portal en vivo)"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
                           <button
                             onClick={() => {
                               setActivePresupuesto(prop);
@@ -1160,7 +1386,6 @@ export default function PresupuestosModule({
                         <div>• <strong>Vigencia de la Oferta:</strong> {activePresupuesto.vigenciaDias || 15} días calendario.</div>
                       </div>
                     </div>
-                  </div>
 
                   {/* 4. FIRMA OFICIAL GOGLITE */}
                   <div className="pt-4 border-t border-slate-300 flex items-center justify-between text-[11px] text-slate-600 avoid-break mt-6">
@@ -1174,8 +1399,109 @@ export default function PresupuestosModule({
                       <div className="font-mono text-[10px] text-slate-400">Documento Oficial Certificado</div>
                       <div className="text-xs font-bold text-slate-900">Estado: {activePresupuesto.estado.toUpperCase()}</div>
                     </div>
+                  </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL: COTIZACIÓN GUARDADA Y ENLACE DE CLIENTE */}
+      {showSavedModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0f1422] border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-white">¡Cotización Guardada y Lista para Enviar!</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Se generó el enlace interactivo para que el cliente la revise y apruebe en línea.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSavedModal(false)}
+                className="w-7 h-7 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-[#080b11] border border-slate-800/80 space-y-2">
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-slate-400">Código de Propuesta:</span>
+                <span className="font-bold text-orange-400">{activePresupuesto?.codigo || 'P-2026'}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-slate-400">Cliente / Negocio:</span>
+                <span className="font-bold text-slate-200">{activePresupuesto?.cliente?.empresa}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-slate-400">Monto Inversión:</span>
+                <span className="font-black text-emerald-400">${Number(activePresupuesto?.inversion?.precioTotal || 0).toLocaleString()} USD</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300 block">
+                Enlace Público del Portal de Cliente (Fase 1: Propuesta VIP):
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={savedPortalUrl}
+                  className="flex-1 bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-sky-400 select-all focus:outline-none focus:border-sky-500"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(savedPortalUrl);
+                    setCopiedLink('modal');
+                    setTimeout(() => setCopiedLink(false), 2000);
+                  }}
+                  className="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shrink-0"
+                >
+                  {copiedLink === 'modal' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedLink === 'modal' ? '¡Copiado!' : 'Copiar'}</span>
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500">
+                El cliente puede abrir este enlace desde su computadora o móvil sin necesidad de iniciar sesión para revisar módulos, montos y aprobar con 1 clic.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80">
+              <a
+                href={savedPortalUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Abrir Vista de Cliente</span>
+              </a>
+
+              <a
+                href={`https://wa.me/${(savedClientPhone || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(`Hola ${activePresupuesto?.cliente?.nombre || ''}, te comparto el enlace a tu Propuesta de Desarrollo Digital VIP de Goglite:\n\n${savedPortalUrl}\n\nPuedes revisarla en detalle y aprobarla directamente en línea para iniciar el proyecto.`)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Enviar por WhatsApp</span>
+              </a>
+            </div>
+
+            <div className="pt-1 text-center">
+              <button
+                onClick={() => setShowSavedModal(false)}
+                className="text-xs text-slate-500 hover:text-slate-300 underline"
+              >
+                Cerrar y continuar en el constructor
+              </button>
             </div>
           </div>
         </div>
