@@ -6,10 +6,12 @@
  */
 
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
-const CREDENTIALS_PATH = process.env.GOOGLE_SUITE_CREDENTIALS || 'C:/Users/laura hart/google-suite-mcp/credentials.json';
-const TOKEN_PATH = process.env.GOOGLE_SUITE_TOKENS || 'C:/Users/laura hart/google-suite-mcp/token.json';
+const DEFAULT_MCP_DIR = path.join(os.homedir(), 'google-suite-mcp');
+const CREDENTIALS_PATH = process.env.GOOGLE_SUITE_CREDENTIALS || path.join(DEFAULT_MCP_DIR, 'credentials.json');
+const TOKEN_PATH = process.env.GOOGLE_SUITE_TOKENS || path.join(DEFAULT_MCP_DIR, 'token.json');
 
 /**
  * Obtiene o refresca el token de acceso OAuth2 para Google APIs
@@ -184,12 +186,13 @@ async function makeFolderShareable(token, folderId) {
 }
 
 /**
- * Busca si ya existe una carpeta con el nombre dado
+ * Busca si ya existe una carpeta con el nombre dado (opcionalmente dentro de un parentId)
  */
-async function findExistingFolder(token, name) {
+async function findExistingFolder(token, name, parentId = null) {
   try {
     const safeName = name.replace(/'/g, "\\'");
-    const q = `name = '${safeName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+    const parentFilter = parentId ? ` and '${parentId}' in parents` : '';
+    const q = `name = '${safeName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false${parentFilter}`;
     const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,webViewLink)`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -233,26 +236,27 @@ export async function createClientVault(clientName, clientEmail = '', leadId = n
     if (!mainFolder) {
       console.log(`[DRIVE] Creando carpeta principal para cliente: "${folderTitle}"`);
       mainFolder = await createFolder(token, folderTitle);
-      await makeFolderShareable(token, mainFolder.id);
     }
 
     const vaultId = mainFolder.id;
     const vaultUrl = mainFolder.webViewLink || `https://drive.google.com/drive/folders/${vaultId}`;
 
-    // 2. Crear las 3 subcarpetas
-    let insumosFolder = await findExistingFolder(token, '01_Insumos_Cliente');
+    // 2. Crear las 3 subcarpetas aisladas dentro del vaultId de este cliente
+    let insumosFolder = await findExistingFolder(token, '01_Insumos_Cliente', vaultId);
     if (!insumosFolder) {
       insumosFolder = await createFolder(token, '01_Insumos_Cliente', vaultId);
+      await makeFolderShareable(token, insumosFolder.id);
     }
 
-    let contratosFolder = await findExistingFolder(token, '02_Contratos_Firmados');
+    let contratosFolder = await findExistingFolder(token, '02_Contratos_Firmados', vaultId);
     if (!contratosFolder) {
       contratosFolder = await createFolder(token, '02_Contratos_Firmados', vaultId);
     }
 
-    let entregablesFolder = await findExistingFolder(token, '03_Entregables_Codigo');
+    let entregablesFolder = await findExistingFolder(token, '03_Entregables_Codigo', vaultId);
     if (!entregablesFolder) {
       entregablesFolder = await createFolder(token, '03_Entregables_Codigo', vaultId);
+      await makeFolderShareable(token, entregablesFolder.id);
     }
 
     // 3. Crear archivo de bienvenida e instrucciones en la carpeta de Insumos

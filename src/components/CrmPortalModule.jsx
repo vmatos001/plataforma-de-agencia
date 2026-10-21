@@ -563,7 +563,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       cargo: sl.cargo || 'Propietario / Gerente',
       email: sl.email && !sl.email.endsWith('.negocio') ? sl.email : '',
       telefono: sl.telefono || '',
-      pais: sl.pais || selectedCountry === 'ALL' ? 'SV' : selectedCountry,
+      pais: sl.pais || (selectedCountry === 'ALL' ? 'SV' : selectedCountry),
       dominio: sl.sinWeb ? '' : (sl.dominio || ''),
       sinWeb: Boolean(sl.sinWeb),
       resenas: sl.resenas || 0,

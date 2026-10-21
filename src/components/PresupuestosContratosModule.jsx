@@ -8,9 +8,11 @@ export default function PresupuestosContratosModule({
   leadToConvert,
   onClearLeadConvert,
   onNavigateToRentabilidad,
+  onConvertToFactura,
   initialTab = 'presupuestos'
 }) {
   const [activeSubTab, setActiveSubTab] = useState(initialTab);
+  const handleNavigateToRentabilidad = onNavigateToRentabilidad || onConvertToFactura;
 
   // Al convertir un lead, activar automáticamente la pestaña de presupuestos
   useEffect(() => {
@@ -67,7 +69,7 @@ export default function PresupuestosContratosModule({
           leadToConvert={leadToConvert}
           onClearLeadConvert={onClearLeadConvert}
           onNavigateToContratos={() => setActiveSubTab('contratos')}
-          onNavigateToRentabilidad={onNavigateToRentabilidad}
+          onNavigateToRentabilidad={handleNavigateToRentabilidad}
         />
       ) : (
         <ContratosOnboardingModule

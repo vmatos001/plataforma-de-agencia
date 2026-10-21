@@ -1,7 +1,7 @@
 // Motor autónomo de búsqueda y enriquecimiento de leads para el frontend (Edge / Firebase Hosting)
 // Conexión directa y en vivo a Google Maps (Places) y Google SERP vía Serper API
 
-const MASTER_SERPER_KEY = 'baf795126893267f72efe62337f625075df6693a';
+const MASTER_SERPER_KEY = '';
 
 function getValidSerperKey(key) {
   if (key && typeof key === 'string' && key.trim().length > 20 && !key.includes('active') && !key.includes('mock')) {

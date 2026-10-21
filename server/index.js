@@ -54,6 +54,13 @@ import {
 import { getAgencySettings, saveAgencySettings } from './services/agencySettingsStorage.js';
 import { getUsers, saveUsers, createCollaborator, registerOrUpdateClientAuth, getUserById, updateUser, deleteCollaborator } from './services/usersStorage.js';
 import { verifyTOTP, generateTOTP, buildOtpAuthUri, generateQrCodeDataUrl } from './services/totpService.js';
+import {
+  syncScrapperLeadToCrm,
+  syncPresupuestoToWorkflow,
+  ensureDownstreamProjectPipeline,
+  getUnifiedPortalPayload,
+  applyPortalUpdateToWorkflow
+} from './services/workflowContinuityService.js';
 
 import path from 'path';
 import fs from 'fs';
@@ -188,6 +195,11 @@ app.post('/api/auth/login', (req, res) => {
       return res.status(401).json({ error: 'Usuario no registrado con este correo.' });
     }
 
+    // Verificación de contraseña si el usuario tiene credencial configurada
+    if (user.password && password !== undefined && user.password !== password) {
+      return res.status(401).json({ error: 'Credenciales inválidas.' });
+    }
+
     // Si tiene MFA con Google Authenticator requerido (RFC 6238)
     if (user.mfaActivo && user.rol === 'admin') {
       if (!totpCode || totpCode.trim().length !== 6) {
@@ -196,7 +208,7 @@ app.post('/api/auth/login', (req, res) => {
           message: 'Introduce el código de 6 dígitos generado por tu app Google Authenticator.' 
         });
       }
-      const verifyResult = verifyTOTP(totpCode, user.totpKeySecret || 'JBSWY3DPEHPK3PXP');
+      const verifyResult = verifyTOTP(totpCode, user.totpKeySecret || process.env.GOGLITE_TOTP_SECRET || 'JBSWY3DPEHPK3PXP');
       if (!verifyResult.valid) {
         return res.status(401).json({
           error: 'Código de Google Authenticator incorrecto o expirado. Revisa tu aplicación móvil.'
@@ -221,19 +233,17 @@ app.post('/api/auth/login', (req, res) => {
 app.get('/api/auth/2fa/setup', async (req, res) => {
   try {
     const email = req.query.email || 'victor@goglite.com';
-    const secret = req.query.secret || 'JBSWY3DPEHPK3PXP';
+    const secret = req.query.secret || process.env.GOGLITE_TOTP_SECRET || 'JBSWY3DPEHPK3PXP';
     const issuer = req.query.issuer || 'Goglite Agency';
     const otpAuthUri = buildOtpAuthUri({ email, issuer, secret });
     const qrCodeDataUrl = await generateQrCodeDataUrl(otpAuthUri);
-    const currentCode = generateTOTP(secret);
     res.json({
       success: true,
       email,
       issuer,
       secret,
       otpAuthUri,
-      qrCodeDataUrl,
-      currentCode
+      qrCodeDataUrl
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -242,7 +252,7 @@ app.get('/api/auth/2fa/setup', async (req, res) => {
 
 app.post('/api/auth/2fa/verify', (req, res) => {
   try {
-    const { token, secret = 'JBSWY3DPEHPK3PXP' } = req.body;
+    const { token, secret = process.env.GOGLITE_TOTP_SECRET || 'JBSWY3DPEHPK3PXP' } = req.body;
     const result = verifyTOTP(token, secret);
     res.json({
       success: result.valid,
@@ -434,7 +444,14 @@ app.post('/api/pipeline', async (req, res) => {
     const finalLeads = [...leadsToAdd, ...currentLeads];
     saveLeads(finalLeads);
 
-    console.log(`[PIPELINE] Completado: ${leadsToAdd.length} leads nuevos guardados en Neon/Local.`);
+    // Fase 1 -> Fase 2: Sincronizar automáticamente con el CRM
+    for (const l of leadsToAdd) {
+      try {
+        syncScrapperLeadToCrm(l);
+      } catch (e) {}
+    }
+
+    console.log(`[PIPELINE] Completado: ${leadsToAdd.length} leads nuevos guardados en Neon/Local y sincronizados con CRM.`);
 
     res.json({
       success: true,
@@ -466,6 +483,9 @@ app.post('/api/leads', (req, res) => {
   };
   leads.unshift(newLead);
   saveLeads(leads);
+  try {
+    syncScrapperLeadToCrm(newLead);
+  } catch (e) {}
   res.json(newLead);
 });
 
@@ -476,6 +496,9 @@ app.patch('/api/leads/:id', (req, res) => {
 
   leads[idx] = { ...leads[idx], ...req.body, actualizado: new Date().toISOString().split('T')[0] };
   saveLeads(leads);
+  try {
+    syncScrapperLeadToCrm(leads[idx]);
+  } catch (e) {}
   res.json(leads[idx]);
 });
 
@@ -712,6 +735,9 @@ app.post('/api/presupuestos', (req, res) => {
   };
   list.unshift(newProp);
   savePresupuestos(list);
+  try {
+    syncPresupuestoToWorkflow(newProp);
+  } catch (e) {}
   res.json(newProp);
 });
 
@@ -722,6 +748,9 @@ app.patch('/api/presupuestos/:id', (req, res) => {
 
   list[idx] = { ...list[idx], ...req.body };
   savePresupuestos(list);
+  try {
+    syncPresupuestoToWorkflow(list[idx]);
+  } catch (e) {}
   res.json(list[idx]);
 });
 
@@ -750,6 +779,9 @@ app.post('/api/presupuestos/:id/accept', (req, res) => {
   if (prop) {
     prop.estado = 'aceptado';
     savePresupuestos(list);
+    try {
+      syncPresupuestoToWorkflow(prop);
+    } catch (e) {}
   }
   res.json({ success: true, estado: prop?.estado });
 });
@@ -783,6 +815,9 @@ app.post('/api/proyectos/crear-desde-presupuesto/:presupuestoId', (req, res) => 
   savePresupuestos(presupuestos);
 
   const nuevoProj = crearProyectoDesdePresupuesto(prop);
+  try {
+    ensureDownstreamProjectPipeline({ presupuesto: prop, proyecto: nuevoProj });
+  } catch (e) {}
   res.json({ success: true, proyecto: nuevoProj });
 });
 
@@ -799,6 +834,9 @@ app.post('/api/proyectos', (req, res) => {
   };
   list.unshift(nuevo);
   saveProyectos(list);
+  try {
+    ensureDownstreamProjectPipeline({ proyecto: nuevo });
+  } catch (e) {}
   res.json(nuevo);
 });
 
@@ -810,6 +848,9 @@ app.patch('/api/proyectos/:id', (req, res) => {
 
   list[idx] = { ...list[idx], ...req.body };
   saveProyectos(list);
+  try {
+    ensureDownstreamProjectPipeline({ proyecto: list[idx] });
+  } catch (e) {}
   res.json(list[idx]);
 });
 
@@ -856,6 +897,9 @@ app.post('/api/proyectos/:id/firmar', (req, res) => {
   }
 
   saveProyectos(list);
+  try {
+    ensureDownstreamProjectPipeline({ proyecto: proj });
+  } catch (e) {}
   res.json({ success: true, proyecto: proj });
 });
 
@@ -886,6 +930,9 @@ app.post('/api/proyectos/:id/onboarding', (req, res) => {
   }
 
   saveProyectos(list);
+  try {
+    ensureDownstreamProjectPipeline({ proyecto: proj });
+  } catch (e) {}
   res.json({ success: true, proyecto: proj });
 });
 
@@ -916,6 +963,9 @@ app.post('/api/proyectos/:id/hito', (req, res) => {
   }
 
   saveProyectos(list);
+  try {
+    ensureDownstreamProjectPipeline({ proyecto: proj });
+  } catch (e) {}
   res.json({ success: true, proyecto: proj });
 });
 
@@ -951,6 +1001,9 @@ app.post('/api/proyectos/:id/pago', (req, res) => {
   }
 
   saveProyectos(list);
+  try {
+    ensureDownstreamProjectPipeline({ proyecto: proj });
+  } catch (e) {}
   res.json({ success: true, proyecto: proj });
 });
 
@@ -1219,39 +1272,29 @@ app.delete('/api/crm/leads/:id', (req, res) => {
   res.json({ success: true });
 });
 
-// Endpoint público del Portal de Cliente
+// Endpoint público del Portal de Cliente (Alimentado en tiempo real por las Fases 1 a 7 de la base de datos)
 app.get('/api/portal/:token', (req, res) => {
   const { token } = req.params;
-  const lead = getCrmLeadByToken(token);
-  if (!lead) return res.status(404).json({ error: 'Portal no encontrado o enlace inválido' });
-
-  // Buscar si tiene presupuesto vinculado
-  const presupuestos = getPresupuestos();
-  const presupuesto = presupuestos.find(p => p.cliente?.empresa?.toLowerCase() === lead.empresa.toLowerCase() || p.id === lead.portalConfig?.presupuestoId) || null;
-
-  // Buscar si tiene contrato/proyecto vinculado
-  const proyectos = getProyectos();
-  const proyecto = proyectos.find(p => p.cliente?.empresa?.toLowerCase() === lead.empresa.toLowerCase() || p.id === lead.portalConfig?.proyectoId) || null;
-
-  res.json({
-    lead,
-    presupuesto,
-    proyecto,
-    portalConfig: lead.portalConfig
-  });
+  const unifiedPayload = getUnifiedPortalPayload(token);
+  if (!unifiedPayload) {
+    return res.status(404).json({ error: 'Portal no encontrado o enlace inválido' });
+  }
+  res.json(unifiedPayload);
 });
 
 app.post('/api/portal/:token/upload-assets', (req, res) => {
   const { token } = req.params;
   const updated = addClientUploadedAsset(token, req.body);
   if (!updated) return res.status(404).json({ error: 'Portal no encontrado' });
-  res.json({ success: true, lead: updated });
+  const unified = applyPortalUpdateToWorkflow(token, { fase3InsumosCompletos: true });
+  res.json({ success: true, lead: updated, portal: unified });
 });
 
 app.post('/api/portal/:token/update', async (req, res) => {
   const { token } = req.params;
-  const lead = getCrmLeadByToken(token);
-  if (!lead) return res.status(404).json({ error: 'Portal no encontrado' });
+  const currentPortal = getUnifiedPortalPayload(token);
+  if (!currentPortal) return res.status(404).json({ error: 'Portal no encontrado' });
+  const lead = currentPortal.lead;
 
   let extraConfig = {};
 
@@ -1280,8 +1323,16 @@ app.post('/api/portal/:token/update', async (req, res) => {
   }
 
   const finalPayload = { ...req.body, ...extraConfig };
-  const updated = updateClientPortalConfig(token, finalPayload);
-  res.json({ success: true, lead: updated, driveVault: currentVault });
+  const unified = applyPortalUpdateToWorkflow(token, finalPayload);
+  res.json({
+    success: true,
+    lead: unified?.lead || lead,
+    presupuesto: unified?.presupuesto || null,
+    proyecto: unified?.proyecto || null,
+    portalConfig: unified?.portalConfig || finalPayload,
+    workflowData: unified?.workflowData || null,
+    driveVault: currentVault
+  });
 });
 
 // Endpoint para forzar creación o sincronización de Bóveda en Google Drive para un portal

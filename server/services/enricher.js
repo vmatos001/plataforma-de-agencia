@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import { getSettings } from './storage.js';
+import { isSafePublicHost } from './auditor.js';
 
 /**
  * Extracts decision makers and verified emails for a domain
@@ -61,11 +62,17 @@ export async function enrichDomain(domain, companyName = '', country = 'SV') {
 }
 
 async function scrapeWebsiteContact(domain) {
+  const cleanDomain = (domain || '').replace(/^https?:\/\//, '').split('/')[0].trim();
+  if (!isSafePublicHost(cleanDomain)) {
+    console.warn(`[ENRICHER SSRF] Dominio bloqueado por política de seguridad: "${cleanDomain}"`);
+    return null;
+  }
+
   const urlsToTry = [
-    `https://${domain}`,
-    `https://${domain}/contacto`,
-    `https://${domain}/contact`,
-    `https://${domain}/nosotros`
+    `https://${cleanDomain}`,
+    `https://${cleanDomain}/contacto`,
+    `https://${cleanDomain}/contact`,
+    `https://${cleanDomain}/nosotros`
   ];
 
   for (const url of urlsToTry) {

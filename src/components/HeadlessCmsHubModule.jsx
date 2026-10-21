@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import apiClient from '../services/apiClient';
 import {
   Globe,
   Layout,
@@ -64,8 +65,9 @@ export default function HeadlessCmsHubModule() {
       let loaded = null;
 
       try {
-        const res = await fetch('/api/cms/sites');
-        if (res.ok) {
+        const res = await apiClient.get('/api/cms/sites');
+        const cType = res.headers.get('content-type') || '';
+        if (res.ok && cType.includes('application/json')) {
           loaded = await res.json();
         }
       } catch (err) {
@@ -187,12 +189,9 @@ export default function HeadlessCmsHubModule() {
 
       // 1. Guardar en API servidor
       try {
-        const res = await fetch(`/api/cms/content/${selectedSlug}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(editableContent)
-        });
-        if (res.ok) {
+        const res = await apiClient.patch(`/api/cms/content/${selectedSlug}`, editableContent);
+        const cType = res.headers.get('content-type') || '';
+        if (res.ok && cType.includes('application/json')) {
           updatedSite = await res.json();
         }
       } catch (e) {
@@ -235,12 +234,9 @@ export default function HeadlessCmsHubModule() {
       let created = null;
 
       try {
-        const res = await fetch('/api/cms/sites', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newSiteForm)
-        });
-        if (res.ok) {
+        const res = await apiClient.post('/api/cms/sites', newSiteForm);
+        const cType = res.headers.get('content-type') || '';
+        if (res.ok && cType.includes('application/json')) {
           const data = await res.json();
           created = data.site;
         }

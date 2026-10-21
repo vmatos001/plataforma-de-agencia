@@ -35,7 +35,8 @@ export function crearProyectoDesdePresupuesto(presupuesto) {
   const nextNum = list.length + 1;
   const codigo = `CON-2026-${String(nextNum).padStart(3, '0')}`;
 
-  const total = presupuesto.modulos?.reduce((acc, m) => acc + (Number(m.precio) || 0), 0) || 0;
+  const modulosTotal = presupuesto.modulos?.reduce((acc, m) => acc + (Number(m.precio) || 0), 0) || 0;
+  const total = Number(presupuesto.inversion?.precioTotal) || modulosTotal || 0;
   const anticipo = Math.round(total * 0.5);
   const saldo = total - anticipo;
 

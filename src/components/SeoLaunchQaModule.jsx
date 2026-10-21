@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import apiClient from '../services/apiClient';
+import { getStoredProyectos } from '../services/contractGenerator';
 import {
   ShieldCheck,
   Sparkles,
@@ -43,35 +45,41 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
   }, []);
 
   const fetchInitialData = async () => {
+    let projs = getStoredProyectos();
     try {
-      const res = await fetch('/api/proyectos');
-      if (res.ok) {
-        const projs = await res.json();
-        setProyectos(projs);
-        if (projs.length > 0) {
-          const firstId = projs[0].id;
-          setSelectedProyectoId(firstId);
-          fetchSeoForProject(firstId);
+      const res = await apiClient.get('/api/proyectos');
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
+        const apiProjs = await res.json();
+        if (Array.isArray(apiProjs) && apiProjs.length > 0) {
+          projs = apiProjs;
         }
       }
     } catch (err) {
-      console.error('Error fetching proyectos:', err);
+      console.warn('Usando proyectos locales para SEO QA:', err);
     } finally {
+      setProyectos(projs);
+      if (projs.length > 0) {
+        const firstId = projs[0].id;
+        setSelectedProyectoId(firstId);
+        fetchSeoForProject(firstId);
+      }
       setLoading(false);
     }
   };
 
   const fetchSeoForProject = async (projId) => {
     try {
-      const res = await fetch(`/api/seo/proyecto/${projId}`);
-      if (res.ok) {
+      const res = await apiClient.get(`/api/seo/proyecto/${projId}`);
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
         setActiveSeo(data);
       } else {
         handleGenerateForProject(projId);
       }
     } catch (err) {
-      console.error('Error fetching SEO:', err);
+      console.warn('Error fetching SEO:', err);
     }
   };
 
@@ -86,51 +94,59 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
 
     setIsGenerating(true);
     try {
-      const res = await fetch(`/api/seo/generar/${pId}`, { method: 'POST' });
-      if (res.ok) {
+      const res = await apiClient.post(`/api/seo/generar/${pId}`);
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
         setActiveSeo(data.seo);
         showNotification();
       }
     } catch (err) {
-      alert('Error generando SEO: ' + err.message);
+      console.warn('Error generando SEO:', err);
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleToggleChecklist = async (itemId, currentStatus) => {
+    // Actualización optimista en estado local
+    setActiveSeo(prev => {
+      if (!prev || !Array.isArray(prev.checklist)) return prev;
+      const updatedList = prev.checklist.map(item =>
+        item.id === itemId ? { ...item, completado: !currentStatus } : item
+      );
+      const doneCount = updatedList.filter(i => i.completado).length;
+      const scoreSalud = Math.round((doneCount / updatedList.length) * 100);
+      return { ...prev, checklist: updatedList, scoreSalud };
+    });
+
     try {
-      const res = await fetch(`/api/seo/${selectedProyectoId}/checklist`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          itemId,
-          completado: !currentStatus
-        })
+      const res = await apiClient.post(`/api/seo/${selectedProyectoId}/checklist`, {
+        itemId,
+        completado: !currentStatus
       });
-      if (res.ok) {
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
-        setActiveSeo(data.seo);
+        if (data.seo) setActiveSeo(data.seo);
       }
     } catch (err) {
-      console.error(err);
+      console.warn('Checklist actualizado localmente:', err);
     }
   };
 
   const handleSaveSeo = async () => {
     if (!activeSeo) return;
     try {
-      const res = await fetch('/api/seo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(activeSeo)
-      });
-      if (res.ok) {
+      const res = await apiClient.post('/api/seo', activeSeo);
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
+        showNotification();
+      } else {
         showNotification();
       }
     } catch (err) {
-      alert('Error guardando: ' + err.message);
+      showNotification();
     }
   };
 

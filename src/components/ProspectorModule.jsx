@@ -115,10 +115,80 @@ export default function ProspectorModule({
         if (Array.isArray(data)) {
           setLeads(data);
           setLocalItem(STORAGE_KEYS.OUTBOUND_LEADS, data);
+          autoSyncLeadsToCrmLocal(data);
         }
       }
     } catch (err) {
       console.warn('[Prospector] API offline o en hosting estático, operando en modo Local-First:', err.message);
+    }
+  };
+
+  // Continuidad Automática Fase 1 -> Fase 2 (CRM) en el almacén local
+  const autoSyncLeadsToCrmLocal = (outboundList = []) => {
+    if (!Array.isArray(outboundList) || outboundList.length === 0) return;
+    try {
+      const currentCrm = getStoredCrmLeads();
+      let changed = false;
+      const today = new Date().toISOString().split('T')[0];
+
+      for (const sl of outboundList) {
+        const slDom = (sl.dominio || '').toLowerCase().trim();
+        const slEmp = (sl.nombreEmpresa || sl.dominio || '').toLowerCase().trim();
+        const exists = currentCrm.some(cl =>
+          (sl.id && (cl.leadId === sl.id || cl.id === `crm-${sl.id}` || cl.id === `crm-scrapper-${sl.id}`)) ||
+          (slDom && (cl.dominio || '').toLowerCase().trim() === slDom) ||
+          (slEmp && (cl.empresa || '').toLowerCase().trim() === slEmp)
+        );
+
+        if (!exists) {
+          changed = true;
+          currentCrm.unshift({
+            id: `crm-${sl.id || Date.now() + '-' + Math.random().toString(36).substring(2, 6)}`,
+            leadId: sl.id || null,
+            empresa: sl.nombreEmpresa || sl.dominio || 'Negocio Prospectado',
+            contacto: sl.responsable || 'Dirección Comercial',
+            cargo: sl.cargo || 'Propietario / Gerente',
+            email: sl.email && !sl.email.endsWith('.negocio') ? sl.email : '',
+            telefono: sl.telefono || '',
+            pais: sl.pais || (selectedCountry === 'ALL' ? 'SV' : selectedCountry),
+            dominio: sl.sinWeb ? '' : (sl.dominio || ''),
+            sinWeb: Boolean(sl.sinWeb),
+            resenas: sl.resenas || 0,
+            calificacion: sl.calificacion || 4.8,
+            etapa: sl.estado === 'cliente' ? 'ganado' : 'nuevo',
+            valorEstimado: 1500,
+            probabilidad: 25,
+            fuente: `Fase 1 Prospector (${sl.sinWeb ? 'Google Maps' : 'SERP Web'})`,
+            portalToken: `portal-${sl.id || Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            auditoriaResumen: sl.auditoria || null,
+            interacciones: [
+              {
+                id: 'int-auto-' + Date.now() + Math.random(),
+                tipo: 'nota',
+                titulo: 'Sincronización Automática Fase 1 → Fase 2',
+                detalle: `Prospecto captado en Fase 1 con ${sl.auditoria?.puntos?.length || 0} oportunidades detectadas.`,
+                fecha: today,
+                proximoPaso: 'Primer contacto por WhatsApp / Envío de Propuesta',
+                fechaProximoPaso: ''
+              }
+            ],
+            whatsappData: {
+              telefono: sl.telefono || '',
+              temperatura: 'caliente',
+              estadoSeguimiento: 'primer_contacto',
+              ultimoMensajeFecha: 'Hoy',
+              mensajes: []
+            },
+            creadoEn: today
+          });
+        }
+      }
+
+      if (changed) {
+        saveStoredCrmLeads(currentCrm);
+      }
+    } catch (e) {
+      console.warn('[Prospector] Error sincronizando con CRM local:', e);
     }
   };
 
@@ -232,6 +302,7 @@ export default function ProspectorModule({
             const fresh = leadsToCreate.filter(l => !existingDomains.has(l.dominio));
             const updated = [...fresh, ...prev];
             setLocalItem(STORAGE_KEYS.OUTBOUND_LEADS, updated);
+            autoSyncLeadsToCrmLocal(fresh);
             return updated;
           });
           setPipelineProgress(`¡Completado en vivo! Se generaron ${leadsToCreate.length} leads calificados.`);
@@ -336,6 +407,7 @@ export default function ProspectorModule({
           setLeads(prev => {
             const updated = [newLeadPayload, ...prev];
             setLocalItem(STORAGE_KEYS.OUTBOUND_LEADS, updated);
+            autoSyncLeadsToCrmLocal([newLeadPayload]);
             return updated;
           });
         }

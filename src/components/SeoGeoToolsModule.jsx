@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import apiClient from '../services/apiClient';
 import {
   Search,
   Sparkles,
@@ -90,13 +91,14 @@ export default function SeoGeoToolsModule({ selectedCountry = 'SV' }) {
   const fetchGscMetrics = async () => {
     try {
       setGscLoading(true);
-      const res = await fetch(`/api/seo-geo/gsc/${gscDomain}?country=${country}`);
-      if (res.ok) {
+      const res = await apiClient.get(`/api/seo-geo/gsc/${gscDomain}?country=${country}`);
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
         const json = await res.json();
         setGscData(json);
       }
     } catch (err) {
-      console.error('Error fetching GSC metrics:', err);
+      console.warn('Error fetching GSC metrics:', err);
     } finally {
       setGscLoading(false);
     }
@@ -109,19 +111,16 @@ export default function SeoGeoToolsModule({ selectedCountry = 'SV' }) {
   const handleSyncGsc = async () => {
     try {
       setGscLoading(true);
-      const res = await fetch('/api/seo-geo/gsc/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain: gscDomain, country })
-      });
-      if (res.ok) {
+      const res = await apiClient.post('/api/seo-geo/gsc/sync', { domain: gscDomain, country });
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
         const json = await res.json();
         setGscData(json.metrics);
         setGscSynced(true);
         setTimeout(() => setGscSynced(false), 3000);
       }
     } catch (err) {
-      console.error(err);
+      console.warn(err);
     } finally {
       setGscLoading(false);
     }
@@ -135,25 +134,22 @@ export default function SeoGeoToolsModule({ selectedCountry = 'SV' }) {
   const runAnalysis = async () => {
     try {
       setAnalyzing(true);
-      const res = await fetch('/api/seo-geo/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          metaDescription: metaDesc,
-          h1,
-          content,
-          focusKeyword,
-          country,
-          city
-        })
+      const res = await apiClient.post('/api/seo-geo/analyze', {
+        title,
+        metaDescription: metaDesc,
+        h1,
+        content,
+        focusKeyword,
+        country,
+        city
       });
-      if (res.ok) {
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
         const json = await res.json();
         setAnalysis(json);
       }
     } catch (err) {
-      console.error('Error analizando SEO:', err);
+      console.warn('Error analizando SEO:', err);
     } finally {
       setAnalyzing(false);
     }

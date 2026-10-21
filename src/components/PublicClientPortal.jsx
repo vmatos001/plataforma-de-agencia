@@ -47,6 +47,7 @@ import {
   buildProyectoFromPresupuesto,
   ensureProyectoForPresupuesto
 } from '../services/contractGenerator';
+import { evaluateProjectMilestones } from '../services/projectMilestoneSync';
 
 function GoogleProtectedCard({
   title,
@@ -317,6 +318,21 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   useEffect(() => {
     loadPortalData();
+
+    // Escuchar actualizaciones en tiempo real de la base de datos de la aplicación (Fases 1 a 7)
+    const handleDatabaseSync = () => {
+      loadPortalData();
+    };
+
+    window.addEventListener('storage', handleDatabaseSync);
+    window.addEventListener('goglite_proyectos_synced', handleDatabaseSync);
+    window.addEventListener('focus', handleDatabaseSync);
+
+    return () => {
+      window.removeEventListener('storage', handleDatabaseSync);
+      window.removeEventListener('goglite_proyectos_synced', handleDatabaseSync);
+      window.removeEventListener('focus', handleDatabaseSync);
+    };
   }, [token]);
 
   const tabInitializedRef = useRef(false);
@@ -429,7 +445,14 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
           const searchParams = new URLSearchParams(window.location.search);
           const encodedData = searchParams.get('d');
           if (encodedData) {
-            const decodedJson = decodeURIComponent(escape(atob(encodedData)));
+            const binaryStr = atob(encodedData);
+            const bytes = Uint8Array.from(binaryStr, ch => ch.charCodeAt(0));
+            let decodedJson;
+            try {
+              decodedJson = decodeURIComponent(new TextDecoder('utf-8').decode(bytes));
+            } catch {
+              decodedJson = new TextDecoder('utf-8').decode(bytes);
+            }
             const parsedProp = JSON.parse(decodedJson);
             if (parsedProp && (parsedProp.cliente || parsedProp.empresa || parsedProp.titulo)) {
               const clientEmpresa = parsedProp.cliente?.empresa || parsedProp.empresa || 'Cliente VIP';
@@ -497,17 +520,30 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         }
       }
 
-      // 1. Intentar consultar API del servidor si devuelve JSON real
-      if (!loadedData) {
-        try {
-          const res = await fetch(`/api/portal/${token}`);
-          const ctype = res.headers.get('content-type') || '';
-          if (res.ok && ctype.includes('application/json')) {
-            loadedData = await res.json();
+      // 1. Consultar en tiempo real la Base de Datos de la Aplicación (Fases 1 a 7) vía API y fusionar con payload URL si existe
+      try {
+        const res = await fetch(`/api/portal/${token}`);
+        const ctype = res.headers.get('content-type') || '';
+        if (res.ok && ctype.includes('application/json')) {
+          const apiData = await res.json();
+          if (apiData && (apiData.lead || apiData.presupuesto || apiData.proyecto)) {
+            if (loadedData) {
+              loadedData = {
+                ...loadedData,
+                ...apiData,
+                lead: { ...(loadedData.lead || {}), ...(apiData.lead || {}) },
+                presupuesto: apiData.presupuesto || loadedData.presupuesto,
+                proyecto: apiData.proyecto || loadedData.proyecto,
+                portalConfig: { ...(loadedData.portalConfig || {}), ...(apiData.portalConfig || {}) },
+                workflowData: apiData.workflowData || loadedData.workflowData || null
+              };
+            } else {
+              loadedData = apiData;
+            }
           }
-        } catch (err) {
-          console.warn('API portal fetch warning, falling back to local storage:', err);
         }
+      } catch (err) {
+        console.warn('API portal fetch warning, falling back to local storage:', err);
       }
 
       // 2. Buscar en presupuestos guardados localmente
@@ -675,6 +711,29 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         setSelectedBankTab('SV');
       }
 
+      // Enlazar con proyecto formal si existe y reconciliar progreso por eventos y sprint
+      try {
+        const storedProjs = getStoredProyectos();
+        const leadEmp = (loadedData?.lead?.empresa || '').toLowerCase().trim();
+        const matchedProj = storedProjs.find(p => 
+          (loadedData.proyecto && p.id === loadedData.proyecto.id) ||
+          (loadedData.presupuesto && (p.presupuestoId === loadedData.presupuesto.id || p.presupuestoCodigo === loadedData.presupuesto.codigo)) ||
+          (leadEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === leadEmp)
+        );
+        if (matchedProj) {
+          const evaluatedProj = evaluateProjectMilestones(matchedProj);
+          loadedData.proyecto = evaluatedProj;
+          if (evaluatedProj.seguimiento?.porcentajeAvance) {
+            loadedData.portalConfig = {
+              ...(loadedData.portalConfig || {}),
+              progresoPorcentaje: evaluatedProj.seguimiento.porcentajeAvance
+            };
+          }
+        }
+      } catch (projSyncErr) {
+        console.warn('[Portal] Error sincronizando con proyectos:', projSyncErr);
+      }
+
       setData(loadedData);
     } catch (err) {
       console.error('Fatal portal load error:', err);
@@ -735,16 +794,21 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         const cType = res.headers.get('content-type') || '';
         if (cType.includes('application/json')) {
           const respData = await res.json();
-          if (respData.driveVault) {
-            setData(prev => ({
-              ...prev,
-              portalConfig: {
-                ...(prev?.portalConfig || {}),
+          setData(prev => ({
+            ...prev,
+            lead: respData.lead || prev?.lead,
+            presupuesto: respData.presupuesto || prev?.presupuesto,
+            proyecto: respData.proyecto || prev?.proyecto,
+            workflowData: respData.workflowData || prev?.workflowData,
+            portalConfig: {
+              ...(prev?.portalConfig || {}),
+              ...(respData.portalConfig || {}),
+              ...(respData.driveVault ? {
                 driveVault: respData.driveVault,
                 enlaceDriveArchivos: respData.driveVault.vaultUrl
-              }
-            }));
-          }
+              } : {})
+            }
+          }));
         }
       }
     } catch (err) {
@@ -940,12 +1004,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             seguimiento: {
               ...(p.seguimiento || {}),
               faseActual: 2,
-              porcentajeAvance: 40,
               hitos
             }
           };
-          targetUpdatedProj = modP;
-          return modP;
+          const evaluatedP = evaluateProjectMilestones(modP);
+          targetUpdatedProj = evaluatedP;
+          return evaluatedP;
         }
         return p;
       });
@@ -959,7 +1023,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             return h;
           });
 
-          targetUpdatedProj = {
+          const freshProj = {
             ...baseProj,
             id: baseProj.id || ('proj-' + Date.now()),
             estado: 'firmado',
@@ -984,15 +1048,16 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             seguimiento: {
               ...(baseProj.seguimiento || {}),
               faseActual: 2,
-              porcentajeAvance: 40,
               hitos
             }
           };
+          targetUpdatedProj = evaluateProjectMilestones(freshProj);
           updatedProjs.unshift(targetUpdatedProj);
         }
       }
 
       saveStoredProyectos(updatedProjs);
+      window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: updatedProjs } }));
     } catch (e) {
       console.warn('Error guardando proyecto firmado:', e);
     }
@@ -1083,6 +1148,30 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   };
 
   const handleCompletarInsumos = async () => {
+    try {
+      const storedProjs = getStoredProyectos();
+      const leadEmp = (data?.lead?.empresa || '').toLowerCase().trim();
+      const idx = storedProjs.findIndex(p => 
+        (data?.proyecto && p.id === data.proyecto.id) ||
+        (data?.presupuesto && (p.presupuestoId === data.presupuesto.id || p.presupuestoCodigo === data.presupuesto.codigo)) ||
+        (leadEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === leadEmp)
+      );
+      if (idx !== -1) {
+        storedProjs[idx] = evaluateProjectMilestones({
+          ...storedProjs[idx],
+          onboarding: {
+            ...(storedProjs[idx].onboarding || {}),
+            completado: true,
+            fecha: new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+          }
+        });
+        saveStoredProyectos(storedProjs);
+        window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: storedProjs } }));
+      }
+    } catch (e) {
+      console.warn('Error sync onboarding with project:', e);
+    }
+
     await savePortalUpdates({
       fase3InsumosCompletos: true,
       fechaInsumosCompletos: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
@@ -1097,6 +1186,31 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     e.preventDefault();
     setUnlockAnimating(true);
     setTimeout(async () => {
+      try {
+        const storedProjs = getStoredProyectos();
+        const leadEmp = (data?.lead?.empresa || '').toLowerCase().trim();
+        const idx = storedProjs.findIndex(p => 
+          (data?.proyecto && p.id === data.proyecto.id) ||
+          (data?.presupuesto && (p.presupuestoId === data.presupuesto.id || p.presupuestoCodigo === data.presupuesto.codigo)) ||
+          (leadEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === leadEmp)
+        );
+        if (idx !== -1) {
+          storedProjs[idx] = evaluateProjectMilestones({
+            ...storedProjs[idx],
+            estado: 'entregado',
+            pagos: {
+              ...(storedProjs[idx].pagos || {}),
+              saldoEstado: 'confirmado',
+              saldoFecha: new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+            }
+          });
+          saveStoredProyectos(storedProjs);
+          window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: storedProjs } }));
+        }
+      } catch (err) {
+        console.warn('Error sync settlement with project:', err);
+      }
+
       await savePortalUpdates({
         fase4Liquidada: true,
         fechaLiquidacion: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),

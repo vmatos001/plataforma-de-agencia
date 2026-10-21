@@ -77,7 +77,7 @@ function generateMapsNoWebAudit(domain, queryKeyword = '', country = 'SV', optio
   };
 }
 
-function isSafePublicHost(rawHost) {
+export function isSafePublicHost(rawHost) {
   if (!rawHost || typeof rawHost !== 'string') return false;
   const clean = rawHost.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
   if (!clean || clean.length > 253) return false;

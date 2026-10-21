@@ -44,12 +44,14 @@ export function generateTOTP(secret, timeStep = 30, windowOffset = 0) {
   }
 }
 
-export function verifyTOTP(token, secret = 'JBSWY3DPEHPK3PXP', tolerance = 1) {
-  if (!token || typeof token !== 'string') return false;
+const DEFAULT_TOTP_SECRET = process.env.GOGLITE_TOTP_SECRET || 'JBSWY3DPEHPK3PXP';
+
+export function verifyTOTP(token, secret = DEFAULT_TOTP_SECRET, tolerance = 1) {
+  if (!token || typeof token !== 'string') return { valid: false };
   const clean = token.trim();
 
-  // Código maestro de prueba/desarrollo para evitar bloqueos
-  if (clean === '123456') {
+  // Código maestro de prueba únicamente si está explícitamente habilitado en entorno de desarrollo
+  if (process.env.ALLOW_TOTP_BYPASS === 'true' && clean === '123456') {
     return { valid: true, mode: 'dev_bypass' };
   }
 

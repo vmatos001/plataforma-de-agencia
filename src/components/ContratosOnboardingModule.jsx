@@ -37,13 +37,20 @@ import {
   Square,
   Flame,
   FileCheck2,
-  RefreshCw
+  RefreshCw,
+  Zap,
+  Kanban
 } from 'lucide-react';
 import {
   getStoredProyectos,
   saveStoredProyectos,
   buildProyectoFromPresupuesto
 } from '../services/contractGenerator';
+import {
+  evaluateProjectMilestones,
+  syncAllProyectosWithEvents,
+  getStoredSprintTasks
+} from '../services/projectMilestoneSync';
 
 export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNavigateToPresupuestos }) {
   const [proyectos, setProyectos] = useState([]);
@@ -82,7 +89,13 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       fetchPresupuestos();
     };
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    window.addEventListener('goglite_proyectos_synced', handleStorageChange);
+    window.addEventListener('goglite_tasks_updated', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('goglite_proyectos_synced', handleStorageChange);
+      window.removeEventListener('goglite_tasks_updated', handleStorageChange);
+    };
   }, []);
 
   const fetchProyectos = async () => {
@@ -127,12 +140,15 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
             if (p?.id && !map.has(p.id)) map.set(p.id, p);
           });
           localList = Array.from(map.values());
-          saveStoredProyectos(localList);
         }
       }
     } catch (err) {
       console.warn('[Contratos] Usando proyectos locales:', err);
     } finally {
+      // Re-evaluar automáticamente hitos con eventos del cliente y sprint de desarrollo
+      localList = localList.map(p => evaluateProjectMilestones(p));
+      saveStoredProyectos(localList);
+
       setProyectos(localList);
       setActiveProyecto(prev => {
         if (!prev) return null;
@@ -142,7 +158,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
           (prev.presupuestoId && p.presupuestoId === prev.presupuestoId) || 
           (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
         );
-        return found || prev;
+        return found ? evaluateProjectMilestones(found) : prev;
       });
       setLoading(false);
     }
@@ -319,7 +335,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       firmaBase64: signatureBase64
     };
 
-    const updatedProj = {
+    const baseProj = {
       ...activeProyecto,
       estado: activeProyecto.estado === 'contrato_pendiente' ? 'firmado' : activeProyecto.estado,
       contrato: {
@@ -328,11 +344,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       }
     };
 
-    const hitoFirma = updatedProj.seguimiento?.hitos?.find(h => h.id === 'h-1');
-    if (hitoFirma) {
-      hitoFirma.completado = true;
-      hitoFirma.fecha = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
-    }
+    const updatedProj = evaluateProjectMilestones(baseProj);
 
     setActiveProyecto(updatedProj);
     setProyectos(prev => {
@@ -358,34 +370,29 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     showNotification();
   };
 
-  // Toggle milestone completion
+  // Toggle milestone completion (Modo Híbrido: Permite alternar manualmente cualquier hito)
   const handleToggleHito = async (hitoId, currentStatus) => {
     const updatedHitos = (activeProyecto.seguimiento?.hitos || []).map(h => {
       if (h.id === hitoId) {
         return {
           ...h,
           completado: !currentStatus,
+          origen: 'manual',
           fecha: !currentStatus ? new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Pendiente'
         };
       }
       return h;
     });
 
-    const completados = updatedHitos.filter(h => h.completado).length;
-    const porcentajeAvance = Math.round((completados / updatedHitos.length) * 100);
-    let nuevoEstado = activeProyecto.estado;
-    if (porcentajeAvance >= 100) nuevoEstado = 'entregado';
-    else if (porcentajeAvance >= 25 && nuevoEstado !== 'en_desarrollo') nuevoEstado = 'en_desarrollo';
-
-    const updatedProj = {
+    const baseProj = {
       ...activeProyecto,
-      estado: nuevoEstado,
       seguimiento: {
         ...activeProyecto.seguimiento,
-        porcentajeAvance,
         hitos: updatedHitos
       }
     };
+
+    const updatedProj = evaluateProjectMilestones(baseProj);
 
     setActiveProyecto(updatedProj);
     setProyectos(prev => {
@@ -408,6 +415,20 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     }
   };
 
+  // Re-evaluación forzada de eventos automáticos
+  const handleReSyncEvents = () => {
+    if (!activeProyecto) return;
+    const reEvaluated = evaluateProjectMilestones(activeProyecto);
+    setActiveProyecto(reEvaluated);
+    setProyectos(prev => {
+      const next = prev.map(p => p.id === reEvaluated.id ? reEvaluated : p);
+      saveStoredProyectos(next);
+      return next;
+    });
+    showNotification();
+  };
+
+
   // Update onboarding form data
   const handleUpdateOnboardingField = (field, val) => {
     setActiveProyecto(prev => ({
@@ -424,7 +445,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
 
   // Save onboarding
   const handleSaveOnboarding = async () => {
-    const updatedProj = {
+    const baseProj = {
       ...activeProyecto,
       onboarding: {
         completado: true,
@@ -433,11 +454,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       }
     };
 
-    const hitoOnb = updatedProj.seguimiento?.hitos?.find(h => h.id === 'h-3');
-    if (hitoOnb) {
-      hitoOnb.completado = true;
-      hitoOnb.fecha = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
-    }
+    const updatedProj = evaluateProjectMilestones(baseProj);
 
     setActiveProyecto(updatedProj);
     setProyectos(prev => {
@@ -474,21 +491,12 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       updatedPagos.saldoMetodo = 'transferencia_bancaria';
     }
 
-    const updatedProj = {
+    const baseProj = {
       ...activeProyecto,
       pagos: updatedPagos
     };
 
-    const hitoPagoId = tipoPago === 'anticipo' ? 'h-2' : 'h-7';
-    const hitoPago = updatedProj.seguimiento?.hitos?.find(h => h.id === hitoPagoId);
-    if (hitoPago) {
-      hitoPago.completado = true;
-      hitoPago.fecha = nowStr;
-    }
-
-    if (updatedProj.estado === 'firmado' && updatedPagos.anticipoEstado === 'confirmado') {
-      updatedProj.estado = 'en_desarrollo';
-    }
+    const updatedProj = evaluateProjectMilestones(baseProj);
 
     setActiveProyecto(updatedProj);
     setProyectos(prev => {
@@ -1395,16 +1403,39 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                 </div>
               </div>
 
-              {/* Milestones Checklist */}
+              {/* Milestones Checklist con Sincronización Inteligente por Eventos */}
               <div className="p-6 rounded-2xl bg-[#0d121c] border border-slate-800 shadow-xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                    <CheckSquare className="w-4 h-4 text-orange-400" />
-                    <span>Hoja de Ruta de Hitos Entregables (Haz clic para marcar avance)</span>
-                  </h4>
-                  <span className="text-xs text-slate-500">
-                    Fase {activeProyecto.seguimiento?.faseActual} de 3
-                  </span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800/80">
+                  <div>
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <CheckSquare className="w-4 h-4 text-orange-400" />
+                      <span>Hoja de Ruta de Hitos Entregables</span>
+                    </h4>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        <Sparkles className="w-3 h-3 text-emerald-400" />
+                        Sincronización por Eventos Activa
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        (Haz clic en cualquier hito si deseas forzar avance manual)
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleReSyncEvents}
+                      title="Re-evaluar eventos de cliente y tareas del sprint ahora"
+                      className="px-2.5 py-1 text-[11px] font-mono text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700/60 shadow-sm"
+                    >
+                      <RefreshCw className="w-3 h-3 text-orange-400" />
+                      <span>Re-evaluar Eventos</span>
+                    </button>
+                    <span className="text-xs font-mono text-slate-400 bg-slate-800/60 px-2.5 py-1 rounded-lg border border-slate-700">
+                      Fase {activeProyecto.seguimiento?.faseActual} de 3
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -1414,24 +1445,43 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                       onClick={() => handleToggleHito(h.id, h.completado)}
                       className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
                         h.completado
-                          ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
+                          ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200 shadow-sm'
                           : 'bg-[#111622] border-slate-800 hover:border-slate-700 text-slate-300'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-md flex items-center justify-center border ${
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center border shrink-0 ${
                           h.completado 
                             ? 'bg-emerald-500 border-emerald-400 text-white' 
                             : 'border-slate-700 bg-slate-800 text-transparent'
                         }`}>
                           <Check className="w-3.5 h-3.5 stroke-[3]" />
                         </div>
-                        <span className={`text-xs font-semibold ${h.completado ? 'line-through text-slate-400' : 'text-slate-200'}`}>
-                          {h.titulo}
-                        </span>
+                        <div className="min-w-0">
+                          <div className={`text-xs font-semibold truncate ${h.completado ? 'text-emerald-100' : 'text-slate-200'}`}>
+                            {h.titulo}
+                          </div>
+                          {h.eventReason && h.completado && (
+                            <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5 font-mono">
+                              <span className="text-cyan-400">↳</span>
+                              <span>{h.eventReason}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2 text-[11px] font-mono shrink-0">
+                        {h.origen === 'auto' ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 flex items-center gap-1" title={h.eventReason || 'Evento del sistema'}>
+                            <Zap className="w-2.5 h-2.5 text-cyan-400" />
+                            <span>Auto</span>
+                          </span>
+                        ) : h.completado ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                            Manual
+                          </span>
+                        ) : null}
+
                         <span className={`px-2 py-0.5 rounded text-[10px] ${
                           h.fase === 1 ? 'bg-indigo-500/20 text-indigo-300' :
                           h.fase === 2 ? 'bg-orange-500/20 text-orange-300' :
@@ -1439,11 +1489,61 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                         }`}>
                           Fase {h.fase}
                         </span>
-                        <span className="text-slate-500">{h.fecha}</span>
+                        <span className="text-slate-500 text-[10px]">{h.fecha}</span>
                       </div>
                     </div>
                   ))}
                 </div>
+
+                {/* Card: Vinculación con las 12 Fases de Desarrollo del Playbook Maestro */}
+                {(() => {
+                  const tasks = getStoredSprintTasks();
+                  const compCount = tasks.filter(t => t.columna === 'completado').length;
+                  const pctSprint = Math.round((Math.min(compCount, 12) / 12) * 45);
+                  return (
+                    <div className="p-4 rounded-xl bg-[#090d15] border border-slate-800/80 space-y-3 mt-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 shrink-0">
+                            <Kanban className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-white flex items-center gap-2">
+                              <span>Sprint Técnico: 12 Fases del Playbook Maestro Goglite</span>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-500/30 font-bold">
+                                {compCount} / 12 Fases Listas
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-400">
+                              Al completar tarjetas en el Centro de Desarrollo & PRD (Fase 4), los hitos técnicos avanzan automáticamente.
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">
+                            +{pctSprint}% aporte al proyecto
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Barra de progreso de las 12 fases */}
+                      <div className="space-y-1">
+                        <div className="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="bg-gradient-to-r from-orange-500 via-amber-400 to-emerald-400 h-1.5 rounded-full transition-all duration-500"
+                            style={{ width: `${(compCount / 12) * 100}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[10px] font-mono text-slate-500">
+                          <span>Fases 1-4: Wireframes & Identidad</span>
+                          <span>Fases 5-8: Frontend & Integraciones</span>
+                          <span>Fases 9-12: WPO, QA & Entrega</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Deliverables Section */}

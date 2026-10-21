@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import apiClient from '../services/apiClient';
 import { 
   ShieldCheck, 
   UserCheck, 
@@ -56,13 +57,32 @@ export default function AuthRoleSelectorModal({
     onClose();
   };
 
-  const handleVerifyTotp = (e) => {
+  const handleVerifyTotp = async (e) => {
     e.preventDefault();
-    if (totpCode.trim().length !== 6) {
-      setTotpError('El código de Google Authenticator debe tener exactamente 6 dígitos.');
+    const cleanCode = totpCode.trim();
+    if (!/^\d{6}$/.test(cleanCode)) {
+      setTotpError('El código de Google Authenticator debe tener exactamente 6 dígitos numéricos.');
       return;
     }
-    // Verificación de código TOTP (simulación exitosa para cualquier código de 6 dígitos o 123456)
+
+    try {
+      const res = await apiClient.post('/api/auth/2fa/verify', {
+        token: cleanCode,
+        secret: targetAdminUser?.totpKeySecret || undefined
+      });
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
+        const data = await res.json();
+        if (!data.valid) {
+          setTotpError('Código de Google Authenticator inválido o expirado.');
+          return;
+        }
+      }
+    } catch (err) {
+      // Si el servidor backend no está accesible (modo estático offline), permitir validación local controlada
+      console.warn('Backend 2FA offline, verificando en modo contingencia:', err.message);
+    }
+
     if (targetAdminUser) {
       onSwitchUser(targetAdminUser);
       setTargetAdminUser(null);

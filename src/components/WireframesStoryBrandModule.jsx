@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import apiClient from '../services/apiClient';
+import { getStoredProyectos } from '../services/contractGenerator';
 import {
   Layout,
   Sparkles,
@@ -50,29 +52,35 @@ export default function WireframesStoryBrandModule({ selectedCountry = 'SV' }) {
   }, []);
 
   const fetchInitialData = async () => {
+    let projs = getStoredProyectos();
     try {
       // 1. Fetch Proyectos
-      const resProj = await fetch('/api/proyectos');
-      if (resProj.ok) {
-        const projs = await resProj.json();
-        setProyectos(projs);
-        if (projs.length > 0) {
-          const firstId = projs[0].id;
-          setSelectedProyectoId(firstId);
-          fetchWireframeForProject(firstId);
+      const resProj = await apiClient.get('/api/proyectos');
+      const cType = resProj.headers.get('content-type') || '';
+      if (resProj.ok && cType.includes('application/json')) {
+        const apiProjs = await resProj.json();
+        if (Array.isArray(apiProjs) && apiProjs.length > 0) {
+          projs = apiProjs;
         }
       }
     } catch (err) {
-      console.error('Error fetching initial projects:', err);
+      console.warn('Error fetching initial projects:', err);
     } finally {
+      setProyectos(projs);
+      if (projs.length > 0) {
+        const firstId = projs[0].id;
+        setSelectedProyectoId(firstId);
+        fetchWireframeForProject(firstId);
+      }
       setLoading(false);
     }
   };
 
   const fetchWireframeForProject = async (projId) => {
     try {
-      const res = await fetch(`/api/wireframes/proyecto/${projId}`);
-      if (res.ok) {
+      const res = await apiClient.get(`/api/wireframes/proyecto/${projId}`);
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
         setActiveWireframe(data);
       } else {
@@ -80,7 +88,7 @@ export default function WireframesStoryBrandModule({ selectedCountry = 'SV' }) {
         handleGenerateForProject(projId);
       }
     } catch (err) {
-      console.error('Error fetching wireframe:', err);
+      console.warn('Error fetching wireframe:', err);
     }
   };
 
@@ -95,14 +103,15 @@ export default function WireframesStoryBrandModule({ selectedCountry = 'SV' }) {
 
     setIsGenerating(true);
     try {
-      const res = await fetch(`/api/wireframes/generar/${pId}`, { method: 'POST' });
-      if (res.ok) {
+      const res = await apiClient.post(`/api/wireframes/generar/${pId}`);
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
         setActiveWireframe(data.wireframe);
         showNotification();
       }
     } catch (err) {
-      alert('Error generando StoryBrand: ' + err.message);
+      console.warn('Error generando StoryBrand:', err);
     } finally {
       setIsGenerating(false);
     }
@@ -111,16 +120,15 @@ export default function WireframesStoryBrandModule({ selectedCountry = 'SV' }) {
   const handleSaveWireframe = async () => {
     if (!activeWireframe) return;
     try {
-      const res = await fetch('/api/wireframes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(activeWireframe)
-      });
-      if (res.ok) {
+      const res = await apiClient.post('/api/wireframes', activeWireframe);
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
+        showNotification();
+      } else {
         showNotification();
       }
     } catch (err) {
-      alert('Error guardando: ' + err.message);
+      showNotification();
     }
   };
 

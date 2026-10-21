@@ -36,7 +36,9 @@ import {
   Share2
 } from 'lucide-react';
 import WireframesStoryBrandModule from './WireframesStoryBrandModule';
+import apiClient from '../services/apiClient';
 import { getStoredProyectos } from '../services/contractGenerator';
+import { syncAllProyectosWithEvents } from '../services/projectMilestoneSync';
 
 // Plantilla predeterminada de PRD Técnico para proyectos Goglite de alta velocidad (Playbook Maestro 2026)
 const DEFAULT_PRD_CONFIG = {
@@ -266,17 +268,14 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   const handleCreateDriveVault = async () => {
     try {
       setCreatingDriveVault(true);
-      const clientName = activeProyecto?.cliente?.empresa || prdData.empresa || 'Cliente Goglite';
-      const res = await fetch('/api/drive/create-vault', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientName,
-          clientEmail: activeProyecto?.cliente?.email || '',
-          leadId: activeProyecto?.leadId || null
-        })
+      const clientName = proyectoActivo?.cliente?.empresa || prdConfig?.clienteNombre || 'Cliente Goglite';
+      const res = await apiClient.post('/api/drive/create-vault', {
+        clientName,
+        clientEmail: proyectoActivo?.cliente?.email || '',
+        leadId: proyectoActivo?.leadId || null
       });
-      if (res.ok) {
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
         if (data.vault?.vaultUrl) {
           setRepoVault(prev => ({
@@ -305,18 +304,54 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // Persistir tareas y bóveda en localStorage
+  // Cargar tareas y bóveda específicas cuando cambia el proyecto seleccionado
+  useEffect(() => {
+    if (!selectedProyectoId) return;
+    try {
+      const byProjRaw = localStorage.getItem('goglite_sprint_tasks_by_project');
+      if (byProjRaw) {
+        const byProj = JSON.parse(byProjRaw);
+        if (byProj && Array.isArray(byProj[selectedProyectoId])) {
+          setSprintTasks(byProj[selectedProyectoId]);
+        } else {
+          setSprintTasks(DEFAULT_SPRINT_TASKS);
+        }
+      }
+      const vaultByProjRaw = localStorage.getItem('goglite_repo_vault_by_project');
+      if (vaultByProjRaw) {
+        const vaultByProj = JSON.parse(vaultByProjRaw);
+        if (vaultByProj && vaultByProj[selectedProyectoId]) {
+          setRepoVault(vaultByProj[selectedProyectoId]);
+        }
+      }
+    } catch (e) {}
+  }, [selectedProyectoId]);
+
+  // Persistir tareas y bóveda en localStorage (aislado por proyecto + fallback global) y sincronizar hitos
   useEffect(() => {
     try {
       localStorage.setItem('goglite_sprint_tasks', JSON.stringify(sprintTasks));
+      if (selectedProyectoId) {
+        const byProjRaw = localStorage.getItem('goglite_sprint_tasks_by_project');
+        const byProj = byProjRaw ? JSON.parse(byProjRaw) : {};
+        byProj[selectedProyectoId] = sprintTasks;
+        localStorage.setItem('goglite_sprint_tasks_by_project', JSON.stringify(byProj));
+      }
+      syncAllProyectosWithEvents(sprintTasks, selectedProyectoId || null);
     } catch (e) {}
-  }, [sprintTasks]);
+  }, [sprintTasks, selectedProyectoId]);
 
   useEffect(() => {
     try {
       localStorage.setItem('goglite_repo_vault', JSON.stringify(repoVault));
+      if (selectedProyectoId) {
+        const vaultByProjRaw = localStorage.getItem('goglite_repo_vault_by_project');
+        const vaultByProj = vaultByProjRaw ? JSON.parse(vaultByProjRaw) : {};
+        vaultByProj[selectedProyectoId] = repoVault;
+        localStorage.setItem('goglite_repo_vault_by_project', JSON.stringify(vaultByProj));
+      }
     } catch (e) {}
-  }, [repoVault]);
+  }, [repoVault, selectedProyectoId]);
 
   // Manejo del cronómetro en vivo
   useEffect(() => {
@@ -386,22 +421,48 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         return t;
       }));
 
-      // 2. Enviar automáticamente al Time Tracker de Finanzas (Módulo 7)
+      // 2. Enviar automáticamente al Time Tracker de Finanzas (Módulo 7) en API y LocalStorage
+      const tareaObj = sprintTasks.find(t => t.id === taskId);
+      const clienteEmpresa = proyectoActivo.cliente?.empresa || 'Cliente de Agencia';
+      const conceptoTarea = tareaObj ? tareaObj.titulo : 'Desarrollo en Sprint';
+      const costoHoraEst = 30;
+      const fechaHoy = new Date().toISOString().split('T')[0];
+
+      // Sincronizar con estado local de Finanzas (goglite_finanzas_v1) para modo estático/offline
       try {
-        const tareaObj = sprintTasks.find(t => t.id === taskId);
-        await fetch('/api/finanzas/horas', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const rawFin = localStorage.getItem('goglite_finanzas_v1');
+        if (rawFin) {
+          const parsedFin = JSON.parse(rawFin);
+          const localTimeEntry = {
+            id: 'time-' + Date.now(),
             proyectoId: proyectoActivo.id,
-            proyectoNombre: proyectoActivo.cliente?.empresa,
-            tarea: tareaObj ? tareaObj.titulo : 'Desarrollo en Sprint',
-            descripcion: `Tiempo registrado en vivo desde Sprint Kanban (${timerSeconds}s)`,
+            cliente: clienteEmpresa,
+            concepto: conceptoTarea,
+            categoria: 'frontend_astro',
             horas: horasIncremento,
-            costoPorHora: 30, // $30/hora estándar Goglite
-            moneda: 'USD',
-            fecha: new Date().toISOString().split('T')[0]
-          })
+            costoHora: costoHoraEst,
+            costoTotal: Number((horasIncremento * costoHoraEst).toFixed(2)),
+            fecha: fechaHoy
+          };
+          parsedFin.timeEntries = [localTimeEntry, ...(parsedFin.timeEntries || [])];
+          localStorage.setItem('goglite_finanzas_v1', JSON.stringify(parsedFin));
+        }
+      } catch (e) {}
+
+      try {
+        await apiClient.post('/api/finanzas/horas', {
+          proyectoId: proyectoActivo.id,
+          cliente: clienteEmpresa,
+          proyectoNombre: clienteEmpresa,
+          concepto: conceptoTarea,
+          tarea: conceptoTarea,
+          categoria: 'frontend_astro',
+          descripcion: `Tiempo registrado en vivo desde Sprint Kanban (${timerSeconds}s)`,
+          horas: horasIncremento,
+          costoHora: costoHoraEst,
+          costoPorHora: costoHoraEst,
+          moneda: 'USD',
+          fecha: fechaHoy
         });
       } catch (err) {
         console.warn('Horas guardadas en local');

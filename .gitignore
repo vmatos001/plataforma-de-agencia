@@ -28,6 +28,8 @@ temp_*
 
 # WhatsApp sessions & credentials (Security / Privacy)
 server/sessions/
+server/data/*.json
+!server/data/*.example.json
 
 # === GOGLITE SECURITY POLICY: EXCLUSIONES SENSIBLES OBLIGATORIAS ===
 # Credenciales, cuentas y accesos
