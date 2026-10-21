@@ -330,16 +330,20 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     try {
       setSyncingDrive(true);
       const agencyOwnerAccount = 'sitesgoglite@gmail.com';
+      const gasDriveWebhook = 'https://script.google.com/macros/s/AKfycbz2qqnBdelAif_BvpwkFCk-0WZ1b2fgiPaPVT3EK0mSyN0jboo_XBdZQL5OCP1rHLT0sw/exec';
       const empresa = data?.presupuesto?.cliente?.empresa || data?.lead?.empresa || 'Cliente';
       const cleanEmpresa = empresa.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
       const folderTitle = `[Goglite] ${cleanEmpresa}`;
-      const authenticatedClientEmail = (
+      const rawAuthEmail = (
         data?.portalConfig?.clienteAuthEmail ||
         clientAuthEmail ||
         data?.presupuesto?.cliente?.email ||
         data?.lead?.email ||
-        'cliente@gmail.com'
+        ''
       ).trim().toLowerCase();
+      const authenticatedClientEmail = (rawAuthEmail && rawAuthEmail !== 'cliente@empresa.com' && rawAuthEmail !== 'cliente@gmail.com')
+        ? rawAuthEmail
+        : agencyOwnerAccount;
 
       let vault = null;
       try {
@@ -355,7 +359,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         const cType = res.headers.get('content-type') || '';
         if (res.ok && cType.includes('application/json')) {
           const result = await res.json();
-          if (result.vault) {
+          if (result.vault && String(result.vault.vaultUrl || '').includes('/drive/folders/')) {
             vault = {
               ...result.vault,
               ownerAccount: agencyOwnerAccount,
@@ -367,6 +371,35 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         }
       } catch (apiErr) {
         console.warn('API sync drive fallback:', apiErr);
+      }
+
+      // Ejecutar directamente el puente oficial de Google Apps Script en sitesgoglite@gmail.com (Firebase Hosting)
+      if (!vault) {
+        try {
+          const gasRes = await fetch(gasDriveWebhook, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              clientName: cleanEmpresa,
+              clientEmail: authenticatedClientEmail,
+              ownerAccount: agencyOwnerAccount
+            })
+          });
+          if (gasRes.ok) {
+            const gasData = await gasRes.json();
+            if (gasData && gasData.success && gasData.vaultId) {
+              vault = {
+                ...gasData,
+                ownerAccount: agencyOwnerAccount,
+                sharedWithEmail: authenticatedClientEmail,
+                isolatedClientAccess: true,
+                createdByClientAction: true
+              };
+            }
+          }
+        } catch (gasErr) {
+          console.warn('GAS sync drive error:', gasErr);
+        }
       }
 
       if (!vault) {
@@ -502,7 +535,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const handleRegisterClientAuth = async (provider = 'google') => {
     try {
       setClientAuthLoading(true);
-      const email = clientAuthEmail.trim() || data?.lead?.email || 'cliente@empresa.com';
+      const email = clientAuthEmail.trim() || data?.lead?.email || 'sitesgoglite@gmail.com';
       const nombre = signerName.trim() || data?.lead?.contacto || data?.lead?.empresa || 'Cliente';
 
       try {
@@ -2859,13 +2892,13 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       📁 Bóveda de Archivos: [Goglite] {data.lead?.empresa}
                     </h3>
                     <p className="text-xs text-slate-300 mt-1 max-w-xl">
-                      {data.portalConfig?.driveVault?.createdByClientAction && data.portalConfig?.driveVault?.vaultUrl ? (
+                      {data.portalConfig?.driveVault?.createdByClientAction && String(data.portalConfig?.driveVault?.vaultUrl || '').includes('/drive/folders/') ? (
                         <>
-                          Carpeta creada en <strong>sitesgoglite@gmail.com</strong> y compartida <strong>exclusivamente</strong> con tu cuenta autenticada (<strong className="text-emerald-400">{data.portalConfig?.driveVault?.sharedWithEmail || portalConfig.clienteAuthEmail || lead.email}</strong>). Ningún otro cliente tiene acceso a esta carpeta.
+                          Carpeta creada en <strong>sitesgoglite@gmail.com</strong> y compartida <strong>exclusivamente</strong> con tu cuenta autenticada (<strong className="text-emerald-400">{data.portalConfig?.driveVault?.sharedWithEmail || portalConfig.clienteAuthEmail || lead.email || 'sitesgoglite@gmail.com'}</strong>). Ningún otro cliente tiene acceso a esta carpeta.
                         </>
                       ) : (
                         <>
-                          Presiona <strong>Crear Bóveda en Google Drive</strong> para generar tu carpeta privada en la cuenta de la agencia (<strong>sitesgoglite@gmail.com</strong>) y compartirla únicamente con tu sesión autenticada (<strong className="text-blue-300">{portalConfig.clienteAuthEmail || lead.email}</strong>).
+                          Presiona <strong>Crear Bóveda en Google Drive</strong> para generar físicamente tu carpeta privada en la cuenta de la agencia (<strong>sitesgoglite@gmail.com</strong>) y compartirla únicamente con tu sesión autenticada (<strong className="text-blue-300">{portalConfig.clienteAuthEmail || lead.email || 'sitesgoglite@gmail.com'}</strong>).
                         </>
                       )}
                     </p>
@@ -2873,7 +2906,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 </div>
 
                 <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto">
-                  {data.portalConfig?.driveVault?.createdByClientAction && data.portalConfig?.driveVault?.vaultUrl ? (
+                  {data.portalConfig?.driveVault?.createdByClientAction && String(data.portalConfig?.driveVault?.vaultUrl || '').includes('/drive/folders/') ? (
                     <a
                       href={data.portalConfig.driveVault.vaultUrl}
                       target="_blank"
@@ -2898,7 +2931,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               </div>
 
               {/* Subcarpetas de Google Drive */}
-              {data.portalConfig?.driveVault?.createdByClientAction && data.portalConfig?.driveVault?.vaultUrl ? (
+              {data.portalConfig?.driveVault?.createdByClientAction && String(data.portalConfig?.driveVault?.vaultUrl || '').includes('/drive/folders/') ? (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-800/80">
                   <a
                     href={data.portalConfig?.driveVault?.subfolders?.insumos?.url || data.portalConfig?.driveVault?.vaultUrl}

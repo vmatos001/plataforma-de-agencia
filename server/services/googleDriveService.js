@@ -165,6 +165,7 @@ export async function uploadTextFile(token, name, content, mimeType = 'text/plai
 }
 
 export const AGENCY_DRIVE_ACCOUNT = 'sitesgoglite@gmail.com';
+export const AGENCY_DRIVE_GAS_WEBHOOK = 'https://script.google.com/macros/s/AKfycbz2qqnBdelAif_BvpwkFCk-0WZ1b2fgiPaPVT3EK0mSyN0jboo_XBdZQL5OCP1rHLT0sw/exec';
 
 /**
  * Comparte la carpeta creada en la cuenta de la agencia (sitesgoglite@gmail.com)
@@ -225,8 +226,29 @@ export async function createClientVault(clientName, clientEmail = '', leadId = n
   const folderTitle = `📁 [Goglite] ${cleanClientName}`;
   const authUserParam = normalizedClientEmail ? `&authuser=${encodeURIComponent(normalizedClientEmail)}` : '';
 
-  // Si no hay conexión con Google Drive, devolver estructura aislada por cliente y cuenta autenticada
+  // Si no hay token local en disco, ejecutar el puente oficial de Google Apps Script de sitesgoglite@gmail.com
   if (!token) {
+    try {
+      console.log(`[DRIVE] Creando carpeta real en ${AGENCY_DRIVE_ACCOUNT} vía Apps Script para: ${cleanClientName}`);
+      const gasRes = await fetch(AGENCY_DRIVE_GAS_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          clientName: cleanClientName,
+          clientEmail: normalizedClientEmail,
+          leadId
+        })
+      });
+      if (gasRes.ok) {
+        const gasData = await gasRes.json();
+        if (gasData && gasData.success && gasData.vaultId) {
+          return gasData;
+        }
+      }
+    } catch (gasErr) {
+      console.warn('[DRIVE] Error invocando Apps Script de sitesgoglite@gmail.com:', gasErr.message);
+    }
+
     console.warn(`[DRIVE] Operando en modo local para cuenta gestora ${AGENCY_DRIVE_ACCOUNT}`);
     const mockId = 'vault-' + (leadId || Date.now());
     const exactFolderQuery = `title = '${folderTitle.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
