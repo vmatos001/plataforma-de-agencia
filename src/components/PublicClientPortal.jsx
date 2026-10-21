@@ -205,9 +205,30 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const [selectedBankTab, setSelectedBankTab] = useState('SV'); // 'SV' | 'DO' | 'US'
   const [previewReceiptModalUrl, setPreviewReceiptModalUrl] = useState(null);
 
+  const applyReceiptDataUrl = (finalUrl, fileName, target = 'advance') => {
+    if (target === 'settlement') {
+      setSettlementReceiptImage(finalUrl);
+      setSettlementReceiptFileName(fileName);
+      savePortalUpdates({
+        comprobanteLiquidacionImagen: finalUrl,
+        comprobanteLiquidacionNombre: fileName
+      });
+    } else {
+      setAdvanceReceiptImage(finalUrl);
+      setAdvanceReceiptFileName(fileName);
+      savePortalUpdates({
+        comprobanteAnticipoImagen: finalUrl,
+        comprobanteAnticipoNombre: fileName
+      });
+    }
+    showNotification(`✓ Captura del comprobante "${fileName}" cargada correctamente.`);
+  };
+
   const handleReceiptImageSelect = (e, target = 'advance') => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const fileName = file.name || 'Comprobante_Bancario.jpg';
+    const fileType = file.type || '';
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -215,13 +236,13 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       if (!rawDataUrl) return;
 
       // Si es imagen, optimizar tamaño para almacenamiento ágil y nítido
-      if (file.type.startsWith('image/')) {
+      if (fileType.startsWith('image/')) {
         const img = new Image();
         img.onload = () => {
           try {
             const maxDim = 1100;
-            let width = img.width;
-            let height = img.height;
+            let width = img.width || 800;
+            let height = img.height || 600;
             if (width > maxDim || height > maxDim) {
               if (width > height) {
                 height = Math.round((height * maxDim) / width);
@@ -237,34 +258,17 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             const ctx = offCanvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
             const compressedUrl = offCanvas.toDataURL('image/jpeg', 0.82);
-            if (target === 'settlement') {
-              setSettlementReceiptImage(compressedUrl);
-              setSettlementReceiptFileName(file.name);
-            } else {
-              setAdvanceReceiptImage(compressedUrl);
-              setAdvanceReceiptFileName(file.name);
-            }
-            showNotification(`✓ Captura del comprobante "${file.name}" adjuntada correctamente.`);
+            applyReceiptDataUrl(compressedUrl, fileName, target);
           } catch (err) {
-            if (target === 'settlement') {
-              setSettlementReceiptImage(rawDataUrl);
-              setSettlementReceiptFileName(file.name);
-            } else {
-              setAdvanceReceiptImage(rawDataUrl);
-              setAdvanceReceiptFileName(file.name);
-            }
+            applyReceiptDataUrl(rawDataUrl, fileName, target);
           }
+        };
+        img.onerror = () => {
+          applyReceiptDataUrl(rawDataUrl, fileName, target);
         };
         img.src = rawDataUrl;
       } else {
-        if (target === 'settlement') {
-          setSettlementReceiptImage(rawDataUrl);
-          setSettlementReceiptFileName(file.name);
-        } else {
-          setAdvanceReceiptImage(rawDataUrl);
-          setAdvanceReceiptFileName(file.name);
-        }
-        showNotification(`✓ Comprobante "${file.name}" adjuntado correctamente.`);
+        applyReceiptDataUrl(rawDataUrl, fileName, target);
       }
     };
     reader.readAsDataURL(file);
@@ -389,21 +393,21 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   };
 
   useEffect(() => {
-    loadPortalData();
+    loadPortalData({ silent: false });
 
     // Escuchar actualizaciones en tiempo real de la base de datos de la aplicación (Fases 1 a 7)
+    // IMPORTANTE: No escuchar 'focus' porque al cerrar el selector de archivos del sistema operativo
+    // se dispara 'focus' y recargaría el portal desmontando el formulario.
     const handleDatabaseSync = () => {
-      loadPortalData();
+      loadPortalData({ silent: true });
     };
 
     window.addEventListener('storage', handleDatabaseSync);
     window.addEventListener('goglite_proyectos_synced', handleDatabaseSync);
-    window.addEventListener('focus', handleDatabaseSync);
 
     return () => {
       window.removeEventListener('storage', handleDatabaseSync);
       window.removeEventListener('goglite_proyectos_synced', handleDatabaseSync);
-      window.removeEventListener('focus', handleDatabaseSync);
     };
   }, [token]);
 
@@ -518,9 +522,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     }
   };
 
-  const loadPortalData = async () => {
+  const loadPortalData = async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent && !data) {
+        setLoading(true);
+      }
       let loadedData = null;
 
       // 0. Prioridad Absoluta: Payload autosuficiente transmitido en la URL (?d=...)
@@ -877,7 +883,6 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
             if (pChanged) {
               localStorage.setItem('goglite_presupuestos', JSON.stringify(nextListP));
-              window.dispatchEvent(new Event('storage'));
               window.dispatchEvent(new CustomEvent('goglite_presupuestos_updated'));
             }
           }
@@ -916,7 +921,34 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         console.warn('[Portal] Error registrando apertura de propuesta:', openTrackErr);
       }
 
-      setData(loadedData);
+      // Fusionar siempre cualquier configuración persistida localmente en goglite_portal_<token>
+      try {
+        if (typeof window !== 'undefined' && loadedData) {
+          const rawLocalPortal = localStorage.getItem('goglite_portal_' + token) ||
+            (loadedData.lead?.id ? localStorage.getItem('goglite_portal_' + loadedData.lead.id) : null);
+          if (rawLocalPortal) {
+            const parsedLocalPortal = JSON.parse(rawLocalPortal);
+            loadedData.portalConfig = {
+              ...(loadedData.portalConfig || {}),
+              ...parsedLocalPortal
+            };
+          }
+        }
+      } catch (e) {}
+
+      setData(prev => {
+        if (!prev) return loadedData;
+        return {
+          ...loadedData,
+          portalConfig: {
+            ...(loadedData?.portalConfig || {}),
+            comprobanteAnticipoImagen: loadedData?.portalConfig?.comprobanteAnticipoImagen || prev?.portalConfig?.comprobanteAnticipoImagen || '',
+            comprobanteAnticipoNombre: loadedData?.portalConfig?.comprobanteAnticipoNombre || prev?.portalConfig?.comprobanteAnticipoNombre || '',
+            comprobanteLiquidacionImagen: loadedData?.portalConfig?.comprobanteLiquidacionImagen || prev?.portalConfig?.comprobanteLiquidacionImagen || '',
+            comprobanteLiquidacionNombre: loadedData?.portalConfig?.comprobanteLiquidacionNombre || prev?.portalConfig?.comprobanteLiquidacionNombre || ''
+          }
+        };
+      });
     } catch (err) {
       console.error('Fatal portal load error:', err);
     } finally {
