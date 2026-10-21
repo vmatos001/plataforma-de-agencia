@@ -57,7 +57,6 @@ import {
 } from '../services/localStore';
 
 const PIPELINE_STAGES = [
-  { id: 'nuevo', label: 'Nuevo Lead', color: 'border-slate-600', badge: 'bg-slate-700/50 text-slate-300', dot: 'bg-slate-400' },
   { id: 'contactado', label: 'Contactado', color: 'border-sky-500/40', badge: 'bg-sky-500/10 text-sky-400', dot: 'bg-sky-400' },
   { id: 'reunion', label: 'Reunión / Demo', color: 'border-indigo-500/40', badge: 'bg-indigo-500/10 text-indigo-400', dot: 'bg-indigo-400' },
   { id: 'propuesta_enviada', label: 'Propuesta Enviada', color: 'border-amber-500/40', badge: 'bg-amber-500/10 text-amber-400', dot: 'bg-amber-400' },
@@ -568,7 +567,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       sinWeb: Boolean(sl.sinWeb),
       resenas: sl.resenas || 0,
       calificacion: sl.calificacion || 4.8,
-      etapa: sl.estado === 'cliente' ? 'ganado' : 'nuevo',
+      etapa: sl.estado === 'cliente' ? 'ganado' : sl.estado === 'respondio' ? 'reunion' : 'contactado',
       valorEstimado: sl.estado === 'cliente' ? 2400 : 1500,
       probabilidad: sl.estado === 'cliente' ? 100 : 35,
       fuente: `Lead Scrapper (${sl.sinWeb || sl.dominio?.startsWith('maps-') ? 'Google Maps Sin Web' : 'SERP Web'})`,
@@ -637,7 +636,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     pais: 'SV',
     dominio: '',
     valorEstimado: 1500,
-    etapa: 'nuevo',
+    etapa: 'contactado',
     notasIniciales: ''
   });
 
@@ -1264,7 +1263,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       pais: selectedCountry === 'ALL' ? 'SV' : selectedCountry,
       dominio: '',
       valorEstimado: 1500,
-      etapa: 'nuevo',
+      etapa: 'contactado',
       notasIniciales: ''
     });
 
@@ -1501,12 +1500,13 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
               <span>Puedes arrastrar las tarjetas con el ratón de una fase a otra para mover el estado del cliente.</span>
             </span>
             <span className="font-mono text-[11px] text-slate-500">
-              7 Fases en Embudo Vertical
+              6 Fases en Embudo Vertical
             </span>
           </div>
 
           {PIPELINE_STAGES.map((stage, sIdx) => {
             const stageLeads = filteredLeads.filter(l => {
+              if (stage.id === 'contactado') return l.etapa === 'contactado' || l.etapa === 'nuevo' || !l.etapa;
               if (stage.id === 'reunion') return l.etapa === 'reunion' || l.etapa === 'reunion_demo';
               if (stage.id === 'propuesta_enviada') return l.etapa === 'propuesta_enviada' || l.etapa === 'propuesta';
               return l.etapa === stage.id;
@@ -3268,7 +3268,6 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, etapa: e.target.value })}
                     className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-orange-400 font-semibold"
                   >
-                    <option value="nuevo">Nuevo Lead</option>
                     <option value="contactado">Contactado</option>
                     <option value="reunion">Reunión / Demo</option>
                     <option value="propuesta_enviada">Propuesta Enviada</option>

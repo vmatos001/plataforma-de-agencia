@@ -48,9 +48,15 @@ export function syncScrapperLeadToCrm(scrapperLead) {
   );
 
   const today = new Date().toISOString().split('T')[0];
+  const mappedStage = scrapperLead.estado === 'cliente'
+    ? 'ganado'
+    : scrapperLead.estado === 'respondio'
+    ? 'reunion'
+    : 'contactado';
 
   if (existingIdx !== -1) {
     const existing = crmLeads[existingIdx];
+    const nextEtapa = (!existing.etapa || existing.etapa === 'nuevo') ? mappedStage : existing.etapa;
     crmLeads[existingIdx] = {
       ...existing,
       leadId: existing.leadId || scrapperLead.id || null,
@@ -61,6 +67,7 @@ export function syncScrapperLeadToCrm(scrapperLead) {
       telefono: existing.telefono || scrapperLead.telefono || '',
       pais: scrapperLead.pais || existing.pais || 'SV',
       dominio: existing.dominio || scrapperLead.dominio || '',
+      etapa: nextEtapa,
       auditoriaResumen: scrapperLead.auditoria || existing.auditoriaResumen || null,
       actualizadoEn: today
     };
@@ -82,7 +89,7 @@ export function syncScrapperLeadToCrm(scrapperLead) {
     sinWeb: Boolean(scrapperLead.sinWeb),
     resenas: scrapperLead.resenas || 0,
     calificacion: scrapperLead.calificacion || 4.8,
-    etapa: scrapperLead.estado === 'cliente' ? 'ganado' : 'nuevo',
+    etapa: mappedStage,
     valorEstimado: 1500,
     probabilidad: 25,
     fuente: `Fase 1 Prospector (${scrapperLead.sinWeb ? 'Google Maps' : 'SERP Web'})`,

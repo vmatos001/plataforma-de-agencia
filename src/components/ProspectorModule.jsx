@@ -124,68 +124,100 @@ export default function ProspectorModule({
   };
 
   // Continuidad Automática Fase 1 -> Fase 2 (CRM) en el almacén local
+  // Solo pasan al CRM los prospectos que ya han sido contactados/interactuados (empezando en etapa 'contactado')
+  const mapFase1StatusToCrmStage = (estado) => {
+    if (estado === 'cliente') return 'ganado';
+    if (estado === 'respondio') return 'reunion';
+    return 'contactado';
+  };
+
+  const upsertLeadIntoCrm = (sl, statusOverride = null) => {
+    if (!sl) return null;
+    const effectiveStatus = statusOverride || sl.estado || 'contactado';
+    const targetStage = mapFase1StatusToCrmStage(effectiveStatus);
+    const currentCrm = getStoredCrmLeads();
+    const today = new Date().toISOString().split('T')[0];
+
+    const slDom = (sl.dominio || '').toLowerCase().trim();
+    const slEmp = (sl.nombreEmpresa || sl.dominio || '').toLowerCase().trim();
+    const slPhone = (sl.telefono || '').replace(/\D/g, '');
+
+    const existingIdx = currentCrm.findIndex(cl =>
+      (sl.id && (cl.id === sl.id || cl.leadId === sl.id || cl.id === `crm-${sl.id}` || cl.id === `crm-scrapper-${sl.id}`)) ||
+      (slDom && !sl.sinWeb && (cl.dominio || '').toLowerCase().trim() === slDom) ||
+      (slEmp && (cl.empresa || '').toLowerCase().trim() === slEmp) ||
+      (slPhone && slPhone.length >= 7 && (cl.telefono || '').replace(/\D/g, '') === slPhone)
+    );
+
+    if (existingIdx !== -1) {
+      const existing = currentCrm[existingIdx];
+      const nextEtapa = (existing.etapa === 'nuevo' || !existing.etapa || effectiveStatus === 'contactado' || effectiveStatus === 'respondio' || effectiveStatus === 'cliente')
+        ? (['propuesta_enviada', 'negociacion', 'ganado'].includes(existing.etapa) && targetStage === 'contactado' ? existing.etapa : targetStage)
+        : existing.etapa;
+
+      currentCrm[existingIdx] = {
+        ...existing,
+        leadId: existing.leadId || sl.id || null,
+        etapa: nextEtapa,
+        actualizadoEn: today
+      };
+      saveStoredCrmLeads(currentCrm);
+      return currentCrm[existingIdx];
+    }
+
+    const newCrmLead = {
+      id: `crm-${sl.id || Date.now() + '-' + Math.random().toString(36).substring(2, 6)}`,
+      leadId: sl.id || null,
+      empresa: sl.nombreEmpresa || sl.dominio || 'Negocio Prospectado',
+      contacto: sl.responsable || 'Dirección Comercial',
+      cargo: sl.cargo || 'Propietario / Gerente',
+      email: sl.email && !sl.email.endsWith('.negocio') ? sl.email : '',
+      telefono: sl.telefono || '',
+      pais: sl.pais || (selectedCountry === 'ALL' ? 'SV' : selectedCountry),
+      dominio: sl.sinWeb ? '' : (sl.dominio || ''),
+      sinWeb: Boolean(sl.sinWeb),
+      resenas: sl.resenas || 0,
+      calificacion: sl.calificacion || 4.8,
+      etapa: targetStage,
+      valorEstimado: effectiveStatus === 'cliente' ? 2400 : 1500,
+      probabilidad: effectiveStatus === 'cliente' ? 100 : 35,
+      fuente: `Fase 1 Prospector (${sl.sinWeb ? 'Google Maps' : 'SERP Web'})`,
+      portalToken: `portal-${sl.id || Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      auditoriaResumen: sl.auditoria || null,
+      interacciones: [
+        {
+          id: 'int-auto-' + Date.now() + Math.random(),
+          tipo: 'email',
+          titulo: 'Prospecto Contactado en Fase 1 → CRM',
+          detalle: `Prospecto contactado desde Fase 1 con ${sl.auditoria?.puntos?.length || 0} oportunidades detectadas.`,
+          fecha: today,
+          proximoPaso: 'Seguimiento por WhatsApp / Envío de Propuesta',
+          fechaProximoPaso: ''
+        }
+      ],
+      whatsappData: {
+        telefono: sl.telefono || '',
+        temperatura: 'caliente',
+        estadoSeguimiento: 'esperando_respuesta',
+        ultimoMensajeFecha: 'Hoy',
+        mensajes: []
+      },
+      creadoEn: today
+    };
+
+    currentCrm.unshift(newCrmLead);
+    saveStoredCrmLeads(currentCrm);
+    return newCrmLead;
+  };
+
   const autoSyncLeadsToCrmLocal = (outboundList = []) => {
     if (!Array.isArray(outboundList) || outboundList.length === 0) return;
     try {
-      const currentCrm = getStoredCrmLeads();
-      let changed = false;
-      const today = new Date().toISOString().split('T')[0];
-
+      const contactedStates = ['contactado', 'enviado_resend', 'enviado_instantly', 'respondio', 'cliente'];
       for (const sl of outboundList) {
-        const slDom = (sl.dominio || '').toLowerCase().trim();
-        const slEmp = (sl.nombreEmpresa || sl.dominio || '').toLowerCase().trim();
-        const exists = currentCrm.some(cl =>
-          (sl.id && (cl.leadId === sl.id || cl.id === `crm-${sl.id}` || cl.id === `crm-scrapper-${sl.id}`)) ||
-          (slDom && (cl.dominio || '').toLowerCase().trim() === slDom) ||
-          (slEmp && (cl.empresa || '').toLowerCase().trim() === slEmp)
-        );
-
-        if (!exists) {
-          changed = true;
-          currentCrm.unshift({
-            id: `crm-${sl.id || Date.now() + '-' + Math.random().toString(36).substring(2, 6)}`,
-            leadId: sl.id || null,
-            empresa: sl.nombreEmpresa || sl.dominio || 'Negocio Prospectado',
-            contacto: sl.responsable || 'Dirección Comercial',
-            cargo: sl.cargo || 'Propietario / Gerente',
-            email: sl.email && !sl.email.endsWith('.negocio') ? sl.email : '',
-            telefono: sl.telefono || '',
-            pais: sl.pais || (selectedCountry === 'ALL' ? 'SV' : selectedCountry),
-            dominio: sl.sinWeb ? '' : (sl.dominio || ''),
-            sinWeb: Boolean(sl.sinWeb),
-            resenas: sl.resenas || 0,
-            calificacion: sl.calificacion || 4.8,
-            etapa: sl.estado === 'cliente' ? 'ganado' : 'nuevo',
-            valorEstimado: 1500,
-            probabilidad: 25,
-            fuente: `Fase 1 Prospector (${sl.sinWeb ? 'Google Maps' : 'SERP Web'})`,
-            portalToken: `portal-${sl.id || Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-            auditoriaResumen: sl.auditoria || null,
-            interacciones: [
-              {
-                id: 'int-auto-' + Date.now() + Math.random(),
-                tipo: 'nota',
-                titulo: 'Sincronización Automática Fase 1 → Fase 2',
-                detalle: `Prospecto captado en Fase 1 con ${sl.auditoria?.puntos?.length || 0} oportunidades detectadas.`,
-                fecha: today,
-                proximoPaso: 'Primer contacto por WhatsApp / Envío de Propuesta',
-                fechaProximoPaso: ''
-              }
-            ],
-            whatsappData: {
-              telefono: sl.telefono || '',
-              temperatura: 'caliente',
-              estadoSeguimiento: 'primer_contacto',
-              ultimoMensajeFecha: 'Hoy',
-              mensajes: []
-            },
-            creadoEn: today
-          });
+        if (contactedStates.includes(sl.estado)) {
+          upsertLeadIntoCrm(sl, sl.estado);
         }
-      }
-
-      if (changed) {
-        saveStoredCrmLeads(currentCrm);
       }
     } catch (e) {
       console.warn('[Prospector] Error sincronizando con CRM local:', e);
@@ -421,16 +453,42 @@ export default function ProspectorModule({
     handleTabSwitch('leads');
   };
 
-  // Actualizar estado del lead
+  // Actualizar estado del lead y sincronizar automáticamente con CRM si fue contactado
   const handleUpdateLeadStatus = async (leadId, newStatus) => {
+    let targetLead = null;
     setLeads(prev => {
-      const updated = prev.map(l => l.id === leadId ? { ...l, estado: newStatus, actualizado: new Date().toISOString().split('T')[0] } : l);
+      const updated = prev.map(l => {
+        if (l.id === leadId) {
+          targetLead = { ...l, estado: newStatus, actualizado: new Date().toISOString().split('T')[0] };
+          return targetLead;
+        }
+        return l;
+      });
       setLocalItem(STORAGE_KEYS.OUTBOUND_LEADS, updated);
       return updated;
     });
 
     if (selectedLeadModal && selectedLeadModal.id === leadId) {
-      setSelectedLeadModal(prev => ({ ...prev, estado: newStatus }));
+      setSelectedLeadModal(prev => {
+        const next = { ...prev, estado: newStatus };
+        if (!targetLead) targetLead = next;
+        return next;
+      });
+    }
+
+    // Si pasa a contactado, respondió o cliente, sincronizar de inmediato en el CRM (empezando en 'contactado')
+    if (['contactado', 'enviado_resend', 'enviado_instantly', 'respondio', 'cliente'].includes(newStatus)) {
+      const leadToSync = targetLead || leads.find(l => l.id === leadId);
+      if (leadToSync) {
+        const crmLead = upsertLeadIntoCrm(leadToSync, newStatus);
+        if (crmLead) {
+          try {
+            await apiClient.post('/api/crm/leads', crmLead);
+          } catch (e) {
+            // Operando en modo Local-First
+          }
+        }
+      }
     }
 
     try {
@@ -457,75 +515,40 @@ export default function ProspectorModule({
     }
   };
 
-  // Transferir lead al CRM
+  // Transferir lead al CRM (inicia directamente en 'contactado')
   const handleTransferLeadToCrm = async (lead) => {
     try {
       const crmLeads = getStoredCrmLeads();
 
       const exists = crmLeads.some(cl =>
-        (cl.id && cl.id === lead.id) ||
+        (cl.id && (cl.id === lead.id || cl.leadId === lead.id || cl.id === `crm-${lead.id}`)) ||
         (cl.telefono && lead.telefono && cl.telefono.replace(/\D/g, '') === lead.telefono.replace(/\D/g, '')) ||
         (cl.empresa && lead.nombreEmpresa && cl.empresa.toLowerCase().trim() === lead.nombreEmpresa.toLowerCase().trim())
       );
 
+      const nextFase1Status = (!lead.estado || lead.estado === 'nuevo') ? 'contactado' : lead.estado;
+      const syncedCrmLead = upsertLeadIntoCrm(lead, nextFase1Status);
+
+      if (lead.estado === 'nuevo' || !lead.estado) {
+        handleUpdateLeadStatus(lead.id, 'contactado');
+      }
+
       if (exists) {
-        if (confirm(`El prospecto "${lead.nombreEmpresa || lead.dominio}" ya está registrado en el CRM.\n\n¿Deseas ir a la Fase 2 (CRM) para ver su Ficha de Cliente?`)) {
+        if (confirm(`El prospecto "${lead.nombreEmpresa || lead.dominio}" ya está en el CRM en la etapa Contactado.\n\n¿Deseas ir a la Fase 2 (CRM) para ver su Ficha de Cliente?`)) {
           if (onNavigateToCrm) onNavigateToCrm();
         }
         return;
       }
 
-      const nuevoCrmLead = {
-        id: lead.id || 'crm-lead-' + Date.now(),
-        leadId: lead.id || null,
-        empresa: lead.nombreEmpresa || lead.dominio || 'Negocio Scrapeado',
-        contacto: lead.responsable || 'Dirección Comercial',
-        cargo: lead.cargo || 'Propietario / Gerente',
-        email: lead.email && !lead.email.endsWith('.negocio') ? lead.email : '',
-        telefono: lead.telefono || '',
-        pais: lead.pais || selectedCountry || 'SV',
-        dominio: lead.sinWeb ? '' : (lead.dominio || ''),
-        sinWeb: Boolean(lead.sinWeb),
-        resenas: lead.resenas || 0,
-        calificacion: lead.calificacion || 4.8,
-        etapa: lead.estado === 'cliente' ? 'ganado' : 'nuevo',
-        valorEstimado: lead.estado === 'cliente' ? 2400 : 1500,
-        probabilidad: lead.estado === 'cliente' ? 100 : 35,
-        fuente: `Lead Scrapper Fase 1 (${lead.sinWeb || lead.dominio?.startsWith('maps-') ? 'Google Maps Sin Web' : 'SERP Web'})`,
-        portalToken: 'portal-' + (lead.id || Date.now()) + '-' + Math.random().toString(36).substring(2, 6),
-        interacciones: [
-          {
-            id: 'int-scrape-' + Date.now(),
-            tipo: 'nota',
-            titulo: 'Importado desde Lead Scrapper Fase 1',
-            detalle: `Prospecto localizado en ${lead.pais === 'DO' ? 'República Dominicana' : 'El Salvador'}. ${lead.auditoria ? `Auditoría inicial con ${lead.auditoria.puntos?.length || 0} oportunidades detectadas.` : 'Localizado en prospección activa.'}`,
-            fecha: new Date().toISOString().split('T')[0],
-            proximoPaso: 'Realizar contacto inicial o enviar WhatsApp',
-            fechaProximoPaso: ''
-          }
-        ],
-        whatsappData: {
-          telefono: lead.telefono || '',
-          temperatura: 'caliente',
-          estadoSeguimiento: 'primer_contacto',
-          ultimoMensajeFecha: 'Hoy',
-          mensajes: []
-        },
-        creadoEn: new Date().toISOString().split('T')[0]
-      };
-
-      const updatedCrm = [nuevoCrmLead, ...crmLeads];
-      saveStoredCrmLeads(updatedCrm);
-
       try {
-        await apiClient.post('/api/crm/leads', nuevoCrmLead);
+        if (syncedCrmLead) {
+          await apiClient.post('/api/crm/leads', syncedCrmLead);
+        }
       } catch (e) {
         console.warn('[Prospector] Guardado en CRM localmente:', e);
       }
 
-      handleUpdateLeadStatus(lead.id, 'cliente');
-
-      if (confirm(`🎉 ¡"${nuevoCrmLead.empresa}" registrado con éxito en el CRM!\n\n¿Deseas ir ahora a la Fase 2 (CRM) para ver su Ficha 360°?`)) {
+      if (confirm(`🎉 ¡"${syncedCrmLead?.empresa || lead.nombreEmpresa || lead.dominio}" pasó al CRM en la etapa Contactado!\n\n¿Deseas ir ahora a la Fase 2 (CRM) para darle seguimiento?`)) {
         if (onNavigateToCrm) onNavigateToCrm();
       }
     } catch (err) {
@@ -1454,10 +1477,10 @@ export default function ProspectorModule({
                         <button
                           onClick={() => {
                             handleUpdateLeadStatus(selectedLeadModal.id, 'contactado');
-                            alert(`El prospecto "${selectedLeadModal.nombreEmpresa || selectedLeadModal.dominio}" fue marcado como Contactado.`);
+                            alert(`✅ El prospecto "${selectedLeadModal.nombreEmpresa || selectedLeadModal.dominio}" fue marcado como Contactado y pasó automáticamente al CRM en la etapa Contactado.`);
                           }}
                           className="px-4 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 font-semibold text-xs flex items-center gap-1.5 transition-all"
-                          title="Marcar estado del prospecto como Contactado"
+                          title="Marcar estado del prospecto como Contactado y enviarlo al CRM"
                         >
                           <Check className="w-3.5 h-3.5" />
                           <span>Marcar como Contactado</span>

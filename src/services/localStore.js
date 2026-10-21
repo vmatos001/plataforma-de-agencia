@@ -93,16 +93,22 @@ export function removeLocalItem(key) {
 
 /**
  * Sincroniza dinámicamente los leads del CRM con los presupuestos emitidos en Fase 3
+ * y normaliza cualquier etapa legacy 'nuevo' hacia 'contactado' (ya que 'nuevo' vive en Leads Guardados de Fase 1)
  */
 export function syncCrmLeadsWithPresupuestos(crmLeads) {
   if (typeof window === 'undefined' || !Array.isArray(crmLeads)) return crmLeads;
   try {
-    const rawP = localStorage.getItem(STORAGE_KEYS.PRESUPUESTOS);
-    if (!rawP) return crmLeads;
-    const presupuestos = JSON.parse(rawP);
-    if (!Array.isArray(presupuestos) || presupuestos.length === 0) return crmLeads;
+    const normalizedLeads = crmLeads.map(l => ({
+      ...l,
+      etapa: (!l.etapa || l.etapa === 'nuevo') ? 'contactado' : l.etapa
+    }));
 
-    return crmLeads.map(lead => {
+    const rawP = localStorage.getItem(STORAGE_KEYS.PRESUPUESTOS);
+    if (!rawP) return normalizedLeads;
+    const presupuestos = JSON.parse(rawP);
+    if (!Array.isArray(presupuestos) || presupuestos.length === 0) return normalizedLeads;
+
+    return normalizedLeads.map(lead => {
       const lName = (lead.empresa || '').toLowerCase().trim();
       const lPhone = (lead.telefono || '').replace(/\D/g, '');
 
@@ -171,12 +177,15 @@ export function getStoredCrmLeads() {
 }
 
 /**
- * Guarda los leads de CRM en la clave estandarizada v3
+ * Guarda los leads de CRM en la clave estandarizada v3 normalizando etapas legacy
  */
 export function saveStoredCrmLeads(leads) {
-  setLocalItem(STORAGE_KEYS.CRM_LEADS, leads);
+  const normalized = Array.isArray(leads)
+    ? leads.map(l => ({ ...l, etapa: (!l.etapa || l.etapa === 'nuevo') ? 'contactado' : l.etapa }))
+    : leads;
+  setLocalItem(STORAGE_KEYS.CRM_LEADS, normalized);
   // Mantener legacy sincronizado temporalmente para componentes en transición
-  setLocalItem(STORAGE_KEYS.CRM_LEADS_LEGACY, leads);
+  setLocalItem(STORAGE_KEYS.CRM_LEADS_LEGACY, normalized);
 }
 
 /**
