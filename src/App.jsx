@@ -757,6 +757,10 @@ export default function App() {
             <CrmPortalModule
               onConvertToPresupuesto={(lead) => {
                 setLeadForPresupuesto({
+                  id: lead.id,
+                  leadId: lead.leadId || lead.id,
+                  portalToken: lead.portalToken,
+                  presupuestoId: lead.presupuestoId,
                   nombreEmpresa: lead.empresa,
                   responsable: lead.contacto,
                   cargo: lead.cargo,

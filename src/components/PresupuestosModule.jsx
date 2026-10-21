@@ -149,15 +149,44 @@ export default function PresupuestosModule({
     return endpoint;
   };
 
-  // Deduplica presupuestos y normaliza propuestas ya guardadas con estado 'borrador' hacia 'sin_abrir'
+  // Deduplica presupuestos, limpia registros fantasma sin código y conserva el estado más avanzado de la propuesta única
+  const STATUS_PRIORITY = { borrador: 1, enviado: 2, sin_abrir: 2, visto: 3, aceptado: 4, rechazado: 4 };
+
   const deduplicatePresupuestos = (list) => {
     if (!Array.isArray(list)) return [];
+
+    // Detectar si un enlace previo sin ID ('/portal/undefined') registró apertura ('visto') para transferirlo a la propuesta real
+    const hadPhantomOpen = list.some(
+      p => (!p.id && !p.codigo) && (p.estado === 'visto' || p.estado === 'aceptado')
+    );
+
+    const validList = list.filter(
+      p => p && (p.id || p.codigo) && !(p.cliente?.empresa === 'Empresa' && !p.codigo)
+    );
+
     const seen = new Map();
-    for (const p of list) {
-      const key = (p.codigo || '') + '|' + (p.cliente?.empresa || '').toLowerCase().trim();
+    for (const p of validList) {
+      const empKey = (p.cliente?.empresa || '').toLowerCase().trim();
+      const key = empKey || p.codigo || p.id;
+      const rawEstado = (!p.estado || p.estado === 'borrador') ? 'sin_abrir' : p.estado;
+      const effectiveEstado = (hadPhantomOpen && validList.length === 1 && rawEstado === 'sin_abrir')
+        ? 'visto'
+        : rawEstado;
+
       if (!seen.has(key)) {
-        const normalizedEstado = (!p.estado || p.estado === 'borrador') ? 'sin_abrir' : p.estado;
-        seen.set(key, { ...p, estado: normalizedEstado });
+        seen.set(key, { ...p, estado: effectiveEstado });
+      } else {
+        const existing = seen.get(key);
+        const existingPrio = STATUS_PRIORITY[existing.estado] || 1;
+        const newPrio = STATUS_PRIORITY[effectiveEstado] || 1;
+        seen.set(key, {
+          ...existing,
+          ...p,
+          id: existing.id || p.id,
+          codigo: existing.codigo || p.codigo,
+          estado: newPrio >= existingPrio ? effectiveEstado : existing.estado,
+          abiertoEn: p.abiertoEn || existing.abiertoEn
+        });
       }
     }
     return Array.from(seen.values());
@@ -172,13 +201,17 @@ export default function PresupuestosModule({
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
             const clean = deduplicatePresupuestos(parsed);
+            if (JSON.stringify(clean) !== JSON.stringify(parsed)) {
+              localStorage.setItem('goglite_presupuestos', JSON.stringify(clean));
+            }
             setPresupuestos(clean);
             setActivePresupuesto(prev => {
               if (!prev) return prev;
               const matched = clean.find(p =>
                 (prev.id && p.id === prev.id) ||
                 (prev.codigo && p.codigo === prev.codigo) ||
-                (prev.portalToken && p.portalToken === prev.portalToken)
+                (prev.portalToken && p.portalToken === prev.portalToken) ||
+                (prev.cliente?.empresa && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === prev.cliente.empresa.toLowerCase().trim())
               );
               if (matched && (matched.estado !== prev.estado || matched.abiertoEn !== prev.abiertoEn)) {
                 return { ...prev, estado: matched.estado, abiertoEn: matched.abiertoEn, vecesAbierto: matched.vecesAbierto };
@@ -586,7 +619,8 @@ export default function PresupuestosModule({
 
   // Helper para obtener el enlace público del portal interactivo
   const getPublicProposalUrl = (prop = null) => {
-    const target = prop || activePresupuesto;
+    const isValidProp = prop && typeof prop === 'object' && !prop.nativeEvent && !prop.target && (prop.id || prop.codigo || prop.cliente);
+    const target = isValidProp ? prop : activePresupuesto;
     if (!target) return '';
 
     let portalToken = target.portalToken || target.codigo || target.id;
@@ -630,7 +664,7 @@ export default function PresupuestosModule({
         modulos: target.modulos || [],
         fases: target.fases || [],
         vigenciaDias: target.vigenciaDias || 15,
-        estado: target.estado || 'enviado'
+        estado: (!target.estado || target.estado === 'borrador') ? 'sin_abrir' : target.estado
       };
       const jsonStr = JSON.stringify(compactPayload);
       const encoded = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (m, p) => String.fromCharCode('0x' + p)));
@@ -644,10 +678,12 @@ export default function PresupuestosModule({
 
   // Copy link
   const handleCopyLink = (prop = null) => {
-    const url = getPublicProposalUrl(prop);
+    const isValidProp = prop && typeof prop === 'object' && !prop.nativeEvent && !prop.target && (prop.id || prop.codigo || prop.cliente);
+    const targetProp = isValidProp ? prop : activePresupuesto;
+    const url = getPublicProposalUrl(targetProp);
     if (!url) return;
     navigator.clipboard.writeText(url);
-    const targetId = prop?.id || (activePresupuesto?.id || true);
+    const targetId = targetProp?.id || true;
     setCopiedLink(targetId);
     setTimeout(() => setCopiedLink(false), 2500);
     return url;
@@ -950,7 +986,7 @@ export default function PresupuestosModule({
               </select>
 
               <button
-                onClick={handleCopyLink}
+                onClick={() => handleCopyLink(activePresupuesto)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
                 title="Copiar enlace interactivo para el cliente"
               >

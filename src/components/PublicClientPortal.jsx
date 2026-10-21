@@ -454,7 +454,8 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               decodedJson = new TextDecoder('utf-8').decode(bytes);
             }
             const parsedProp = JSON.parse(decodedJson);
-            if (parsedProp && (parsedProp.cliente || parsedProp.empresa || parsedProp.titulo)) {
+            const hasValidIdOrCode = Boolean(parsedProp && (parsedProp.id || parsedProp.codigo));
+            if (hasValidIdOrCode && (parsedProp.cliente || parsedProp.empresa || parsedProp.titulo)) {
               const clientEmpresa = parsedProp.cliente?.empresa || parsedProp.empresa || 'Cliente VIP';
               const clientContacto = parsedProp.cliente?.nombre || parsedProp.contacto || 'Representante Legal';
               const clientPais = parsedProp.pais || parsedProp.cliente?.pais || 'SV';
@@ -501,22 +502,29 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 proyecto: matchedProj
               };
 
-              // Guardar en cache local respetando estados avanzados ('aceptado' / 'rechazado') y marcando apertura ('visto')
+              // Actualizar únicamente la propuesta existente sin duplicar registros
               try {
                 const rawP = localStorage.getItem('goglite_presupuestos');
                 let curP = rawP ? JSON.parse(rawP) : [];
-                const existIdx = curP.findIndex(p => p.id === parsedProp.id || p.codigo === parsedProp.codigo);
+                const targetEmp = clientEmpresa.toLowerCase().trim();
+                const existIdx = curP.findIndex(p =>
+                  (parsedProp.id && p.id === parsedProp.id) ||
+                  (parsedProp.codigo && p.codigo === parsedProp.codigo) ||
+                  (token && p.portalToken === token) ||
+                  (parsedProp.leadId && p.leadId === parsedProp.leadId) ||
+                  (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
+                );
                 if (existIdx !== -1) {
                   const prevEstado = curP[existIdx].estado;
                   const finalEstado = (prevEstado === 'aceptado' || prevEstado === 'rechazado') ? prevEstado : 'visto';
                   curP[existIdx] = {
                     ...curP[existIdx],
-                    ...parsedProp,
                     estado: finalEstado,
                     abiertoEn: curP[existIdx].abiertoEn || new Date().toISOString()
                   };
                   parsedProp.estado = finalEstado;
-                } else {
+                } else if (curP.length === 0 && parsedProp.id && parsedProp.codigo) {
+                  // Solo insertar en caché si el navegador del cliente externo no tenía ninguna propuesta local
                   const finalEstado = (parsedProp.estado === 'aceptado' || parsedProp.estado === 'rechazado') ? parsedProp.estado : 'visto';
                   parsedProp.estado = finalEstado;
                   parsedProp.abiertoEn = new Date().toISOString();
