@@ -584,6 +584,12 @@ export function getUnifiedPortalPayload(rawToken) {
     firmanteNombre: proyecto?.contrato?.firmaCliente?.nombreFirmante || rawConfig.firmanteNombre || null,
     firmanteDocumento: proyecto?.contrato?.firmaCliente?.identificacion || rawConfig.firmanteDocumento || null,
     fechaFirmaContrato: proyecto?.contrato?.firmaCliente?.timestampUtc || rawConfig.fechaFirmaContrato || null,
+    comprobanteAnticipo: proyecto?.pagos?.anticipoComprobante || rawConfig.comprobanteAnticipo || null,
+    comprobanteAnticipoImagen: proyecto?.pagos?.anticipoComprobanteImagen || rawConfig.comprobanteAnticipoImagen || null,
+    comprobanteAnticipoNombre: proyecto?.pagos?.anticipoComprobanteNombre || rawConfig.comprobanteAnticipoNombre || null,
+    comprobanteLiquidacion: proyecto?.pagos?.saldoComprobante || rawConfig.comprobanteLiquidacion || null,
+    comprobanteLiquidacionImagen: proyecto?.pagos?.saldoComprobanteImagen || rawConfig.comprobanteLiquidacionImagen || null,
+    comprobanteLiquidacionNombre: proyecto?.pagos?.saldoComprobanteNombre || rawConfig.comprobanteLiquidacionNombre || null,
     seoScoreSalud: seoAudit?.scoreSalud || null,
     cmsSlug: cmsSite?.slug || null,
     cmsDominio: cmsSite?.dominio || null
@@ -686,12 +692,14 @@ export function applyPortalUpdateToWorkflow(token, updates = {}) {
       }
 
       // Comprobante / Pago de Anticipo 50%
-      if (updates.anticipoPagado || updates.comprobanteAnticipo) {
+      if (updates.anticipoPagado || updates.comprobanteAnticipo || updates.comprobanteAnticipoImagen) {
         targetProj.pagos = {
           ...(targetProj.pagos || {}),
           anticipoEstado: 'confirmado',
           anticipoFecha: todayIso,
-          anticipoComprobante: updates.comprobanteAnticipo || targetProj.pagos?.anticipoComprobante || 'Confirmado en Portal'
+          anticipoComprobante: updates.comprobanteAnticipo || targetProj.pagos?.anticipoComprobante || 'Confirmado en Portal',
+          anticipoComprobanteImagen: updates.comprobanteAnticipoImagen || targetProj.pagos?.anticipoComprobanteImagen || null,
+          anticipoComprobanteNombre: updates.comprobanteAnticipoNombre || targetProj.pagos?.anticipoComprobanteNombre || null
         };
         const h2 = targetProj.seguimiento?.hitos?.find(h => h.id === 'h-2');
         if (h2) {
@@ -722,12 +730,14 @@ export function applyPortalUpdateToWorkflow(token, updates = {}) {
       }
 
       // Liquidación Final 50%
-      if (updates.fase4Liquidada || updates.liquidacionPagada) {
+      if (updates.fase4Liquidada || updates.liquidacionPagada || updates.comprobanteLiquidacionImagen) {
         targetProj.pagos = {
           ...(targetProj.pagos || {}),
           saldoEstado: 'confirmado',
           saldoFecha: todayIso,
-          saldoComprobante: updates.comprobanteLiquidacion || 'Confirmado en Portal'
+          saldoComprobante: updates.comprobanteLiquidacion || targetProj.pagos?.saldoComprobante || 'Confirmado en Portal',
+          saldoComprobanteImagen: updates.comprobanteLiquidacionImagen || targetProj.pagos?.saldoComprobanteImagen || null,
+          saldoComprobanteNombre: updates.comprobanteLiquidacionNombre || targetProj.pagos?.saldoComprobanteNombre || null
         };
         targetProj.estado = 'entregado';
         const h7 = targetProj.seguimiento?.hitos?.find(h => h.id === 'h-7');

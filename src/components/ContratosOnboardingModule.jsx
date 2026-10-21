@@ -1616,13 +1616,35 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                     Requerido formalmente para la reserva de agenda y comienzo de la Fase 1.
                   </p>
 
-                  {activeProyecto.pagos?.anticipoComprobante && (
-                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-1">
+                  {(activeProyecto.pagos?.anticipoComprobante || activeProyecto.pagos?.anticipoComprobanteImagen) && (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-2">
                       <div className="font-bold flex items-center gap-1.5 text-amber-400">
                         <FileText className="w-3.5 h-3.5" />
                         <span>Comprobante Reportado por Cliente:</span>
                       </div>
-                      <div className="font-mono text-white text-[11px]">{activeProyecto.pagos.anticipoComprobante}</div>
+                      {activeProyecto.pagos?.anticipoComprobante && (
+                        <div className="font-mono text-white text-[11px]">{activeProyecto.pagos.anticipoComprobante}</div>
+                      )}
+                      {activeProyecto.pagos?.anticipoComprobanteImagen && (
+                        <div className="space-y-1.5 pt-1">
+                          <a
+                            href={activeProyecto.pagos.anticipoComprobanteImagen}
+                            download={activeProyecto.pagos?.anticipoComprobanteNombre || 'Comprobante_Anticipo.jpg'}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block rounded-lg overflow-hidden border border-slate-700 bg-[#090d16] max-h-44 flex items-center justify-center group relative"
+                          >
+                            <img
+                              src={activeProyecto.pagos.anticipoComprobanteImagen}
+                              alt="Captura de Comprobante"
+                              className="max-h-40 w-auto object-contain"
+                            />
+                          </a>
+                          <div className="text-[10px] text-emerald-400 font-mono">
+                            ✓ Captura bancaria adjunta ({activeProyecto.pagos?.anticipoComprobanteNombre || 'Imagen verificada'})
+                          </div>
+                        </div>
+                      )}
                       {activeProyecto.pagos?.anticipoFecha && (
                         <div className="text-[10px] text-slate-400">Reportado el: {activeProyecto.pagos.anticipoFecha}</div>
                       )}

@@ -199,7 +199,76 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const [signerName, setSignerName] = useState('');
   const [signerDoc, setSignerDoc] = useState('');
   const [advanceReceiptRef, setAdvanceReceiptRef] = useState('');
+  const [advanceReceiptImage, setAdvanceReceiptImage] = useState('');
+  const [advanceReceiptFileName, setAdvanceReceiptFileName] = useState('');
+  const advanceReceiptInputRef = useRef(null);
   const [selectedBankTab, setSelectedBankTab] = useState('SV'); // 'SV' | 'DO' | 'US'
+  const [previewReceiptModalUrl, setPreviewReceiptModalUrl] = useState(null);
+
+  const handleReceiptImageSelect = (e, target = 'advance') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const rawDataUrl = event.target?.result;
+      if (!rawDataUrl) return;
+
+      // Si es imagen, optimizar tamaño para almacenamiento ágil y nítido
+      if (file.type.startsWith('image/')) {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const maxDim = 1100;
+            let width = img.width;
+            let height = img.height;
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            const offCanvas = document.createElement('canvas');
+            offCanvas.width = width;
+            offCanvas.height = height;
+            const ctx = offCanvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedUrl = offCanvas.toDataURL('image/jpeg', 0.82);
+            if (target === 'settlement') {
+              setSettlementReceiptImage(compressedUrl);
+              setSettlementReceiptFileName(file.name);
+            } else {
+              setAdvanceReceiptImage(compressedUrl);
+              setAdvanceReceiptFileName(file.name);
+            }
+            showNotification(`✓ Captura del comprobante "${file.name}" adjuntada correctamente.`);
+          } catch (err) {
+            if (target === 'settlement') {
+              setSettlementReceiptImage(rawDataUrl);
+              setSettlementReceiptFileName(file.name);
+            } else {
+              setAdvanceReceiptImage(rawDataUrl);
+              setAdvanceReceiptFileName(file.name);
+            }
+          }
+        };
+        img.src = rawDataUrl;
+      } else {
+        if (target === 'settlement') {
+          setSettlementReceiptImage(rawDataUrl);
+          setSettlementReceiptFileName(file.name);
+        } else {
+          setAdvanceReceiptImage(rawDataUrl);
+          setAdvanceReceiptFileName(file.name);
+        }
+        showNotification(`✓ Comprobante "${file.name}" adjuntado correctamente.`);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Fase 3 - Assets intake states
   const [assetName, setAssetName] = useState('');
@@ -242,6 +311,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   // Fase 4 - Settlement states
   const [settlementReceiptRef, setSettlementReceiptRef] = useState('');
+  const [settlementReceiptImage, setSettlementReceiptImage] = useState('');
+  const [settlementReceiptFileName, setSettlementReceiptFileName] = useState('');
+  const settlementReceiptInputRef = useRef(null);
   const [unlockAnimating, setUnlockAnimating] = useState(false);
 
   // Fase 5 - Maintenance state
@@ -344,7 +416,19 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       if (cfg.nombreFirmante) setSignerName(cfg.nombreFirmante);
       if (cfg.documentoFirmante) setSignerDoc(cfg.documentoFirmante);
       if (cfg.comprobanteAnticipo) setAdvanceReceiptRef(cfg.comprobanteAnticipo);
+      if (cfg.comprobanteAnticipoImagen || data?.proyecto?.pagos?.anticipoComprobanteImagen) {
+        setAdvanceReceiptImage(cfg.comprobanteAnticipoImagen || data.proyecto.pagos.anticipoComprobanteImagen);
+      }
+      if (cfg.comprobanteAnticipoNombre || data?.proyecto?.pagos?.anticipoComprobanteNombre) {
+        setAdvanceReceiptFileName(cfg.comprobanteAnticipoNombre || data.proyecto.pagos.anticipoComprobanteNombre);
+      }
       if (cfg.comprobanteLiquidacion) setSettlementReceiptRef(cfg.comprobanteLiquidacion);
+      if (cfg.comprobanteLiquidacionImagen || data?.proyecto?.pagos?.saldoComprobanteImagen) {
+        setSettlementReceiptImage(cfg.comprobanteLiquidacionImagen || data.proyecto.pagos.saldoComprobanteImagen);
+      }
+      if (cfg.comprobanteLiquidacionNombre || data?.proyecto?.pagos?.saldoComprobanteNombre) {
+        setSettlementReceiptFileName(cfg.comprobanteLiquidacionNombre || data.proyecto.pagos.saldoComprobanteNombre);
+      }
       if (cfg.fase5CareActivo) setCarePlanActive(true);
 
       // Set initial active tab based on progress ONCE
@@ -1053,6 +1137,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       alert('Por favor realiza tu firma digital manuscrita en el recuadro interactivo.');
       return;
     }
+    const finalReceiptImage = advanceReceiptImage || data.portalConfig?.comprobanteAnticipoImagen || data.proyecto?.pagos?.anticipoComprobanteImagen || '';
+    const finalReceiptFileName = advanceReceiptFileName || data.portalConfig?.comprobanteAnticipoNombre || data.proyecto?.pagos?.anticipoComprobanteNombre || '';
+    if (!finalReceiptImage) {
+      alert('Por favor sube la captura o imagen del comprobante de pago generado por tu aplicación bancaria.');
+      return;
+    }
 
     let signatureUrl = data.portalConfig?.firmaDigital || null;
     if (canvasRef.current && hasSignature) {
@@ -1060,6 +1150,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     }
 
     const fechaFirma = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+    const textoComprobante = advanceReceiptRef.trim() || (finalReceiptFileName ? `Captura: ${finalReceiptFileName}` : 'Captura de Comprobante Adjunta');
 
     // 1. Actualizar o crear proyecto formal firmado en el almacén local
     let targetUpdatedProj = null;
@@ -1074,7 +1165,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
           found = true;
           const hitos = (p.seguimiento?.hitos || []).map(h => {
             if (h.id === 'h-1') return { ...h, completado: true, fecha: fechaFirma };
-            if (h.id === 'h-2' && advanceReceiptRef.trim()) return { ...h, completado: true, fecha: fechaFirma };
+            if (h.id === 'h-2' && (advanceReceiptRef.trim() || finalReceiptImage)) return { ...h, completado: true, fecha: fechaFirma };
             return h;
           });
 
@@ -1095,7 +1186,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             },
             pagos: {
               ...(p.pagos || {}),
-              anticipoComprobante: advanceReceiptRef.trim() || 'Comprobante Registrado',
+              anticipoComprobante: textoComprobante,
+              anticipoComprobanteImagen: finalReceiptImage,
+              anticipoComprobanteNombre: finalReceiptFileName || 'Comprobante_Anticipo_50.jpg',
               anticipoFecha: fechaFirma,
               anticipoEstado: 'verificacion'
             },
@@ -1117,7 +1210,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         if (baseProj) {
           const hitos = (baseProj.seguimiento?.hitos || []).map(h => {
             if (h.id === 'h-1') return { ...h, completado: true, fecha: fechaFirma };
-            if (h.id === 'h-2' && advanceReceiptRef.trim()) return { ...h, completado: true, fecha: fechaFirma };
+            if (h.id === 'h-2' && (advanceReceiptRef.trim() || finalReceiptImage)) return { ...h, completado: true, fecha: fechaFirma };
             return h;
           });
 
@@ -1139,7 +1232,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             },
             pagos: {
               ...(baseProj.pagos || {}),
-              anticipoComprobante: advanceReceiptRef.trim() || 'Comprobante Registrado',
+              anticipoComprobante: textoComprobante,
+              anticipoComprobanteImagen: finalReceiptImage,
+              anticipoComprobanteNombre: finalReceiptFileName || 'Comprobante_Anticipo_50.jpg',
               anticipoFecha: fechaFirma,
               anticipoEstado: 'verificacion'
             },
@@ -1189,7 +1284,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       firmaDigital: signatureUrl,
       nombreFirmante: signerName.trim(),
       documentoFirmante: signerDoc.trim() || 'Identificación Oficial Registrada',
-      comprobanteAnticipo: advanceReceiptRef.trim() || 'En verificación bancaria',
+      comprobanteAnticipo: textoComprobante,
+      comprobanteAnticipoImagen: finalReceiptImage,
+      comprobanteAnticipoNombre: finalReceiptFileName || 'Comprobante_Anticipo_50.jpg',
       anticipoPagado: true,
       progresoPorcentaje: 60,
       faseActual: 3
@@ -1282,6 +1379,14 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   const handleLiquidarProyecto = async (e) => {
     e.preventDefault();
+    const finalSettlementImg = settlementReceiptImage || data.portalConfig?.comprobanteLiquidacionImagen || data.proyecto?.pagos?.saldoComprobanteImagen || '';
+    const finalSettlementName = settlementReceiptFileName || data.portalConfig?.comprobanteLiquidacionNombre || data.proyecto?.pagos?.saldoComprobanteNombre || '';
+    if (!finalSettlementImg && !settlementReceiptRef.trim()) {
+      alert('Por favor sube la captura del comprobante de liquidación bancaria o indica el número de transacción.');
+      return;
+    }
+    const textoLiquidacion = settlementReceiptRef.trim() || (finalSettlementName ? `Captura: ${finalSettlementName}` : 'Comprobante de Liquidación Adjunto');
+
     setUnlockAnimating(true);
     setTimeout(async () => {
       try {
@@ -1299,6 +1404,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             pagos: {
               ...(storedProjs[idx].pagos || {}),
               saldoEstado: 'confirmado',
+              saldoComprobante: textoLiquidacion,
+              saldoComprobanteImagen: finalSettlementImg || storedProjs[idx].pagos?.saldoComprobanteImagen || null,
+              saldoComprobanteNombre: finalSettlementName || storedProjs[idx].pagos?.saldoComprobanteNombre || null,
               saldoFecha: new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
             }
           });
@@ -1312,7 +1420,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       await savePortalUpdates({
         fase4Liquidada: true,
         fechaLiquidacion: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
-        comprobanteLiquidacion: settlementReceiptRef.trim() || 'Referencia Verificada',
+        comprobanteLiquidacion: textoLiquidacion,
+        comprobanteLiquidacionImagen: finalSettlementImg || null,
+        comprobanteLiquidacionNombre: finalSettlementName || null,
         liquidacionPagada: true,
         progresoPorcentaje: 95,
         faseActual: 5
@@ -2393,19 +2503,102 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     )}
                   </div>
 
-                  {/* Proof of Deposit Input */}
-                  <div className="space-y-3">
-                    <label className="text-[11px] text-slate-300 font-mono block">
-                      Número de Referencia o Comprobante de Depósito (50%):
-                    </label>
-                    <input
-                      type="text"
-                      value={advanceReceiptRef}
-                      onChange={(e) => setAdvanceReceiptRef(e.target.value)}
-                      disabled={portalConfig?.fase2Firmada}
-                      placeholder="Ej. Transferencia #982143 o Ref. Banco Agrícola"
-                      className="w-full bg-[#141b2b] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 disabled:opacity-60"
-                    />
+                  {/* Proof of Deposit Input (Number + Screenshot Upload) */}
+                  <div className="space-y-3.5 pt-1 border-t border-slate-800/80">
+                    <div>
+                      <label className="text-[11px] text-slate-300 font-mono block mb-1.5">
+                        1. Captura o Imagen del Comprobante Bancario (50%):
+                      </label>
+                      <input
+                        ref={advanceReceiptInputRef}
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={(e) => handleReceiptImageSelect(e, 'advance')}
+                        className="hidden"
+                      />
+
+                      {(advanceReceiptImage || portalConfig?.comprobanteAnticipoImagen || activeProyecto?.pagos?.anticipoComprobanteImagen) ? (
+                        <div className="p-3 rounded-xl bg-[#141b2b] border border-emerald-500/40 space-y-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                              <span className="text-xs font-bold text-emerald-300 truncate">
+                                {advanceReceiptFileName || portalConfig?.comprobanteAnticipoNombre || activeProyecto?.pagos?.anticipoComprobanteNombre || 'Captura_Comprobante_Pago.jpg'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setPreviewReceiptModalUrl(advanceReceiptImage || portalConfig?.comprobanteAnticipoImagen || activeProyecto?.pagos?.anticipoComprobanteImagen)}
+                                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-orange-400 text-[11px] font-bold flex items-center gap-1 border border-slate-700"
+                              >
+                                <Eye className="w-3 h-3" />
+                                <span>Ver Captura</span>
+                              </button>
+                              {!portalConfig?.fase2Firmada && (
+                                <button
+                                  type="button"
+                                  onClick={() => advanceReceiptInputRef.current?.click()}
+                                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold border border-slate-700"
+                                >
+                                  Cambiar
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div
+                            onClick={() => setPreviewReceiptModalUrl(advanceReceiptImage || portalConfig?.comprobanteAnticipoImagen || activeProyecto?.pagos?.anticipoComprobanteImagen)}
+                            className="relative rounded-lg overflow-hidden border border-slate-700/80 bg-[#090d16] max-h-40 flex items-center justify-center cursor-pointer group"
+                          >
+                            <img
+                              src={advanceReceiptImage || portalConfig?.comprobanteAnticipoImagen || activeProyecto?.pagos?.anticipoComprobanteImagen}
+                              alt="Comprobante de Pago Bancario"
+                              className="max-h-36 w-auto object-contain group-hover:scale-105 transition-transform"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[11px] font-bold text-white gap-1">
+                              <Eye className="w-3.5 h-3.5" /> Ampliar Comprobante
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => !portalConfig?.fase2Firmada && advanceReceiptInputRef.current?.click()}
+                          className={`p-4 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center text-center gap-1.5 ${
+                            portalConfig?.fase2Firmada
+                              ? 'border-slate-800 bg-[#111622] opacity-60'
+                              : 'border-orange-500/40 hover:border-orange-500 bg-[#141b2b]/80 hover:bg-[#141b2b] cursor-pointer'
+                          }`}
+                        >
+                          <div className="w-9 h-9 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-400 flex items-center justify-center">
+                            <FileUp className="w-5 h-5" />
+                          </div>
+                          <div className="text-xs font-bold text-white">
+                            Subir captura o imagen del comprobante bancario
+                          </div>
+                          <p className="text-[10px] text-slate-400 max-w-xs">
+                            Adjunta la captura generada por tu app bancaria (Transfer365, ACH, Banreservas, Banco Agrícola o uglyCash)
+                          </p>
+                          <span className="mt-1 px-3 py-1 rounded-lg bg-orange-600/20 border border-orange-500/30 text-orange-300 text-[11px] font-mono font-bold">
+                            Seleccionar Imagen / Captura
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] text-slate-300 font-mono block mb-1">
+                        2. Número de Referencia o Transacción (Opcional si subiste captura):
+                      </label>
+                      <input
+                        type="text"
+                        value={advanceReceiptRef}
+                        onChange={(e) => setAdvanceReceiptRef(e.target.value)}
+                        disabled={portalConfig?.fase2Firmada}
+                        placeholder="Ej. Transferencia #982143 o Ref. Banco Agrícola"
+                        className="w-full bg-[#141b2b] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 disabled:opacity-60"
+                      />
+                    </div>
 
                     {portalConfig?.fase2Firmada ? (
                       <button
@@ -2421,7 +2614,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                         className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-orange-950 transition-all"
                       >
                         <CheckCheck className="w-4 h-4" />
-                        <span>Confirmar Firma y Enviar Comprobante (50%)</span>
+                        <span>Confirmar Firma y Enviar Captura de Comprobante (50%)</span>
                       </button>
                     )}
                   </div>
@@ -3033,39 +3226,74 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   </div>
 
                   <form onSubmit={handleLiquidarProyecto} className="space-y-3 pt-2">
+                    <input
+                      ref={settlementReceiptInputRef}
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) => handleReceiptImageSelect(e, 'settlement')}
+                      className="hidden"
+                    />
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
+                        <label className="text-[11px] text-slate-300 font-mono block mb-1">
+                          1. Captura del Comprobante Bancario (50% Final):
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => settlementReceiptInputRef.current?.click()}
+                            className="flex-1 py-2.5 px-3 rounded-xl bg-[#141b2b] hover:bg-slate-800 border border-orange-500/40 text-xs text-orange-300 font-bold flex items-center justify-center gap-2 transition-colors"
+                          >
+                            <FileUp className="w-4 h-4 text-orange-400 shrink-0" />
+                            <span className="truncate">
+                              {settlementReceiptFileName || 'Subir Captura Bancaria'}
+                            </span>
+                          </button>
+                          {settlementReceiptImage && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewReceiptModalUrl(settlementReceiptImage)}
+                              className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold border border-emerald-500/30 flex items-center gap-1 shrink-0"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Ver</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
                         <label className="text-[11px] text-slate-400 font-mono block mb-1">
-                          N° Comprobante o Transacción de Liquidación:
+                          2. N° Transacción de Liquidación (Opcional):
                         </label>
                         <input
                           type="text"
                           value={settlementReceiptRef}
                           onChange={(e) => setSettlementReceiptRef(e.target.value)}
-                          placeholder="Ej. Transferencia #839102 (Banco Agrícola / Banreservas / uglyCash)"
+                          placeholder="Ej. Transferencia #839102"
                           className="w-full bg-[#141b2b] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
                         />
                       </div>
-                      <div className="flex items-end">
-                        <button
-                          type="submit"
-                          disabled={unlockAnimating}
-                          className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-orange-950 transition-all h-[42px]"
-                        >
-                          {unlockAnimating ? (
-                            <>
-                              <RefreshCw className="w-4 h-4 animate-spin" />
-                              <span>Liberando Credenciales y Repositorio...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Unlock className="w-4 h-4" />
-                              <span>Confirmar Liquidación y Desbloquear Accesos</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
                     </div>
+
+                    <button
+                      type="submit"
+                      disabled={unlockAnimating}
+                      className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-orange-950 transition-all"
+                    >
+                      {unlockAnimating ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Liberando Credenciales y Repositorio...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Unlock className="w-4 h-4" />
+                          <span>Confirmar Liquidación y Desbloquear Accesos</span>
+                        </>
+                      )}
+                    </button>
                   </form>
                 </div>
               )}
@@ -3229,6 +3457,42 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       <footer className="border-t border-slate-800/80 mt-10 py-6 text-center text-xs text-slate-500 bg-[#080b12]">
         {agencyBranding.nombreAgencia || 'Goglite Studio Agency'} · {agencyBranding.eslogan || 'Suite Integral de Crecimiento Digital'} · {agencyBranding.ubicacionPrincipal || 'San Salvador (SV) & Santo Domingo (DO)'}
       </footer>
+
+      {/* MODAL: VISTA PREVIA DE CAPTURA DE COMPROBANTE BANCARIO */}
+      {previewReceiptModalUrl && (
+        <div
+          onClick={() => setPreviewReceiptModalUrl(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-lg w-full rounded-2xl bg-[#0d121d] border border-slate-700 shadow-2xl p-4 space-y-3"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-orange-400" />
+                <h3 className="text-xs font-bold text-white uppercase font-mono">
+                  Captura del Comprobante Bancario
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewReceiptModalUrl(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-auto rounded-xl bg-[#070a10] border border-slate-800 flex items-center justify-center p-2">
+              <img
+                src={previewReceiptModalUrl}
+                alt="Captura de Comprobante"
+                className="max-w-full max-h-[65vh] object-contain rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: POST-PAYMENT CLIENT AUTHENTICATION */}
       {showClientAuthModal && (
