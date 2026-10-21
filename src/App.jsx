@@ -303,15 +303,6 @@ export default function App() {
               <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
                 {agencySettings.nombreAgencia || 'Goglite'}
               </span>
-              <span className="text-xs font-mono text-orange-400/90 font-semibold px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20">
-                {activeModule === 'lead_scrapper' ? 'Fase 1 · Lead Scrapper' :
-                 activeModule === 'crm_portal' ? 'Fase 2 · CRM & WhatsApp' :
-                 activeModule === 'presupuestos' ? 'Fase 3 · Presupuestos & Contratos' :
-                 activeModule === 'desarrollo_prd' ? 'Fase 4 · Centro Desarrollo & PRD' :
-                 activeModule === 'seo_motor' ? 'Fase 5 · Motor SEO & Launch QA' :
-                 activeModule === 'headless_cms' ? 'Fase 6 · Hub Headless CMS' :
-                 activeModule === 'gestion_rentabilidad' ? 'Fase 7 · Rentabilidad & P&L 👑' : 'Suite'}
-              </span>
             </div>
           </div>
 
@@ -450,17 +441,6 @@ export default function App() {
 
         {/* Right Header Options */}
         <div className="flex items-center gap-3">
-          {/* Botón Maestro Reset / Limpieza para Prueba Manual */}
-          <button
-            onClick={handleResetAllPlatformData}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-semibold transition-all shadow-sm"
-            title="Limpiar datos de prueba de Fases 1 a 7 (Mantiene a salvo ajustes, usuarios y claves)"
-          >
-            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-            <span className="hidden sm:inline">Limpiar Demo (Fases 1-7)</span>
-            <span className="sm:hidden">Limpiar</span>
-          </button>
-
           {/* Country Selector */}
           <div className="flex items-center bg-[#131926] border border-slate-800 rounded-lg p-0.5 text-xs">
             <button
@@ -539,10 +519,10 @@ export default function App() {
 
             {/* Selector de Fases */}
             <div className="space-y-1">
-              {/* 1. Lead Scrapper */}
+              {/* Lead Scrapper */}
               <button
                 onClick={() => setActiveModule('lead_scrapper')}
-                title="Fase 1: Lead Scrapper (Outbound)"
+                title="Lead Scrapper (Outbound)"
                 className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'justify-between px-2.5 py-1.5'} rounded-lg text-xs font-semibold transition-all relative ${
                   activeModule === 'lead_scrapper'
                     ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
@@ -553,15 +533,12 @@ export default function App() {
                   <Zap className="w-3.5 h-3.5" />
                   {!isSidebarCollapsed && <span>Lead Scrapper</span>}
                 </div>
-                <span className={`text-[9px] font-mono bg-orange-500/20 text-orange-400 font-bold ${isSidebarCollapsed ? 'absolute -top-1 -right-1 px-1 rounded-full text-[8px]' : 'px-1.5 py-0.5 rounded'}`}>
-                  1
-                </span>
               </button>
 
-              {/* 2. CRM & WhatsApp */}
+              {/* CRM & WhatsApp */}
               <button
                 onClick={() => setActiveModule('crm_portal')}
-                title="Fase 2: CRM & WhatsApp Web"
+                title="CRM & WhatsApp Web"
                 className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'justify-between px-2.5 py-1.5'} rounded-lg text-xs font-semibold transition-all relative ${
                   activeModule === 'crm_portal'
                     ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
@@ -572,18 +549,15 @@ export default function App() {
                   <Kanban className="w-3.5 h-3.5" />
                   {!isSidebarCollapsed && <span>CRM & WhatsApp</span>}
                 </div>
-                <span className={`text-[9px] font-mono bg-orange-500/20 text-orange-400 font-bold ${isSidebarCollapsed ? 'absolute -top-1 -right-1 px-1 rounded-full text-[8px]' : 'px-1.5 py-0.5 rounded'}`}>
-                  2
-                </span>
               </button>
 
-              {/* 3. Presupuestos & Contratos */}
+              {/* Presupuestos & Contratos */}
               <button
                 onClick={() => {
                   setActiveModule('presupuestos');
                   setPresupuestosInitialTab('presupuestos');
                 }}
-                title="Fase 3: Presupuestos & Contratos SOW"
+                title="Presupuestos & Contratos SOW"
                 className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'justify-between px-2.5 py-1.5'} rounded-lg text-xs font-semibold transition-all relative ${
                   activeModule === 'presupuestos'
                     ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
@@ -594,15 +568,12 @@ export default function App() {
                   <FileText className="w-3.5 h-3.5" />
                   {!isSidebarCollapsed && <span>Presupuestos</span>}
                 </div>
-                <span className={`text-[9px] font-mono bg-orange-500/20 text-orange-400 font-bold ${isSidebarCollapsed ? 'absolute -top-1 -right-1 px-1 rounded-full text-[8px]' : 'px-1.5 py-0.5 rounded'}`}>
-                  3
-                </span>
               </button>
 
-              {/* 4. Centro Desarrollo & PRD */}
+              {/* Centro Desarrollo & PRD */}
               <button
                 onClick={() => setActiveModule('desarrollo_prd')}
-                title="Fase 4: Centro Desarrollo & PRD"
+                title="Centro Desarrollo & PRD"
                 className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'justify-between px-2.5 py-1.5'} rounded-lg text-xs font-semibold transition-all relative ${
                   activeModule === 'desarrollo_prd'
                     ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
@@ -613,18 +584,15 @@ export default function App() {
                   <Layout className="w-3.5 h-3.5" />
                   {!isSidebarCollapsed && <span>Desarrollo & PRD</span>}
                 </div>
-                <span className={`text-[9px] font-mono bg-orange-500/20 text-orange-400 font-bold ${isSidebarCollapsed ? 'absolute -top-1 -right-1 px-1 rounded-full text-[8px]' : 'px-1.5 py-0.5 rounded'}`}>
-                  4
-                </span>
               </button>
 
-              {/* 5. Motor SEO & Launch QA */}
+              {/* Motor SEO & Launch QA */}
               <button
                 onClick={() => {
                   setActiveModule('seo_motor');
                   setSeoInitialTab('seo_geo');
                 }}
-                title="Fase 5: Motor SEO & Launch QA"
+                title="Motor SEO & Launch QA"
                 className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'justify-between px-2.5 py-1.5'} rounded-lg text-xs font-semibold transition-all relative ${
                   activeModule === 'seo_motor'
                     ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
@@ -635,15 +603,12 @@ export default function App() {
                   <Search className="w-3.5 h-3.5" />
                   {!isSidebarCollapsed && <span>Motor SEO & QA</span>}
                 </div>
-                <span className={`text-[9px] font-mono bg-orange-500/20 text-orange-400 font-bold ${isSidebarCollapsed ? 'absolute -top-1 -right-1 px-1 rounded-full text-[8px]' : 'px-1.5 py-0.5 rounded'}`}>
-                  5
-                </span>
               </button>
 
-              {/* 6. Hub Headless CMS */}
+              {/* Hub Headless CMS */}
               <button
                 onClick={() => setActiveModule('headless_cms')}
-                title="Fase 6: Hub Headless CMS"
+                title="Hub Headless CMS"
                 className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'justify-between px-2.5 py-1.5'} rounded-lg text-xs font-semibold transition-all relative ${
                   activeModule === 'headless_cms'
                     ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
@@ -654,15 +619,12 @@ export default function App() {
                   <Globe className="w-3.5 h-3.5" />
                   {!isSidebarCollapsed && <span>Headless CMS</span>}
                 </div>
-                <span className={`text-[9px] font-mono bg-orange-500/20 text-orange-400 font-bold ${isSidebarCollapsed ? 'absolute -top-1 -right-1 px-1 rounded-full text-[8px]' : 'px-1.5 py-0.5 rounded'}`}>
-                  6
-                </span>
               </button>
 
-              {/* 7. Rentabilidad & P&L */}
+              {/* Rentabilidad & P&L */}
               <button
                 onClick={() => setActiveModule('gestion_rentabilidad')}
-                title="Fase 7: Rentabilidad & P&L (Exclusivo Admin)"
+                title="Rentabilidad & P&L (Exclusivo Admin)"
                 className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'justify-between px-2.5 py-1.5'} rounded-lg text-xs font-semibold transition-all relative ${
                   activeModule === 'gestion_rentabilidad'
                     ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
@@ -673,9 +635,6 @@ export default function App() {
                   <DollarSign className="w-3.5 h-3.5" />
                   {!isSidebarCollapsed && <span>Rentabilidad & P&L</span>}
                 </div>
-                <span className={`text-[9px] font-mono bg-amber-500/20 text-amber-300 font-bold ${isSidebarCollapsed ? 'absolute -top-1 -right-1 px-1 rounded-full text-[8px]' : 'px-1.5 py-0.5 rounded'}`}>
-                  7 👑
-                </span>
               </button>
             </div>
 
