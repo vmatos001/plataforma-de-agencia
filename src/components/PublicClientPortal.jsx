@@ -323,6 +323,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   // Fase 5 - Maintenance state
   const [carePlanActive, setCarePlanActive] = useState(false);
   const [syncingDrive, setSyncingDrive] = useState(false);
+  const [subiendoInsumo, setSubiendoInsumo] = useState(false);
 
   const handleSyncDriveVault = async (options = { openWindow: false, silent: false }) => {
     const shouldOpen = options?.openWindow === true;
@@ -1409,33 +1410,134 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       return;
     }
 
-    const finalName = assetName.trim() || selectedFile?.name || 'Archivo Adjunto';
-    const finalSize = selectedFile 
-      ? (selectedFile.size > 1048576 ? (selectedFile.size / 1048576).toFixed(1) + ' MB' : Math.round(selectedFile.size / 1024) + ' KB')
-      : 'Enlace Web';
+    try {
+      setSubiendoInsumo(true);
+      const finalName = assetName.trim() || selectedFile?.name || 'Archivo Adjunto';
+      const finalSize = selectedFile 
+        ? (selectedFile.size > 1048576 ? (selectedFile.size / 1048576).toFixed(1) + ' MB' : Math.round(selectedFile.size / 1024) + ' KB')
+        : 'Enlace Web';
 
-    const nuevoArchivo = {
-      id: 'f-' + Date.now(),
-      nombre: finalName,
-      tamano: finalSize,
-      categoria: assetCategory,
-      notas: assetNotes.trim(),
-      fecha: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
-      estado: 'Recibido'
-    };
+      const empresa = data?.presupuesto?.cliente?.empresa || data?.lead?.empresa || 'Cliente';
+      const cleanEmpresa = empresa.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
+      const rawAuthEmail = (
+        data?.portalConfig?.clienteAuthEmail ||
+        clientAuthEmail ||
+        data?.presupuesto?.cliente?.email ||
+        data?.lead?.email ||
+        ''
+      ).trim().toLowerCase();
+      const authenticatedClientEmail = (rawAuthEmail && rawAuthEmail !== 'cliente@empresa.com' && rawAuthEmail !== 'cliente@gmail.com')
+        ? rawAuthEmail
+        : 'sitesgoglite@gmail.com';
 
-    const archivosActuales = data.portalConfig?.archivosSubidos || [];
-    const actualizados = [...archivosActuales, nuevoArchivo];
+      // 1. Convertir archivo a base64 si se seleccionó archivo local
+      let fileBase64 = null;
+      let isImage = false;
+      if (selectedFile) {
+        isImage = (selectedFile.type || '').startsWith('image/');
+        fileBase64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = (err) => reject(err);
+          reader.readAsDataURL(selectedFile);
+        });
+      }
 
-    await savePortalUpdates({
-      archivosSubidos: actualizados
-    });
+      // 2. Subir directamente a la bóveda en Google Drive (sitesgoglite@gmail.com) -> subcarpeta 01_Insumos_Cliente
+      let driveResult = null;
+      try {
+        const gasPayload = {
+          action: 'uploadFile',
+          clientName: cleanEmpresa,
+          clientEmail: authenticatedClientEmail,
+          targetSubfolder: '01_Insumos_Cliente',
+          fileName: finalName,
+          category: assetCategory,
+          notes: assetNotes.trim()
+        };
+        if (fileBase64) {
+          gasPayload.fileBase64 = fileBase64;
+          gasPayload.mimeType = selectedFile.type || 'application/octet-stream';
+        } else {
+          gasPayload.textContent = `Insumo de Marca: ${finalName}\nCategoría: ${assetCategory}\nNotas/Instrucciones: ${assetNotes.trim() || 'Sin notas'}\nFecha: ${new Date().toLocaleString('es-ES')}`;
+          gasPayload.mimeType = 'text/plain';
+        }
 
-    setAssetName('');
-    setSelectedFile(null);
-    setAssetNotes('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    showNotification(`✓ Insumo "${nuevoArchivo.nombre}" (${finalSize}) registrado correctamente.`);
+        const gasRes = await fetch('https://script.google.com/macros/s/AKfycbz2qqnBdelAif_BvpwkFCk-0WZ1b2fgiPaPVT3EK0mSyN0jboo_XBdZQL5OCP1rHLT0sw/exec', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(gasPayload)
+        });
+        if (gasRes.ok) {
+          driveResult = await gasRes.json();
+        }
+      } catch (uploadErr) {
+        console.warn('Error subiendo insumo a Google Drive:', uploadErr);
+      }
+
+      const nuevoArchivo = {
+        id: 'f-' + Date.now(),
+        nombre: finalName,
+        tamano: finalSize,
+        categoria: assetCategory,
+        notas: assetNotes.trim(),
+        fecha: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
+        hora: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        estado: 'Recibido',
+        driveUrl: driveResult?.fileUrl || null,
+        driveFileId: driveResult?.fileId || null,
+        driveFolderUrl: driveResult?.folderUrl || data.portalConfig?.driveVault?.subfolders?.insumos?.url || null,
+        previewUrl: (isImage && fileBase64 && fileBase64.length < 500000) ? fileBase64 : null,
+        isDirectFile: Boolean(selectedFile)
+      };
+
+      const archivosActuales = data.portalConfig?.archivosSubidos || [];
+      const actualizados = [...archivosActuales, nuevoArchivo];
+
+      // 3. Sincronizar con el proyecto en el Dashboard (Fase 3: Contratos & Onboarding)
+      try {
+        const projs = getStoredProyectos();
+        const targetEmp = cleanEmpresa.toLowerCase().trim();
+        const updatedProjs = projs.map(p => {
+          const pEmp = (p.cliente?.empresa || '').toLowerCase().trim();
+          if ((data?.proyecto?.id && p.id === data.proyecto.id) || (data?.presupuesto?.id && p.presupuestoId === data.presupuesto.id) || (targetEmp && pEmp === targetEmp)) {
+            return {
+              ...p,
+              onboarding: {
+                ...(p.onboarding || {}),
+                archivosSubidos: actualizados,
+                archivosRecibidos: actualizados,
+                driveVault: data?.portalConfig?.driveVault || p.onboarding?.driveVault || null,
+                enlaceDriveInsumos: driveResult?.folderUrl || p.onboarding?.enlaceDriveInsumos || null,
+                enlaceDriveArchivos: data?.portalConfig?.driveVault?.vaultUrl || p.onboarding?.enlaceDriveArchivos || null,
+                ultimaRecepcionInsumos: new Date().toISOString()
+              }
+            };
+          }
+          return p;
+        });
+        saveStoredProyectos(updatedProjs);
+        window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: updatedProjs } }));
+      } catch (projErr) {
+        console.warn('Error sincronizando proyecto en Dashboard:', projErr);
+      }
+
+      await savePortalUpdates({
+        archivosSubidos: actualizados
+      });
+
+      setAssetName('');
+      setSelectedFile(null);
+      setAssetNotes('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      
+      const driveMsg = driveResult?.fileUrl ? ' y guardado directamente en la carpeta 01_Insumos_Cliente de Google Drive' : '';
+      showNotification(`✓ Insumo "${nuevoArchivo.nombre}" (${finalSize}) registrado${driveMsg}.`);
+    } catch (err) {
+      alert('Error registrando insumo: ' + err.message);
+    } finally {
+      setSubiendoInsumo(false);
+    }
   };
 
   const handleCompletarInsumos = async () => {
@@ -3139,7 +3241,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                     <div>
                       <h2 className="text-base font-bold text-white">Insumos Registrados en el Proyecto</h2>
-                      <p className="text-xs text-slate-400">Total: {(portalConfig?.archivosSubidos || []).length} archivos recibidos</p>
+                      <p className="text-xs text-slate-400">Total: {(portalConfig?.archivosSubidos || []).length} archivos en Google Drive</p>
                     </div>
                     {portalConfig?.fase3InsumosCompletos ? (
                       <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20 font-bold">
@@ -3161,20 +3263,46 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       portalConfig.archivosSubidos.map((arch) => (
                         <div
                           key={arch.id}
-                          className="p-3 rounded-xl bg-[#141b2a] border border-slate-800 flex items-center justify-between text-xs hover:border-slate-700 transition-colors"
+                          className="p-3 rounded-xl bg-[#141b2a] border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:border-slate-700 transition-colors shadow-sm"
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
-                              <CheckCircle2 className="w-4 h-4" />
+                          <div className="flex items-start gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                              <CheckCircle2 className="w-5 h-5" />
                             </div>
-                            <div>
-                              <div className="font-bold text-white truncate">{arch.nombre}</div>
-                              <div className="text-[10px] text-slate-400 font-mono">{arch.categoria} · {arch.fecha}</div>
+                            <div className="min-w-0">
+                              <div className="font-bold text-white truncate flex items-center gap-1.5">
+                                <span>{arch.nombre}</span>
+                                {arch.tamano && <span className="text-[10px] text-slate-400 font-mono font-normal">({arch.tamano})</span>}
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                <span className="text-orange-400 font-bold">{arch.categoria}</span> · Recibido {arch.fecha} {arch.hora ? `(${arch.hora})` : ''}
+                              </div>
+                              {arch.notas && (
+                                <p className="text-[11px] text-slate-300 italic mt-1 line-clamp-2 bg-slate-900/60 px-2 py-1 rounded border border-slate-800/80">
+                                  "{arch.notas}"
+                                </p>
+                              )}
                             </div>
                           </div>
-                          <span className="text-[10px] bg-slate-800 text-emerald-400 px-2 py-0.5 rounded font-mono font-bold">
-                            {arch.estado || 'Recibido'}
-                          </span>
+
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                            {arch.driveUrl ? (
+                              <a
+                                href={arch.driveUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2.5 py-1 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 hover:text-white font-mono text-[10px] font-bold flex items-center gap-1 transition-all"
+                                title="Ver archivo en Google Drive"
+                              >
+                                <ExternalLink className="w-3 h-3 text-blue-400" />
+                                <span>Ver en Drive</span>
+                              </a>
+                            ) : (
+                              <span className="text-[10px] bg-slate-800 text-emerald-400 px-2 py-1 rounded font-mono font-bold">
+                                {arch.estado || 'Recibido'}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       ))
                     )}

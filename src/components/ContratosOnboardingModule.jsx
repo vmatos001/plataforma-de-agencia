@@ -39,7 +39,11 @@ import {
   FileCheck2,
   RefreshCw,
   Zap,
-  Kanban
+  Kanban,
+  FolderOpen,
+  FileUp,
+  Download,
+  X
 } from 'lucide-react';
 import {
   getStoredProyectos,
@@ -69,6 +73,8 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
+  const [syncingDriveFiles, setSyncingDriveFiles] = useState(false);
+  const [previewFileModal, setPreviewFileModal] = useState(null);
 
   // E-Signature Canvas Ref & State
   const canvasRef = useRef(null);
@@ -474,6 +480,171 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     }
 
     showNotification();
+  };
+
+  // Helper para obtener los insumos recibidos del proyecto (desde proyecto y portalConfig)
+  const getInsumosList = (proj = null) => {
+    const target = proj || activeProyecto;
+    if (!target) return [];
+    let list = [];
+    if (Array.isArray(target.onboarding?.archivosSubidos) && target.onboarding.archivosSubidos.length > 0) {
+      list = target.onboarding.archivosSubidos;
+    } else if (Array.isArray(target.onboarding?.archivosRecibidos) && target.onboarding.archivosRecibidos.length > 0) {
+      list = target.onboarding.archivosRecibidos;
+    }
+
+    // Complementar con archivos en portalConfig de localStorage si existen
+    try {
+      if (typeof window !== 'undefined') {
+        const tokensToCheck = [
+          target.portalToken,
+          target.presupuestoId,
+          target.id,
+          target.codigo
+        ].filter(Boolean);
+        for (const tk of tokensToCheck) {
+          const raw = localStorage.getItem('goglite_portal_' + tk);
+          if (raw) {
+            const pcfg = JSON.parse(raw);
+            if (Array.isArray(pcfg.archivosSubidos) && pcfg.archivosSubidos.length > list.length) {
+              list = pcfg.archivosSubidos;
+              break;
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
+    return list;
+  };
+
+  // Sincronizar insumos en vivo directamente con Google Drive (sitesgoglite@gmail.com -> 01_Insumos_Cliente)
+  const handleSyncDriveInsumos = async () => {
+    if (!activeProyecto) return;
+    try {
+      setSyncingDriveFiles(true);
+      const clientName = activeProyecto.cliente?.empresa || activeProyecto.cliente?.nombre || 'Cliente';
+      const cleanClientName = clientName.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
+
+      const res = await fetch('https://script.google.com/macros/s/AKfycbz2qqnBdelAif_BvpwkFCk-0WZ1b2fgiPaPVT3EK0mSyN0jboo_XBdZQL5OCP1rHLT0sw/exec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'listFiles',
+          clientName: cleanClientName,
+          targetSubfolder: '01_Insumos_Cliente'
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.files)) {
+          const driveFiles = data.files.filter(f => !f.name.includes('00_LEER_PRIMERO'));
+          const currentList = getInsumosList(activeProyecto);
+          const merged = [...currentList];
+
+          driveFiles.forEach(df => {
+            const exists = merged.some(m => m.driveFileId === df.id || m.nombre === df.name);
+            if (!exists) {
+              merged.push({
+                id: 'drive-' + df.id,
+                nombre: df.name,
+                tamano: df.size > 1048576 ? (df.size / 1048576).toFixed(1) + ' MB' : Math.round(df.size / 1024) + ' KB',
+                categoria: df.name.toLowerCase().includes('logo') ? 'Logotipo Vectorial' : 'Insumos en Drive',
+                notas: 'Sincronizado directamente desde Google Drive',
+                fecha: new Date(df.dateCreated).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
+                hora: new Date(df.dateCreated).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+                estado: 'Recibido en Drive',
+                driveUrl: df.url,
+                driveFileId: df.id,
+                driveFolderUrl: data.folderUrl
+              });
+            } else {
+              const idx = merged.findIndex(m => m.driveFileId === df.id || m.nombre === df.name);
+              if (idx !== -1 && !merged[idx].driveUrl) {
+                merged[idx].driveUrl = df.url;
+                merged[idx].driveFileId = df.id;
+              }
+            }
+          });
+
+          const updatedProj = {
+            ...activeProyecto,
+            onboarding: {
+              ...(activeProyecto.onboarding || {}),
+              archivosSubidos: merged,
+              archivosRecibidos: merged,
+              enlaceDriveInsumos: data.folderUrl || activeProyecto.onboarding?.enlaceDriveInsumos,
+              enlaceDriveArchivos: data.vaultUrl || activeProyecto.onboarding?.enlaceDriveArchivos
+            }
+          };
+
+          setActiveProyecto(updatedProj);
+          setProyectos(prev => {
+            const next = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
+            saveStoredProyectos(next);
+            return next;
+          });
+
+          window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: [updatedProj] } }));
+          alert(`✓ ¡Bóveda sincronizada con éxito! Se detectaron ${driveFiles.length} archivo(s) en la carpeta 01_Insumos_Cliente de sitesgoglite@gmail.com.`);
+        }
+      }
+    } catch (err) {
+      console.warn('Error sincronizando insumos:', err);
+      alert('Error consultando Google Drive: ' + err.message);
+    } finally {
+      setSyncingDriveFiles(false);
+    }
+  };
+
+  // Validar insumos al 100% desde la agencia para iniciar formalmente los 10 días
+  const handleValidateInsumosAgency = async () => {
+    if (!activeProyecto) return;
+    const nowStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+    const currentInsumos = getInsumosList(activeProyecto);
+    const updatedProj = evaluateProjectMilestones({
+      ...activeProyecto,
+      faseActual: 4,
+      onboarding: {
+        ...(activeProyecto.onboarding || {}),
+        completado: true,
+        insumosValidados100: true,
+        fecha: nowStr,
+        fechaValidacionAgencia: nowStr,
+        archivosSubidos: currentInsumos,
+        archivosRecibidos: currentInsumos
+      }
+    });
+
+    setActiveProyecto(updatedProj);
+    setProyectos(prev => {
+      const next = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
+      saveStoredProyectos(next);
+      return next;
+    });
+
+    try {
+      const tokensToCheck = [activeProyecto.portalToken, activeProyecto.presupuestoId, activeProyecto.id].filter(Boolean);
+      tokensToCheck.forEach(tk => {
+        const raw = localStorage.getItem('goglite_portal_' + tk);
+        if (raw) {
+          const cfg = JSON.parse(raw);
+          localStorage.setItem('goglite_portal_' + tk, JSON.stringify({
+            ...cfg,
+            fase3InsumosCompletos: true,
+            fechaInsumosCompletos: nowStr,
+            faseActual: 4,
+            progresoPorcentaje: 80
+          }));
+        }
+      });
+    } catch (e) {}
+
+    window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: [updatedProj] } }));
+    window.dispatchEvent(new Event('storage'));
+    showNotification();
+    alert('✓ ¡Insumos validados al 100%! El cronómetro oficial de 10 días hábiles de desarrollo ha comenzado formalmente.');
   };
 
   // Confirm payment
@@ -904,7 +1075,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
           <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
             {[
               { id: 'contrato', label: '1. Contrato & Firma Digital', icon: PenTool },
-              { id: 'onboarding', label: '2. Onboarding & Activos', icon: FileCheck2 },
+              { id: 'onboarding', label: `2. Onboarding & Insumos (${getInsumosList(activeProyecto).length})`, icon: FileCheck2 },
               { id: 'seguimiento', label: '3. Portal & Hitos de Proyecto', icon: CheckSquare },
               { id: 'pagos', label: '4. Pasarela & Anticipo', icon: CreditCard }
             ].map(tab => {
@@ -1253,27 +1424,268 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                   </div>
                 </div>
 
-                {/* Paso 2: Activos Digitales & Materiales */}
-                <div className="p-4 rounded-xl bg-[#111622] border border-slate-800 space-y-3">
-                  <h4 className="text-xs font-black uppercase text-slate-300 flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center text-[10px]">2</span>
-                    Logos, Fotos & Materiales en Google Drive
-                  </h4>
+                {/* Paso 2: Bóveda Centralizada e Insumos Recibidos en Google Drive */}
+                {(() => {
+                  const insumos = getInsumosList(activeProyecto);
+                  const clientName = activeProyecto.cliente?.empresa || activeProyecto.cliente?.nombre || 'Cliente';
+                  const cleanClientName = clientName.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
+                  const driveVault = activeProyecto.onboarding?.driveVault || activeProyecto.driveVault;
+                  const insumosFolderUrl = activeProyecto.onboarding?.enlaceDriveInsumos ||
+                    driveVault?.subfolders?.insumos?.url ||
+                    (driveVault?.vaultUrl ? `${driveVault.vaultUrl}` : `https://drive.google.com/drive/search?q=${encodeURIComponent(`title = '01_Insumos_Cliente' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`)}`);
+                  const mainVaultUrl = driveVault?.vaultUrl || activeProyecto.onboarding?.enlaceDriveArchivos || `https://drive.google.com/drive/search?q=${encodeURIComponent(`title = '📁 [Goglite] ${cleanClientName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`)}`;
 
-                  <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">Enlace a Carpeta de Google Drive / Dropbox con Logos y Fotos</label>
-                    <input
-                      type="text"
-                      value={activeProyecto.onboarding?.datos?.enlaceDriveArchivos || ''}
-                      onChange={e => handleUpdateOnboardingField('enlaceDriveArchivos', e.target.value)}
-                      placeholder="https://drive.google.com/drive/folders/..."
-                      className="w-full px-3 py-2 rounded-lg bg-[#080b11] border border-slate-800 text-xs text-white focus:outline-none focus:border-orange-500 font-mono"
-                    />
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      Sube aquí el logotipo en formato PNG sin fondo, fotos del equipo, flota de vehículos o catálogo de servicios.
-                    </p>
-                  </div>
-                </div>
+                  const is100InsumosValidados = Boolean(activeProyecto.onboarding?.insumosValidados100 || activeProyecto.onboarding?.completado);
+
+                  return (
+                    <div className="p-5 rounded-2xl bg-[#0f1523] border border-blue-500/30 space-y-4 shadow-xl">
+                      {/* Header Bóveda */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                            <FolderOpen className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] font-mono font-bold uppercase bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
+                                Bóveda Oficial Google Drive
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                Cuenta: <strong className="text-slate-200">sitesgoglite@gmail.com</strong>
+                              </span>
+                            </div>
+                            <h4 className="text-sm font-bold text-white mt-0.5">
+                              📁 [Goglite] {clientName} / 01_Insumos_Cliente
+                            </h4>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={handleSyncDriveInsumos}
+                            disabled={syncingDriveFiles}
+                            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-mono text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700"
+                            title="Consultar Google Drive y actualizar insumos"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 text-orange-400 ${syncingDriveFiles ? 'animate-spin' : ''}`} />
+                            <span>{syncingDriveFiles ? 'Sincronizando...' : 'Sincronizar Drive'}</span>
+                          </button>
+
+                          <a
+                            href={insumosFolderUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-950"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Abrir Carpeta Insumos</span>
+                          </a>
+
+                          <a
+                            href={mainVaultUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700"
+                            title="Abrir la Bóveda Principal con las 3 subcarpetas"
+                          >
+                            <Globe className="w-3.5 h-3.5 text-slate-400" />
+                            <span>Bóveda Raíz</span>
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Regla Contractual de 10 Días y Estado */}
+                      <div className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                        is100InsumosValidados
+                          ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-200'
+                          : 'bg-amber-950/20 border-amber-500/30 text-amber-200'
+                      }`}>
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                            is100InsumosValidados ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                          }`}>
+                            {is100InsumosValidados ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <div className="font-bold text-white text-xs">
+                              {is100InsumosValidados 
+                                ? '✓ 100% Insumos Validados · Plazo de 10 Días Oficial Iniciado' 
+                                : '⚖️ Esperando Recepción & Validación de Insumos (Regla 10 Días)'}
+                            </div>
+                            <div className="text-[11px] opacity-90 mt-0.5">
+                              {is100InsumosValidados 
+                                ? `Validado el ${activeProyecto.onboarding?.fechaValidacionAgencia || activeProyecto.onboarding?.fecha || 'hoy'}. El equipo de desarrollo tiene luz verde.`
+                                : `Total recibidos hasta el momento: ${insumos.length} archivo(s). El plazo de 10 días se activa al validar los insumos.`}
+                            </div>
+                          </div>
+                        </div>
+
+                        {!is100InsumosValidados && (
+                          <button
+                            type="button"
+                            onClick={handleValidateInsumosAgency}
+                            className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0 self-start sm:self-center"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Validar Insumos 100%</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Lista de Insumos Recibidos */}
+                      <div className="space-y-3 pt-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-white uppercase font-mono tracking-wider flex items-center gap-2">
+                            <span>Insumos y Archivos Guardados ({insumos.length})</span>
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            Almacenados en <strong className="text-slate-300">Google Drive · 01_Insumos_Cliente</strong>
+                          </span>
+                        </div>
+
+                        {insumos.length === 0 ? (
+                          <div className="p-6 rounded-xl bg-[#090d16] border border-dashed border-slate-800 text-center text-xs text-slate-400 space-y-2">
+                            <p className="italic">
+                              Aún no se han recibido insumos o materiales de <strong>{clientName}</strong> en el portal.
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              Cuando el cliente suba su logotipo, fotos o textos en la Fase 3 del Portal Público, aparecerán aquí automáticamente y se guardarán en Google Drive.
+                            </p>
+                            <div className="pt-1 flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                onClick={handleSyncDriveInsumos}
+                                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-orange-400 text-xs font-semibold flex items-center gap-1.5 border border-slate-700"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                                <span>Comprobar Google Drive Ahora</span>
+                              </button>
+                              <a
+                                href={insumosFolderUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                <span>Subir Manualmente a Drive</span>
+                              </a>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 gap-2.5 max-h-96 overflow-y-auto pr-1">
+                            {insumos.map((arch) => {
+                              const isLogo = (arch.categoria || '').toLowerCase().includes('logo') || (arch.nombre || '').toLowerCase().includes('logo');
+                              const isFoto = (arch.categoria || '').toLowerCase().includes('foto');
+                              const isAcceso = (arch.categoria || '').toLowerCase().includes('acceso') || (arch.categoria || '').toLowerCase().includes('dominio');
+                              const isTexto = (arch.categoria || '').toLowerCase().includes('texto') || (arch.categoria || '').toLowerCase().includes('catálogo');
+                              
+                              const catBadgeColor = isLogo ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' :
+                                isFoto ? 'bg-sky-500/15 text-sky-300 border-sky-500/30' :
+                                isAcceso ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' :
+                                isTexto ? 'bg-purple-500/15 text-purple-300 border-purple-500/30' :
+                                'bg-slate-800 text-slate-300 border-slate-700';
+
+                              return (
+                                <div
+                                  key={arch.id}
+                                  className="p-3.5 rounded-xl bg-[#121826] border border-slate-800/90 hover:border-slate-700 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-sm"
+                                >
+                                  <div className="flex items-start gap-3 min-w-0">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-800/90 border border-slate-700/80 flex items-center justify-center shrink-0 text-base">
+                                      {isLogo ? '🎨' : isFoto ? '📸' : isAcceso ? '🔑' : isTexto ? '📄' : '📁'}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${catBadgeColor}`}>
+                                          {arch.categoria || 'Insumo'}
+                                        </span>
+                                        <h5 className="font-bold text-white text-xs truncate max-w-xs sm:max-w-md">
+                                          {arch.nombre}
+                                        </h5>
+                                        {arch.tamano && (
+                                          <span className="text-[10px] text-slate-400 font-mono">
+                                            ({arch.tamano})
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <div className="text-[11px] text-slate-400 font-mono mt-1 flex items-center gap-2 flex-wrap">
+                                        <span>Recibido: <strong className="text-slate-300">{arch.fecha || 'Reciente'}</strong></span>
+                                        {arch.hora && <span>({arch.hora})</span>}
+                                        <span className="text-emerald-400 flex items-center gap-1 font-semibold">
+                                          <Check className="w-3.5 h-3.5" /> En Google Drive
+                                        </span>
+                                      </div>
+
+                                      {arch.notas && (
+                                        <div className="mt-1.5 p-2 rounded-lg bg-[#090d16] border border-slate-800/80 text-[11px] text-slate-300 leading-relaxed">
+                                          <strong className="text-slate-400 font-semibold block text-[10px] uppercase font-mono mb-0.5">Indicaciones del Cliente:</strong>
+                                          "{arch.notas}"
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                    {arch.driveUrl ? (
+                                      <a
+                                        href={arch.driveUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-3 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-white border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+                                        title="Abrir o descargar archivo en Google Drive"
+                                      >
+                                        <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
+                                        <span>Ver en Google Drive</span>
+                                      </a>
+                                    ) : (
+                                      <a
+                                        href={insumosFolderUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1 transition-colors"
+                                      >
+                                        <FolderOpen className="w-3.5 h-3.5" />
+                                        <span>Abrir Carpeta</span>
+                                      </a>
+                                    )}
+
+                                    {arch.previewUrl && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewFileModal(arch)}
+                                        className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1 transition-colors"
+                                        title="Ver vista previa de la imagen"
+                                      >
+                                        <Eye className="w-3.5 h-3.5 text-orange-400" />
+                                        <span>Vista Previa</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Enlace alternativo opcional a Google Drive / Dropbox */}
+                      <div className="pt-2 border-t border-slate-800/80">
+                        <label className="text-[11px] text-slate-400 block mb-1">
+                          Enlace Adicional de Google Drive / Dropbox / WeTransfer (Opcional):
+                        </label>
+                        <input
+                          type="text"
+                          value={activeProyecto.onboarding?.datos?.enlaceDriveArchivos || ''}
+                          onChange={e => handleUpdateOnboardingField('enlaceDriveArchivos', e.target.value)}
+                          placeholder={insumosFolderUrl}
+                          className="w-full px-3 py-2 rounded-lg bg-[#080b11] border border-slate-800 text-xs text-white focus:outline-none focus:border-orange-500 font-mono"
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Paso 3: Infraestructura & Dominio */}
                 <div className="p-4 rounded-xl bg-[#111622] border border-slate-800 space-y-3">
@@ -1429,7 +1841,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                       title="Re-evaluar eventos de cliente y tareas del sprint ahora"
                       className="px-2.5 py-1 text-[11px] font-mono text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700/60 shadow-sm"
                     >
-                      <RefreshCw className="w-3 h-3 text-orange-400" />
+                      <RefreshCw className="w-3.5 h-3.5 text-orange-400" />
                       <span>Re-evaluar Eventos</span>
                     </button>
                     <span className="text-xs font-mono text-slate-400 bg-slate-800/60 px-2.5 py-1 rounded-lg border border-slate-700">
@@ -1489,6 +1901,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                         }`}>
                           Fase {h.fase}
                         </span>
+
                         <span className="text-slate-500 text-[10px]">{h.fecha}</span>
                       </div>
                     </div>
@@ -1836,6 +2249,79 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
               >
                 Cancelar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Vista Previa de Archivo/Insumo */}
+      {previewFileModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0f1422] border border-slate-700 rounded-2xl max-w-2xl w-full p-5 space-y-4 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <span className="text-[10px] font-mono font-bold text-orange-400 uppercase tracking-wider">
+                  {previewFileModal.categoria || 'Insumo de Cliente'}
+                </span>
+                <h4 className="text-sm font-bold text-white truncate max-w-md">
+                  {previewFileModal.nombre}
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewFileModal(null)}
+                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="bg-[#070a10] rounded-xl p-4 flex items-center justify-center max-h-[60vh] overflow-auto border border-slate-800/80">
+              {previewFileModal.previewUrl ? (
+                <img
+                  src={previewFileModal.previewUrl}
+                  alt={previewFileModal.nombre}
+                  className="max-h-[50vh] max-w-full object-contain rounded-lg shadow-lg"
+                />
+              ) : (
+                <div className="text-center py-8 space-y-2">
+                  <div className="text-3xl">📁</div>
+                  <div className="text-xs text-slate-400">Este archivo se encuentra almacenado de forma segura en Google Drive.</div>
+                </div>
+              )}
+            </div>
+
+            {previewFileModal.notas && (
+              <div className="p-3 rounded-xl bg-[#0a0d16] border border-slate-800 text-xs text-slate-300">
+                <span className="text-[10px] uppercase font-mono font-bold text-slate-400 block mb-0.5">Indicaciones del Cliente:</span>
+                "{previewFileModal.notas}"
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+              <span className="text-[11px] text-slate-400 font-mono">
+                {previewFileModal.tamano || ''}
+              </span>
+              <div className="flex items-center gap-2">
+                {previewFileModal.driveUrl && (
+                  <a
+                    href={previewFileModal.driveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-sm"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Abrir en Google Drive</span>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPreviewFileModal(null)}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>
