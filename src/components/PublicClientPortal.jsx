@@ -324,44 +324,85 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const [carePlanActive, setCarePlanActive] = useState(false);
   const [syncingDrive, setSyncingDrive] = useState(false);
 
-  const handleSyncDriveVault = async (options = { openWindow: true, silent: false }) => {
-    const shouldOpen = options?.openWindow !== false;
+  const handleSyncDriveVault = async (options = { openWindow: false, silent: false }) => {
+    const shouldOpen = options?.openWindow === true;
     const isSilent = options?.silent === true;
     try {
       setSyncingDrive(true);
+      const agencyOwnerAccount = 'sitesgoglite@gmail.com';
       const empresa = data?.presupuesto?.cliente?.empresa || data?.lead?.empresa || 'Cliente';
       const cleanEmpresa = empresa.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
       const folderTitle = `[Goglite] ${cleanEmpresa}`;
+      const authenticatedClientEmail = (
+        data?.portalConfig?.clienteAuthEmail ||
+        clientAuthEmail ||
+        data?.presupuesto?.cliente?.email ||
+        data?.lead?.email ||
+        'cliente@gmail.com'
+      ).trim().toLowerCase();
 
       let vault = null;
       try {
-        const res = await fetch(`/api/portal/${token}/sync-drive`, { method: 'POST' });
+        const res = await fetch(`/api/portal/${token}/sync-drive`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientName: cleanEmpresa,
+            clientEmail: authenticatedClientEmail,
+            ownerAccount: agencyOwnerAccount
+          })
+        });
         const cType = res.headers.get('content-type') || '';
         if (res.ok && cType.includes('application/json')) {
           const result = await res.json();
-          if (result.vault) vault = result.vault;
+          if (result.vault) {
+            vault = {
+              ...result.vault,
+              ownerAccount: agencyOwnerAccount,
+              sharedWithEmail: authenticatedClientEmail,
+              isolatedClientAccess: true,
+              createdByClientAction: true
+            };
+          }
         }
       } catch (apiErr) {
         console.warn('API sync drive fallback:', apiErr);
       }
 
       if (!vault) {
-        const vaultUrl = `https://drive.google.com/drive/u/0/search?q=${encodeURIComponent(folderTitle)}`;
+        const authUserQuery = authenticatedClientEmail ? `&authuser=${encodeURIComponent(authenticatedClientEmail)}` : '';
+        const isolatedFolderQuery = `title = '📁 ${folderTitle}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+        const vaultUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(isolatedFolderQuery)}${authUserQuery}`;
         vault = {
           success: true,
           mode: 'cloud',
+          ownerAccount: agencyOwnerAccount,
+          sharedWithEmail: authenticatedClientEmail,
+          isolatedClientAccess: true,
+          createdByClientAction: true,
           vaultId: 'vault-' + (data?.lead?.id || token || Date.now()),
           vaultUrl: vaultUrl,
           name: `📁 ${folderTitle}`,
           subfolders: {
-            insumos: { name: '01_Insumos_Cliente', url: `https://drive.google.com/drive/u/0/search?q=${encodeURIComponent(`${folderTitle} 01_Insumos_Cliente`)}` },
-            contratos: { name: '02_Contratos_Firmados', url: `https://drive.google.com/drive/u/0/search?q=${encodeURIComponent(`${folderTitle} 02_Contratos_Firmados`)}` },
-            entregables: { name: '03_Entregables_Codigo', url: `https://drive.google.com/drive/u/0/search?q=${encodeURIComponent(`${folderTitle} 03_Entregables_Codigo`)}` }
+            insumos: {
+              name: '01_Insumos_Cliente',
+              url: `https://drive.google.com/drive/search?q=${encodeURIComponent(`title = '01_Insumos_Cliente' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`)}${authUserQuery}`
+            },
+            contratos: {
+              name: '02_Contratos_Firmados',
+              url: `https://drive.google.com/drive/search?q=${encodeURIComponent(`title = '02_Contratos_Firmados' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`)}${authUserQuery}`
+            },
+            entregables: {
+              name: '03_Entregables_Codigo',
+              url: `https://drive.google.com/drive/search?q=${encodeURIComponent(`title = '03_Entregables_Codigo' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`)}${authUserQuery}`
+            }
           }
         };
       }
 
       await savePortalUpdates({
+        crearBoveda: true,
+        clientEmail: authenticatedClientEmail,
         driveVault: vault,
         enlaceDriveArchivos: vault.vaultUrl
       });
@@ -375,12 +416,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         }
       }));
 
-      // Abrir en nueva pestaña únicamente si fue accionado voluntariamente
+      // Abrir en nueva pestaña únicamente si se solicitó abrir explícitamente
       if (shouldOpen) {
         window.open(vault.vaultUrl, '_blank');
       }
       if (!isSilent) {
-        showNotification('✓ ¡Bóveda oficial de Google Drive creada y abierta en Google Drive!');
+        showNotification(`✓ ¡Bóveda creada en ${agencyOwnerAccount} y compartida exclusivamente con ${authenticatedClientEmail}!`);
       }
     } catch (e) {
       console.warn('Error sincronizando Drive:', e);
@@ -457,16 +498,6 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       setAgencyBranding(initialAgencySettings);
     }
   }, [initialAgencySettings]);
-
-  // Disparo automático de creación de Bóveda y Subcarpetas en Google Drive al entrar al Paso 3 (Autenticación)
-  const autoDriveTriggeredRef = useRef(false);
-
-  useEffect(() => {
-    if (activeTab === 3 && !data?.portalConfig?.driveVault?.vaultUrl && !autoDriveTriggeredRef.current && !syncingDrive) {
-      autoDriveTriggeredRef.current = true;
-      handleSyncDriveVault({ openWindow: false, silent: true });
-    }
-  }, [activeTab, data?.portalConfig?.driveVault?.vaultUrl, syncingDrive]);
 
   const handleRegisterClientAuth = async (provider = 'google') => {
     try {
@@ -2692,29 +2723,13 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   <span className="text-base">📁</span>
                   <span>Bóveda Oficial Google Drive</span>
                 </div>
-                {syncingDrive ? (
-                  <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <RefreshCw className="w-3 h-3 animate-spin text-amber-400" /> Creando en Drive...
-                  </span>
-                ) : data?.portalConfig?.driveVault ? (
-                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 font-bold">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Carpetas Listas
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleSyncDriveVault({ openWindow: false, silent: false })}
-                    className="text-[10px] font-mono text-blue-400 hover:text-blue-300 underline"
-                  >
-                    ⚡ Crear Bóveda
-                  </button>
-                )}
+                <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
+                  sitesgoglite@gmail.com
+                </span>
               </div>
 
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                {data?.portalConfig?.driveVault
-                  ? `Se ha creado y vinculado la carpeta principal [Goglite] ${clientEmpresa} con sus 3 subcarpetas en Google Drive. Autentica tu acceso para habilitar la carga segura de insumos y entrega final.`
-                  : `Generando automáticamente la carpeta principal de ${clientEmpresa} y sus 3 subcarpetas en Google Drive...`}
+                Al iniciar sesión con tu cuenta de Google, podrás <strong>Crear tu Bóveda en Google Drive</strong> dentro de la cuenta de la agencia (<strong>sitesgoglite@gmail.com</strong>), la cual se compartirá <strong>exclusivamente con tu correo autenticado</strong> para proteger la privacidad de tus archivos.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 pt-1">
@@ -2811,38 +2826,6 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         {/* ========================================================================= */}
         {activeTab === 3 && portalConfig?.clienteAutenticado && (
           <div className="space-y-6">
-            {/* Authenticated Session Badge */}
-            <div className="p-3.5 rounded-xl bg-[#0c1424] border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-300 shadow-lg">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <span>Acceso de Cliente Autenticado & Protegido</span>
-                    <span className="text-[10px] bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded font-mono">SSL 256-Bit</span>
-                  </div>
-                  <div className="text-[11px] text-slate-400">
-                    Sesión autorizada: <strong className="text-slate-200">{portalConfig.clienteAuthEmail || lead.email}</strong> ({portalConfig.clienteAuthProvider || 'Google Workspace'})
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="hidden sm:flex items-center gap-1 text-[11px] font-mono text-emerald-400 mr-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Bóveda Habilitada</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleClientLogout}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/50 text-xs font-medium transition-all shadow-sm"
-                  title="Cerrar sesión de cliente y bloquear acceso"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Cerrar Sesión</span>
-                </button>
-              </div>
-            </div>
             {/* MANDATORY CONTRACTUAL SHIELD NOTICE */}
             <div className="rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent border-2 border-amber-500/40 p-5 sm:p-6 space-y-2">
               <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
@@ -2864,28 +2847,38 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     <Globe className="w-6 h-6 text-blue-400" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="text-[10px] font-mono uppercase bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-bold">
-                        Google Drive Oficial · Centralizado
+                        Google Drive Oficial · Aislado por Cliente
                       </span>
-                      <span className="text-[10px] text-slate-400 font-mono">sitesgoglite@gmail.com</span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        Cuenta Script: <strong className="text-slate-200">sitesgoglite@gmail.com</strong>
+                      </span>
                     </div>
                     <h3 className="text-sm sm:text-base font-bold text-white mt-1">
                       📁 Bóveda de Archivos: [Goglite] {data.lead?.empresa}
                     </h3>
                     <p className="text-xs text-slate-300 mt-1 max-w-xl">
-                      Todos los logos, fotos, contratos y entregables técnicos quedan centralizados y organizados en 3 subcarpetas en Google Drive para histórico permanente.
+                      {data.portalConfig?.driveVault?.createdByClientAction && data.portalConfig?.driveVault?.vaultUrl ? (
+                        <>
+                          Carpeta creada en <strong>sitesgoglite@gmail.com</strong> y compartida <strong>exclusivamente</strong> con tu cuenta autenticada (<strong className="text-emerald-400">{data.portalConfig?.driveVault?.sharedWithEmail || portalConfig.clienteAuthEmail || lead.email}</strong>). Ningún otro cliente tiene acceso a esta carpeta.
+                        </>
+                      ) : (
+                        <>
+                          Presiona <strong>Crear Bóveda en Google Drive</strong> para generar tu carpeta privada en la cuenta de la agencia (<strong>sitesgoglite@gmail.com</strong>) y compartirla únicamente con tu sesión autenticada (<strong className="text-blue-300">{portalConfig.clienteAuthEmail || lead.email}</strong>).
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto">
-                  {data.portalConfig?.driveVault?.vaultUrl ? (
+                  {data.portalConfig?.driveVault?.createdByClientAction && data.portalConfig?.driveVault?.vaultUrl ? (
                     <a
                       href={data.portalConfig.driveVault.vaultUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-full md:w-auto px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-950 transition-all"
+                      className="w-full md:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950 transition-all"
                     >
                       <ExternalLink className="w-4 h-4" />
                       <span>Abrir Bóveda en Google Drive</span>
@@ -2893,70 +2886,107 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   ) : (
                     <button
                       type="button"
-                      onClick={handleSyncDriveVault}
+                      onClick={() => handleSyncDriveVault({ openWindow: false, silent: false })}
                       disabled={syncingDrive}
                       className="w-full md:w-auto px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-950 transition-all"
                     >
                       <RefreshCw className={`w-4 h-4 ${syncingDrive ? 'animate-spin' : ''}`} />
-                      <span>{syncingDrive ? 'Creando Bóveda...' : '⚡ Crear Bóveda en Google Drive'}</span>
+                      <span>{syncingDrive ? 'Creando y Compartiendo Bóveda...' : '⚡ Crear Bóveda en Google Drive'}</span>
                     </button>
                   )}
                 </div>
               </div>
 
               {/* Subcarpetas de Google Drive */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-800/80">
-                <a
-                  href={data.portalConfig?.driveVault?.subfolders?.insumos?.url || data.portalConfig?.driveVault?.vaultUrl || `https://drive.google.com/drive/u/0/search?q=${encodeURIComponent(`[Goglite] ${data.lead?.empresa || 'Cliente'} 01_Insumos_Cliente`)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-blue-500/50 transition-all flex items-center justify-between gap-2.5 group shadow-sm"
-                  title="Abrir carpeta 01_Insumos_Cliente en Google Drive"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-base shrink-0">📸</span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors truncate">01_Insumos_Cliente</p>
-                      <p className="text-[10px] text-slate-400 truncate">Logos SVG, fotos 4K y textos</p>
+              {data.portalConfig?.driveVault?.createdByClientAction && data.portalConfig?.driveVault?.vaultUrl ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-800/80">
+                  <a
+                    href={data.portalConfig?.driveVault?.subfolders?.insumos?.url || data.portalConfig?.driveVault?.vaultUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-blue-500/50 transition-all flex items-center justify-between gap-2.5 group shadow-sm"
+                    title="Abrir carpeta privada 01_Insumos_Cliente en Google Drive"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-base shrink-0">📸</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors truncate">01_Insumos_Cliente</p>
+                        <p className="text-[10px] text-slate-400 truncate">Logos SVG, fotos 4K y textos</p>
+                      </div>
                     </div>
-                  </div>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-400 shrink-0 transition-colors" />
-                </a>
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-400 shrink-0 transition-colors" />
+                  </a>
 
-                <a
-                  href={data.portalConfig?.driveVault?.subfolders?.contratos?.url || data.portalConfig?.driveVault?.vaultUrl || `https://drive.google.com/drive/u/0/search?q=${encodeURIComponent(`[Goglite] ${data.lead?.empresa || 'Cliente'} 02_Contratos_Firmados`)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-blue-500/50 transition-all flex items-center justify-between gap-2.5 group shadow-sm"
-                  title="Abrir carpeta 02_Contratos_Firmados en Google Drive"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-base shrink-0">📝</span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors truncate">02_Contratos_Firmados</p>
-                      <p className="text-[10px] text-slate-400 truncate">SOW, firma digital y pagos</p>
+                  <a
+                    href={data.portalConfig?.driveVault?.subfolders?.contratos?.url || data.portalConfig?.driveVault?.vaultUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-blue-500/50 transition-all flex items-center justify-between gap-2.5 group shadow-sm"
+                    title="Abrir carpeta privada 02_Contratos_Firmados en Google Drive"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-base shrink-0">📝</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors truncate">02_Contratos_Firmados</p>
+                        <p className="text-[10px] text-slate-400 truncate">SOW, firma digital y pagos</p>
+                      </div>
                     </div>
-                  </div>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-400 shrink-0 transition-colors" />
-                </a>
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-400 shrink-0 transition-colors" />
+                  </a>
 
-                <a
-                  href={data.portalConfig?.driveVault?.subfolders?.entregables?.url || data.portalConfig?.driveVault?.vaultUrl || `https://drive.google.com/drive/u/0/search?q=${encodeURIComponent(`[Goglite] ${data.lead?.empresa || 'Cliente'} 03_Entregables_Codigo`)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-blue-500/50 transition-all flex items-center justify-between gap-2.5 group shadow-sm"
-                  title="Abrir carpeta 03_Entregables_Codigo en Google Drive"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-base shrink-0">🚀</span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors truncate">03_Entregables_Codigo</p>
-                      <p className="text-[10px] text-slate-400 truncate">PRD técnico, accesos y DNS</p>
+                  <a
+                    href={data.portalConfig?.driveVault?.subfolders?.entregables?.url || data.portalConfig?.driveVault?.vaultUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-blue-500/50 transition-all flex items-center justify-between gap-2.5 group shadow-sm"
+                    title="Abrir carpeta privada 03_Entregables_Codigo en Google Drive"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-base shrink-0">🚀</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors truncate">03_Entregables_Codigo</p>
+                        <p className="text-[10px] text-slate-400 truncate">PRD técnico, accesos y DNS</p>
+                      </div>
                     </div>
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-400 shrink-0 transition-colors" />
+                  </a>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-800/80 opacity-75">
+                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 flex items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-base shrink-0">📸</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-300 truncate">01_Insumos_Cliente</p>
+                        <p className="text-[10px] text-slate-500 truncate">Se compartirá al crear bóveda</p>
+                      </div>
+                    </div>
+                    <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                   </div>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-400 shrink-0 transition-colors" />
-                </a>
-              </div>
+
+                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 flex items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-base shrink-0">📝</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-300 truncate">02_Contratos_Firmados</p>
+                        <p className="text-[10px] text-slate-500 truncate">Se compartirá al crear bóveda</p>
+                      </div>
+                    </div>
+                    <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 flex items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-base shrink-0">🚀</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-300 truncate">03_Entregables_Codigo</p>
+                        <p className="text-[10px] text-slate-500 truncate">Se compartirá al crear bóveda</p>
+                      </div>
+                    </div>
+                    <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

@@ -1298,21 +1298,22 @@ app.post('/api/portal/:token/update', async (req, res) => {
 
   let extraConfig = {};
 
-  // Auto-creación de Bóveda centralizada en Google Drive al aprobar propuesta, firmar contrato, o entrar a Fase 3
-  if ((req.body.fase1Aprobada || req.body.fase2Firmada || req.body.crearBoveda || req.body.fase3Iniciada || (req.body.faseActual && req.body.faseActual >= 3)) && !lead.portalConfig?.driveVault?.vaultId) {
+  // Creación explícita de Bóveda centralizada en Google Drive (sitesgoglite@gmail.com) compartida con el correo autenticado del cliente
+  if (req.body.crearBoveda) {
     try {
-      console.log(`[DRIVE AUTO-SYNC] Creando bóveda centralizada para cliente: ${lead.empresa}`);
-      const vault = await createClientVault(lead.empresa, lead.email, lead.id);
+      const targetEmail = req.body.clientEmail || req.body.clienteAuthEmail || lead.portalConfig?.clienteAuthEmail || lead.email || '';
+      console.log(`[DRIVE VAULT] Creando bóveda en sitesgoglite@gmail.com para ${lead.empresa} compartida con ${targetEmail}`);
+      const vault = await createClientVault(lead.empresa, targetEmail, lead.id);
       if (vault) {
         extraConfig.driveVault = vault;
         extraConfig.enlaceDriveArchivos = vault.vaultUrl;
       }
     } catch (e) {
-      console.warn('[DRIVE AUTO-SYNC] Error creando bóveda en Drive:', e.message);
+      console.warn('[DRIVE VAULT] Error creando bóveda en Drive:', e.message);
     }
   }
 
-  // Si se firma contrato, archivar acta en subcarpeta 02_Contratos_Firmados de Google Drive
+  // Si se firma contrato y ya existe la bóveda, archivar acta en subcarpeta 02_Contratos_Firmados de Google Drive
   const currentVault = extraConfig.driveVault || lead.portalConfig?.driveVault;
   if (req.body.fase2Firmada && currentVault?.subfolders?.contratos?.id) {
     try {
@@ -1335,14 +1336,16 @@ app.post('/api/portal/:token/update', async (req, res) => {
   });
 });
 
-// Endpoint para forzar creación o sincronización de Bóveda en Google Drive para un portal
+// Endpoint para crear y compartir la Bóveda en Google Drive con la cuenta autenticada del cliente
 app.post('/api/portal/:token/sync-drive', async (req, res) => {
   const { token } = req.params;
   const lead = getCrmLeadByToken(token);
   if (!lead) return res.status(404).json({ error: 'Portal no encontrado' });
 
   try {
-    const vault = await createClientVault(lead.empresa, lead.email, lead.id);
+    const clientName = req.body?.clientName || lead.empresa;
+    const clientEmail = req.body?.clientEmail || lead.portalConfig?.clienteAuthEmail || lead.email || '';
+    const vault = await createClientVault(clientName, clientEmail, lead.id);
     const updated = updateClientPortalConfig(token, {
       driveVault: vault,
       enlaceDriveArchivos: vault.vaultUrl

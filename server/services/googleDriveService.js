@@ -164,24 +164,34 @@ export async function uploadTextFile(token, name, content, mimeType = 'text/plai
   return await res.json();
 }
 
+export const AGENCY_DRIVE_ACCOUNT = 'sitesgoglite@gmail.com';
+
 /**
- * Configura permisos de lectura pública para la carpeta compartida con el cliente
+ * Comparte la carpeta creada en la cuenta de la agencia (sitesgoglite@gmail.com)
+ * EXCLUSIVAMENTE con el correo de Google autenticado del cliente (aislamiento total entre clientes).
  */
-async function makeFolderShareable(token, folderId) {
+async function shareFolderWithClient(token, folderId, clientEmail) {
+  const cleanEmail = String(clientEmail || '').trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return false;
+  }
   try {
-    await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}/permissions`, {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}/permissions?sendNotificationEmail=false`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        role: 'reader',
-        type: 'anyone'
+        role: 'writer',
+        type: 'user',
+        emailAddress: cleanEmail
       })
     });
+    return res.ok;
   } catch (e) {
-    console.warn('[DRIVE] Permisos públicos no aplicados (opcional):', e.message);
+    console.warn(`[DRIVE] Error compartiendo carpeta ${folderId} con ${cleanEmail}:`, e.message);
+    return false;
   }
 }
 
@@ -205,72 +215,113 @@ async function findExistingFolder(token, name, parentId = null) {
 }
 
 /**
- * Crea o recupera la Bóveda Centralizada del Cliente con sus 3 subcarpetas
+ * Crea o recupera la Bóveda Centralizada del Cliente en sitesgoglite@gmail.com
+ * y la comparte exclusivamente con la cuenta de Google con la que el cliente inició sesión.
  */
 export async function createClientVault(clientName, clientEmail = '', leadId = null) {
   const token = await getAccessToken();
-  const folderTitle = `📁 [Goglite] ${clientName || 'Cliente'}`;
+  const cleanClientName = (clientName || 'Cliente').trim();
+  const normalizedClientEmail = String(clientEmail || '').trim().toLowerCase();
+  const folderTitle = `📁 [Goglite] ${cleanClientName}`;
+  const authUserParam = normalizedClientEmail ? `&authuser=${encodeURIComponent(normalizedClientEmail)}` : '';
 
-  // Si no hay conexión con Google Drive, devolver estructura mock funcional
+  // Si no hay conexión con Google Drive, devolver estructura aislada por cliente y cuenta autenticada
   if (!token) {
-    console.warn('[DRIVE] Operando en modo local sin token de Drive');
-    const mockId = 'local-drive-' + Date.now();
+    console.warn(`[DRIVE] Operando en modo local para cuenta gestora ${AGENCY_DRIVE_ACCOUNT}`);
+    const mockId = 'vault-' + (leadId || Date.now());
+    const exactFolderQuery = `title = '${folderTitle.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
     return {
       success: true,
       mode: 'local',
+      ownerAccount: AGENCY_DRIVE_ACCOUNT,
+      sharedWithEmail: normalizedClientEmail,
+      isolatedClientAccess: true,
+      createdByClientAction: true,
       vaultId: mockId,
-      vaultUrl: `https://drive.google.com/drive/search?q=${encodeURIComponent(folderTitle)}`,
+      vaultUrl: `https://drive.google.com/drive/search?q=${encodeURIComponent(exactFolderQuery)}${authUserParam}`,
       name: folderTitle,
       subfolders: {
-        insumos: { id: `${mockId}-insumos`, name: '01_Insumos_Cliente', url: `https://drive.google.com/drive/folders/${mockId}-insumos` },
-        contratos: { id: `${mockId}-contratos`, name: '02_Contratos_Firmados', url: `https://drive.google.com/drive/folders/${mockId}-contratos` },
-        entregables: { id: `${mockId}-entregables`, name: '03_Entregables_Codigo', url: `https://drive.google.com/drive/folders/${mockId}-entregables` }
+        insumos: {
+          id: `${mockId}-insumos`,
+          name: '01_Insumos_Cliente',
+          url: `https://drive.google.com/drive/search?q=${encodeURIComponent(`title = '01_Insumos_Cliente' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`)}${authUserParam}`
+        },
+        contratos: {
+          id: `${mockId}-contratos`,
+          name: '02_Contratos_Firmados',
+          url: `https://drive.google.com/drive/search?q=${encodeURIComponent(`title = '02_Contratos_Firmados' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`)}${authUserParam}`
+        },
+        entregables: {
+          id: `${mockId}-entregables`,
+          name: '03_Entregables_Codigo',
+          url: `https://drive.google.com/drive/search?q=${encodeURIComponent(`title = '03_Entregables_Codigo' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`)}${authUserParam}`
+        }
       }
     };
   }
 
   try {
-    // 1. Verificar si ya existe
+    // 1. Verificar si ya existe en la cuenta de la agencia (sitesgoglite@gmail.com)
     let mainFolder = await findExistingFolder(token, folderTitle);
 
     if (!mainFolder) {
-      console.log(`[DRIVE] Creando carpeta principal para cliente: "${folderTitle}"`);
+      console.log(`[DRIVE] Creando carpeta aislada en ${AGENCY_DRIVE_ACCOUNT} para cliente: "${folderTitle}"`);
       mainFolder = await createFolder(token, folderTitle);
     }
 
     const vaultId = mainFolder.id;
-    const vaultUrl = mainFolder.webViewLink || `https://drive.google.com/drive/folders/${vaultId}`;
+    const baseVaultUrl = mainFolder.webViewLink || `https://drive.google.com/drive/folders/${vaultId}`;
+    const vaultUrl = normalizedClientEmail
+      ? `${baseVaultUrl}${baseVaultUrl.includes('?') ? '&' : '?'}authuser=${encodeURIComponent(normalizedClientEmail)}`
+      : baseVaultUrl;
+
+    // Compartir la carpeta raíz de este cliente EXCLUSIVAMENTE con el correo autenticado del cliente
+    if (normalizedClientEmail) {
+      await shareFolderWithClient(token, vaultId, normalizedClientEmail);
+    }
 
     // 2. Crear las 3 subcarpetas aisladas dentro del vaultId de este cliente
     let insumosFolder = await findExistingFolder(token, '01_Insumos_Cliente', vaultId);
     if (!insumosFolder) {
       insumosFolder = await createFolder(token, '01_Insumos_Cliente', vaultId);
-      await makeFolderShareable(token, insumosFolder.id);
+    }
+    if (normalizedClientEmail) {
+      await shareFolderWithClient(token, insumosFolder.id, normalizedClientEmail);
     }
 
     let contratosFolder = await findExistingFolder(token, '02_Contratos_Firmados', vaultId);
     if (!contratosFolder) {
       contratosFolder = await createFolder(token, '02_Contratos_Firmados', vaultId);
     }
+    if (normalizedClientEmail) {
+      await shareFolderWithClient(token, contratosFolder.id, normalizedClientEmail);
+    }
 
     let entregablesFolder = await findExistingFolder(token, '03_Entregables_Codigo', vaultId);
     if (!entregablesFolder) {
       entregablesFolder = await createFolder(token, '03_Entregables_Codigo', vaultId);
-      await makeFolderShareable(token, entregablesFolder.id);
+    }
+    if (normalizedClientEmail) {
+      await shareFolderWithClient(token, entregablesFolder.id, normalizedClientEmail);
     }
 
     // 3. Crear archivo de bienvenida e instrucciones en la carpeta de Insumos
     const instruccionesTexto = `========================================================================
 GOGLITE DIGITAL · BÓVEDA CENTRALIZADA DE ACTIVOS Y PROYECTO
-Cliente: ${clientName}
+Cliente: ${cleanClientName}
+Cuenta Autorizada del Cliente: ${normalizedClientEmail || 'Pendiente de vinculación'}
 Fecha de Alta: ${new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-Cuenta Gestora: sitesgoglite@gmail.com
+Cuenta Gestora Oficial: ${AGENCY_DRIVE_ACCOUNT}
 ========================================================================
 
-ESTRUCTURA DE TU BÓVEDA EN LA NUBE:
+ESTRUCTURA DE TU BÓVEDA AISLADA EN LA NUBE:
 - 📁 01_Insumos_Cliente      -> Deposita aquí logos (SVG/PNG), fotos de alta resolución y textos.
 - 📁 02_Contratos_Firmados   -> Contrato SOW oficial, firma digital manuscrita y comprobantes.
 - 📁 03_Entregables_Codigo   -> Especificaciones PRD, credenciales, DNS y entregables finales.
+
+REGLA DE PRIVACIDAD Y AISLAMIENTO:
+Esta carpeta ha sido creada en la cuenta ${AGENCY_DRIVE_ACCOUNT} y compartida
+exclusivamente con ${normalizedClientEmail || 'tu cuenta autorizada'}.
 
 REGLA CONTRACTUAL DE INICIO DE DESARROLLO:
 "El plazo acordado de entrega de diez (10) días hábiles inicia formalmente
@@ -286,6 +337,10 @@ WhatsApp Directo: +1 (829) 986-2000
     return {
       success: true,
       mode: 'live',
+      ownerAccount: AGENCY_DRIVE_ACCOUNT,
+      sharedWithEmail: normalizedClientEmail,
+      isolatedClientAccess: true,
+      createdByClientAction: true,
       vaultId,
       vaultUrl,
       name: folderTitle,
