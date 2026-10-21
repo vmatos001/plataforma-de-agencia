@@ -1454,8 +1454,10 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   }
 
   const { lead, portalConfig, presupuesto } = data;
-  const currentPais = presupuesto?.pais || lead.pais || 'SV';
+  const rawUbicacion = (presupuesto?.cliente?.ubicacion || data.proyecto?.cliente?.ubicacion || lead.ubicacion || '').toLowerCase();
+  const currentPais = (presupuesto?.pais === 'DO' || data.proyecto?.pais === 'DO' || lead.pais === 'DO' || rawUbicacion.includes('dominicana') || rawUbicacion.includes('santo domingo')) ? 'DO' : 'SV';
   const isSV = currentPais === 'SV';
+  const activeBankTab = selectedBankTab === 'US' ? 'US' : currentPais;
   const totalInversion = Number(presupuesto?.inversion?.precioTotal || lead.presupuestoMonto) || 650;
   const anticipoMonto = Number(presupuesto?.inversion?.anticipo) || Math.round(totalInversion * 0.5);
   const liquidacionMonto = Number(presupuesto?.inversion?.contraEntrega) || (totalInversion - anticipoMonto);
@@ -2406,34 +2408,37 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       Datos de Pago Oficiales
                     </span>
                     <h2 className="text-lg font-bold text-white">Anticipo del 50%: ${anticipoMonto} USD</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">Selecciona tu país para visualizar las cuentas bancarias oficiales:</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Selecciona tu método de transferencia local o internacional (USD):</p>
                   </div>
 
-                  {/* Bank Country Selector */}
+                  {/* Bank Country Selector (Solo país del cliente + uglyCash / USA) */}
                   <div className="flex rounded-xl bg-[#141b2b] p-1 border border-slate-800">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedBankTab('SV')}
-                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                        selectedBankTab === 'SV' ? 'bg-orange-600 text-white shadow' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      🇸🇻 El Salvador
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedBankTab('DO')}
-                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                        selectedBankTab === 'DO' ? 'bg-orange-600 text-white shadow' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      🇩🇴 Rep. Dominicana
-                    </button>
+                    {isSV ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBankTab('SV')}
+                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                          activeBankTab === 'SV' ? 'bg-orange-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        🇸🇻 El Salvador
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBankTab('DO')}
+                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                          activeBankTab === 'DO' ? 'bg-orange-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        🇩🇴 Rep. Dominicana
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setSelectedBankTab('US')}
                       className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                        selectedBankTab === 'US' ? 'bg-orange-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                        activeBankTab === 'US' ? 'bg-orange-600 text-white shadow' : 'text-slate-400 hover:text-white'
                       }`}
                     >
                       🇺🇸 uglyCash / USA
@@ -2442,7 +2447,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
                   {/* Bank Details Card */}
                   <div className="p-4 rounded-xl bg-[#141b2a] border border-slate-700/80 space-y-3 font-mono text-xs">
-                    {selectedBankTab === 'SV' && (
+                    {activeBankTab === 'SV' && isSV && (
                       <div className="space-y-2">
                         <div className="text-emerald-400 font-bold flex items-center justify-between">
                           <span>Banco Agrícola El Salvador</span>
@@ -2462,7 +2467,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       </div>
                     )}
 
-                    {selectedBankTab === 'DO' && (
+                    {activeBankTab === 'DO' && !isSV && (
                       <div className="space-y-2">
                         <div className="text-emerald-400 font-bold flex items-center justify-between">
                           <span>Banreservas / Banco BHD</span>
@@ -2482,7 +2487,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       </div>
                     )}
 
-                    {selectedBankTab === 'US' && (
+                    {activeBankTab === 'US' && (
                       <div className="space-y-2">
                         <div className="text-emerald-400 font-bold flex items-center justify-between">
                           <span>uglyCash / ACH Internacional</span>
@@ -2577,7 +2582,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                             Subir captura o imagen del comprobante bancario
                           </div>
                           <p className="text-[10px] text-slate-400 max-w-xs">
-                            Adjunta la captura generada por tu app bancaria (Transfer365, ACH, Banreservas, Banco Agrícola o uglyCash)
+                            {isSV
+                              ? 'Adjunta la captura generada por tu app bancaria (Banco Agrícola, Transfer365 o uglyCash)'
+                              : 'Adjunta la captura generada por tu app bancaria (Banreservas, Banco BHD, ACH o uglyCash)'}
                           </p>
                           <span className="mt-1 px-3 py-1 rounded-lg bg-orange-600/20 border border-orange-500/30 text-orange-300 text-[11px] font-mono font-bold">
                             Seleccionar Imagen / Captura
@@ -2595,7 +2602,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                         value={advanceReceiptRef}
                         onChange={(e) => setAdvanceReceiptRef(e.target.value)}
                         disabled={portalConfig?.fase2Firmada}
-                        placeholder="Ej. Transferencia #982143 o Ref. Banco Agrícola"
+                        placeholder={isSV ? 'Ej. Transferencia #982143 (Banco Agrícola / uglyCash)' : 'Ej. Transferencia #982143 (Banreservas / uglyCash)'}
                         className="w-full bg-[#141b2b] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 disabled:opacity-60"
                       />
                     </div>
