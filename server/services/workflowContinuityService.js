@@ -633,13 +633,21 @@ export function applyPortalUpdateToWorkflow(token, updates = {}) {
   const todayFormatted = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
   const todayIso = new Date().toISOString().split('T')[0];
 
-  // 1. Si el cliente aprueba la propuesta en Fase 1 del Portal -> Marcar presupuesto 'aceptado'
-  if (updates.fase1Aprobada && presupuesto) {
+  // 1. Si el cliente abre el enlace o aprueba la propuesta en Fase 1 del Portal -> Actualizar estado del presupuesto
+  if (presupuesto) {
     const pIdx = presupuestos.findIndex(p => p.id === presupuesto.id);
     if (pIdx !== -1) {
-      presupuestos[pIdx].estado = 'aceptado';
-      savePresupuestos(presupuestos);
-      presupuesto = presupuestos[pIdx];
+      if (updates.fase1Aprobada) {
+        presupuestos[pIdx].estado = 'aceptado';
+        savePresupuestos(presupuestos);
+        presupuesto = presupuestos[pIdx];
+      } else if (updates.propuestaVista && ['borrador', 'sin_abrir', 'enviado'].includes(presupuestos[pIdx].estado)) {
+        presupuestos[pIdx].estado = 'visto';
+        presupuestos[pIdx].abiertoEn = presupuestos[pIdx].abiertoEn || new Date().toISOString();
+        presupuestos[pIdx].vecesAbierto = (Number(presupuestos[pIdx].vecesAbierto) || 0) + 1;
+        savePresupuestos(presupuestos);
+        presupuesto = presupuestos[pIdx];
+      }
     }
   }
 

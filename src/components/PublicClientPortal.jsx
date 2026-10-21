@@ -501,14 +501,25 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 proyecto: matchedProj
               };
 
-              // Guardar en cache local para persistencia en recargas
+              // Guardar en cache local respetando estados avanzados ('aceptado' / 'rechazado') y marcando apertura ('visto')
               try {
                 const rawP = localStorage.getItem('goglite_presupuestos');
                 let curP = rawP ? JSON.parse(rawP) : [];
                 const existIdx = curP.findIndex(p => p.id === parsedProp.id || p.codigo === parsedProp.codigo);
                 if (existIdx !== -1) {
-                  curP[existIdx] = { ...curP[existIdx], ...parsedProp };
+                  const prevEstado = curP[existIdx].estado;
+                  const finalEstado = (prevEstado === 'aceptado' || prevEstado === 'rechazado') ? prevEstado : 'visto';
+                  curP[existIdx] = {
+                    ...curP[existIdx],
+                    ...parsedProp,
+                    estado: finalEstado,
+                    abiertoEn: curP[existIdx].abiertoEn || new Date().toISOString()
+                  };
+                  parsedProp.estado = finalEstado;
                 } else {
+                  const finalEstado = (parsedProp.estado === 'aceptado' || parsedProp.estado === 'rechazado') ? parsedProp.estado : 'visto';
+                  parsedProp.estado = finalEstado;
+                  parsedProp.abiertoEn = new Date().toISOString();
                   curP.push(parsedProp);
                 }
                 localStorage.setItem('goglite_presupuestos', JSON.stringify(curP));
@@ -732,6 +743,85 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         }
       } catch (projSyncErr) {
         console.warn('[Portal] Error sincronizando con proyectos:', projSyncErr);
+      }
+
+      // 6. Marcar dinámicamente la propuesta como 'visto' (Abierto por el cliente) al abrir el enlace del portal
+      try {
+        const currentProp = loadedData?.presupuesto;
+        const isAlreadyFinal = currentProp?.estado === 'aceptado' || currentProp?.estado === 'rechazado' || loadedData?.portalConfig?.fase1Aprobada;
+        const resolvedStatus = loadedData?.portalConfig?.fase1Aprobada ? 'aceptado' : (isAlreadyFinal ? currentProp.estado : 'visto');
+
+        if (currentProp) {
+          currentProp.estado = resolvedStatus;
+          if (!currentProp.abiertoEn) currentProp.abiertoEn = new Date().toISOString();
+        }
+
+        if (typeof window !== 'undefined') {
+          const rawP = localStorage.getItem('goglite_presupuestos');
+          if (rawP) {
+            const listP = JSON.parse(rawP);
+            const targetEmp = (loadedData?.lead?.empresa || currentProp?.cliente?.empresa || '').toLowerCase().trim();
+            let pChanged = false;
+            const nextListP = listP.map(p => {
+              const pEmp = (p.cliente?.empresa || '').toLowerCase().trim();
+              const isMatch = (currentProp?.id && p.id === currentProp.id) ||
+                              (currentProp?.codigo && p.codigo === currentProp.codigo) ||
+                              (token && p.portalToken === token) ||
+                              (targetEmp && pEmp === targetEmp);
+              if (isMatch) {
+                const nextEst = (p.estado === 'aceptado' || p.estado === 'rechazado') ? p.estado : resolvedStatus;
+                if (p.estado !== nextEst) {
+                  pChanged = true;
+                  return {
+                    ...p,
+                    estado: nextEst,
+                    abiertoEn: p.abiertoEn || new Date().toISOString(),
+                    vecesAbierto: (Number(p.vecesAbierto) || 0) + 1
+                  };
+                }
+              }
+              return p;
+            });
+
+            if (pChanged) {
+              localStorage.setItem('goglite_presupuestos', JSON.stringify(nextListP));
+              window.dispatchEvent(new Event('storage'));
+              window.dispatchEvent(new CustomEvent('goglite_presupuestos_updated'));
+            }
+          }
+
+          // Sincronizar también en CRM Leads
+          const crmLeads = getStoredCrmLeads();
+          const targetEmp = (loadedData?.lead?.empresa || currentProp?.cliente?.empresa || '').toLowerCase().trim();
+          let crmChanged = false;
+          const nextCrm = crmLeads.map(cl => {
+            const clEmp = (cl.empresa || '').toLowerCase().trim();
+            if (cl.portalToken === token || (loadedData?.lead?.id && cl.id === loadedData.lead.id) || (targetEmp && clEmp === targetEmp)) {
+              const nextEst = (cl.presupuestoEstado === 'aceptado') ? 'aceptado' : resolvedStatus;
+              if (cl.presupuestoEstado !== nextEst) {
+                crmChanged = true;
+                return { ...cl, presupuestoEstado: nextEst };
+              }
+            }
+            return cl;
+          });
+          if (crmChanged) {
+            saveStoredCrmLeads(nextCrm);
+          }
+        }
+
+        // Notificar al backend en segundo plano que el cliente abrió el enlace
+        fetch(`/api/portal/${token}/update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            propuestaVista: true,
+            estadoPropuesta: resolvedStatus,
+            abiertoEn: new Date().toISOString()
+          })
+        }).catch(() => {});
+      } catch (openTrackErr) {
+        console.warn('[Portal] Error registrando apertura de propuesta:', openTrackErr);
       }
 
       setData(loadedData);

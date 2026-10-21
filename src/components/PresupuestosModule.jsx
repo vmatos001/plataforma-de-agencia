@@ -149,21 +149,22 @@ export default function PresupuestosModule({
     return endpoint;
   };
 
-  // Deduplica presupuestos para evitar múltiples cotizaciones para el mismo cliente/código
+  // Deduplica presupuestos y normaliza propuestas ya guardadas con estado 'borrador' hacia 'sin_abrir'
   const deduplicatePresupuestos = (list) => {
     if (!Array.isArray(list)) return [];
     const seen = new Map();
     for (const p of list) {
       const key = (p.codigo || '') + '|' + (p.cliente?.empresa || '').toLowerCase().trim();
       if (!seen.has(key)) {
-        seen.set(key, p);
+        const normalizedEstado = (!p.estado || p.estado === 'borrador') ? 'sin_abrir' : p.estado;
+        seen.set(key, { ...p, estado: normalizedEstado });
       }
     }
     return Array.from(seen.values());
   };
 
-  useEffect(() => {
-    // Cargar caché local inmediato si existe con deduplicación
+  // Sincronización dinámica en tiempo real con localStorage y Portal del Cliente
+  const syncPresupuestosFromStorage = () => {
     try {
       if (typeof window !== 'undefined') {
         const cached = localStorage.getItem('goglite_presupuestos');
@@ -172,16 +173,57 @@ export default function PresupuestosModule({
           if (Array.isArray(parsed) && parsed.length > 0) {
             const clean = deduplicatePresupuestos(parsed);
             setPresupuestos(clean);
-            if (clean.length !== parsed.length) {
-              localStorage.setItem('goglite_presupuestos', JSON.stringify(clean));
-            }
+            setActivePresupuesto(prev => {
+              if (!prev) return prev;
+              const matched = clean.find(p =>
+                (prev.id && p.id === prev.id) ||
+                (prev.codigo && p.codigo === prev.codigo) ||
+                (prev.portalToken && p.portalToken === prev.portalToken)
+              );
+              if (matched && (matched.estado !== prev.estado || matched.abiertoEn !== prev.abiertoEn)) {
+                return { ...prev, estado: matched.estado, abiertoEn: matched.abiertoEn, vecesAbierto: matched.vecesAbierto };
+              }
+              return prev;
+            });
           }
         }
       }
     } catch (e) {}
+  };
 
+  useEffect(() => {
+    syncPresupuestosFromStorage();
     fetchPresupuestos();
     fetchPlantillas();
+
+    const handleRealtimeUpdate = () => {
+      syncPresupuestosFromStorage();
+      fetchPresupuestos();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        handleRealtimeUpdate();
+      }
+    };
+
+    window.addEventListener('storage', handleRealtimeUpdate);
+    window.addEventListener('focus', handleRealtimeUpdate);
+    window.addEventListener('goglite_presupuestos_updated', handleRealtimeUpdate);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Polling ligero para detectar aperturas del enlace por parte del cliente en tiempo real
+    const pollInterval = setInterval(() => {
+      syncPresupuestosFromStorage();
+    }, 2500);
+
+    return () => {
+      window.removeEventListener('storage', handleRealtimeUpdate);
+      window.removeEventListener('focus', handleRealtimeUpdate);
+      window.removeEventListener('goglite_presupuestos_updated', handleRealtimeUpdate);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(pollInterval);
+    };
   }, []);
 
   // Recibir prospecto desde el Módulo 2 (CRM & WhatsApp) o Módulo 1
@@ -357,13 +399,22 @@ export default function PresupuestosModule({
       } catch (e) {}
       if (!targetPortalToken) targetPortalToken = `portal-${targetId}`;
 
+      // Al presionar Guardar, si el estado era 'borrador', cambia automáticamente a 'sin_abrir'
+      // porque ya se generó el enlace público listo para que el cliente lo abra
+      const currentStatus = activePresupuesto.estado || (exists ? presupuestos[existingIdx].estado : 'borrador');
+      const nextEstado = (!currentStatus || currentStatus === 'borrador') ? 'sin_abrir' : currentStatus;
+
       const propToSave = {
         ...activePresupuesto,
         id: targetId,
         codigo: targetCodigo,
         leadId: targetLeadId,
-        portalToken: targetPortalToken
+        portalToken: targetPortalToken,
+        estado: nextEstado,
+        guardadoEn: new Date().toISOString()
       };
+
+      setActivePresupuesto(propToSave);
 
       const url = exists ? getBackendEndpoint(`/api/presupuestos/${targetId}`) : getBackendEndpoint('/api/presupuestos');
       const method = exists ? 'PATCH' : 'POST';
@@ -398,9 +449,9 @@ export default function PresupuestosModule({
       if (typeof window !== 'undefined') {
         try {
           const crmLeads = getStoredCrmLeads();
-          const targetName = (activePresupuesto.cliente?.empresa || '').toLowerCase().trim();
-          const targetPhone = (activePresupuesto.cliente?.telefono || '').replace(/\D/g, '');
-          const nuevoMonto = Number(activePresupuesto.inversion?.precioTotal) || 0;
+          const targetName = (propToSave.cliente?.empresa || '').toLowerCase().trim();
+          const targetPhone = (propToSave.cliente?.telefono || '').replace(/\D/g, '');
+          const nuevoMonto = Number(propToSave.inversion?.precioTotal) || 0;
 
           let updatedCrmFlag = false;
           const updatedCrm = crmLeads.map(cl => {
@@ -408,18 +459,18 @@ export default function PresupuestosModule({
             const clPhone = (cl.telefono || '').replace(/\D/g, '');
             const isMatch = (targetName && (clName === targetName || clName.includes(targetName) || targetName.includes(clName))) ||
                             (targetPhone && clPhone && (targetPhone === clPhone || clPhone.endsWith(targetPhone) || targetPhone.endsWith(clPhone))) ||
-                            (activePresupuesto.leadId && cl.id === activePresupuesto.leadId) ||
-                            (activePresupuesto.cliente?.id && cl.id === activePresupuesto.cliente.id);
+                            (propToSave.leadId && cl.id === propToSave.leadId) ||
+                            (propToSave.cliente?.id && cl.id === propToSave.cliente.id);
 
             if (isMatch) {
               updatedCrmFlag = true;
               return {
                 ...cl,
-                presupuestoId: activePresupuesto.id,
-                presupuestoCodigo: activePresupuesto.codigo || 'P-2026',
+                presupuestoId: propToSave.id,
+                presupuestoCodigo: propToSave.codigo || 'P-2026',
                 presupuestoMonto: nuevoMonto,
                 valorEstimado: nuevoMonto,
-                presupuestoEstado: activePresupuesto.estado || 'borrador',
+                presupuestoEstado: propToSave.estado || 'sin_abrir',
                 etapa: (cl.etapa === 'nuevo' || cl.etapa === 'contactado') ? 'propuesta_enviada' : cl.etapa
               };
             }
@@ -610,6 +661,7 @@ export default function PresupuestosModule({
   // Filtered proposals
   const filteredList = presupuestos.filter(p => {
     if (filterStatus === 'todos') return true;
+    if (filterStatus === 'sin_abrir') return p.estado === 'sin_abrir' || p.estado === 'enviado';
     return p.estado === filterStatus;
   });
 
@@ -672,8 +724,8 @@ export default function PresupuestosModule({
               {[
                 { id: 'todos', label: 'Todos' },
                 { id: 'borrador', label: 'Borrador' },
-                { id: 'enviado', label: 'Enviado' },
-                { id: 'visto', label: 'Visto por Cliente' },
+                { id: 'sin_abrir', label: 'Sin Abrir' },
+                { id: 'visto', label: 'Abierto por Cliente' },
                 { id: 'aceptado', label: 'Aceptado' },
                 { id: 'rechazado', label: 'Rechazado' },
               ].map(f => (
@@ -750,17 +802,27 @@ export default function PresupuestosModule({
                       </td>
 
                       <td className="px-4 py-3.5">
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                        <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border inline-flex items-center gap-1.5 ${
                           prop.estado === 'aceptado' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
-                          prop.estado === 'enviado' ? 'bg-sky-500/15 text-sky-400 border-sky-500/30' :
-                          prop.estado === 'visto' ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' :
+                          prop.estado === 'visto' ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' :
+                          prop.estado === 'sin_abrir' || prop.estado === 'enviado' ? 'bg-sky-500/15 text-sky-400 border-sky-500/30' :
                           prop.estado === 'rechazado' ? 'bg-red-500/15 text-red-400 border-red-500/30' :
                           'bg-slate-800 text-slate-400 border-slate-700'
                         }`}>
-                          {prop.estado === 'enviado' ? 'Enviado al cliente' :
-                           prop.estado === 'visto' ? 'Visto por el cliente' :
-                           prop.estado === 'aceptado' ? 'Aceptado' :
-                           prop.estado === 'borrador' ? 'Borrador' : prop.estado}
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            prop.estado === 'aceptado' ? 'bg-emerald-400' :
+                            prop.estado === 'visto' ? 'bg-amber-400 animate-pulse' :
+                            prop.estado === 'sin_abrir' || prop.estado === 'enviado' ? 'bg-sky-400' :
+                            prop.estado === 'rechazado' ? 'bg-red-400' :
+                            'bg-slate-500'
+                          }`} />
+                          <span>
+                            {prop.estado === 'sin_abrir' ? 'Sin abrir (Enlace enviado)' :
+                             prop.estado === 'enviado' ? 'Sin abrir (Enviado)' :
+                             prop.estado === 'visto' ? 'Abierto por el cliente' :
+                             prop.estado === 'aceptado' ? 'Aceptado por el cliente' :
+                             prop.estado === 'borrador' ? 'Borrador' : prop.estado}
+                          </span>
                         </span>
                       </td>
 
@@ -844,7 +906,37 @@ export default function PresupuestosModule({
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Indicador dinámico de estado del enlace */}
+              <div className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono font-semibold flex items-center gap-1.5 ${
+                activePresupuesto.estado === 'aceptado'
+                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                  : activePresupuesto.estado === 'visto'
+                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                  : activePresupuesto.estado === 'sin_abrir' || activePresupuesto.estado === 'enviado'
+                  ? 'bg-sky-500/15 border-sky-500/30 text-sky-300'
+                  : 'bg-slate-800/80 border-slate-700 text-slate-400'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${
+                  activePresupuesto.estado === 'aceptado'
+                    ? 'bg-emerald-400'
+                    : activePresupuesto.estado === 'visto'
+                    ? 'bg-amber-400 animate-ping'
+                    : activePresupuesto.estado === 'sin_abrir' || activePresupuesto.estado === 'enviado'
+                    ? 'bg-sky-400'
+                    : 'bg-slate-500'
+                }`} />
+                <span>
+                  {activePresupuesto.estado === 'aceptado'
+                    ? 'Enlace: Aceptado por el cliente'
+                    : activePresupuesto.estado === 'visto'
+                    ? 'Enlace: Abierto / Visto por el cliente'
+                    : activePresupuesto.estado === 'sin_abrir' || activePresupuesto.estado === 'enviado'
+                    ? 'Enlace: Sin abrir (Listo / Compartido)'
+                    : 'Estado: Borrador (Presiona Guardar)'}
+                </span>
+              </div>
+
               <select
                 value={activePresupuesto.estado}
                 onChange={(e) => updatePropField('estado', e.target.value)}
@@ -852,8 +944,7 @@ export default function PresupuestosModule({
               >
                 <option value="borrador">Borrador</option>
                 <option value="sin_abrir">Sin abrir</option>
-                <option value="enviado">Enviado al cliente</option>
-                <option value="visto">Visto por el cliente</option>
+                <option value="visto">Abierto / Visto por el cliente</option>
                 <option value="aceptado">Aceptado</option>
                 <option value="rechazado">Rechazado</option>
               </select>
