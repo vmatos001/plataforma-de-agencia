@@ -1025,12 +1025,12 @@ app.get('/api/wireframes/proyecto/:proyectoId', (req, res) => {
 });
 
 // Generar StoryBrand y Wireframe para un proyecto
-app.post('/api/wireframes/generar/:proyectoId', (req, res) => {
+app.post('/api/wireframes/generar/:proyectoId', async (req, res) => {
   const proyectos = getProyectos();
   const proj = proyectos.find(p => p.id === req.params.proyectoId);
   if (!proj) return res.status(404).json({ error: 'Proyecto no encontrado' });
 
-  const wf = generarStoryBrandAuto(proj);
+  const wf = await generarStoryBrandAuto(proj);
   res.json({ success: true, wireframe: wf });
 });
 
