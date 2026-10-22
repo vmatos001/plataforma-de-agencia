@@ -1335,34 +1335,51 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   return (
     <div className="flex-1 overflow-y-auto bg-[#080b11] p-6 text-slate-100 flex flex-col gap-6">
       
-      {/* 1. TOP STATS BAR */}
+      {/* 1. TOP STATS BAR: 4 TARJETAS CLAVE DE PROSPECCIÓN & CRM */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 1. Prospectos Totales */}
         <div className="p-4 rounded-xl bg-[#0e131f] border border-slate-800/80 flex items-center justify-between shadow-sm">
           <div>
-            <div className="text-xs font-mono uppercase text-slate-400 font-semibold">Pipeline Cotizado</div>
+            <div className="text-xs font-mono uppercase text-slate-400 font-semibold">Prospectos Totales</div>
             <div className="text-2xl font-black text-white mt-1">
-              ${totalPipeline.toLocaleString()} <span className="text-xs font-normal text-slate-400">USD</span>
+              {filteredLeads.length} <span className="text-xs font-normal text-slate-400">en base</span>
             </div>
-            <div className="text-[11px] text-slate-500 mt-0.5">{leadsCotizadosActivos.length} propuestas en curso · {leadsEnProspeccion} en prospección</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">{leadsDeScrapperCount} de Scrapper · {leadsManualesCount} manuales</div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center font-bold">
-            <DollarSign className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
+            <Users className="w-5 h-5" />
           </div>
         </div>
 
+        {/* 2. En Negociación */}
         <div className="p-4 rounded-xl bg-[#0e131f] border border-slate-800/80 flex items-center justify-between shadow-sm">
           <div>
-            <div className="text-xs font-mono uppercase text-slate-400 font-semibold">Cerrado Ganado</div>
-            <div className="text-2xl font-black text-emerald-400 mt-1">
-              ${totalGanado.toLocaleString()} <span className="text-xs font-normal text-slate-400">USD</span>
+            <div className="text-xs font-mono uppercase text-slate-400 font-semibold">En Negociación</div>
+            <div className="text-2xl font-black text-amber-400 mt-1">
+              {leadsEnNegociacionCount} <span className="text-xs font-normal text-slate-400">leads</span>
             </div>
-            <div className="text-[11px] text-emerald-500/80 mt-0.5">{leadsGanadosCount} contratos firmados</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">{leadsCotizadosActivos.length} propuestas y reuniones activas</div>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+            <Flame className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* 3. En Prospección / Contactados */}
+        <div className="p-4 rounded-xl bg-[#0e131f] border border-slate-800/80 flex items-center justify-between shadow-sm">
+          <div>
+            <div className="text-xs font-mono uppercase text-slate-400 font-semibold">En Prospección</div>
+            <div className="text-2xl font-black text-emerald-400 mt-1">
+              {leadsEnProspeccion} <span className="text-xs font-normal text-slate-400">activos</span>
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5">Seguimiento comercial y canales</div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
-            <TrendingUp className="w-5 h-5" />
+            <MessageSquare className="w-5 h-5" />
           </div>
         </div>
 
+        {/* 4. Tasa de Conversión */}
         <div className="p-4 rounded-xl bg-[#0e131f] border border-slate-800/80 flex items-center justify-between shadow-sm">
           <div>
             <div className="text-xs font-mono uppercase text-slate-400 font-semibold">Tasa de Conversión</div>
@@ -1372,20 +1389,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
             <div className="text-[11px] text-slate-500 mt-0.5">De lead prospectado a cliente</div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center font-bold">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="p-4 rounded-xl bg-[#0e131f] border border-slate-800/80 flex items-center justify-between shadow-sm">
-          <div>
-            <div className="text-xs font-mono uppercase text-slate-400 font-semibold">Prospectos Totales</div>
-            <div className="text-2xl font-black text-white mt-1">
-              {filteredLeads.length} <span className="text-xs font-normal text-slate-400">en embudo</span>
-            </div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Costo por software: $0 USD</div>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
-            <Users className="w-5 h-5" />
+            <TrendingUp className="w-5 h-5" />
           </div>
         </div>
       </div>
@@ -1760,88 +1764,21 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
         <div className="space-y-5">
           {/* Header de la Base de Datos */}
           <div className="p-5 rounded-2xl bg-[#0c1017] border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center font-bold">
-                  <Users className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-white flex items-center gap-2">
-                    <span>Base de Datos Centralizada de Clientes & Fichas 360°</span>
-                    <span className="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-mono border border-emerald-500/30 font-bold">
-                      👑 {leadsGanadosCount} Clientes Ganados
-                    </span>
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Expedientes de clientes cerrados y prospectos calificados. Conecta directamente con presupuestos VIP, contratos SOW, PRD técnico y WhatsApp CRM.
-                  </p>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center font-bold shrink-0">
+                <Users className="w-5 h-5" />
               </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={handleOpenImportScrapperModal}
-                className="px-3.5 py-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 font-semibold text-xs flex items-center gap-2 transition-all shadow-sm"
-              >
-                <Download className="w-4 h-4" />
-                <span>📥 Importar desde Scrapper ({scrapperAvailableCount})</span>
-              </button>
-
-              <button
-                onClick={() => setCreateLeadModalOpen(true)}
-                className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs flex items-center gap-2 transition-all shadow-md shadow-orange-950"
-              >
-                <Plus className="w-4 h-4" />
-                <span>+ Nueva Ficha Manual</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Sub-tarjetas Métricas del Directorio */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="p-3.5 rounded-xl bg-[#0e1320] border border-slate-800 flex items-center justify-between">
               <div>
-                <div className="text-[11px] font-mono text-slate-400 uppercase">Clientes Ganados</div>
-                <div className="text-xl font-black text-emerald-400 mt-0.5">${totalGanado.toLocaleString()} USD</div>
-                <div className="text-[10px] text-slate-500">{leadsGanadosCount} contratos firmados</div>
-              </div>
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
-                <Crown className="w-4 h-4" />
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-[#0e1320] border border-slate-800 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-mono text-slate-400 uppercase">En Negociación</div>
-                <div className="text-xl font-black text-amber-400 mt-0.5">{leadsEnNegociacionCount} leads</div>
-                <div className="text-[10px] text-slate-500">Propuestas en curso</div>
-              </div>
-              <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold">
-                <Flame className="w-4 h-4" />
+                <h3 className="font-bold text-base text-white flex items-center gap-2">
+                  <span>Base de Datos Centralizada de Clientes & Fichas 360°</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Expedientes detallados con histórico de interacción, diagnóstico, propuesta comercial y acceso a servicios.
+                </p>
               </div>
             </div>
-
-            <div className="p-3.5 rounded-xl bg-[#0e1320] border border-slate-800 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-mono text-slate-400 uppercase">Total en Base de Datos</div>
-                <div className="text-xl font-black text-white mt-0.5">{filteredLeads.length} fichas</div>
-                <div className="text-[10px] text-slate-500">Prospectos y clientes</div>
-              </div>
-              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold">
-                <Users className="w-4 h-4" />
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-[#0e1320] border border-slate-800 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-mono text-slate-400 uppercase">Origen de Datos</div>
-                <div className="text-xl font-black text-sky-400 mt-0.5">{leadsDeScrapperCount} de Scrapper</div>
-                <div className="text-[10px] text-slate-500">{leadsManualesCount} creados a mano</div>
-              </div>
-              <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold">
-                <Download className="w-4 h-4" />
-              </div>
+            <div className="text-xs font-mono text-slate-400 bg-[#121826] px-3 py-1.5 rounded-xl border border-slate-800/80 shrink-0">
+              Total Fichas: <span className="text-white font-bold">{filteredLeads.length}</span>
             </div>
           </div>
 
