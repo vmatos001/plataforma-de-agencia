@@ -282,6 +282,22 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   const [savedVaultNotice, setSavedVaultNotice] = useState(false);
   const [creatingDriveVault, setCreatingDriveVault] = useState(false);
 
+  const handleSaveVault = () => {
+    try {
+      localStorage.setItem('goglite_repo_vault', JSON.stringify(repoVault));
+      if (selectedProyectoId) {
+        const vaultByProjRaw = localStorage.getItem('goglite_repo_vault_by_project');
+        const vaultByProj = vaultByProjRaw ? JSON.parse(vaultByProjRaw) : {};
+        vaultByProj[selectedProyectoId] = repoVault;
+        localStorage.setItem('goglite_repo_vault_by_project', JSON.stringify(vaultByProj));
+      }
+      setSavedVaultNotice(true);
+      setTimeout(() => setSavedVaultNotice(false), 3000);
+    } catch (e) {
+      console.warn('Error guardando bóveda:', e);
+    }
+  };
+
   const handleCreateDriveVault = async () => {
     try {
       setCreatingDriveVault(true);
@@ -1199,11 +1215,21 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
                 Centraliza los accesos de desarrollo del cliente: Google Stitch (UI), Drive de activos, Staging en Firebase, GitHub privado y Dominio de producción.
               </p>
             </div>
-            {savedVaultNotice && (
-              <span className="text-xs font-mono text-emerald-400 font-bold flex items-center gap-1">
-                <Check className="w-3.5 h-3.5" /> ¡Bóveda Guardada!
-              </span>
-            )}
+            <div className="flex items-center gap-2.5">
+              {savedVaultNotice && (
+                <span className="text-xs font-mono text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1.5 rounded-lg animate-pulse">
+                  <Check className="w-3.5 h-3.5" /> ¡Bóveda Guardada!
+                </span>
+              )}
+              <button
+                onClick={handleSaveVault}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-sm"
+                title="Guardar URLs y accesos en el proyecto"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Guardar Bóveda</span>
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1440,6 +1466,27 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
                 </a>
               </div>
               <p className="text-[10px] text-slate-500">Auditorías automáticas también disponibles directamente en las tarjetas de Fase 9 y 10 del Sprint Kanban.</p>
+            </div>
+          </div>
+
+          {/* Barra de Confirmación y Guardado Inferior */}
+          <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#0c1017] border border-slate-800">
+            <span className="text-xs text-slate-400">
+              Presiona guardar para asentar las URLs de Google Stitch, Drive, Staging, GitHub y Producción en este proyecto.
+            </span>
+            <div className="flex items-center gap-2">
+              {savedVaultNotice && (
+                <span className="text-xs font-mono text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-lg animate-pulse">
+                  <Check className="w-3.5 h-3.5" /> ¡Guardado Exitosamente!
+                </span>
+              )}
+              <button
+                onClick={handleSaveVault}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md"
+              >
+                <Save className="w-4 h-4" />
+                <span>Guardar Bóveda</span>
+              </button>
             </div>
           </div>
         </div>
