@@ -35,7 +35,8 @@ import {
   Printer,
   LogOut,
   FolderOpen,
-  FileUp
+  FileUp,
+  Trash2
 } from 'lucide-react';
 import {
   getStoredCrmLeads,
@@ -284,11 +285,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setSelectedFile({
-      name: file.name,
-      size: file.size,
-      type: file.type
-    });
+    setSelectedFile(file);
     setAssetName(file.name);
   };
 
@@ -1405,16 +1402,17 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   const handleSubirInsumo = async (e) => {
     e.preventDefault();
-    if (!assetName.trim() && !selectedFile) {
+    const fileToUpload = selectedFile || fileInputRef.current?.files?.[0] || null;
+    if (!assetName.trim() && !fileToUpload) {
       alert('Por favor selecciona un archivo de tu dispositivo o indica el nombre/enlace del insumo.');
       return;
     }
 
     try {
       setSubiendoInsumo(true);
-      const finalName = assetName.trim() || selectedFile?.name || 'Archivo Adjunto';
-      const finalSize = selectedFile 
-        ? (selectedFile.size > 1048576 ? (selectedFile.size / 1048576).toFixed(1) + ' MB' : Math.round(selectedFile.size / 1024) + ' KB')
+      const finalName = assetName.trim() || fileToUpload?.name || 'Archivo Adjunto';
+      const finalSize = fileToUpload 
+        ? (fileToUpload.size > 1048576 ? (fileToUpload.size / 1048576).toFixed(1) + ' MB' : Math.round(fileToUpload.size / 1024) + ' KB')
         : 'Enlace Web';
 
       const empresa = data?.presupuesto?.cliente?.empresa || data?.lead?.empresa || 'Cliente';
@@ -1433,13 +1431,13 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       // 1. Convertir archivo a base64 si se seleccionó archivo local
       let fileBase64 = null;
       let isImage = false;
-      if (selectedFile) {
-        isImage = (selectedFile.type || '').startsWith('image/');
+      if (fileToUpload) {
+        isImage = (fileToUpload.type || '').startsWith('image/');
         fileBase64 = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result);
           reader.onerror = (err) => reject(err);
-          reader.readAsDataURL(selectedFile);
+          reader.readAsDataURL(fileToUpload);
         });
       }
 
@@ -1457,7 +1455,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         };
         if (fileBase64) {
           gasPayload.fileBase64 = fileBase64;
-          gasPayload.mimeType = selectedFile.type || 'application/octet-stream';
+          gasPayload.mimeType = fileToUpload?.type || 'application/octet-stream';
         } else {
           gasPayload.textContent = `Insumo de Marca: ${finalName}\nCategoría: ${assetCategory}\nNotas/Instrucciones: ${assetNotes.trim() || 'Sin notas'}\nFecha: ${new Date().toLocaleString('es-ES')}`;
           gasPayload.mimeType = 'text/plain';
@@ -1475,6 +1473,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         console.warn('Error subiendo insumo a Google Drive:', uploadErr);
       }
 
+      if (!driveResult || !driveResult.success || !driveResult.fileUrl) {
+        alert('No se pudo guardar el archivo en Google Drive. Verifica tu conexión o intenta nuevamente.');
+        return;
+      }
+
       const nuevoArchivo = {
         id: 'f-' + Date.now(),
         nombre: finalName,
@@ -1483,12 +1486,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         notas: assetNotes.trim(),
         fecha: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
         hora: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-        estado: 'Recibido',
-        driveUrl: driveResult?.fileUrl || null,
-        driveFileId: driveResult?.fileId || null,
-        driveFolderUrl: driveResult?.folderUrl || data.portalConfig?.driveVault?.subfolders?.insumos?.url || null,
+        estado: 'Recibido en Drive',
+        driveUrl: driveResult.fileUrl,
+        driveFileId: driveResult.fileId,
+        driveFolderUrl: driveResult.folderUrl || data.portalConfig?.driveVault?.subfolders?.insumos?.url || null,
         previewUrl: (isImage && fileBase64 && fileBase64.length < 500000) ? fileBase64 : null,
-        isDirectFile: Boolean(selectedFile)
+        isDirectFile: Boolean(fileToUpload)
       };
 
       const archivosActuales = data.portalConfig?.archivosSubidos || [];
@@ -1531,13 +1534,44 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       setAssetNotes('');
       if (fileInputRef.current) fileInputRef.current.value = '';
       
-      const driveMsg = driveResult?.fileUrl ? ' y guardado directamente en la carpeta 01_Insumos_Cliente de Google Drive' : '';
-      showNotification(`✓ Insumo "${nuevoArchivo.nombre}" (${finalSize}) registrado${driveMsg}.`);
+      showNotification(`✓ Archivo "${nuevoArchivo.nombre}" (${finalSize}) guardado directamente en Google Drive.`);
     } catch (err) {
       alert('Error registrando insumo: ' + err.message);
     } finally {
       setSubiendoInsumo(false);
     }
+  };
+
+  const handleEliminarInsumo = async (archId) => {
+    if (!window.confirm('¿Deseas eliminar este insumo de la lista del proyecto?')) return;
+    const archivosActuales = data.portalConfig?.archivosSubidos || [];
+    const actualizados = archivosActuales.filter(a => a.id !== archId);
+
+    try {
+      const projs = getStoredProyectos();
+      const cleanEmpresa = (data?.presupuesto?.cliente?.empresa || data?.lead?.empresa || '').toLowerCase().trim();
+      const updatedProjs = projs.map(p => {
+        const pEmp = (p.cliente?.empresa || '').toLowerCase().trim();
+        if ((data?.proyecto?.id && p.id === data.proyecto.id) || (data?.presupuesto?.id && p.presupuestoId === data.presupuesto.id) || (cleanEmpresa && pEmp === cleanEmpresa)) {
+          return {
+            ...p,
+            onboarding: {
+              ...(p.onboarding || {}),
+              archivosSubidos: actualizados,
+              archivosRecibidos: actualizados
+            }
+          };
+        }
+        return p;
+      });
+      saveStoredProyectos(updatedProjs);
+      window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: updatedProjs } }));
+    } catch (e) {}
+
+    await savePortalUpdates({
+      archivosSubidos: actualizados
+    });
+    showNotification('Insumo eliminado del proyecto.');
   };
 
   const handleCompletarInsumos = async () => {
@@ -3302,6 +3336,15 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                                 {arch.estado || 'Recibido'}
                               </span>
                             )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleEliminarInsumo(arch.id)}
+                              className="p-1 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 transition-colors border border-slate-700/60"
+                              title="Eliminar insumo"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
                           </div>
                         </div>
                       ))
