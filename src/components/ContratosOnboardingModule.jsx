@@ -152,7 +152,35 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       console.warn('[Contratos] Usando proyectos locales:', err);
     } finally {
       // Re-evaluar automáticamente hitos con eventos del cliente y sprint de desarrollo
-      localList = localList.map(p => evaluateProjectMilestones(p));
+      // y auto-sincronizar datos de comprobante de anticipo desde portalConfig si faltan en pagos
+      localList = localList.map(p => {
+        let evaluated = evaluateProjectMilestones(p);
+        try {
+          const tokensToCheck = [evaluated.portalToken, evaluated.presupuestoId, evaluated.id, evaluated.codigo, evaluated.leadId].filter(Boolean);
+          for (const tk of tokensToCheck) {
+            const raw = localStorage.getItem('goglite_portal_' + tk);
+            if (raw) {
+              const pcfg = JSON.parse(raw);
+              if (pcfg.comprobanteAnticipo || pcfg.comprobanteAnticipoImagen) {
+                const currentPagos = evaluated.pagos || {};
+                evaluated = {
+                  ...evaluated,
+                  pagos: {
+                    ...currentPagos,
+                    anticipoComprobante: currentPagos.anticipoComprobante || pcfg.comprobanteAnticipo || '',
+                    anticipoComprobanteImagen: currentPagos.anticipoComprobanteImagen || pcfg.comprobanteAnticipoImagen || '',
+                    anticipoComprobanteNombre: currentPagos.anticipoComprobanteNombre || pcfg.comprobanteAnticipoNombre || 'Comprobante_Anticipo.jpg',
+                    anticipoFecha: currentPagos.anticipoFecha || pcfg.fechaFirmaContrato || '',
+                    anticipoEstado: currentPagos.anticipoEstado === 'confirmado' ? 'confirmado' : 'verificacion'
+                  }
+                };
+                break;
+              }
+            }
+          }
+        } catch (e) {}
+        return evaluated;
+      });
       saveStoredProyectos(localList);
 
       setProyectos(localList);
@@ -516,6 +544,45 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     } catch (e) {}
 
     return list;
+  };
+
+  // Helper para obtener datos e imagen del comprobante de anticipo (desde proyecto y portalConfig)
+  const getAnticipoComprobanteData = (proj = null) => {
+    const target = proj || activeProyecto;
+    if (!target) return { texto: '', imagen: '', nombre: '', fecha: '' };
+
+    let texto = target.pagos?.anticipoComprobante || '';
+    let imagen = target.pagos?.anticipoComprobanteImagen || '';
+    let nombre = target.pagos?.anticipoComprobanteNombre || '';
+    let fecha = target.pagos?.anticipoFecha || '';
+
+    // Complementar con datos guardados en el portal del cliente si no están en pagos
+    try {
+      if (typeof window !== 'undefined') {
+        const tokensToCheck = [
+          target.portalToken,
+          target.presupuestoId,
+          target.id,
+          target.codigo,
+          target.leadId
+        ].filter(Boolean);
+        for (const tk of tokensToCheck) {
+          const raw = localStorage.getItem('goglite_portal_' + tk);
+          if (raw) {
+            const pcfg = JSON.parse(raw);
+            if (!texto && pcfg.comprobanteAnticipo) texto = pcfg.comprobanteAnticipo;
+            if (!imagen && pcfg.comprobanteAnticipoImagen) imagen = pcfg.comprobanteAnticipoImagen;
+            if (!nombre && pcfg.comprobanteAnticipoNombre) nombre = pcfg.comprobanteAnticipoNombre;
+            if (!fecha && (pcfg.fechaFirmaContrato || pcfg.fechaAutenticacion)) {
+              fecha = pcfg.fechaFirmaContrato || pcfg.fechaAutenticacion;
+            }
+            if (imagen || texto) break;
+          }
+        }
+      }
+    } catch (e) {}
+
+    return { texto, imagen, nombre, fecha };
   };
 
   // Sincronizar insumos en vivo directamente con Google Drive (sitesgoglite@gmail.com -> 01_Insumos_Cliente)
@@ -2044,7 +2111,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                 <div>
                   <div className="flex items-center gap-2 text-xs font-bold text-orange-400 uppercase tracking-wider mb-0.5">
                     <CreditCard className="w-4 h-4" />
-                    <span>Facturación, Anticipo & Cuentas Bancarias ($0 Cuota Fija)</span>
+                    <span>Facturación & Gestión Financiera de Anticipo (50%)</span>
                   </div>
                   <h3 className="text-base font-extrabold text-white">
                     Gestión de Anticipos y Desglose Financiero
@@ -2055,76 +2122,111 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
               {/* Status Summary */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Anticipo Box */}
-                <div className="p-5 rounded-2xl bg-[#111622] border border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400">1. Anticipo (50%)</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                      activeProyecto.pagos?.anticipoEstado === 'confirmado'
-                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                        : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-                    }`}>
-                      {activeProyecto.pagos?.anticipoEstado === 'confirmado' ? 'Confirmado' : 'Pendiente de Pago'}
-                    </span>
-                  </div>
+                {(() => {
+                  const comprobanteData = getAnticipoComprobanteData(activeProyecto);
+                  const hasComprobante = Boolean(comprobanteData.texto || comprobanteData.imagen);
 
-                  <div className="text-2xl font-mono font-black text-white">
-                    ${activeProyecto.pagos?.anticipoMonto} USD
-                  </div>
-
-                  <p className="text-[11px] text-slate-400">
-                    Requerido formalmente para la reserva de agenda y comienzo de la Fase 1.
-                  </p>
-
-                  {(activeProyecto.pagos?.anticipoComprobante || activeProyecto.pagos?.anticipoComprobanteImagen) && (
-                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-2">
-                      <div className="font-bold flex items-center gap-1.5 text-amber-400">
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>Comprobante Reportado por Cliente:</span>
+                  return (
+                    <div className="p-5 rounded-2xl bg-[#111622] border border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-400">1. Anticipo (50%)</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          activeProyecto.pagos?.anticipoEstado === 'confirmado'
+                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                            : hasComprobante
+                            ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                        }`}>
+                          {activeProyecto.pagos?.anticipoEstado === 'confirmado' ? '✓ Confirmado' : hasComprobante ? 'En Verificación' : 'Pendiente de Pago'}
+                        </span>
                       </div>
-                      {activeProyecto.pagos?.anticipoComprobante && (
-                        <div className="font-mono text-white text-[11px]">{activeProyecto.pagos.anticipoComprobante}</div>
-                      )}
-                      {activeProyecto.pagos?.anticipoComprobanteImagen && (
-                        <div className="space-y-1.5 pt-1">
-                          <a
-                            href={activeProyecto.pagos.anticipoComprobanteImagen}
-                            download={activeProyecto.pagos?.anticipoComprobanteNombre || 'Comprobante_Anticipo.jpg'}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="block rounded-lg overflow-hidden border border-slate-700 bg-[#090d16] max-h-44 flex items-center justify-center group relative"
-                          >
-                            <img
-                              src={activeProyecto.pagos.anticipoComprobanteImagen}
-                              alt="Captura de Comprobante"
-                              className="max-h-40 w-auto object-contain"
-                            />
-                          </a>
-                          <div className="text-[10px] text-emerald-400 font-mono">
-                            ✓ Captura bancaria adjunta ({activeProyecto.pagos?.anticipoComprobanteNombre || 'Imagen verificada'})
+
+                      <div className="text-2xl font-mono font-black text-white">
+                        ${activeProyecto.pagos?.anticipoMonto} USD
+                      </div>
+
+                      <p className="text-[11px] text-slate-400">
+                        Requerido formalmente para la reserva de agenda y comienzo de la Fase 1.
+                      </p>
+
+                      {hasComprobante && (
+                        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-2.5">
+                          <div className="font-bold flex items-center justify-between gap-1.5 text-amber-400">
+                            <div className="flex items-center gap-1.5">
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>Comprobante Reportado por Cliente:</span>
+                            </div>
+                            {comprobanteData.fecha && (
+                              <span className="text-[10px] text-slate-400 font-normal">
+                                {comprobanteData.fecha}
+                              </span>
+                            )}
                           </div>
+
+                          {comprobanteData.texto && (
+                            <div className="font-mono text-white text-[11px] bg-slate-900/60 p-2 rounded-lg border border-amber-500/20">
+                              {comprobanteData.texto}
+                            </div>
+                          )}
+
+                          {comprobanteData.imagen && (
+                            <div className="space-y-1.5 pt-1">
+                              <div
+                                onClick={() => setPreviewFileModal({
+                                  nombre: comprobanteData.nombre || 'Captura Comprobante de Anticipo (50%)',
+                                  previewUrl: comprobanteData.imagen
+                                })}
+                                className="block rounded-lg overflow-hidden border border-slate-700 bg-[#090d16] max-h-56 flex items-center justify-center group relative cursor-pointer hover:border-orange-500/60 transition-all shadow-inner"
+                                title="Clic para ampliar captura en pantalla completa"
+                              >
+                                <img
+                                  src={comprobanteData.imagen}
+                                  alt="Captura de Comprobante"
+                                  className="max-h-52 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1.5 text-white text-xs font-bold transition-opacity">
+                                  <Eye className="w-4 h-4 text-orange-400" />
+                                  <span>Ampliar Comprobante</span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between text-[10px] pt-1">
+                                <span className="text-emerald-400 font-mono flex items-center gap-1 truncate max-w-[200px]" title={comprobanteData.nombre}>
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                                  <span className="truncate">✓ Captura adjunta ({comprobanteData.nombre || 'Imagen verificada'})</span>
+                                </span>
+                                <a
+                                  href={comprobanteData.imagen}
+                                  download={comprobanteData.nombre || 'Comprobante_Anticipo.jpg'}
+                                  className="text-orange-400 hover:text-orange-300 flex items-center gap-1 font-semibold shrink-0 transition-colors"
+                                  title="Descargar comprobante"
+                                >
+                                  <Download className="w-3 h-3" />
+                                  <span>Descargar</span>
+                                </a>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
-                      {activeProyecto.pagos?.anticipoFecha && (
-                        <div className="text-[10px] text-slate-400">Reportado el: {activeProyecto.pagos.anticipoFecha}</div>
+
+                      {activeProyecto.pagos?.anticipoEstado !== 'confirmado' ? (
+                        <button
+                          onClick={() => handleConfirmPayment('anticipo')}
+                          className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-md"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>{hasComprobante ? 'Validar Anticipo y Pasar a Desarrollo' : 'Marcar Anticipo como Confirmado'}</span>
+                        </button>
+                      ) : (
+                        <div className="text-[11px] text-emerald-400 font-mono flex items-center gap-1.5 pt-1">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Validado el {activeProyecto.pagos?.anticipoFecha || '10 Oct 2026'}</span>
+                        </div>
                       )}
                     </div>
-                  )}
-
-                  {activeProyecto.pagos?.anticipoEstado !== 'confirmado' ? (
-                    <button
-                      onClick={() => handleConfirmPayment('anticipo')}
-                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-md"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>{activeProyecto.pagos?.anticipoComprobante ? 'Validar Anticipo y Pasar a Desarrollo' : 'Marcar Anticipo como Confirmado'}</span>
-                    </button>
-                  ) : (
-                    <div className="text-[11px] text-emerald-400 font-mono flex items-center gap-1.5 pt-1">
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Validado el {activeProyecto.pagos?.anticipoFecha || '10 Oct 2026'}</span>
-                    </div>
-                  )}
-                </div>
+                  );
+                })()}
 
                 {/* Saldo Final Box */}
                 <div className="p-5 rounded-2xl bg-[#111622] border border-slate-800 space-y-3">
@@ -2161,44 +2263,6 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                       <span>Proyecto 100% Liquidado</span>
                     </div>
                   )}
-                </div>
-              </div>
-
-              {/* Bank Accounts Section (SV & DO) */}
-              <div className="p-5 rounded-2xl bg-[#080b11] border border-slate-800 space-y-4">
-                <h4 className="text-xs font-black uppercase text-slate-300 flex items-center gap-2">
-                  <Building className="w-4 h-4 text-orange-400" />
-                  <span>Cuentas Bancarias de la Agencia para Transferencias Directas ($0 Comisiones)</span>
-                </h4>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  {/* El Salvador */}
-                  <div className="p-3.5 rounded-xl bg-[#101522] border border-slate-800/80 space-y-1.5">
-                    <div className="flex items-center justify-between font-bold text-slate-200">
-                      <span>El Salvador 🇸🇻</span>
-                      <span className="text-[10px] text-orange-400 font-mono">Transfer365 / Chivo</span>
-                    </div>
-                    <div className="text-slate-400 text-[11px]">
-                      <strong>Banco:</strong> Banco Agrícola / Banco Cuscatlán<br />
-                      <strong>Cuenta Corriente:</strong> 054-01-92841-0<br />
-                      <strong>Titular:</strong> Víctor Matos / Goglite Digital<br />
-                      <strong>Moneda:</strong> USD ($)
-                    </div>
-                  </div>
-
-                  {/* República Dominicana */}
-                  <div className="p-3.5 rounded-xl bg-[#101522] border border-slate-800/80 space-y-1.5">
-                    <div className="flex items-center justify-between font-bold text-slate-200">
-                      <span>República Dominicana 🇩🇴</span>
-                      <span className="text-[10px] text-orange-400 font-mono">ACH Directo</span>
-                    </div>
-                    <div className="text-slate-400 text-[11px]">
-                      <strong>Banco:</strong> Banreservas / Banco Popular Dominicano<br />
-                      <strong>Cuenta Ahorros:</strong> 960-249102-3<br />
-                      <strong>Titular:</strong> Víctor Matos<br />
-                      <strong>Moneda:</strong> DOP (Pesos) / USD
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
