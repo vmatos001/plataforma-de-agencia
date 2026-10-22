@@ -93,58 +93,58 @@ const DEFAULT_PRD_CONFIG = {
   ]
 };
 
-// Las 12 Fases Oficiales del Playbook Maestro Goglite 2026
+// Las 12 Fases Oficiales del Playbook Maestro Goglite 2026 (Inicializan todas en Backlog con 0h registradas)
 const PLAYBOOK_12_FASES_TASKS = [
   {
     id: 'fase-1',
     titulo: 'Fase 1: Infraestructura Base, GitHub Privado & Firebase Spark ($0)',
     descripcion: 'Inicializar Git, configurar Astro 5 / Vite con Tailwind v4 y cache inmutable en firebase.json.',
-    columna: 'completado',
+    columna: 'backlog',
     horasEstimadas: 1.5,
-    horasRegistradas: 1.5,
+    horasRegistradas: 0.0,
     prioridad: 'alta'
   },
   {
     id: 'fase-2',
     titulo: 'Fase 2: Identidad Corporativa, Correo Oficial & DNS (SPF/DKIM/DMARC)',
     descripcion: 'Configurar buzón institucional info@empresa.com, validar registros DNS y vincular en /contacto y footer.',
-    columna: 'completado',
+    columna: 'backlog',
     horasEstimadas: 1.0,
-    horasRegistradas: 1.0,
+    horasRegistradas: 0.0,
     prioridad: 'alta'
   },
   {
     id: 'fase-3',
     titulo: 'Fase 3: Sistema de Diseño Dark Mode Luxury & Golden Badge',
     descripcion: 'Paleta profunda #060E21, acento dorado #D4AF37, Plus Jakarta Sans auto-hospedada y cápsula de distinción visual.',
-    columna: 'completado',
+    columna: 'backlog',
     horasEstimadas: 2.0,
-    horasRegistradas: 2.0,
+    horasRegistradas: 0.0,
     prioridad: 'alta'
   },
   {
     id: 'fase-4',
     titulo: 'Fase 4: Landing Page de Alta Conversión con Cotizador en 4 Pasos',
     descripcion: 'Hero interactivo con cotizador directo a WhatsApp en < 2 min, Bento Grid de servicios y pilares de confianza.',
-    columna: 'desarrollo',
+    columna: 'backlog',
     horasEstimadas: 2.5,
-    horasRegistradas: 1.5,
+    horasRegistradas: 0.0,
     prioridad: 'alta'
   },
   {
     id: 'fase-5',
     titulo: 'Fase 5: Arquitectura Multilingüe Nativa en Espejo (i18n)',
     descripcion: 'Rutas raíz en español y /en/ para clientes internacionales con etiquetas canonical y hreflang obligatorias.',
-    columna: 'desarrollo',
+    columna: 'backlog',
     horasEstimadas: 1.5,
-    horasRegistradas: 0.5,
+    horasRegistradas: 0.0,
     prioridad: 'media'
   },
   {
     id: 'fase-6',
     titulo: 'Fase 6: Páginas Interiores Especializadas, B2B Fiscal & Rutas Legales',
     descripcion: 'Servicios individuales, sección B2B con RNC/DGII, /terminos-de-servicio, /aviso-de-privacidad y 404.',
-    columna: 'desarrollo',
+    columna: 'backlog',
     horasEstimadas: 2.0,
     horasRegistradas: 0.0,
     prioridad: 'alta'
@@ -171,7 +171,7 @@ const PLAYBOOK_12_FASES_TASKS = [
     id: 'fase-9',
     titulo: 'Fase 9: WPO Móvil Extrema (90+ en PageSpeed Mobile Garantizado)',
     descripcion: 'Hero WebP < 40 KB, doble preload condicional LCP, TBT = 0 ms y dimensiones explícitas para CLS = 0.',
-    columna: 'staging',
+    columna: 'backlog',
     horasEstimadas: 2.0,
     horasRegistradas: 0.0,
     prioridad: 'alta'
@@ -180,7 +180,7 @@ const PLAYBOOK_12_FASES_TASKS = [
     id: 'fase-10',
     titulo: 'Fase 10: Optimización y Certificación Agéntica de IA (is-agentic.com)',
     descripcion: 'Auditar 3 Trust Anchors (/about, /contact, /privacy con > 500 chars), Schema contactPoint y meta 80+/100.',
-    columna: 'staging',
+    columna: 'backlog',
     horasEstimadas: 1.5,
     horasRegistradas: 0.0,
     prioridad: 'alta'
@@ -222,11 +222,18 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   const [copiedPrdMarkdown, setCopiedPrdMarkdown] = useState(false);
   const [savedPrdNotice, setSavedPrdNotice] = useState(false);
 
-  // Estado del Sprint Kanban
+  // Estado del Sprint Kanban (Todas las tareas inician en Backlog ordenadas 1..12 con 0h)
   const [sprintTasks, setSprintTasks] = useState(() => {
     try {
       const cached = localStorage.getItem('goglite_sprint_tasks');
-      if (cached) return JSON.parse(cached);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          // Detectar si era el antiguo mockup ilustrativo donde las primeras fases estaban completadas
+          const isOldMock = parsed.some(t => t.id === 'fase-1' && t.columna === 'completado');
+          if (!isOldMock) return parsed;
+        }
+      }
     } catch (e) {}
     return DEFAULT_SPRINT_TASKS;
   });
@@ -312,10 +319,20 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
       if (byProjRaw) {
         const byProj = JSON.parse(byProjRaw);
         if (byProj && Array.isArray(byProj[selectedProyectoId])) {
-          setSprintTasks(byProj[selectedProyectoId]);
+          const tasks = byProj[selectedProyectoId];
+          const isOldMock = tasks.some(t => t.id === 'fase-1' && t.columna === 'completado');
+          if (isOldMock) {
+            byProj[selectedProyectoId] = DEFAULT_SPRINT_TASKS;
+            localStorage.setItem('goglite_sprint_tasks_by_project', JSON.stringify(byProj));
+            setSprintTasks(DEFAULT_SPRINT_TASKS);
+          } else {
+            setSprintTasks(tasks);
+          }
         } else {
           setSprintTasks(DEFAULT_SPRINT_TASKS);
         }
+      } else {
+        setSprintTasks(DEFAULT_SPRINT_TASKS);
       }
       const vaultByProjRaw = localStorage.getItem('goglite_repo_vault_by_project');
       if (vaultByProjRaw) {
@@ -517,13 +534,19 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     setShowNewTaskModal(false);
   };
 
-  // Cargar las 12 Fases Oficiales del Playbook Maestro Goglite 2026
+  // Cargar las 12 Fases Oficiales del Playbook Maestro Goglite 2026 (Todas en Backlog con 0h)
   const handleResetToPlaybook12Fases = () => {
     setSprintTasks(PLAYBOOK_12_FASES_TASKS);
     try {
       localStorage.setItem('goglite_sprint_tasks', JSON.stringify(PLAYBOOK_12_FASES_TASKS));
+      if (selectedProyectoId) {
+        const byProjRaw = localStorage.getItem('goglite_sprint_tasks_by_project');
+        const byProj = byProjRaw ? JSON.parse(byProjRaw) : {};
+        byProj[selectedProyectoId] = PLAYBOOK_12_FASES_TASKS;
+        localStorage.setItem('goglite_sprint_tasks_by_project', JSON.stringify(byProj));
+      }
     } catch (e) {}
-    alert('✓ Se han cargado las 12 Fases Oficiales del Playbook Maestro Goglite 2026 en el Sprint Kanban.');
+    alert('✓ Las 12 Fases Oficiales han sido cargadas en orden cronológico en Por Iniciar (Backlog) con 0 horas registradas.');
   };
 
   // Formato de tiempo para el cronómetro (HH:MM:SS)
