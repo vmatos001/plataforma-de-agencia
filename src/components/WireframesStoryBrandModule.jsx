@@ -76,19 +76,368 @@ export default function WireframesStoryBrandModule({ selectedCountry = 'SV' }) {
     }
   };
 
+  const getLocalWireframes = () => {
+    try {
+      const raw = localStorage.getItem('goglite_wireframes_v1');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveLocalWireframe = (wf) => {
+    try {
+      const list = getLocalWireframes();
+      const idx = list.findIndex(w => w.id === wf.id || w.proyectoId === wf.proyectoId);
+      if (idx !== -1) {
+        list[idx] = wf;
+      } else {
+        list.unshift(wf);
+      }
+      localStorage.setItem('goglite_wireframes_v1', JSON.stringify(list));
+    } catch (e) {}
+  };
+
+  // Motor Inteligente de StoryBrand en Cliente (Google Gemini Flash Free Tier + Fallback Determinista)
+  const generateClientSideStoryBrand = async (proyecto) => {
+    const cliente = proyecto.cliente || {};
+    const nombreComercial = proyecto.onboarding?.datos?.nombreComercial || cliente.empresa || cliente.nombre || 'Negocio';
+    const slogan = proyecto.onboarding?.datos?.slogan || 'Soluciones profesionales y atención de primera clase';
+    const actividad = cliente.actividad || 'Servicios Especializados';
+    const telefono = proyecto.onboarding?.datos?.telefonoEmergencia || cliente.telefono || '';
+    const whatsapp = proyecto.onboarding?.datos?.whatsappVentas || cliente.telefono || '';
+    const pais = proyecto.pais || 'SV';
+    const paisNombre = pais === 'DO' ? 'República Dominicana' : 'El Salvador';
+    const ubicacion = cliente.ubicacion || (pais === 'DO' ? 'Santo Domingo' : 'San Salvador');
+
+    const modulosContratados = Array.isArray(proyecto.modulos) && proyecto.modulos.length > 0
+      ? proyecto.modulos.map(m => `- ${m.titulo}: ${m.descripcion || ''}`).join('\n')
+      : '- Plataforma Web Mobile-First\n- Canales de Cierre & WhatsApp 24/7\n- Posicionamiento en Google Maps & SEO Local';
+
+    const onboardingDatos = proyecto.onboarding?.datos || {};
+    const insumosOnboarding = Object.entries(onboardingDatos)
+      .filter(([_, v]) => typeof v === 'string' && v.trim().length > 0)
+      .map(([k, v]) => `- ${k}: ${v}`)
+      .join('\n') || '- Datos base cargados en contrato SOW';
+
+    // Clave de API de Gemini (Leída de variables de entorno seguras o Backend en Render)
+    const geminiKey = (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY)) || (typeof window !== 'undefined' && window.__GOGLITE_GEMINI_KEY) || '';
+
+    if (geminiKey && geminiKey.trim()) {
+      const prompt = `Eres el Director Creativo de Copywriting de la agencia "Goglite" y un experto de clase mundial en el Framework StoryBrand de Donald Miller.
+Diseña la estrategia completa de copywriting de alta conversión para este cliente:
+EMPRESA / MARCA: "${nombreComercial}"
+NICHO / ACTIVIDAD: "${actividad}"
+PAÍS / UBICACIÓN: "${paisNombre}" (Zona: ${ubicacion})
+TELÉFONO OFICIAL: "${telefono}"
+WHATSAPP COMERCIAL: "${whatsapp}"
+MÓDULOS CONTRATADOS EN SOW:
+${modulosContratados}
+INSUMOS DEL CLIENTE (FASE 3):
+${insumosOnboarding}
+
+REGLAS DE COPYWRITING STORYBRAND:
+1. El cliente es el HÉROE; la empresa es la GUÍA (Empatía + Autoridad).
+2. Tono humano, persuasivo, adaptado a ${paisNombre}. Cero frases genéricas vacías ("somos líderes", "los mejores").
+3. Prueba de los 5 segundos en el Hero: Muy claro qué hacen, qué resuelven y cómo contactar por WhatsApp o llamada directa.
+4. Genera las 7 secciones completas y detalladas listas para maquetar en web.
+
+Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown) con esta estructura exacta:
+{
+  "storyBrand": {
+    "heroe": { "identidad": "...", "deseo": "..." },
+    "problema": { "externo": "...", "interno": "...", "filosofico": "..." },
+    "guia": { "empatia": "...", "autoridad": "..." },
+    "plan": { "paso1": "1. ...", "paso2": "2. ...", "paso3": "3. ..." },
+    "llamadaAccion": { "directa": "...", "transitoria": "..." },
+    "exito": "...",
+    "fracasoEvitado": "..."
+  },
+  "seccionesWireframe": [
+    {
+      "id": "sec-1",
+      "tipo": "hero",
+      "etiqueta": "Sección 1: Cabecera Hero (Prueba de los 5 Segundos)",
+      "titular": "...",
+      "subtitulo": "...",
+      "ctaPrincipal": "...",
+      "ctaSecundario": "...",
+      "insigniasConfianza": ["...", "...", "..."],
+      "layout": "split_hero_cta"
+    },
+    {
+      "id": "sec-2",
+      "tipo": "problema",
+      "etiqueta": "Sección 2: El Problema (Puntos de Dolor)",
+      "titular": "...",
+      "subtitulo": "...",
+      "puntosDolor": [
+        { "titulo": "...", "desc": "..." },
+        { "titulo": "...", "desc": "..." },
+        { "titulo": "...", "desc": "..." }
+      ],
+      "layout": "3_cards_pain_points"
+    },
+    {
+      "id": "sec-3",
+      "tipo": "solucion",
+      "etiqueta": "Sección 3: Servicios & Soluciones",
+      "titular": "...",
+      "subtitulo": "...",
+      "servicios": [
+        { "nombre": "...", "detalle": "..." },
+        { "nombre": "...", "detalle": "..." },
+        { "nombre": "...", "detalle": "..." }
+      ],
+      "layout": "4_services_grid"
+    },
+    {
+      "id": "sec-4",
+      "tipo": "guia",
+      "etiqueta": "Sección 4: La Guía (Empatía + Autoridad)",
+      "titular": "...",
+      "subtitulo": "...",
+      "metricas": [
+        { "valor": "...", "label": "..." },
+        { "valor": "...", "label": "..." },
+        { "valor": "...", "label": "..." }
+      ],
+      "layout": "guide_empathy_stats"
+    },
+    {
+      "id": "sec-5",
+      "tipo": "plan",
+      "etiqueta": "Sección 5: El Plan en 3 Pasos (Sencillo y Transparente)",
+      "titular": "...",
+      "subtitulo": "...",
+      "pasos": [
+        { "num": "1", "titulo": "...", "desc": "..." },
+        { "num": "2", "titulo": "...", "desc": "..." },
+        { "num": "3", "titulo": "...", "desc": "..." }
+      ],
+      "layout": "3_step_horizontal"
+    },
+    {
+      "id": "sec-6",
+      "tipo": "social_proof",
+      "etiqueta": "Sección 6: Prueba Social & Testimonios",
+      "titular": "...",
+      "subtitulo": "...",
+      "testimonios": [
+        { "cliente": "...", "texto": "...", "rating": 5 },
+        { "cliente": "...", "texto": "...", "rating": 5 }
+      ],
+      "layout": "testimonials_carousel"
+    },
+    {
+      "id": "sec-7",
+      "tipo": "cta_final",
+      "etiqueta": "Sección 7: Llamada a la Acción Final",
+      "titular": "...",
+      "subtitulo": "...",
+      "ctaPrincipal": "...",
+      "ctaSecundario": "...",
+      "layout": "high_contrast_closing_banner"
+    }
+  ]
+}`;
+
+      const models = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-lite-latest'];
+      for (const m of models) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${geminiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.7,
+                responseMimeType: 'application/json'
+              }
+            })
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            let raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            raw = raw.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+            const parsed = JSON.parse(raw);
+            if (parsed.storyBrand && Array.isArray(parsed.seccionesWireframe)) {
+              return {
+                id: 'wf-' + proyecto.id,
+                proyectoId: proyecto.id,
+                clienteNombre: cliente.nombre,
+                empresa: nombreComercial,
+                nicho: actividad,
+                pais,
+                fechaActualizacion: new Date().toISOString().split('T')[0],
+                aiGenerated: true,
+                aiModel: m,
+                storyBrand: parsed.storyBrand,
+                seccionesWireframe: parsed.seccionesWireframe
+              };
+            }
+          }
+        } catch (e) {
+          console.warn(`[Client StoryBrand AI] Error en ${m}:`, e);
+        }
+      }
+    }
+
+    // Fallback Determinista
+    return {
+      id: 'wf-' + proyecto.id,
+      proyectoId: proyecto.id,
+      clienteNombre: cliente.nombre,
+      empresa: nombreComercial,
+      nicho: actividad,
+      pais,
+      fechaActualizacion: new Date().toISOString().split('T')[0],
+      aiGenerated: false,
+      storyBrand: {
+        heroe: {
+          identidad: `Pacientes y familias en ${ubicacion} que buscan atención dental confiable, indolora y con tecnología moderna.`,
+          deseo: 'Tener una sonrisa sana, estética y comer con total seguridad sin temor al dolor ni a presupuestos excesivos.'
+        },
+        problema: {
+          externo: 'Requieren tratamientos dentales de alta calidad y les preocupa el dolor, citas demoradas o clínicas informales.',
+          interno: 'Ansiedad dental por malas experiencias pasadas o temor a cotizaciones sorpresa sin garantía.',
+          filosofico: 'Toda persona merece sonreír con orgullo y recibir atención médica dental honesta, digna y sin estrés.'
+        },
+        guia: {
+          empatia: `En ${nombreComercial} entendemos lo valiosa que es tu tranquilidad. Eliminamos el miedo al dentista con atención humana y cálida.`,
+          autoridad: 'Especialistas certificados, tecnología digital avanzada y cientos de sonrisas recuperadas con satisfacción total.'
+        },
+        plan: {
+          paso1: '1. Escríbenos a WhatsApp y elige el horario de tu preferencia.',
+          paso2: '2. Diagnóstico integral con cámara intraoral y presupuesto transparente sin letras pequeñas.',
+          paso3: '3. Disfruta de un tratamiento cómodo, seguro y con garantía de durabilidad.'
+        },
+        llamadaAccion: {
+          directa: `Agendar Cita en WhatsApp (${whatsapp || telefono})`,
+          transitoria: 'Consultar Costos y Promociones por Chat'
+        },
+        exito: 'Recuperas la seguridad de sonreír, masticar sin molestias y la confianza en tu salud bucal para siempre.',
+        fracasoEvitado: 'Evitas dolores agudos de emergencia, pérdidas dentales por descuido y gastos desorbitados por tratamientos mal realizados.'
+      },
+      seccionesWireframe: [
+        {
+          id: 'sec-1',
+          tipo: 'hero',
+          etiqueta: 'Sección 1: Cabecera Hero (Prueba de los 5 Segundos)',
+          titular: `${nombreComercial}: Tu Sonrisa en Manos de Expertos`,
+          subtitulo: `Atención odontológica avanzada y sin dolor en ${ubicacion}. Diseños de sonrisa, ortodoncia, implantes y odontología integral con facilidades de pago.`,
+          ctaPrincipal: 'Agendar Cita en WhatsApp',
+          ctaSecundario: `Llamar a Clínica (${telefono || '+503 2289-4411'})`,
+          insigniasConfianza: ['⚡ Citas Puntuales', '🛡️ Tecnología Sin Dolor', '⭐ 5.0 en Google Maps'],
+          layout: 'split_hero_cta'
+        },
+        {
+          id: 'sec-2',
+          tipo: 'problema',
+          etiqueta: 'Sección 2: El Problema (Puntos de Dolor)',
+          titular: '¿Posponiendo tu Visita al Dentista por Temor al Dolor o al Costo?',
+          subtitulo: 'Sabemos que ir al odontólogo puede causar incertidumbre. En nuestra clínica dejamos atrás esos miedos:',
+          puntosDolor: [
+            { titulo: 'Miedo al Dolor', desc: 'Protocolos de anestesia suave y tecnología mínimamente invasiva.' },
+            { titulo: 'Precios Ocultos', desc: 'Presupuestos claros desde el primer día, sin costos sorpresa.' },
+            { titulo: 'Falta de Tiempo', desc: 'Atención ágil, sin salas de espera interminables ni demoras.' }
+          ],
+          layout: '3_cards_pain_points'
+        },
+        {
+          id: 'sec-3',
+          tipo: 'solucion',
+          etiqueta: 'Sección 3: Servicios & Especialidades Odontológicas',
+          titular: 'Tratamientos Integrales para Toda tu Familia',
+          subtitulo: 'Todo lo que necesitas para tu salud y estética dental en un solo lugar.',
+          servicios: [
+            { nombre: 'Ortodoncia & Alineadores Invisibles', detalle: 'Corrige la posición de tus dientes con opciones cómodas y discretas.' },
+            { nombre: 'Implantes Dentales & Rehabilitación', detalle: 'Recupera piezas perdidas con prótesis fijas idénticas al diente natural.' },
+            { nombre: 'Diseño de Sonrisa & Blanqueamiento', detalle: 'Dientes más blancos y armónicos para potenciar tu seguridad.' },
+            { nombre: 'Odontopediatría & Limpiezas Profundas', detalle: 'Cuidado preventivo cariñoso para niños y chequeos periódicos de adultos.' }
+          ],
+          layout: '4_services_grid'
+        },
+        {
+          id: 'sec-4',
+          tipo: 'guia',
+          etiqueta: 'Sección 4: La Guía (Empatía + Autoridad)',
+          titular: 'Respaldados por Cientos de Pacientes Satisfechos',
+          subtitulo: 'Nos dedicamos a cuidar tu salud bucodental con vocación, ética y los más altos estándares sanitarios.',
+          metricas: [
+            { valor: '+10 Años', label: 'Cuidando Sonrisas' },
+            { valor: '99.4%', label: 'Pacientes Sin Dolor' },
+            { valor: '100%', label: 'Garantía de Satisfacción' }
+          ],
+          layout: 'guide_empathy_stats'
+        },
+        {
+          id: 'sec-5',
+          tipo: 'plan',
+          etiqueta: 'Sección 5: El Plan en 3 Pasos',
+          titular: 'Comenzar es Fácil y Rápido',
+          subtitulo: 'Tu nueva sonrisa está a solo 3 pasos de distancia:',
+          pasos: [
+            { num: '1', titulo: 'Escríbenos por WhatsApp', desc: 'Elige el día y hora que mejor se adapte a tu agenda.' },
+            { num: '2', titulo: 'Evaluación y Diagnóstico', desc: 'Revisamos tu caso con honestidad y te presentamos tu plan.' },
+            { num: '3', titulo: 'Sonríe con Confianza', desc: 'Inicias tu tratamiento en un ambiente relajado y profesional.' }
+          ],
+          layout: '3_step_horizontal'
+        },
+        {
+          id: 'sec-6',
+          tipo: 'social_proof',
+          etiqueta: 'Sección 6: Opiniones de Pacientes Reales',
+          titular: 'Historias que Inspiran Confianza',
+          subtitulo: 'Lee lo que opinan quienes ya transformaron su sonrisa con nosotros:',
+          testimonios: [
+            { cliente: 'Mariana G. (San Salvador)', texto: 'Tenía pánico a los dentistas. Desde que llegué aquí el trato fue increíble y el tratamiento de ortodoncia superó mis expectativas.', rating: 5 },
+            { cliente: 'Carlos R. (San Salvador)', texto: 'Puntualidad británica, instalaciones impecables y precios justos. Muy recomendados para toda la familia.', rating: 5 }
+          ],
+          layout: 'testimonials_carousel'
+        },
+        {
+          id: 'sec-7',
+          tipo: 'cta_final',
+          etiqueta: 'Sección 7: Llamado a la Acción Directo',
+          titular: `¿Listo para Lucir la Sonrisa que Siempre Has Querido?`,
+          subtitulo: 'Agenda tu valoración hoy mismo. Cupos limitados por día para asegurar atención personalizada.',
+          ctaPrincipal: 'Agendar por WhatsApp en 1 Minuto',
+          ctaSecundario: 'Llamar a Recepción',
+          layout: 'high_contrast_closing_banner'
+        }
+      ]
+    };
+  };
+
   const fetchWireframeForProject = async (projId) => {
+    // 1. Revisar si ya está guardado en localStorage
+    const localWfs = getLocalWireframes();
+    const localFound = localWfs.find(w => w.proyectoId === projId);
+    if (localFound) {
+      setActiveWireframe(localFound);
+    }
+
+    // 2. Sincronizar con backend si está disponible
     try {
       const res = await apiClient.get(`/api/wireframes/proyecto/${projId}`);
       const cType = res.headers.get('content-type') || '';
       if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
-        setActiveWireframe(data);
-      } else {
-        // If not found, auto-generate from project
-        handleGenerateForProject(projId);
+        if (data) {
+          setActiveWireframe(data);
+          saveLocalWireframe(data);
+          return;
+        }
       }
     } catch (err) {
-      console.warn('Error fetching wireframe:', err);
+      // Backend offline
+    }
+
+    // Si no existía ni local ni en backend, generar
+    if (!localFound) {
+      handleGenerateForProject(projId);
     }
   };
 
@@ -102,34 +451,45 @@ export default function WireframesStoryBrandModule({ selectedCountry = 'SV' }) {
     if (!pId) return;
 
     setIsGenerating(true);
+    let generatedWireframe = null;
+
+    // 1. Intentar llamar al backend oficial
     try {
       const res = await apiClient.post(`/api/wireframes/generar/${pId}`);
       const cType = res.headers.get('content-type') || '';
       if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
-        setActiveWireframe(data.wireframe);
-        showNotification();
+        if (data.wireframe) {
+          generatedWireframe = data.wireframe;
+        }
       }
     } catch (err) {
-      console.warn('Error generando StoryBrand:', err);
-    } finally {
-      setIsGenerating(false);
+      console.warn('Backend offline o sin proxy, ejecutando motor IA resiliente:', err);
     }
+
+    // 2. Si el backend no respondió, ejecutar generación con IA o plantilla en cliente
+    if (!generatedWireframe) {
+      const proj = proyectos.find(p => p.id === pId) || { id: pId };
+      generatedWireframe = await generateClientSideStoryBrand(proj);
+    }
+
+    if (generatedWireframe) {
+      setActiveWireframe(generatedWireframe);
+      saveLocalWireframe(generatedWireframe);
+      showNotification();
+    }
+    setIsGenerating(false);
   };
 
   const handleSaveWireframe = async () => {
     if (!activeWireframe) return;
+    saveLocalWireframe(activeWireframe);
     try {
-      const res = await apiClient.post('/api/wireframes', activeWireframe);
-      const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
-        showNotification();
-      } else {
-        showNotification();
-      }
+      await apiClient.post('/api/wireframes', activeWireframe);
     } catch (err) {
-      showNotification();
+      console.warn('Wireframe guardado localmente (Backend offline)');
     }
+    showNotification();
   };
 
   const showNotification = () => {
@@ -223,6 +583,18 @@ export default function WireframesStoryBrandModule({ selectedCountry = 'SV' }) {
               Diseña la estructura de alta conversión en 7 secciones basada en el framework StoryBrand de Donald Miller. 
               Convierte visitantes en clientes eliminando la ambigüedad y asegurando la prueba de los 5 segundos.
             </p>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {activeWireframe?.aiGenerated ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  Redactado con Google AI ({activeWireframe.aiModel || 'Gemini Flash'})
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono text-slate-400 bg-slate-800/80 border border-slate-700/80">
+                  Plantilla StoryBrand Base
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Action Buttons & Project Switcher */}
