@@ -598,6 +598,43 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     }
   };
 
+  // Eliminar insumo del proyecto
+  const handleDeleteInsumo = async (archId) => {
+    if (!activeProyecto) return;
+    if (!confirm('¿Deseas eliminar este insumo del proyecto?')) return;
+    const currentList = getInsumosList(activeProyecto);
+    const updated = currentList.filter(a => a.id !== archId);
+    const updatedProj = {
+      ...activeProyecto,
+      onboarding: {
+        ...(activeProyecto.onboarding || {}),
+        archivosSubidos: updated,
+        archivosRecibidos: updated
+      }
+    };
+    setActiveProyecto(updatedProj);
+    setProyectos(prev => {
+      const next = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
+      saveStoredProyectos(next);
+      return next;
+    });
+    try {
+      const tokensToCheck = [activeProyecto.portalToken, activeProyecto.presupuestoId, activeProyecto.id].filter(Boolean);
+      tokensToCheck.forEach(tk => {
+        const raw = localStorage.getItem('goglite_portal_' + tk);
+        if (raw) {
+          const cfg = JSON.parse(raw);
+          localStorage.setItem('goglite_portal_' + tk, JSON.stringify({
+            ...cfg,
+            archivosSubidos: updated
+          }));
+        }
+      });
+      window.dispatchEvent(new Event('storage'));
+    } catch (e) {}
+    alert('✓ Insumo eliminado del proyecto');
+  };
+
   // Validar insumos al 100% desde la agencia para iniciar formalmente los 10 días
   const handleValidateInsumosAgency = async () => {
     if (!activeProyecto) return;
@@ -1662,6 +1699,15 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                                         <span>Vista Previa</span>
                                       </button>
                                     )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteInsumo(arch.id)}
+                                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 transition-colors border border-slate-700/60"
+                                      title="Eliminar insumo del proyecto"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
                                   </div>
                                 </div>
                               );
