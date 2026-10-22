@@ -658,10 +658,83 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
 
   const [waSearchTerm, setWaSearchTerm] = useState('');
   const [waTemperatureFilter, setWaTemperatureFilter] = useState('ALL'); // 'ALL' | 'caliente' | 'tibio' | 'frio'
-  const [waRole, setWaRole] = useState('agencia'); // 'agencia' | 'cliente'
-  const [waMessageInput, setWaMessageInput] = useState('');
-  const [waScriptCategory, setWaScriptCategory] = useState('todos'); // 'todos' | 'diagnostico' | 'solucion' | 'objeciones' | 'followup' | 'cierre'
   const [waNotice, setWaNotice] = useState(null);
+
+  // Estados de Síntesis Ejecutiva & Radar Comercial
+  const [executiveSummaryInput, setExecutiveSummaryInput] = useState('');
+  const [proximoPasoInput, setProximoPasoInput] = useState('');
+  const [fechaProximoPasoInput, setFechaProximoPasoInput] = useState('');
+  const [requerimientosInput, setRequerimientosInput] = useState('');
+  const [objecionesInput, setObjecionesInput] = useState('');
+  const [nuevaNotaInput, setNuevaNotaInput] = useState('');
+
+  // Sincronizar inputs de síntesis ejecutiva cuando cambia el lead seleccionado
+  useEffect(() => {
+    const cur = leads.find(l => l.id === selectedWaLeadId) || leads[0];
+    if (cur) {
+      setExecutiveSummaryInput(cur.whatsappData?.resumenEjecutivo || '');
+      setProximoPasoInput(cur.whatsappData?.proximoPaso || '');
+      setFechaProximoPasoInput(cur.whatsappData?.fechaProximoPaso || '');
+      setRequerimientosInput(cur.whatsappData?.requerimientos || '');
+      setObjecionesInput(cur.whatsappData?.objeciones || '');
+    }
+  }, [selectedWaLeadId, leads]);
+
+  const handleSaveExecutiveBrief = async (leadId, updates) => {
+    const now = new Date();
+    const timeStr = `${now.getDate()} ${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][now.getMonth()]} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    updateAndPersistLeads(prev => prev.map(l => {
+      if (l.id !== leadId) return l;
+      const currentWa = l.whatsappData || {};
+      return {
+        ...l,
+        whatsappData: {
+          ...currentWa,
+          ...updates,
+          fechaResumen: timeStr
+        }
+      };
+    }));
+    setWaNotice('✓ Ficha ejecutiva guardada correctamente');
+    setTimeout(() => setWaNotice(null), 3000);
+
+    try {
+      await fetch(getBackendEndpoint(`/api/crm/leads/${leadId}/whatsapp-meta`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...updates, fechaResumen: timeStr })
+      });
+    } catch (e) {}
+  };
+
+  const handleAddQuickNote = async (leadId) => {
+    if (!nuevaNotaInput.trim()) return;
+    const noteText = nuevaNotaInput.trim();
+    const now = new Date();
+    const timeStr = `${now.getDate()} ${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][now.getMonth()]} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    const newNote = {
+      id: 'nota-' + Date.now(),
+      tipo: 'whatsapp',
+      titulo: 'Nota de Estatus WhatsApp',
+      detalle: noteText,
+      fecha: timeStr
+    };
+
+    updateAndPersistLeads(prev => prev.map(l => {
+      if (l.id !== leadId) return l;
+      const interacciones = Array.isArray(l.interacciones) ? l.interacciones : [];
+      return {
+        ...l,
+        interacciones: [newNote, ...interacciones]
+      };
+    }));
+
+    setNuevaNotaInput('');
+    setWaNotice('✓ Hito registrado en la bitácora');
+    setTimeout(() => setWaNotice(null), 2500);
+  };
 
   // Estados de WhatsApp Multi-Sesión Real (SV & DO)
   const [waSessions, setWaSessions] = useState({
@@ -2154,137 +2227,93 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
         </div>
       )}
 
-      {/* WHATSAPP CRM & CONVERSATIONAL SELLING SUITE */}
-      {/* WHATSAPP CRM & CONVERSATIONAL SELLING SUITE (ESTILO WHATSAPP WEB) */}
+      {/* WHATSAPP CRM: HUB DE ESTADO & SÍNTESIS DE CONVERSACIONES */}
       {activeTab === 'whatsapp_crm' && (
-        <div className="bg-[#0e1320] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[740px]">
+        <div className="bg-[#0e1320] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col min-h-[720px]">
           
-          {/* Top Banner / Strategy & Multi-Session bar */}
-          <div className="px-5 py-2.5 bg-[#131926] border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-bold text-white flex items-center gap-1.5 mr-2">
-                <MessageSquare className="w-4 h-4 text-emerald-400" />
-                <span>WhatsApp Multi-Línea</span>
-              </span>
-
-              {/* Pill Línea El Salvador */}
-              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono ${
-                waSessions.SV?.status === 'connected'
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                  : 'bg-slate-800/80 border-slate-700/80 text-slate-400'
-              }`}>
-                <span className={`w-2 h-2 rounded-full ${waSessions.SV?.status === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`}></span>
-                <span className="font-bold">🇸🇻 SV:</span>
-                <span>{waSessions.SV?.status === 'connected' ? `+${waSessions.SV.phoneNumber || '503'}` : 'Desconectada'}</span>
+          {/* Top Header del Hub */}
+          <div className="px-6 py-4 bg-[#121826] border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-bold shrink-0">
+                <MessageSquare className="w-5 h-5" />
               </div>
-
-              {/* Pill Línea República Dominicana */}
-              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono ${
-                waSessions.DO?.status === 'connected'
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                  : 'bg-slate-800/80 border-slate-700/80 text-slate-400'
-              }`}>
-                <span className={`w-2 h-2 rounded-full ${waSessions.DO?.status === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`}></span>
-                <span className="font-bold">🇩🇴 DO:</span>
-                <span>{waSessions.DO?.status === 'connected' ? `+${waSessions.DO.phoneNumber || '1'}` : 'Desconectada'}</span>
+              <div>
+                <h3 className="font-bold text-base text-white flex items-center gap-2">
+                  <span>CRM WhatsApp: Hub de Estado & Síntesis</span>
+                  <span className="text-[11px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
+                    Radar de Conversaciones
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Seguimiento de temperatura, acuerdos y resúmenes ejecutivos sin leer historiales largos. Usa WhatsApp Web o tu asistente remoto para la mensajería.
+                </p>
               </div>
-
-              {/* Botón Abrir Modal de QR */}
-              <button
-                type="button"
-                onClick={() => setIsQrModalOpen(true)}
-                className="ml-1 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all"
-              >
-                <QrCode className="w-3.5 h-3.5" />
-                <span>Vincular por Código QR</span>
-              </button>
             </div>
 
             <div className="flex items-center gap-3">
               {waNotice && (
-                <div className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium text-[11px] animate-fadeIn">
+                <div className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-semibold animate-pulse">
                   {waNotice}
                 </div>
               )}
-              <div className="text-[11px] text-slate-400 font-mono hidden sm:block">
-                {filteredLeads.length} prospectos activos
+              <div className="text-xs font-mono text-slate-400 bg-[#090d15] px-3 py-1.5 rounded-xl border border-slate-800">
+                Total Registros: <span className="text-white font-bold">{filteredLeads.length}</span>
               </div>
             </div>
           </div>
 
-          {/* 2-Column Workspace (Estilo WhatsApp Web: 30% Contactos · 70% Conversación) */}
-          <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+          {/* 2-Column Workspace: 32% Radar de Contactos · 68% Ficha Ejecutiva */}
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
             
-            {/* APARTADO 1: BANDEJA DE CONVERSACIONES RECIENTES (30% DEL ANCHO) */}
-            <div className="w-full md:w-[30%] lg:w-[30%] shrink-0 border-r border-slate-800 flex flex-col bg-[#0b0f19]">
-              {/* Inbox Header & Search */}
-              <div className="p-3 border-b border-slate-800 space-y-2.5">
+            {/* COLUMNA 1: RADAR DE CONTACTOS (32%) */}
+            <div className="w-full md:w-[32%] shrink-0 border-r border-slate-800 flex flex-col bg-[#0b0f19]">
+              
+              {/* Buscador & Filtros por Temperatura */}
+              <div className="p-3.5 border-b border-slate-800 space-y-2.5">
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Buscar conversación..."
+                    placeholder="Buscar por contacto, empresa o teléfono..."
                     value={waSearchTerm}
                     onChange={(e) => setWaSearchTerm(e.target.value)}
-                    className="w-full bg-[#131926] border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50"
+                    className="w-full bg-[#131926] border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/60"
                   />
                 </div>
 
-                {/* Filter chips for temperature */}
-                <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px]">
+                <div className="flex items-center gap-1 overflow-x-auto pb-1 text-xs">
                   <button
                     onClick={() => setWaTemperatureFilter('ALL')}
-                    className={`px-2 py-0.5 rounded-md transition-colors shrink-0 ${waTemperatureFilter === 'ALL' ? 'bg-slate-700 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                    className={`px-2.5 py-1 rounded-lg transition-all text-xs font-medium shrink-0 ${waTemperatureFilter === 'ALL' ? 'bg-slate-700 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
                   >
                     Todos ({filteredLeads.length})
                   </button>
                   <button
                     onClick={() => setWaTemperatureFilter('caliente')}
-                    className={`px-2 py-0.5 rounded-md transition-colors shrink-0 ${waTemperatureFilter === 'caliente' ? 'bg-amber-500/30 text-amber-300 font-semibold border border-amber-500/40' : 'text-slate-400 hover:text-slate-200'}`}
+                    className={`px-2.5 py-1 rounded-lg transition-all text-xs font-medium shrink-0 ${waTemperatureFilter === 'caliente' ? 'bg-amber-500/30 text-amber-300 font-bold border border-amber-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
                   >
                     🔥 Calientes
                   </button>
                   <button
                     onClick={() => setWaTemperatureFilter('tibio')}
-                    className={`px-2 py-0.5 rounded-md transition-colors shrink-0 ${waTemperatureFilter === 'tibio' ? 'bg-yellow-500/30 text-yellow-300 font-semibold border border-yellow-500/40' : 'text-slate-400 hover:text-slate-200'}`}
+                    className={`px-2.5 py-1 rounded-lg transition-all text-xs font-medium shrink-0 ${waTemperatureFilter === 'tibio' ? 'bg-yellow-500/30 text-yellow-300 font-bold border border-yellow-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
                   >
                     🟡 Tibios
                   </button>
                   <button
                     onClick={() => setWaTemperatureFilter('frio')}
-                    className={`px-2 py-0.5 rounded-md transition-colors shrink-0 ${waTemperatureFilter === 'frio' ? 'bg-sky-500/30 text-sky-300 font-semibold border border-sky-500/40' : 'text-slate-400 hover:text-slate-200'}`}
+                    className={`px-2.5 py-1 rounded-lg transition-all text-xs font-medium shrink-0 ${waTemperatureFilter === 'frio' ? 'bg-sky-500/30 text-sky-300 font-bold border border-sky-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
                   >
                     ❄️ Fríos
                   </button>
                 </div>
-
-                {/* Acciones de Bandeja: Iniciar Chat Real y Limpiar Mockups */}
-                <div className="pt-2 flex items-center justify-between gap-1.5 border-t border-slate-800/80">
-                  <button
-                    type="button"
-                    onClick={() => setIsNewChatModalOpen(true)}
-                    className="flex-1 py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Iniciar Chat Real</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleClearMockLeads}
-                    className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-[10px] font-medium transition-colors"
-                    title="Eliminar las conversaciones iniciales de prueba para dejar la bandeja limpia"
-                  >
-                    Limpiar Ejemplos
-                  </button>
-                </div>
               </div>
 
-              {/* Chat list */}
+              {/* Lista de Contactos en el Radar */}
               <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60">
                 {filteredLeads
                   .filter(l => {
-                    const matchesSearch = !waSearchTerm || 
+                    const matchesSearch = !waSearchTerm ||
                       (l.empresa || '').toLowerCase().includes(waSearchTerm.toLowerCase()) ||
                       (l.contacto || '').toLowerCase().includes(waSearchTerm.toLowerCase()) ||
                       (l.telefono || '').includes(waSearchTerm);
@@ -2293,66 +2322,55 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                   })
                   .map(leadItem => {
                     const isSelected = (selectedWaLeadId === leadItem.id) || (!selectedWaLeadId && leadItem.id === filteredLeads[0]?.id);
-                    const lastMsg = leadItem.whatsappData?.mensajes?.[leadItem.whatsappData.mensajes.length - 1];
                     const temp = leadItem.whatsappData?.temperatura || 'tibio';
                     const tempConfig = TEMPERATURE_CONFIG[temp] || TEMPERATURE_CONFIG.tibio;
-                    const stageTag = FOLLOWUP_STAGES.find(s => s.id === (leadItem.whatsappData?.estadoSeguimiento || 'esperando_respuesta')) || FOLLOWUP_STAGES[0];
+                    const stageTag = PIPELINE_STAGES.find(s => s.id === leadItem.etapa) || PIPELINE_STAGES[0];
+                    const resumenSnippet = leadItem.whatsappData?.resumenEjecutivo || leadItem.whatsappData?.proximoPaso || (leadItem.whatsappData?.mensajes?.[leadItem.whatsappData.mensajes.length - 1]?.texto) || 'Sin resumen registrado aún';
 
                     return (
                       <div
                         key={leadItem.id}
                         onClick={() => setSelectedWaLeadId(leadItem.id)}
-                        className={`p-3 cursor-pointer transition-all ${
+                        className={`p-3.5 cursor-pointer transition-all ${
                           isSelected
-                            ? 'bg-[#141c2c] border-l-4 border-emerald-500 shadow-inner'
+                            ? 'bg-[#151e30] border-l-4 border-emerald-500 shadow-inner'
                             : 'hover:bg-slate-900/60'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-emerald-400 shrink-0">
-                              {leadItem.contacto?.charAt(0) || 'C'}
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700/80 flex items-center justify-center font-bold text-xs text-emerald-400 shrink-0">
+                              {leadItem.contacto?.charAt(0) || leadItem.empresa?.charAt(0) || 'C'}
                             </div>
                             <div className="min-w-0">
-                              <div className="flex items-center gap-1">
-                                <span className="font-bold text-xs text-white truncate max-w-[110px]">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-xs text-white truncate max-w-[130px]">
                                   {leadItem.contacto}
                                 </span>
-                                <span className="text-[10px] shrink-0">{leadItem.pais === 'SV' ? '🇸🇻' : '🇩🇴'}</span>
+                                <span className="text-xs shrink-0">{leadItem.pais === 'SV' ? '🇸🇻' : '🇩🇴'}</span>
                               </div>
-                              <div className="text-[11px] text-slate-400 truncate max-w-[120px]">
+                              <div className="text-[11px] text-slate-400 truncate max-w-[140px]">
                                 {leadItem.empresa}
                               </div>
                             </div>
                           </div>
 
-                          <div className="text-right shrink-0">
-                            <span className="text-[10px] text-slate-500 font-mono">
-                              {lastMsg?.fechaHora?.split(' ')?.[1] || 'Reciente'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Last message preview */}
-                        <div className="mt-1.5 text-[11px] text-slate-400 truncate line-clamp-1">
-                          {lastMsg ? (
-                            <span>
-                              <span className="text-slate-500 font-semibold">{lastMsg.emisor === 'agencia' ? 'Tú: ' : ''}</span>
-                              {lastMsg.texto}
-                            </span>
-                          ) : (
-                            <span className="italic text-slate-600">Sin mensajes aún</span>
-                          )}
-                        </div>
-
-                        {/* Pills */}
-                        <div className="mt-2 flex items-center justify-between gap-1">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${tempConfig.badge}`}>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold shrink-0 ${tempConfig.badge}`}>
                             {tempConfig.icon} {tempConfig.label}
                           </span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${stageTag.color} truncate max-w-[120px]`}>
+                        </div>
+
+                        {/* Snippet del resumen */}
+                        <p className="mt-2 text-[11px] text-slate-300/80 line-clamp-2 leading-relaxed bg-[#0c1018]/60 p-1.5 rounded-lg border border-slate-800/60 font-sans">
+                          {resumenSnippet}
+                        </p>
+
+                        {/* Footer tags */}
+                        <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                          <span className={`px-1.5 py-0.5 rounded font-medium ${stageTag.badge} truncate max-w-[130px]`}>
                             {stageTag.label}
                           </span>
+                          <span>{leadItem.whatsappData?.fechaResumen ? `Act: ${leadItem.whatsappData.fechaResumen.split(',')[0]}` : 'Reciente'}</span>
                         </div>
                       </div>
                     );
@@ -2360,87 +2378,48 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
               </div>
             </div>
 
-            {/* APARTADO 2: CONVERSACIÓN ACTUAL (70% DEL ANCHO · AMPLIA Y ORGÁNICA) */}
+            {/* COLUMNA 2: FICHA EJECUTIVA DE SÍNTESIS & PRÓXIMO PASO (68%) */}
             {(() => {
               const currentLead = leads.find(l => l.id === selectedWaLeadId) || filteredLeads[0];
               if (!currentLead) {
                 return (
-                  <div className="flex-1 md:w-[70%] flex items-center justify-center text-slate-500 text-sm">
-                    Selecciona una conversación para comenzar
+                  <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8 space-y-3">
+                    <MessageSquare className="w-12 h-12 text-slate-700" />
+                    <p className="text-sm">Selecciona una conversación del radar para ver su resumen ejecutivo.</p>
                   </div>
                 );
               }
 
               const cleanPhone = (currentLead.whatsappData?.telefono || currentLead.telefono || '').replace(/[^\d]/g, '');
-              const messages = currentLead.whatsappData?.mensajes || [];
+              const waData = currentLead.whatsappData || {};
 
               return (
-                <div className="flex-1 min-w-0 md:w-[70%] flex flex-col bg-[#0a0e17] overflow-hidden relative">
+                <div className="flex-1 min-w-0 flex flex-col bg-[#0a0e17] overflow-y-auto">
                   
-                  {/* Chat Header: Espacioso con separación orgánica de acciones y metadatos */}
-                  <div className="p-3.5 bg-[#0f1422] border-b border-slate-800 flex flex-col gap-3 shadow-md z-10">
-                    {/* Fila 1: Contacto + Acciones Principales */}
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center font-bold text-white text-sm shadow-md shrink-0">
-                          {currentLead.contacto?.charAt(0) || 'C'}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-sm text-white truncate">{currentLead.contacto}</h4>
-                            <span className="text-xs shrink-0">{currentLead.pais === 'SV' ? '🇸🇻 El Salvador' : '🇩🇴 Rep. Dominicana'}</span>
-                          </div>
-                          <div className="text-xs text-slate-400 flex items-center gap-2 truncate">
-                            <span className="font-medium text-slate-300 truncate">{currentLead.empresa}</span>
-                            <span>·</span>
-                            <span className="font-mono text-emerald-400 shrink-0">{currentLead.whatsappData?.telefono || currentLead.telefono}</span>
-                          </div>
-                        </div>
+                  {/* Header Ejecutivo del Contacto */}
+                  <div className="p-4 bg-[#101625] border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-md">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center font-black text-white text-base shadow-md shrink-0">
+                        {currentLead.contacto?.charAt(0) || 'C'}
                       </div>
-
-                      {/* Botones Principales del Centro de Comando */}
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        <a
-                          href="https://web.whatsapp.com/"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950/50 transition-all"
-                          title="Abrir WhatsApp Web oficial en tu navegador (sesión real sin riesgo de baneo)"
-                        >
-                          <Smartphone className="w-3.5 h-3.5" />
-                          <span>Abrir WhatsApp Web</span>
-                        </a>
-
-                        <a
-                          href={`https://wa.me/${cleanPhone}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold text-xs flex items-center gap-1.5 border border-slate-700 transition-all"
-                          title="Abrir chat directo en wa.me"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          <span>wa.me</span>
-                        </a>
-
-                        <button
-                          type="button"
-                          onClick={() => setIsCopilotOpen(!isCopilotOpen)}
-                          className={`px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-all ${
-                            isCopilotOpen
-                              ? 'bg-orange-600 text-white border border-orange-400 ring-2 ring-orange-500/30'
-                              : 'bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 border border-orange-500/30'
-                          }`}
-                          title="Abrir panel con guiones StoryBrand y objeciones"
-                        >
-                          <Zap className="w-3.5 h-3.5" />
-                          <span>{isCopilotOpen ? 'Cerrar Copiloto' : '⚡ Copiloto StoryBrand'}</span>
-                        </button>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-base text-white truncate">{currentLead.contacto}</h4>
+                          <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                            {currentLead.pais === 'SV' ? '🇸🇻 El Salvador' : '🇩🇴 Rep. Dominicana'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-400 flex items-center gap-2 truncate mt-0.5">
+                          <span className="font-semibold text-slate-300 truncate">{currentLead.empresa}</span>
+                          <span>·</span>
+                          <span className="font-mono text-emerald-400 font-bold shrink-0">{currentLead.whatsappData?.telefono || currentLead.telefono || 'Sin teléfono'}</span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Fila 2: Barra de Estado Comercial & Seguimiento (Píldoras bien ordenadas) */}
-                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/80 text-xs">
-                      <div className="flex items-center gap-1.5 bg-[#141b2a] px-2.5 py-1 rounded-lg border border-slate-800 shrink-0">
+                    {/* Controles Directos: Etapa, Temperatura y Abrir WhatsApp Web */}
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <div className="flex items-center gap-1.5 bg-[#141b2a] px-3 py-1.5 rounded-xl border border-slate-700/80">
                         <span className="text-[10px] font-mono text-slate-400 font-semibold uppercase">Etapa:</span>
                         <select
                           value={currentLead.etapa}
@@ -2453,10 +2432,10 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                         </select>
                       </div>
 
-                      <div className="flex items-center gap-1.5 bg-[#141b2a] px-2.5 py-1 rounded-lg border border-slate-800 shrink-0">
+                      <div className="flex items-center gap-1.5 bg-[#141b2a] px-3 py-1.5 rounded-xl border border-slate-700/80">
                         <span className="text-[10px] font-mono text-slate-400 font-semibold uppercase">Temperatura:</span>
                         <select
-                          value={currentLead.whatsappData?.temperatura || 'tibio'}
+                          value={waData.temperatura || 'tibio'}
                           onChange={(e) => handleUpdateWaMeta(currentLead.id, { temperatura: e.target.value })}
                           className="bg-transparent text-xs text-amber-300 font-bold focus:outline-none cursor-pointer"
                         >
@@ -2466,292 +2445,187 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                         </select>
                       </div>
 
-                      <div className="flex items-center gap-1.5 bg-[#141b2a] px-2.5 py-1 rounded-lg border border-slate-800 shrink-0">
-                        <span className="text-[10px] font-mono text-slate-400 font-semibold uppercase">Protocolo:</span>
-                        <select
-                          value={currentLead.whatsappData?.estadoSeguimiento || 'esperando_respuesta'}
-                          onChange={(e) => handleUpdateWaMeta(currentLead.id, { estadoSeguimiento: e.target.value })}
-                          className="bg-transparent text-xs text-sky-300 font-medium focus:outline-none cursor-pointer max-w-[170px]"
-                        >
-                          {FOLLOWUP_STAGES.map(st => (
-                            <option key={st.id} value={st.id} className="bg-[#141b2a] text-slate-200">{st.label}</option>
-                          ))}
-                        </select>
-                      </div>
+                      {/* Botón Único Oficial: Abrir en WhatsApp Web */}
+                      <a
+                        href={cleanPhone ? `https://web.whatsapp.com/send?phone=${cleanPhone}` : 'https://web.whatsapp.com/'}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950/60 transition-all hover:scale-[1.02]"
+                        title="Abrir chat en la aplicación oficial de WhatsApp Web"
+                      >
+                        <Smartphone className="w-4 h-4" />
+                        <span>Abrir en WhatsApp Web</span>
+                        <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                      </a>
                     </div>
                   </div>
 
-                  {/* Chat Bubbles Stream (Amplio) */}
-                  <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3.5 bg-gradient-to-b from-[#0a0e17] to-[#070a10]">
-                    <div className="text-center my-1">
-                      <span className="px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[10px] text-slate-400 font-mono">
-                        Conversación activa · Lead captado para propuesta
-                      </span>
-                    </div>
-
-                    {messages.length === 0 ? (
-                      <div className="text-center py-12 text-slate-500 text-xs italic space-y-2">
-                        <MessageSquare className="w-8 h-8 text-slate-700 mx-auto" />
-                        <p>No hay mensajes registrados aún en este chat.</p>
-                        <p className="text-[11px] text-slate-600">Usa el compositor abajo o haz clic en <strong>⚡ Copiloto de Ventas</strong> para insertar un guion probado.</p>
-                      </div>
-                    ) : (
-                      messages.map((msg, idx) => {
-                        const isAgency = msg.emisor === 'agencia';
-
-                        return (
-                          <div
-                            key={msg.id || idx}
-                            className={`flex flex-col ${isAgency ? 'items-end' : 'items-start'}`}
-                          >
-                            <div className="flex items-center gap-1.5 mb-1 px-1">
-                              <span className="text-[10px] text-slate-500 font-mono">{msg.fechaHora}</span>
-                              <span className={`text-[10px] font-semibold ${isAgency ? 'text-emerald-400' : 'text-sky-400'}`}>
-                                {isAgency ? 'Tú (Goglite)' : currentLead.contacto}
-                              </span>
-                            </div>
-
-                            <div
-                              className={`max-w-[85%] md:max-w-[70%] p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap shadow-md ${
-                                isAgency
-                                  ? 'bg-emerald-600/20 border border-emerald-500/30 text-emerald-100 rounded-tr-none'
-                                  : 'bg-[#151d2e] border border-slate-700/70 text-slate-200 rounded-tl-none'
-                              }`}
-                            >
-                              {msg.texto}
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {/* Composer Bottom Area: Espacioso, orgánico y cómodo */}
-                  <div className="p-4 bg-[#0f1422] border-t border-slate-800 space-y-2.5 z-10">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <div className="flex items-center gap-1 bg-[#131926] p-1 rounded-xl border border-slate-800">
-                        <button
-                          type="button"
-                          onClick={() => setWaRole('agencia')}
-                          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                            waRole === 'agencia' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-                          }`}
-                        >
-                          💬 Mensaje Enviado
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setWaRole('cliente')}
-                          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                            waRole === 'cliente' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-                          }`}
-                        >
-                          📥 Respuesta del Cliente
-                        </button>
-                      </div>
-
-                      {/* Quick variable inserts, Sending Line Selector & Copilot activator */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                        {/* Selector de Línea Emisora */}
-                        <div className="flex items-center gap-1.5 bg-[#131926] px-2.5 py-1 rounded-lg border border-slate-800 text-[11px]">
-                          <span className="text-slate-400 font-semibold">Línea Emisora:</span>
-                          <select
-                            value={selectedSendingLine}
-                            onChange={(e) => setSelectedSendingLine(e.target.value)}
-                            className="bg-transparent text-emerald-400 font-bold focus:outline-none cursor-pointer"
-                          >
-                            <option value="SV" className="bg-[#131926] text-slate-200">
-                              🇸🇻 El Salvador {waSessions.SV?.status === 'connected' ? '🟢 Conectada' : '🔴 Desconectada'}
-                            </option>
-                            <option value="DO" className="bg-[#131926] text-slate-200">
-                              🇩🇴 Rep. Dominicana {waSessions.DO?.status === 'connected' ? '🟢 Conectada' : '🔴 Desconectada'}
-                            </option>
-                          </select>
-                        </div>
-
+                  {/* Cuerpo de la Ficha: Tarjetas de Síntesis */}
+                  <div className="p-5 md:p-6 space-y-5 flex-1">
+                    
+                    {/* TARJETA 1: RESUMEN EJECUTIVO DE LA CONVERSACIÓN */}
+                    <div className="p-5 rounded-2xl bg-[#0f1523] border border-slate-800 shadow-xl space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setWaMessageInput(prev => prev + ` ¡Hola ${currentLead.contacto.split(' ')[0]}!`)}
-                            className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition-colors"
-                          >
-                            + {currentLead.contacto.split(' ')[0]}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setIsCopilotOpen(true)}
-                            className="px-2.5 py-1 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-400 border border-orange-500/30 text-[11px] font-bold flex items-center gap-1 transition-colors"
-                          >
-                            <Zap className="w-3 h-3" />
-                            <span>Ver Guiones</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Composer Input & Buttons */}
-                    <form onSubmit={handleSendWaMessage} className="flex gap-2.5 items-end">
-                      <textarea
-                        rows={2}
-                        value={waMessageInput}
-                        onChange={(e) => setWaMessageInput(e.target.value)}
-                        placeholder={waRole === 'agencia' ? "Escribe un mensaje de WhatsApp o selecciona un guion del copiloto..." : "Registra la respuesta recibida del cliente..."}
-                        className="flex-1 bg-[#141a29] border border-slate-700/80 rounded-xl p-3 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/60 resize-none leading-relaxed"
-                      />
-
-                      <div className="flex flex-col gap-1.5 shrink-0">
-                        {/* Botón Principal: Enviar por WhatsApp Web Real */}
-                        <button
-                          type="button"
-                          onClick={() => handleSendRealWhatsAppViaLine(currentLead, waMessageInput, selectedSendingLine)}
-                          disabled={!waMessageInput.trim() || isSendingRealMsg}
-                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950 transition-all"
-                          title="Enviar directamente a través de la sesión de WhatsApp Web vinculada"
-                        >
-                          {isSendingRealMsg ? (
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Send className="w-3.5 h-3.5" />
-                          )}
-                          <span>Enviar WhatsApp</span>
-                        </button>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="submit"
-                            disabled={!waMessageInput.trim()}
-                            className="flex-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 font-semibold text-[11px] flex items-center justify-center gap-1 transition-all"
-                            title="Guardar en bitácora sin enviar"
-                          >
-                            <span>Guardar</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleOpenRealWhatsApp(currentLead, waMessageInput)}
-                            disabled={!waMessageInput.trim()}
-                            className="flex-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-emerald-400 font-semibold text-[11px] flex items-center justify-center gap-1 transition-all"
-                            title="Abrir enlace wa.me"
-                          >
-                            <Smartphone className="w-3 h-3" />
-                            <span>wa.me</span>
-                          </button>
-                        </div>
-                      </div>
-                    </form>
-                  </div>
-
-                  {/* DRAWER LATERAL ON-DEMAND DEL COPILOTO DE VENTAS */}
-                  {isCopilotOpen && (
-                    <div className="absolute inset-y-0 right-0 w-full sm:w-[380px] bg-[#0e1320] border-l border-slate-800 shadow-2xl z-20 flex flex-col animate-in slide-in-from-right duration-200">
-                      
-                      {/* Drawer Header */}
-                      <div className="p-3.5 border-b border-slate-800 bg-[#131926] flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-md bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold text-xs">
-                            <Zap className="w-3.5 h-3.5" />
+                          <div className="w-7 h-7 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center font-bold">
+                            <FileText className="w-4 h-4" />
                           </div>
                           <div>
-                            <h4 className="font-bold text-xs text-white">Copiloto de Venta WhatsApp</h4>
-                            <p className="text-[10px] text-slate-400">Guiones persuasivos de alta conversión</p>
+                            <h4 className="font-bold text-sm text-white flex items-center gap-2">
+                              <span>Resumen Ejecutivo de la Conversación</span>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                {waData.fechaResumen ? `(Actualizado: ${waData.fechaResumen})` : '(Sin fecha)'}
+                              </span>
+                            </h4>
+                            <p className="text-[11px] text-slate-400">
+                              Síntesis ejecutiva de los acuerdos, tono del cliente y estado de la negociación (generado por ti o tu asistente remoto).
+                            </p>
                           </div>
                         </div>
 
                         <button
-                          onClick={() => setIsCopilotOpen(false)}
-                          className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                          title="Cerrar panel"
+                          type="button"
+                          onClick={() => handleSaveExecutiveBrief(currentLead.id, {
+                            resumenEjecutivo: executiveSummaryInput,
+                            requerimientos: requerimientosInput,
+                            objeciones: objecionesInput,
+                            proximoPaso: proximoPasoInput,
+                            fechaProximoPaso: fechaProximoPasoInput
+                          })}
+                          className="px-4 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-orange-950 transition-all"
                         >
-                          <X className="w-4 h-4" />
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Guardar Ficha</span>
                         </button>
                       </div>
 
-                      {/* Script Category Tabs */}
-                      <div className="p-2.5 border-b border-slate-800/80 bg-[#0f1422]">
-                        <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px]">
-                          {[
-                            { id: 'todos', label: 'Todos' },
-                            { id: 'diagnostico', label: 'Saludo' },
-                            { id: 'solucion', label: 'Solución' },
-                            { id: 'objeciones', label: 'Objeciones' },
-                            { id: 'followup', label: '1-3-7' },
-                            { id: 'cierre', label: 'Cierre' }
-                          ].map(cat => (
-                            <button
-                              key={cat.id}
-                              onClick={() => setWaScriptCategory(cat.id)}
-                              className={`px-2.5 py-1 rounded-md transition-colors shrink-0 ${
-                                waScriptCategory === cat.id
-                                  ? 'bg-orange-600 text-white font-semibold'
-                                  : 'text-slate-400 hover:text-slate-200 bg-slate-800/60'
-                              }`}
-                            >
-                              {cat.label}
-                            </button>
-                          ))}
+                      <textarea
+                        rows={3}
+                        value={executiveSummaryInput}
+                        onChange={(e) => setExecutiveSummaryInput(e.target.value)}
+                        placeholder="Ejemplo: Cliente interesado en rediseño web StoryBrand para su clínica dental. Le pareció excelente la entrega en 10 días llave en mano. Preguntó por facilidades de pago del anticipo 50/50 y solicita ver el portal de cliente con la propuesta formal..."
+                        className="w-full bg-[#090d16] border border-slate-800 rounded-xl p-3.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-orange-500/60 leading-relaxed font-sans resize-none"
+                      />
+                    </div>
+
+                    {/* TARJETA 2 EN 2 COLUMNAS: REQUERIMIENTOS Y OBJECIONES */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      
+                      {/* Columna A: Requerimientos & Servicios de Interés */}
+                      <div className="p-4 rounded-xl bg-[#0f1523] border border-slate-800 space-y-2.5">
+                        <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase tracking-wide">
+                          <Sparkles className="w-4 h-4" />
+                          <span>Requerimientos & Servicios Clave</span>
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={requerimientosInput}
+                          onChange={(e) => setRequerimientosInput(e.target.value)}
+                          placeholder="Ej: Sitio web Mobile-First, presencia en Google Maps, botón directo a WhatsApp..."
+                          className="w-full bg-[#090d16] border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50 resize-none leading-relaxed"
+                        />
+                      </div>
+
+                      {/* Columna B: Objeciones o Puntos a Resolver */}
+                      <div className="p-4 rounded-xl bg-[#0f1523] border border-slate-800 space-y-2.5">
+                        <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wide">
+                          <AlertCircle className="w-4 h-4" />
+                          <span>Objeciones o Dudas Expresadas</span>
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={objecionesInput}
+                          onChange={(e) => setObjecionesInput(e.target.value)}
+                          placeholder="Ej: Dudas sobre métodos de transferencia local o tiempo exacto de entrega..."
+                          className="w-full bg-[#090d16] border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-amber-500/50 resize-none leading-relaxed"
+                        />
+                      </div>
+                    </div>
+
+                    {/* TARJETA 3: PRÓXIMO PASO Y COMPROMISO */}
+                    <div className="p-4 rounded-xl bg-[#111827] border border-slate-800 space-y-3">
+                      <div className="flex items-center gap-2 text-xs font-bold text-sky-400 uppercase tracking-wide">
+                        <Clock className="w-4 h-4" />
+                        <span>Próximo Paso Acordado & Compromiso Comercial</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="md:col-span-2">
+                          <input
+                            type="text"
+                            value={proximoPasoInput}
+                            onChange={(e) => setProximoPasoInput(e.target.value)}
+                            placeholder="Ej: Enviar enlace del portal con contrato SOW antes de las 3:00 PM..."
+                            className="w-full bg-[#090d16] border border-slate-800 rounded-lg p-2.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500/50"
+                          />
+                        </div>
+                        <div>
+                          <input
+                            type="date"
+                            value={fechaProximoPasoInput}
+                            onChange={(e) => setFechaProximoPasoInput(e.target.value)}
+                            className="w-full bg-[#090d16] border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500/50"
+                          />
                         </div>
                       </div>
+                    </div>
 
-                      {/* Scripts List */}
-                      <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-[#0a0e17]">
-                        {WHATSAPP_SCRIPTS
-                          .filter(s => waScriptCategory === 'todos' || s.categoria === waScriptCategory)
-                          .map(script => {
-                            const scriptText = currentLead ? script.generarTexto(currentLead) : 'Selecciona un prospecto';
-
-                            return (
-                              <div
-                                key={script.id}
-                                className="p-3 rounded-xl bg-[#121827] border border-slate-800 hover:border-slate-700 transition-all space-y-2"
-                              >
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-orange-400 border border-slate-700">
-                                    {script.fase}
-                                  </span>
-                                  <span className="text-[10px] text-slate-500 font-semibold uppercase">
-                                    {script.categoriaLabel}
-                                  </span>
-                                </div>
-
-                                <div className="font-bold text-xs text-slate-200">
-                                  {script.titulo}
-                                </div>
-
-                                <div className="p-2.5 rounded-lg bg-[#090d15] border border-slate-800/80 text-[11px] text-slate-300 leading-relaxed font-sans max-h-28 overflow-y-auto">
-                                  {scriptText}
-                                </div>
-
-                                <div className="flex items-center justify-end gap-2 pt-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      handleInsertScript(scriptText);
-                                    }}
-                                    className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium flex items-center gap-1 transition-colors"
-                                  >
-                                    <Edit className="w-3 h-3 text-sky-400" />
-                                    <span>Insertar en chat</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      handleDirectLaunchScript(currentLead, scriptText);
-                                    }}
-                                    className="px-2.5 py-1 rounded bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold flex items-center gap-1 transition-colors"
-                                  >
-                                    <Smartphone className="w-3 h-3 text-emerald-400" />
-                                    <span>Lanzar wa.me</span>
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
+                    {/* TARJETA 4: BITÁCORA RÁPIDA DE HITOS DE LA CONVERSACIÓN */}
+                    <div className="p-4 rounded-xl bg-[#0f1523] border border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-300 uppercase tracking-wide flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Bitácora de Hitos & Acuerdos Registrados ({currentLead.interacciones?.length || 0})</span>
+                        </span>
                       </div>
 
-                    </div>
-                  )}
+                      {/* Mini Form para registrar hito rápido */}
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={nuevaNotaInput}
+                          onChange={(e) => setNuevaNotaInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddQuickNote(currentLead.id);
+                            }
+                          }}
+                          placeholder="Añadir nota de estatus rápida (ej: Cliente confirmó recepción del presupuesto)..."
+                          className="flex-1 bg-[#090d16] border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAddQuickNote(currentLead.id)}
+                          disabled={!nuevaNotaInput.trim()}
+                          className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-emerald-400 font-bold text-xs flex items-center gap-1 transition-all"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Añadir Hito</span>
+                        </button>
+                      </div>
 
+                      {/* Lista de notas/hitos cronológicos */}
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {(!currentLead.interacciones || currentLead.interacciones.length === 0) ? (
+                          <div className="p-3 rounded-lg bg-[#090d16] border border-slate-800/60 text-center text-xs text-slate-500">
+                            No hay notas de estatus en la bitácora aún. Escribe arriba para registrar un hito.
+                          </div>
+                        ) : (
+                          currentLead.interacciones.map((item, idx) => (
+                            <div key={item.id || idx} className="p-2.5 rounded-lg bg-[#090d16] border border-slate-800/80 text-xs flex items-start justify-between gap-3">
+                              <div className="space-y-0.5">
+                                <span className="font-bold text-slate-200 block text-[11px]">{item.titulo || 'Nota de Estatus'}</span>
+                                <p className="text-slate-400 text-[11px] leading-relaxed">{item.detalle}</p>
+                              </div>
+                              <span className="text-[10px] font-mono text-slate-500 shrink-0">{item.fecha}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
               );
             })()}
