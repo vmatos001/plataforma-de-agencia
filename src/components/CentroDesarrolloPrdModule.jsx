@@ -1469,26 +1469,6 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
             </div>
           </div>
 
-          {/* Barra de Confirmación y Guardado Inferior */}
-          <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#0c1017] border border-slate-800">
-            <span className="text-xs text-slate-400">
-              Presiona guardar para asentar las URLs de Google Stitch, Drive, Staging, GitHub y Producción en este proyecto.
-            </span>
-            <div className="flex items-center gap-2">
-              {savedVaultNotice && (
-                <span className="text-xs font-mono text-emerald-400 font-bold flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-lg animate-pulse">
-                  <Check className="w-3.5 h-3.5" /> ¡Guardado Exitosamente!
-                </span>
-              )}
-              <button
-                onClick={handleSaveVault}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md"
-              >
-                <Save className="w-4 h-4" />
-                <span>Guardar Bóveda</span>
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
