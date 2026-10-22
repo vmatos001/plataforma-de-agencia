@@ -253,19 +253,29 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     prioridad: 'media'
   });
 
-  // Estado de Bóveda de Repositorios & URLs
+  // Estado de Bóveda de Repositorios & URLs (Configuración limpia y Google Stitch)
   const [repoVault, setRepoVault] = useState(() => {
     try {
       const cached = localStorage.getItem('goglite_repo_vault');
-      if (cached) return JSON.parse(cached);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.figmaBoard && !parsed.googleStitchUrl) {
+          parsed.googleStitchUrl = '';
+          delete parsed.figmaBoard;
+        }
+        if (parsed.githubRepo === 'https://github.com/goglite-agency/cliente-web-platform') parsed.githubRepo = '';
+        if (parsed.stagingUrl === 'https://goglite-client-staging.web.app') parsed.stagingUrl = '';
+        if (parsed.productionUrl === 'https://www.gruasandreasv.com') parsed.productionUrl = '';
+        if (parsed.driveAssets === 'https://drive.google.com/drive/folders/goglite-client-assets') parsed.driveAssets = '';
+        return parsed;
+      }
     } catch (e) {}
     return {
-      githubRepo: 'https://github.com/goglite-agency/cliente-web-platform',
-      figmaBoard: 'https://www.figma.com/design/goglite-templates-2026',
-      stagingUrl: 'https://goglite-client-staging.web.app',
-      productionUrl: 'https://www.gruasandreasv.com',
-      driveAssets: 'https://drive.google.com/drive/folders/goglite-client-assets',
-      deployCommand: 'npm run build && firebase deploy --only hosting'
+      googleStitchUrl: '',
+      driveAssets: '',
+      stagingUrl: '',
+      githubRepo: '',
+      productionUrl: ''
     };
   });
   const [copiedField, setCopiedField] = useState(null);
@@ -338,8 +348,31 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
       if (vaultByProjRaw) {
         const vaultByProj = JSON.parse(vaultByProjRaw);
         if (vaultByProj && vaultByProj[selectedProyectoId]) {
-          setRepoVault(vaultByProj[selectedProyectoId]);
+          const pVault = { ...vaultByProj[selectedProyectoId] };
+          if (pVault.figmaBoard && !pVault.googleStitchUrl) {
+            delete pVault.figmaBoard;
+          }
+          if (pVault.githubRepo === 'https://github.com/goglite-agency/cliente-web-platform') pVault.githubRepo = '';
+          if (pVault.stagingUrl === 'https://goglite-client-staging.web.app') pVault.stagingUrl = '';
+          if (pVault.productionUrl === 'https://www.gruasandreasv.com') pVault.productionUrl = '';
+          if (pVault.driveAssets === 'https://drive.google.com/drive/folders/goglite-client-assets') pVault.driveAssets = '';
+          setRepoVault(pVault);
+        } else {
+          const proj = proyectos.find(p => p.id === selectedProyectoId);
+          setRepoVault({
+            googleStitchUrl: '',
+            driveAssets: proj?.portalConfig?.driveVaultUrl || proj?.onboarding?.driveFolderUrl || '',
+            stagingUrl: '',
+            githubRepo: '',
+            productionUrl: ''
+          });
         }
+      } else {
+        const proj = proyectos.find(p => p.id === selectedProyectoId);
+        setRepoVault(prev => ({
+          ...prev,
+          driveAssets: prev.driveAssets || proj?.portalConfig?.driveVaultUrl || proj?.onboarding?.driveFolderUrl || ''
+        }));
       }
     } catch (e) {}
   }, [selectedProyectoId]);
@@ -811,6 +844,35 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
 
                             <p className="text-[11px] text-slate-400 leading-relaxed">{task.descripcion}</p>
 
+                            {/* Acceso Directo de Auditoría QA en Kanban */}
+                            {task.id === 'fase-9' && (
+                              <div className="pt-1">
+                                <a
+                                  href={`https://pagespeed.web.dev/analysis?url=${encodeURIComponent(repoVault.stagingUrl || repoVault.productionUrl || 'https://goglite-agency.web.app')}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold font-mono transition-all shadow-sm"
+                                >
+                                  <Zap className="w-3 h-3 text-emerald-400" />
+                                  <span>⚡ Auditar en PageSpeed ↗</span>
+                                </a>
+                              </div>
+                            )}
+
+                            {task.id === 'fase-10' && (
+                              <div className="pt-1">
+                                <a
+                                  href="https://is-agentic.com"
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-[10px] font-bold font-mono transition-all shadow-sm"
+                                >
+                                  <Sparkles className="w-3 h-3 text-purple-400" />
+                                  <span>🤖 Certificar en is-agentic ↗</span>
+                                </a>
+                              </div>
+                            )}
+
                             {/* Badge de Horas y Cronómetro */}
                             <div className="pt-1.5 border-t border-slate-800/60 flex items-center justify-between text-[10px] font-mono">
                               <div className="text-slate-400">
@@ -1131,10 +1193,10 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
             <div>
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
                 <FolderGit2 className="w-4 h-4 text-orange-400" />
-                <span>Bóveda de Repositorios, Staging & Assets</span>
+                <span>Bóveda de Repositorios, URLs & Entornos</span>
               </h2>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Centraliza los accesos de desarrollo del cliente: GitHub privado, URLs de Staging, Figma y comando de publicación a Firebase.
+                Centraliza los accesos de desarrollo del cliente: Google Stitch (UI), Drive de activos, Staging en Firebase, GitHub privado y Dominio de producción.
               </p>
             </div>
             {savedVaultNotice && (
@@ -1144,8 +1206,131 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* 1. GitHub Repo */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* 1. Google Stitch (Prototipo UI & Diseño) */}
+            <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                  <Layout className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Google Stitch (UI & Diseño)</span>
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleCopyText(repoVault.googleStitchUrl || '', 'stitch')}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] flex items-center gap-1 font-mono"
+                  >
+                    {copiedField === 'stitch' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>Copiar</span>
+                  </button>
+                  {repoVault.googleStitchUrl && (
+                    <a
+                      href={repoVault.googleStitchUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                      title="Abrir Google Stitch"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+              <input
+                type="text"
+                placeholder="https://stitch.google.com/..."
+                value={repoVault.googleStitchUrl || ''}
+                onChange={(e) => setRepoVault({ ...repoVault, googleStitchUrl: e.target.value })}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
+              />
+              <p className="text-[10px] text-slate-500">Prototipo interactivo y wireframes visuales diseñados en Google Stitch para el cliente.</p>
+            </div>
+
+            {/* 2. Google Drive / Bóveda de Assets */}
+            <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                  <FolderGit2 className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Google Drive (Logos & Assets)</span>
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={handleCreateDriveVault}
+                    disabled={creatingDriveVault}
+                    title="Crear o enlazar bóveda centralizada"
+                    className="p-1 px-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-[10px] flex items-center gap-1 font-mono font-bold transition-colors"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${creatingDriveVault ? 'animate-spin' : ''}`} />
+                    <span>{creatingDriveVault ? 'Creando...' : '⚡ Sincronizar'}</span>
+                  </button>
+                  <button
+                    onClick={() => handleCopyText(repoVault.driveAssets || '', 'drive')}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] flex items-center gap-1 font-mono"
+                  >
+                    {copiedField === 'drive' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>Copiar</span>
+                  </button>
+                  {repoVault.driveAssets && (
+                    <a
+                      href={repoVault.driveAssets}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                      title="Abrir Google Drive"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+              <input
+                type="text"
+                placeholder="https://drive.google.com/drive/folders/..."
+                value={repoVault.driveAssets || ''}
+                onChange={(e) => setRepoVault({ ...repoVault, driveAssets: e.target.value })}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500"
+              />
+              <p className="text-[10px] text-slate-500">Carpeta oficial compartida con el cliente para fotos en alta resolución, branding y recursos.</p>
+            </div>
+
+            {/* 3. Staging URL (Firebase) */}
+            <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                  <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>URL de Staging (Firebase)</span>
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleCopyText(repoVault.stagingUrl || '', 'staging')}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] flex items-center gap-1 font-mono"
+                  >
+                    {copiedField === 'staging' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>Copiar</span>
+                  </button>
+                  {repoVault.stagingUrl && (
+                    <a
+                      href={repoVault.stagingUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                      title="Abrir Staging"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+              <input
+                type="text"
+                placeholder="https://proyecto-staging.web.app"
+                value={repoVault.stagingUrl || ''}
+                onChange={(e) => setRepoVault({ ...repoVault, stagingUrl: e.target.value })}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
+              />
+              <p className="text-[10px] text-slate-500">Entorno de pruebas y previsualización para el cliente con despliegues automáticos.</p>
+            </div>
+
+            {/* 4. GitHub Repo */}
             <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-300 flex items-center gap-2">
@@ -1154,176 +1339,89 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
                 </label>
                 <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => handleCopyText(repoVault.githubRepo, 'github')}
+                    onClick={() => handleCopyText(repoVault.githubRepo || '', 'github')}
                     className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] flex items-center gap-1 font-mono"
                   >
                     {copiedField === 'github' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                     <span>Copiar</span>
                   </button>
-                  <a
-                    href={repoVault.githubRepo}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
+                  {repoVault.githubRepo && (
+                    <a
+                      href={repoVault.githubRepo}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                      title="Abrir Repositorio GitHub"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
               </div>
               <input
                 type="text"
-                value={repoVault.githubRepo}
+                placeholder="https://github.com/organizacion/repositorio-privado"
+                value={repoVault.githubRepo || ''}
                 onChange={(e) => setRepoVault({ ...repoVault, githubRepo: e.target.value })}
                 className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-orange-500"
               />
+              <p className="text-[10px] text-slate-500">Control de versiones privado donde se compila el código fuente con Astro / Vite.</p>
             </div>
 
-            {/* 2. Staging URL */}
+            {/* 5. Dominio Oficial en Producción */}
             <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-300 flex items-center gap-2">
-                  <Globe className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>URL de Staging Temporal (Firebase)</span>
+                  <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Dominio Oficial (Producción)</span>
                 </label>
                 <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => handleCopyText(repoVault.stagingUrl, 'staging')}
+                    onClick={() => handleCopyText(repoVault.productionUrl || '', 'production')}
                     className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] flex items-center gap-1 font-mono"
                   >
-                    {copiedField === 'staging' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    {copiedField === 'production' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                     <span>Copiar</span>
                   </button>
-                  <a
-                    href={repoVault.stagingUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
+                  {repoVault.productionUrl && (
+                    <a
+                      href={repoVault.productionUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                      title="Abrir Dominio Oficial"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
               </div>
               <input
                 type="text"
-                value={repoVault.stagingUrl}
-                onChange={(e) => setRepoVault({ ...repoVault, stagingUrl: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
+                placeholder="https://www.dominiodelcliente.com"
+                value={repoVault.productionUrl || ''}
+                onChange={(e) => setRepoVault({ ...repoVault, productionUrl: e.target.value })}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500"
               />
+              <p className="text-[10px] text-slate-500">Dominio definitivo del cliente enlazado con certificado SSL de Firebase Hosting.</p>
             </div>
 
-            {/* 3. Figma / Diseño UI */}
-            <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-2">
-                  <Layout className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Tablero Figma / Wireframes UX</span>
-                </label>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => handleCopyText(repoVault.figmaBoard, 'figma')}
-                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] flex items-center gap-1 font-mono"
-                  >
-                    {copiedField === 'figma' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    <span>Copiar</span>
-                  </button>
-                  <a
-                    href={repoVault.figmaBoard}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              </div>
-              <input
-                type="text"
-                value={repoVault.figmaBoard}
-                onChange={(e) => setRepoVault({ ...repoVault, figmaBoard: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-purple-500"
-              />
-            </div>
-
-            {/* 4. Google Drive / Bóveda de Assets */}
-            <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-2">
-                  <FolderGit2 className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Carpeta Google Drive (Logos & Fotos)</span>
-                </label>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={handleCreateDriveVault}
-                    disabled={creatingDriveVault}
-                    title="Crear o enlazar bóveda centralizada en sitesgoglite@gmail.com"
-                    className="p-1 px-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-[10px] flex items-center gap-1 font-mono font-bold transition-colors"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${creatingDriveVault ? 'animate-spin' : ''}`} />
-                    <span>{creatingDriveVault ? 'Creando...' : '⚡ Bóveda Drive'}</span>
-                  </button>
-                  <button
-                    onClick={() => handleCopyText(repoVault.driveAssets, 'drive')}
-                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] flex items-center gap-1 font-mono"
-                  >
-                    {copiedField === 'drive' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    <span>Copiar</span>
-                  </button>
-                  <a
-                    href={repoVault.driveAssets}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              </div>
-              <input
-                type="text"
-                value={repoVault.driveAssets}
-                onChange={(e) => setRepoVault({ ...repoVault, driveAssets: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500"
-              />
-            </div>
-          </div>
-
-          {/* Caja de Comando de Despliegue 1-Click */}
-          <div className="p-4 rounded-xl bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-transparent border border-orange-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-bold text-orange-300 font-mono">
-                <Terminal className="w-4 h-4 text-orange-400" />
-                <span>Comando de Compilación y Publicación a Staging</span>
-              </div>
-              <code className="text-[11px] font-mono text-slate-300 block mt-1 bg-black/40 px-3 py-1.5 rounded-lg border border-slate-800">
-                {repoVault.deployCommand}
-              </code>
-            </div>
-            <button
-              onClick={() => handleCopyText(repoVault.deployCommand, 'deploy')}
-              className="px-3.5 py-2 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold font-mono flex items-center gap-1.5 shrink-0 shadow-sm transition-all"
-            >
-              {copiedField === 'deploy' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copiedField === 'deploy' ? '¡Copiado!' : 'Copiar Comando'}</span>
-            </button>
-          </div>
-
-          {/* Enlaces de Auditoría y Comandos Diarios del Playbook Maestro */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 6. Herramientas de Auditoría QA en Vivo */}
             <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 space-y-3">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-300 font-mono">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Herramientas de Auditoría QA en Vivo</span>
+                <span>Auditoría QA & Certificación en Vivo</span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <a
-                  href="https://pagespeed.web.dev"
+                  href={`https://pagespeed.web.dev/analysis?url=${encodeURIComponent(repoVault.stagingUrl || repoVault.productionUrl || 'https://goglite-agency.web.app')}`}
                   target="_blank"
                   rel="noreferrer"
                   className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-emerald-500/40 flex items-center justify-between text-slate-300 hover:text-white transition-colors"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <Zap className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>PageSpeed (90+)</span>
+                    <span className="text-[11px] font-bold">PageSpeed</span>
                   </div>
                   <ExternalLink className="w-3 h-3 text-slate-500" />
                 </a>
@@ -1334,31 +1432,19 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
                   rel="noreferrer"
                   className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-purple-500/40 flex items-center justify-between text-slate-300 hover:text-white transition-colors"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                    <span>is-agentic.com (80+)</span>
+                    <span className="text-[11px] font-bold">is-agentic</span>
                   </div>
                   <ExternalLink className="w-3 h-3 text-slate-500" />
                 </a>
               </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 space-y-2">
-              <div className="text-xs font-bold text-slate-300 font-mono flex items-center gap-2">
-                <Terminal className="w-4 h-4 text-cyan-400" />
-                <span>Pipeline de Comandos Diarios (Playbook Maestro)</span>
-              </div>
-              <div className="text-[11px] font-mono text-slate-400 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 space-y-1">
-                <div># 1. Compilación limpia: <span className="text-emerald-400">npm run build</span></div>
-                <div># 2. Control de cambios: <span className="text-cyan-400">git commit -m "feat: avance"</span></div>
-                <div># 3. Despliegue perimetral $0: <span className="text-orange-400">npx -y firebase-tools deploy --only hosting</span></div>
-              </div>
+              <p className="text-[10px] text-slate-500">Auditorías automáticas también disponibles directamente en las tarjetas de Fase 9 y 10 del Sprint Kanban.</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================================= */}
       {/* MODAL: NUEVA TAREA DE SPRINT                                              */}
       {/* ========================================================================= */}
       {showNewTaskModal && (
