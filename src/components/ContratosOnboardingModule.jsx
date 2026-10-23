@@ -697,9 +697,9 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
           }));
         }
       });
-      window.dispatchEvent(new Event('storage'));
     } catch (e) {}
-    alert('✓ Insumo eliminado del proyecto');
+    window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: [updatedProj] } }));
+    window.dispatchEvent(new Event('storage'));
   };
 
   // Validar insumos al 100% desde la agencia para iniciar formalmente los 10 días
@@ -1718,7 +1718,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                                         <span>Recibido: <strong className="text-slate-300">{arch.fecha || 'Reciente'}</strong></span>
                                         {arch.hora && <span>({arch.hora})</span>}
                                         <span className="text-emerald-400 flex items-center gap-1 font-semibold">
-                                          <Check className="w-3.5 h-3.5" /> En Google Drive
+                                          <Check className="w-3 h-3" /> En Google Drive
                                         </span>
                                       </div>
 
@@ -1954,7 +1954,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                       title="Re-evaluar eventos de cliente y tareas del sprint ahora"
                       className="px-2.5 py-1 text-[11px] font-mono text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700/60 shadow-sm"
                     >
-                      <RefreshCw className="w-3.5 h-3.5 text-orange-400" />
+                      <RefreshCw className="w-3 h-3 text-orange-400" />
                       <span>Re-evaluar Eventos</span>
                     </button>
                     <span className="text-xs font-mono text-slate-400 bg-slate-800/60 px-2.5 py-1 rounded-lg border border-slate-700">
@@ -2014,7 +2014,6 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                         }`}>
                           Fase {h.fase}
                         </span>
-
                         <span className="text-slate-500 text-[10px]">{h.fecha}</span>
                       </div>
                     </div>

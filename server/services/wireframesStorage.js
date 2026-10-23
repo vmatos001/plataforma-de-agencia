@@ -209,7 +209,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin formato markdown adicional) con est
         if (res.ok) {
           const data = await res.json();
           let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          rawText = rawText.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+          rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(rawText);
 
           if (parsed.storyBrand && Array.isArray(parsed.seccionesWireframe)) {

@@ -260,7 +260,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown) con esta estructura exact
           if (res.ok) {
             const data = await res.json();
             let raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            raw = raw.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+            raw = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
             const parsed = JSON.parse(raw);
             if (parsed.storyBrand && Array.isArray(parsed.seccionesWireframe)) {
               return {
@@ -297,28 +297,28 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown) con esta estructura exact
       storyBrand: {
         heroe: {
           identidad: `Pacientes y familias en ${ubicacion} que buscan atención dental confiable, indolora y con tecnología moderna.`,
-          deseo: 'Tener una sonrisa sana, estética y comer con total seguridad sin temor al dolor ni a presupuestos excesivos.'
+          deseo: `Tener una sonrisa sana, estética y comer con total seguridad sin temor al dolor ni a presupuestos excesivos.`
         },
         problema: {
-          externo: 'Requieren tratamientos dentales de alta calidad y les preocupa el dolor, citas demoradas o clínicas informales.',
-          interno: 'Ansiedad dental por malas experiencias pasadas o temor a cotizaciones sorpresa sin garantía.',
-          filosofico: 'Toda persona merece sonreír con orgullo y recibir atención médica dental honesta, digna y sin estrés.'
+          externo: `Requieren tratamientos dentales de alta calidad y les preocupa el dolor, citas demoradas o clínicas informales.`,
+          interno: `Ansiedad dental por malas experiencias pasadas o temor a cotizaciones sorpresa sin garantía.`,
+          filosofico: `Toda persona merece sonreír con orgullo y recibir atención médica dental honesta, digna y sin estrés.`
         },
         guia: {
           empatia: `En ${nombreComercial} entendemos lo valiosa que es tu tranquilidad. Eliminamos el miedo al dentista con atención humana y cálida.`,
-          autoridad: 'Especialistas certificados, tecnología digital avanzada y cientos de sonrisas recuperadas con satisfacción total.'
+          autoridad: `Especialistas certificados, tecnología digital avanzada y cientos de sonrisas recuperadas con satisfacción total.`
         },
         plan: {
-          paso1: '1. Escríbenos a WhatsApp y elige el horario de tu preferencia.',
-          paso2: '2. Diagnóstico integral con cámara intraoral y presupuesto transparente sin letras pequeñas.',
-          paso3: '3. Disfruta de un tratamiento cómodo, seguro y con garantía de durabilidad.'
+          paso1: `1. Escríbenos a WhatsApp y elige el horario de tu preferencia.`,
+          paso2: `2. Diagnóstico integral con cámara intraoral y presupuesto transparente sin letras pequeñas.`,
+          paso3: `3. Disfruta de un tratamiento cómodo, seguro y con garantía de durabilidad.`
         },
         llamadaAccion: {
           directa: `Agendar Cita en WhatsApp (${whatsapp || telefono})`,
-          transitoria: 'Consultar Costos y Promociones por Chat'
+          transitoria: `Consultar Costos y Promociones por Chat`
         },
-        exito: 'Recuperas la seguridad de sonreír, masticar sin molestias y la confianza en tu salud bucal para siempre.',
-        fracasoEvitado: 'Evitas dolores agudos de emergencia, pérdidas dentales por descuido y gastos desorbitados por tratamientos mal realizados.'
+        exito: `Recuperas la seguridad de sonreír, masticar sin molestias y la confianza en tu salud bucal para siempre.`,
+        fracasoEvitado: `Evitas dolores agudos de emergencia, pérdidas dentales por descuido y gastos desorbitados por tratamientos mal realizados.`
       },
       seccionesWireframe: [
         {
@@ -327,7 +327,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown) con esta estructura exact
           etiqueta: 'Sección 1: Cabecera Hero (Prueba de los 5 Segundos)',
           titular: `${nombreComercial}: Tu Sonrisa en Manos de Expertos`,
           subtitulo: `Atención odontológica avanzada y sin dolor en ${ubicacion}. Diseños de sonrisa, ortodoncia, implantes y odontología integral con facilidades de pago.`,
-          ctaPrincipal: 'Agendar Cita en WhatsApp',
+          ctaPrincipal: `Agendar Cita en WhatsApp`,
           ctaSecundario: `Llamar a Clínica (${telefono || '+503 2289-4411'})`,
           insigniasConfianza: ['⚡ Citas Puntuales', '🛡️ Tecnología Sin Dolor', '⭐ 5.0 en Google Maps'],
           layout: 'split_hero_cta'
@@ -363,8 +363,8 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown) con esta estructura exact
           id: 'sec-4',
           tipo: 'guia',
           etiqueta: 'Sección 4: La Guía (Empatía + Autoridad)',
-          titular: 'Respaldados por Cientos de Pacientes Satisfechos',
-          subtitulo: 'Nos dedicamos a cuidar tu salud bucodental con vocación, ética y los más altos estándares sanitarios.',
+          titular: `Respaldados por Cientos de Pacientes Satisfechos`,
+          subtitulo: `Nos dedicamos a cuidar tu salud bucodental con vocación, ética y los más altos estándares sanitarios.`,
           metricas: [
             { valor: '+10 Años', label: 'Cuidando Sonrisas' },
             { valor: '99.4%', label: 'Pacientes Sin Dolor' },
@@ -402,9 +402,9 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown) con esta estructura exact
           tipo: 'cta_final',
           etiqueta: 'Sección 7: Llamado a la Acción Directo',
           titular: `¿Listo para Lucir la Sonrisa que Siempre Has Querido?`,
-          subtitulo: 'Agenda tu valoración hoy mismo. Cupos limitados por día para asegurar atención personalizada.',
-          ctaPrincipal: 'Agendar por WhatsApp en 1 Minuto',
-          ctaSecundario: 'Llamar a Recepción',
+          subtitulo: `Agenda tu valoración hoy mismo. Cupos limitados por día para asegurar atención personalizada.`,
+          ctaPrincipal: `Agendar por WhatsApp en 1 Minuto`,
+          ctaSecundario: `Llamar a Recepción`,
           layout: 'high_contrast_closing_banner'
         }
       ]

@@ -1201,7 +1201,7 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 4: BÓVEDA DE REPOSITORIOS, FIGMA, STAGING & COMANDOS DE DESPLIEGUE     */}
+      {/* TAB 4: BÓVEDA DE REPOSITORIOS, GOOGLE STITCH, DRIVE & STAGING             */}
       {/* ========================================================================= */}
       {activeTab === 'repositorios' && (
         <div className="space-y-4">
@@ -1468,10 +1468,10 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
               <p className="text-[10px] text-slate-500">Auditorías automáticas también disponibles directamente en las tarjetas de Fase 9 y 10 del Sprint Kanban.</p>
             </div>
           </div>
-
         </div>
       )}
 
+      {/* ========================================================================= */}
       {/* MODAL: NUEVA TAREA DE SPRINT                                              */}
       {/* ========================================================================= */}
       {showNewTaskModal && (

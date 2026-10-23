@@ -3259,11 +3259,20 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
                     <button
                       type="submit"
-                      disabled={!assetName.trim() && !selectedFile}
+                      disabled={(!assetName.trim() && !selectedFile) || subiendoInsumo}
                       className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-orange-950 transition-all"
                     >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Registrar Insumo de Marca</span>
+                      {subiendoInsumo ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Guardando en Google Drive...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Subir Insumo a Google Drive</span>
+                        </>
+                      )}
                     </button>
                   </form>
                 </div>
@@ -3288,10 +3297,10 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     )}
                   </div>
 
-                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                  <div className="space-y-2.5 max-h-80 overflow-y-auto">
                     {(portalConfig?.archivosSubidos || []).length === 0 ? (
-                      <div className="p-6 text-center text-xs text-slate-500 italic bg-slate-900/40 rounded-xl">
-                        Aún no se han registrado insumos. Utiliza el formulario a la izquierda.
+                      <div className="p-6 text-center text-xs text-slate-500 italic bg-slate-900/40 rounded-xl border border-slate-800/60">
+                        Aún no se han registrado insumos. Utiliza el formulario a la izquierda para subir archivos a Google Drive.
                       </div>
                     ) : (
                       portalConfig.archivosSubidos.map((arch) => (
