@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAZifkGcuDk3gwP4H8tyT0DKEGDiF7obrY",
@@ -71,4 +71,22 @@ export async function getCmsSiteFromFirestore(slug) {
   return null;
 }
 
-export default { app, db, auth, ensureAuth, saveCmsSiteToFirestore, getCmsSiteFromFirestore };
+/**
+ * Conecta la cuenta de Google mediante OAuth 2.0 con permisos de Google Business Profile
+ */
+export async function connectGoogleBusinessAccount() {
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/business.manage');
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const result = await signInWithPopup(auth, provider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    const token = credential?.accessToken;
+    return { success: true, user: result.user, token };
+  } catch (err) {
+    console.warn('[Firebase Auth Google GBP]', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export default { app, db, auth, ensureAuth, saveCmsSiteToFirestore, getCmsSiteFromFirestore, connectGoogleBusinessAccount };
