@@ -484,7 +484,7 @@ Reglas técnicas de cumplimiento obligatorio:
           <span>📍 Ficha de Google Business & Reseñas IA</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono font-bold flex items-center gap-1">
             <Star className="w-2.5 h-2.5 fill-amber-400" />
-            <span>4.9 (48)</span>
+            <span>{currentSite?.slug === 'goglite' ? '5.0 (3)' : '5.0'}</span>
           </span>
         </button>
       </div>
