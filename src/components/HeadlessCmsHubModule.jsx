@@ -28,9 +28,51 @@ import {
   CheckCheck
 } from 'lucide-react';
 
+const GOGLITE_DEFAULT_SITE = {
+  id: 'cms-goglite',
+  slug: 'goglite',
+  nombre: 'Goglite Digital Hub',
+  pais: 'SV',
+  dominio: 'goglite.com',
+  estado: 'publicado',
+  ultimaActualizacion: new Date().toISOString().split('T')[0],
+  contenido: {
+    branding: {
+      nombreMarca: 'Goglite Agency',
+      slogan: 'Arquitectura Digital & Agentes de IA',
+      colorPrimario: '#FF6B00',
+      telefonoWhatsApp: '+503 7000-9999',
+      ciudadPrincipal: 'San Salvador & Santo Domingo'
+    },
+    hero: {
+      badge: '⚡ Oferta del mes de agosto',
+      titulo: 'Si las IA no te encuentran, tu negocio no existe.',
+      subtitulo: 'Dejamos atrás el diseño web estático. Optimizamos tu infraestructura digital para que los LLMs recomienden tu marca e integramos agentes autónomos que convierten tráfico en facturación 24/7.',
+      botonTexto: 'Contactar por WhatsApp',
+      botonSubtexto: 'Respuesta inmediata'
+    },
+    servicios: [
+      {
+        id: 's-1',
+        titulo: 'Optimización para Motores de IA (GEO)',
+        descripcion: 'Infraestructura semántica para que ChatGPT, Perplexity y Gemini citen y recomienden tu marca.',
+        precio: 'Desde $450 USD'
+      },
+      {
+        id: 's-2',
+        titulo: 'Agentes Autónomos & CRM',
+        descripcion: 'Automatización comercial 24/7 con IA que califica leads y agenda reuniones.',
+        precio: 'Desde $350 USD'
+      }
+    ],
+    testimonios: [],
+    faqs: []
+  }
+};
+
 export default function HeadlessCmsHubModule() {
   const [sites, setSites] = useState([]);
-  const [selectedSlug, setSelectedSlug] = useState('gruas-andrea');
+  const [selectedSlug, setSelectedSlug] = useState('goglite');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -84,9 +126,27 @@ export default function HeadlessCmsHubModule() {
         }
       }
 
-      // Semilla demo si no hay nada
-      if (!loaded || loaded.length === 0) {
-        loaded = [
+      if (!Array.isArray(loaded)) loaded = [];
+
+      // Garantizar que el sitio oficial Goglite Digital Hub esté siempre disponible al inicio
+      const existingGogliteIdx = loaded.findIndex(s => s.slug === 'goglite');
+      if (existingGogliteIdx === -1) {
+        loaded.unshift(GOGLITE_DEFAULT_SITE);
+      } else {
+        // Asegurar datos frescos de prueba
+        loaded[existingGogliteIdx] = {
+          ...GOGLITE_DEFAULT_SITE,
+          ...loaded[existingGogliteIdx],
+          contenido: {
+            ...GOGLITE_DEFAULT_SITE.contenido,
+            ...(loaded[existingGogliteIdx].contenido || {})
+          }
+        };
+      }
+
+      // Semilla demo complementaria si solo está goglite
+      if (loaded.length === 1) {
+        loaded.push(
           {
             id: 'cms-001',
             slug: 'gruas-andrea',
@@ -116,47 +176,13 @@ export default function HeadlessCmsHubModule() {
                   titulo: 'Remolque en Grúa de Plataforma',
                   descripcion: 'Transporte seguro para sedanes, SUVs y deportivos sin rozar defensas.',
                   precio: 'Desde $45 USD'
-                },
-                {
-                  id: 's-2',
-                  titulo: 'Paso de Corriente & Batería',
-                  descripcion: 'Unidad de auxilio rápido para reactivar tu batería en carretera o estacionamiento.',
-                  precio: 'Desde $20 USD'
-                },
-                {
-                  id: 's-3',
-                  titulo: 'Cambio de Neumático & Cerrajería Vial',
-                  descripcion: 'Apertura de autos cerrados y cambio de llanta pinchada en el lugar del incidente.',
-                  precio: 'Desde $25 USD'
                 }
               ],
-              testimonios: [
-                {
-                  id: 't-1',
-                  cliente: 'Carlos Méndez',
-                  comentario: 'Excelente servicio. Llegaron en 20 minutos a la autopista y el trato del conductor fue de primera.',
-                  estrellas: 5
-                },
-                {
-                  id: 't-2',
-                  cliente: 'Dra. Patricia Rivas',
-                  comentario: 'Se me descargó la batería de noche y me auxiliaron al instante. Súper confiables.',
-                  estrellas: 5
-                }
-              ],
-              faqs: [
-                {
-                  pregunta: '¿Cuál es el tiempo promedio de llegada?',
-                  respuesta: 'Entre 20 y 30 minutos dentro del área metropolitana.'
-                },
-                {
-                  pregunta: '¿Qué formas de pago aceptan?',
-                  respuesta: 'Transferencia Banco Agrícola, Wompi, tarjeta de crédito y efectivo.'
-                }
-              ]
+              testimonios: [],
+              faqs: []
             }
           }
-        ];
+        );
       }
 
       setSites(loaded);
@@ -1005,12 +1031,22 @@ export default function HeadlessCmsHubModule() {
                   <Eye className="w-3.5 h-3.5 text-orange-400" />
                   <span>Simulador del Sitio Web</span>
                 </span>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono">
-                  Sincronizado
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>En Línea</span>
                 </span>
               </div>
 
               <div className="flex items-center gap-2">
+                <a
+                  href={`https://${currentSite.dominio}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 text-[11px] font-semibold border border-orange-500/30 transition-colors"
+                >
+                  <span>Abrir {currentSite.dominio}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
                 <div className="flex items-center gap-1 bg-[#131926] p-0.5 rounded-lg border border-slate-700">
                   <button
                     onClick={() => setPreviewTab('render')}
