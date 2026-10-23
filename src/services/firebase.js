@@ -89,4 +89,23 @@ export async function connectGoogleBusinessAccount() {
   }
 }
 
-export default { app, db, auth, ensureAuth, saveCmsSiteToFirestore, getCmsSiteFromFirestore, connectGoogleBusinessAccount };
+/**
+ * Conecta la cuenta de Google con permisos de Search Console y Analytics (Site Kit)
+ */
+export async function connectGoogleSiteKitAccount() {
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/webmasters.readonly');
+    provider.addScope('https://www.googleapis.com/auth/analytics.readonly');
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const result = await signInWithPopup(auth, provider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    const token = credential?.accessToken;
+    return { success: true, user: result.user, token };
+  } catch (err) {
+    console.warn('[Firebase Auth Google Site Kit]', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export default { app, db, auth, ensureAuth, saveCmsSiteToFirestore, getCmsSiteFromFirestore, connectGoogleBusinessAccount, connectGoogleSiteKitAccount };
