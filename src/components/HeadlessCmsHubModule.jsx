@@ -727,6 +727,13 @@ export default function HeadlessCmsHubModule() {
               {/* Live Embedded Client Website */}
               <iframe
                 ref={iframeRef}
+                onLoad={() => {
+                  try {
+                    if (iframeRef.current && iframeRef.current.contentWindow) {
+                      iframeRef.current.contentWindow.postMessage({ type: 'GOGLITE_CMS_ENABLE_INLINE_EDITOR' }, '*');
+                    }
+                  } catch (e) {}
+                }}
                 src={
                   selectedSlug === 'goglite'
                     ? 'https://goglite.com/?goglite_edit=true'
