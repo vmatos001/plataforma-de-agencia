@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import apiClient from '../services/apiClient';
 import { saveCmsSiteToFirestore, getCmsSiteFromFirestore } from '../services/firebase';
 import {
@@ -8,6 +8,7 @@ import {
   Save,
   Check,
   Smartphone,
+  Tablet,
   Monitor,
   Copy,
   ExternalLink,
@@ -26,7 +27,8 @@ import {
   Star,
   Zap,
   Building2,
-  CheckCheck
+  CheckCheck,
+  MousePointerClick
 } from 'lucide-react';
 
 const GOGLITE_DEFAULT_SITE = {
@@ -77,13 +79,18 @@ export default function HeadlessCmsHubModule() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [previewDevice, setPreviewDevice] = useState('desktop'); // 'desktop' | 'mobile'
+  const [previewDevice, setPreviewDevice] = useState('desktop'); // 'desktop' | 'tablet' | 'mobile'
   const [previewTab, setPreviewTab] = useState('render'); // 'render' | 'json'
-  const [activeHubTab, setActiveHubTab] = useState('editor'); // 'editor' | 'snippet' | 'nuevo'
+  const [activeHubTab, setActiveHubTab] = useState('visual_editor'); // 'visual_editor' | 'editor' | 'snippet' | 'nuevo'
   
   const [copiedScript, setCopiedScript] = useState(false);
   const [copiedTag, setCopiedTag] = useState(null);
   const [pingStatus, setPingStatus] = useState(null); // null | 'testing' | 'online' | 'offline'
+
+  // Opción C: Estado para el Editor Visual en Vivo
+  const iframeRef = useRef(null);
+  const [unsavedChangesCount, setUnsavedChangesCount] = useState(0);
+  const [discoveredPageInfo, setDiscoveredPageInfo] = useState(null);
 
   // Form state for editing current site
   const [editableContent, setEditableContent] = useState(null);
@@ -100,6 +107,32 @@ export default function HeadlessCmsHubModule() {
 
   useEffect(() => {
     fetchSites();
+
+    // Listener para recibir cambios en caliente desde el iframe visual
+    const handleWindowMessage = (event) => {
+      if (!event.data) return;
+      if (event.data.type === 'GOGLITE_CMS_INLINE_CHANGE') {
+        const { key, value } = event.data;
+        setEditableContent((prev) => {
+          if (!prev) return prev;
+          const next = JSON.parse(JSON.stringify(prev));
+          const parts = key.split('.');
+          let target = next;
+          for (let i = 0; i < parts.length - 1; i++) {
+            if (!target[parts[i]]) target[parts[i]] = {};
+            target = target[parts[i]];
+          }
+          target[parts[parts.length - 1]] = value;
+          return next;
+        });
+        setUnsavedChangesCount((c) => c + 1);
+      } else if (event.data.type === 'GOGLITE_CMS_PAGE_DISCOVERED') {
+        setDiscoveredPageInfo(event.data);
+      }
+    };
+
+    window.addEventListener('message', handleWindowMessage);
+    return () => window.removeEventListener('message', handleWindowMessage);
   }, []);
 
   const fetchSites = async () => {
@@ -266,6 +299,10 @@ export default function HeadlessCmsHubModule() {
       });
 
       setSavedSuccess(true);
+      setUnsavedChangesCount(0);
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        iframeRef.current.contentWindow.postMessage({ type: 'GOGLITE_CMS_SAVE_CONFIRMED' }, '*');
+      }
       setTimeout(() => setSavedSuccess(false), 2500);
     } catch (err) {
       console.error('Error guardando CMS:', err);
@@ -503,43 +540,205 @@ export default function HeadlessCmsHubModule() {
       </div>
 
       {/* 2. SUB-NAVIGATION TABS */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveHubTab('visual_editor')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
+            activeHubTab === 'visual_editor'
+              ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-lg shadow-orange-950/50'
+              : 'bg-[#0e1320] text-slate-400 hover:text-white'
+          }`}
+        >
+          <MousePointerClick className="w-4 h-4 text-orange-300" />
+          <span>1. 🎨 Editor Visual en Vivo (Click-to-Edit)</span>
+        </button>
+
         <button
           onClick={() => setActiveHubTab('editor')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
             activeHubTab === 'editor'
               ? 'bg-orange-600 text-white shadow-lg shadow-orange-950'
               : 'bg-[#0e1320] text-slate-400 hover:text-white'
           }`}
         >
           <Sliders className="w-4 h-4" />
-          <span>1. Editor de Contenido Visual</span>
+          <span>2. 📝 Editor de Campos (Formulario)</span>
         </button>
 
         <button
           onClick={() => setActiveHubTab('snippet')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
             activeHubTab === 'snippet'
               ? 'bg-blue-600 text-white shadow-lg shadow-blue-950'
               : 'bg-[#0e1320] text-slate-400 hover:text-white'
           }`}
         >
           <Code2 className="w-4 h-4" />
-          <span>2. Guía de Conexión & Snippet (Compatibilidad Anterior)</span>
+          <span>3. ⚡ Conexión & Snippet Universal</span>
         </button>
 
         <button
           onClick={() => setActiveHubTab('nuevo')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
             activeHubTab === 'nuevo'
               ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-950'
               : 'bg-[#0e1320] text-slate-400 hover:text-white'
           }`}
         >
           <Plus className="w-4 h-4" />
-          <span>3. Dar de Alta Nuevo Sitio Cliente</span>
+          <span>4. ➕ Dar de Alta Nuevo Sitio</span>
         </button>
       </div>
+
+      {/* 3. TAB CONTENT: OPCIÓN C - EDITOR VISUAL EN VIVO (CLICK-TO-EDIT) */}
+      {activeHubTab === 'visual_editor' && (
+        <div className="flex-1 flex flex-col gap-4">
+          {/* Top Control Bar */}
+          <div className="p-3.5 bg-[#0e1320] border border-slate-800 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md">
+            {/* Viewport switcher */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 font-semibold mr-1">Vista:</span>
+              <div className="flex items-center bg-[#131926] p-1 rounded-xl border border-slate-700/80">
+                <button
+                  onClick={() => setPreviewDevice('desktop')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    previewDevice === 'desktop' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Monitor className="w-3.5 h-3.5" />
+                  <span>Escritorio</span>
+                </button>
+                <button
+                  onClick={() => setPreviewDevice('tablet')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    previewDevice === 'tablet' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Tablet className="w-3.5 h-3.5" />
+                  <span>Tablet</span>
+                </button>
+                <button
+                  onClick={() => setPreviewDevice('mobile')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    previewDevice === 'mobile' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>Móvil</span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => {
+                  if (iframeRef.current) {
+                    iframeRef.current.src = iframeRef.current.src;
+                  }
+                }}
+                className="p-1.5 rounded-xl bg-[#131926] border border-slate-700 text-slate-300 hover:text-white text-xs flex items-center gap-1 cursor-pointer"
+                title="Recargar página"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* URL bar indicator */}
+            <div className="flex items-center gap-2 bg-[#131926] border border-slate-700/80 rounded-xl px-3 py-1 text-xs text-slate-300 font-mono">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="text-slate-400">https://</span>
+              <span className="text-white font-bold">{currentSite?.dominio || `${currentSite?.slug}.com`}</span>
+              <a
+                href={`https://${currentSite?.dominio || `${currentSite?.slug}.com`}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-orange-400 hover:text-orange-300 ml-1"
+                title="Abrir en pestaña nueva"
+              >
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+
+            {/* Unsaved changes + Save Button */}
+            <div className="flex items-center gap-3">
+              {unsavedChangesCount > 0 ? (
+                <span className="bg-amber-500/20 text-amber-400 border border-amber-500/40 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5 animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                  {unsavedChangesCount} {unsavedChangesCount === 1 ? 'cambio pendiente' : 'cambios pendientes'}
+                </span>
+              ) : (
+                <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Sincronizado
+                </span>
+              )}
+
+              <button
+                onClick={handleSaveContent}
+                disabled={saving}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950 transition-all cursor-pointer"
+              >
+                {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                <span>{savedSuccess ? '¡Publicado con Éxito!' : 'Publicar Cambios en Vivo'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Mode Explanation & Discovered Elements Banner */}
+          <div className="bg-gradient-to-r from-orange-950/30 via-slate-900 to-[#0e1320] border border-orange-500/30 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-slate-300">
+              <MousePointerClick className="w-4 h-4 text-orange-400 shrink-0" />
+              <span>
+                <strong className="text-orange-400">Modo Click-to-Edit Activo:</strong> Pasa el ratón sobre cualquier texto o botón en la web de abajo para ver la silueta naranja. Haz clic y escribe directamente sobre la pantalla como en Elementor.
+              </span>
+            </div>
+            {discoveredPageInfo && (
+              <span className="text-[11px] bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded-lg border border-slate-700 font-mono">
+                ⚡ {discoveredPageInfo.elementsCount} campos editables detectados
+              </span>
+            )}
+          </div>
+
+          {/* Iframe Viewport Container */}
+          <div className="flex justify-center items-start min-h-[680px] bg-[#05070b] border border-slate-800/80 rounded-2xl p-4 overflow-hidden relative">
+            <div
+              className={`transition-all duration-300 flex flex-col bg-slate-900 rounded-xl overflow-hidden shadow-2xl border border-slate-700 ${
+                previewDevice === 'mobile'
+                  ? 'w-[390px] h-[700px]'
+                  : previewDevice === 'tablet'
+                  ? 'w-[768px] h-[720px]'
+                  : 'w-full h-[720px]'
+              }`}
+            >
+              {/* Window Title Bar */}
+              <div className="bg-[#131926] px-4 py-2 flex items-center justify-between border-b border-slate-800 shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500/80"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-500/80"></span>
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                  <span>https://{currentSite?.dominio || `${currentSite?.slug}.com`}</span>
+                </div>
+                <div className="text-[10px] text-orange-400 font-bold bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20">
+                  Modo Editor Activo
+                </div>
+              </div>
+
+              {/* Live Embedded Client Website */}
+              <iframe
+                ref={iframeRef}
+                src={
+                  selectedSlug === 'goglite'
+                    ? 'https://goglite.com/?goglite_edit=true'
+                    : `https://${currentSite?.dominio || `${currentSite?.slug}.com`}/?goglite_edit=true`
+                }
+                title="Editor Visual en Vivo"
+                className="w-full flex-1 bg-white border-0"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 3. TAB CONTENT */}
       {activeHubTab === 'nuevo' && (
