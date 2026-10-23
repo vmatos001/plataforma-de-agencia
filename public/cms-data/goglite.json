@@ -1,0 +1,25 @@
+{
+  "id": "cms-goglite",
+  "slug": "goglite",
+  "nombre": "Goglite Digital Hub",
+  "pais": "SV",
+  "dominio": "goglite.com",
+  "estado": "publicado",
+  "ultimaActualizacion": "2026-10-23",
+  "contenido": {
+    "branding": {
+      "nombreMarca": "Goglite",
+      "slogan": "Arquitectura Digital & Agentes de IA",
+      "colorPrimario": "#FF6B00",
+      "telefonoWhatsApp": "+503 7000-9999",
+      "ciudadPrincipal": "San Salvador & Santo Domingo"
+    },
+    "hero": {
+      "badge": "⚡ Oferta del mes de agosto",
+      "titulo": "Si las IA no te encuentran, tu negocio no existe.",
+      "subtitulo": "Dejamos atrás el diseño web estático. Optimizamos tu infraestructura digital para que los LLMs recomienden tu marca e integramos agentes autónomos que convierten tráfico en facturación 24/7.",
+      "botonTexto": "Contactar por WhatsApp",
+      "botonSubtexto": "Respuesta inmediata"
+    }
+  }
+}
