@@ -1,0 +1,172 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: cms_sites
+// Document ID: {siteSlug} (ej: 'goglite', 'gruas-andrea')
+// Fields:
+//   - slug: string (obligatorio, 1-100 caracteres, inmutable, coincide con {siteSlug})
+//   - nombre: string (obligatorio, 1-200 caracteres) - Nombre de la marca o sitio web
+//   - contenido: map (obligatorio) - Objeto de configuración y textos del CMS
+//       - branding: map (opcional) - Identidad visual y contacto
+//           - telefonoWhatsApp: string (opcional, máx 30 caracteres)
+//           - nombreMarca: string (opcional, máx 100 caracteres)
+//           - slogan: string (opcional, máx 300 caracteres)
+//           - colorPrimario: string (opcional, máx 50 caracteres)
+//           - ciudadPrincipal: string (opcional, máx 150 caracteres)
+//       - hero: map (opcional) - Sección de portada del sitio
+//           - titulo: string (opcional, máx 250 caracteres)
+//           - subtitulo: string (opcional, máx 500 caracteres)
+//           - badge: string (opcional, máx 150 caracteres)
+//           - botonTexto: string (opcional, máx 100 caracteres)
+//           - botonSubtexto: string (opcional, máx 150 caracteres)
+//       - servicios: list (opcional, máx 50 elementos)
+//       - testimonios: list (opcional, máx 50 elementos)
+//       - faqs: list (opcional, máx 50 elementos)
+//   - id: string (opcional, máx 100 caracteres, inmutable si existe)
+//   - pais: string (opcional, máx 10 caracteres)
+//   - dominio: string (opcional, máx 150 caracteres)
+//   - estado: string (opcional, máx 50 caracteres, ej: 'publicado', 'borrador')
+//   - ultimaActualizacion: string | timestamp (opcional, máx 50 caracteres)
+//   - createdAt: timestamp (opcional, inmutable tras creación)
+//   - updatedAt: timestamp (opcional)
+//   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación)
+//   - updatedBy: string (opcional, máx 128 caracteres)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Verifica si la solicitud proviene de un usuario autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Verifica si el usuario cuenta con privilegios de administrador mediante Custom Claims o Token Role
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.admin == true || request.auth.token.role == 'admin');
+    }
+
+    // Valida que el documento contenga todos los campos obligatorios
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Valida que el documento no contenga campos no autorizados (previene inyección de metadatos)
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    // Validación de sub-estructura de branding
+    function isValidBranding(branding) {
+      return branding is map &&
+        (!('telefonoWhatsApp' in branding) || (branding.telefonoWhatsApp is string && branding.telefonoWhatsApp.size() <= 30)) &&
+        (!('nombreMarca' in branding) || (branding.nombreMarca is string && branding.nombreMarca.size() <= 100)) &&
+        (!('slogan' in branding) || (branding.slogan is string && branding.slogan.size() <= 300)) &&
+        (!('colorPrimario' in branding) || (branding.colorPrimario is string && branding.colorPrimario.size() <= 50)) &&
+        (!('ciudadPrincipal' in branding) || (branding.ciudadPrincipal is string && branding.ciudadPrincipal.size() <= 150));
+    }
+
+    // Validación de sub-estructura de hero
+    function isValidHero(hero) {
+      return hero is map &&
+        (!('titulo' in hero) || (hero.titulo is string && hero.titulo.size() <= 250)) &&
+        (!('subtitulo' in hero) || (hero.subtitulo is string && hero.subtitulo.size() <= 500)) &&
+        (!('badge' in hero) || (hero.badge is string && hero.badge.size() <= 150)) &&
+        (!('botonTexto' in hero) || (hero.botonTexto is string && hero.botonTexto.size() <= 100)) &&
+        (!('botonSubtexto' in hero) || (hero.botonSubtexto is string && hero.botonSubtexto.size() <= 150));
+    }
+
+    // Validación del mapa de contenido general
+    function isValidContenido(contenido) {
+      return contenido is map &&
+        (!('branding' in contenido) || isValidBranding(contenido.branding)) &&
+        (!('hero' in contenido) || isValidHero(contenido.hero)) &&
+        (!('servicios' in contenido) || (contenido.servicios is list && contenido.servicios.size() <= 50)) &&
+        (!('testimonios' in contenido) || (contenido.testimonios is list && contenido.testimonios.size() <= 50)) &&
+        (!('faqs' in contenido) || (contenido.faqs is list && contenido.faqs.size() <= 50));
+    }
+
+    // Validador principal del documento de sitio CMS (Validator Function Pattern)
+    function isValidCmsSite(data, siteSlug) {
+      return hasRequiredFields(['slug', 'nombre', 'contenido']) &&
+        hasOnlyAllowedFields([
+          'id', 'slug', 'nombre', 'pais', 'dominio', 'estado',
+          'ultimaActualizacion', 'contenido', 'createdAt', 'updatedAt',
+          'createdBy', 'updatedBy'
+        ]) &&
+        data.slug is string &&
+        data.slug.size() >= 1 &&
+        data.slug.size() <= 100 &&
+        data.slug == siteSlug &&
+        data.nombre is string &&
+        data.nombre.size() >= 1 &&
+        data.nombre.size() <= 200 &&
+        isValidContenido(data.contenido) &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 100)) &&
+        (!('pais' in data) || (data.pais is string && data.pais.size() <= 10)) &&
+        (!('dominio' in data) || (data.dominio is string && data.dominio.size() <= 150)) &&
+        (!('estado' in data) || (data.estado is string && data.estado.size() <= 50)) &&
+        (!('ultimaActualizacion' in data) || (data.ultimaActualizacion is string && data.ultimaActualizacion.size() <= 50) || data.ultimaActualizacion is timestamp) &&
+        (!('createdAt' in data) || data.createdAt is timestamp) &&
+        (!('updatedAt' in data) || data.updatedAt is timestamp) &&
+        (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 128)) &&
+        (!('updatedBy' in data) || (data.updatedBy is string && data.updatedBy.size() <= 128));
+    }
+
+    // Garantiza que los campos inmutables (identificadores y fechas de origen) no sean alterados en update
+    function isImmutableSiteDataPreserved() {
+      return request.resource.data.slug == resource.data.slug &&
+        (!('id' in resource.data) || request.resource.data.id == resource.data.id) &&
+        (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt) &&
+        (!('createdBy' in resource.data) || request.resource.data.createdBy == resource.data.createdBy);
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // Colección principal: Sitios web administrados por el Headless CMS de la agencia
+    match /cms_sites/{siteSlug} {
+      // 1. Lectura pública:
+      // Los sitios web de clientes finales ejecutan el script universal 'cms.js'
+      // para consumir y renderizar textos, branding y botones sin exigir login.
+      allow read: if true;
+
+      // 2. Creación:
+      // Requiere autenticación de usuario y validación exhaustiva de esquema y tipos.
+      allow create: if isAuthenticated() &&
+                    isValidCmsSite(request.resource.data, siteSlug);
+
+      // 3. Actualización:
+      // Requiere autenticación, validación de esquema y preservación de campos inmutables.
+      allow update: if isAuthenticated() &&
+                    isValidCmsSite(request.resource.data, siteSlug) &&
+                    isImmutableSiteDataPreserved();
+
+      // 4. Eliminación:
+      // Restringido estrictamente a administradores autenticados.
+      allow delete: if isAdmin();
+    }
+
+    // ===============================================================
+    // Default Deny Fallback
+    // ===============================================================
+    // Bloquea explícitamente cualquier otra ruta o colección no declarada
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

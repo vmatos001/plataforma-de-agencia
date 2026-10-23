@@ -1,6 +1,7 @@
 /**
- * Goglite Headless CMS — Universal Client Script (v1.0.0)
+ * Goglite Headless CMS — Universal Client Script (v1.1.0)
  * Ultra-rápido, tolerante a fallos, 0ms en visitas recurrentes con caché local.
+ * Conectado en tiempo real a Google Cloud Firestore REST API.
  */
 (function() {
   var scriptTag = document.currentScript || (function() {
@@ -79,9 +80,42 @@
     }
   } catch (e) {}
 
+  // Parseador ligero para documentos de Google Cloud Firestore REST API
+  function parseFirestoreValue(val) {
+    if (!val || typeof val !== 'object') return val;
+    if ('stringValue' in val) return val.stringValue;
+    if ('integerValue' in val) return parseInt(val.integerValue, 10);
+    if ('doubleValue' in val) return parseFloat(val.doubleValue);
+    if ('booleanValue' in val) return val.booleanValue;
+    if ('timestampValue' in val) return val.timestampValue;
+    if ('nullValue' in val) return null;
+    if ('arrayValue' in val) {
+      return ((val.arrayValue && val.arrayValue.values) || []).map(parseFirestoreValue);
+    }
+    if ('mapValue' in val) {
+      var out = {};
+      var f = (val.mapValue && val.mapValue.fields) || {};
+      for (var k in f) {
+        out[k] = parseFirestoreValue(f[k]);
+      }
+      return out;
+    }
+    return val;
+  }
+
+  function parseFirestoreDoc(doc) {
+    if (!doc || !doc.fields) return doc;
+    var res = {};
+    for (var k in doc.fields) {
+      res[k] = parseFirestoreValue(doc.fields[k]);
+    }
+    return res;
+  }
+
   // B. Sincronización en vivo con la nube
   function fetchContent() {
     var endpoints = [
+      'https://firestore.googleapis.com/v1/projects/goglite-agency/databases/(default)/documents/cms_sites/' + siteSlug,
       apiUrl + '/cms-data/' + siteSlug + '.json',
       apiUrl + '/api/cms/content/' + siteSlug,
       'https://raw.githubusercontent.com/vmatos001/plataforma-de-agencia/main/server/data/cms_sites.json'
@@ -98,7 +132,11 @@
         })
         .then(function(data) {
           var content = null;
-          if (Array.isArray(data)) {
+          if (data && data.fields) {
+            // Documento proveniente de Google Cloud Firestore
+            var parsedDoc = parseFirestoreDoc(data);
+            if (parsedDoc && parsedDoc.contenido) content = parsedDoc.contenido;
+          } else if (Array.isArray(data)) {
             var found = data.find(function(s) { return s.slug === siteSlug; });
             if (found && found.contenido) content = found.contenido;
           } else if (data && data.contenido) {

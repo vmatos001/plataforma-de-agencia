@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../services/apiClient';
+import { saveCmsSiteToFirestore, getCmsSiteFromFirestore } from '../services/firebase';
 import {
   Globe,
   Layout,
@@ -185,6 +186,19 @@ export default function HeadlessCmsHubModule() {
         );
       }
 
+      // Intentar sincronizar datos en vivo desde Firestore
+      try {
+        const cloudDoc = await getCmsSiteFromFirestore(selectedSlug || 'goglite');
+        if (cloudDoc && cloudDoc.contenido) {
+          const idx = loaded.findIndex(s => s.slug === (selectedSlug || 'goglite'));
+          if (idx !== -1) {
+            loaded[idx] = { ...loaded[idx], ...cloudDoc, contenido: cloudDoc.contenido };
+          }
+        }
+      } catch (cErr) {
+        console.warn('[Firestore CMS] Error leyendo nube:', cErr);
+      }
+
       setSites(loaded);
       try {
         localStorage.setItem('goglite_cms_sites', JSON.stringify(loaded));
@@ -213,7 +227,16 @@ export default function HeadlessCmsHubModule() {
       setSaving(true);
       let updatedSite = null;
 
-      // 1. Guardar en API servidor
+      // 1. Guardar en Firestore (Nube en tiempo real)
+      try {
+        const currentSite = sites.find(s => s.slug === selectedSlug) || {};
+        await saveCmsSiteToFirestore(selectedSlug, currentSite, editableContent);
+        console.log('[Firestore CMS] Guardado en Firestore con éxito');
+      } catch (fErr) {
+        console.warn('[Firestore CMS] Fallo guardado en Firestore:', fErr);
+      }
+
+      // 2. Guardar en API servidor si está disponible
       try {
         const res = await apiClient.patch(`/api/cms/content/${selectedSlug}`, editableContent);
         const cType = res.headers.get('content-type') || '';
@@ -224,7 +247,7 @@ export default function HeadlessCmsHubModule() {
         console.warn('API error, saving locally:', e);
       }
 
-      // 2. Sincronizar en memoria y localStorage
+      // 3. Sincronizar en memoria y localStorage
       setSites(prev => {
         const next = prev.map(s => {
           if (s.slug === selectedSlug) {
