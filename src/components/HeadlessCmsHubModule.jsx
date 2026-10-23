@@ -349,7 +349,7 @@ export default function HeadlessCmsHubModule() {
   };
 
   // Generador del Prompt Agéntico para Fase 4 · Paso 1
-  const currentSite = sites.find(s => s.slug === selectedSlug) || sites[0];
+  const currentSite = sites.find(s => s.slug === selectedSlug) || sites[0] || GOGLITE_DEFAULT_SITE;
   const targetScriptTag = `<script src="https://goglite-agency.web.app/cms.js" data-site="${selectedSlug}" defer></script>`;
 
   const agentConnectionPrompt = `Actúa como Tech Lead de la agencia. Conecta este sitio web al Headless CMS de Goglite (Fase 4 · Paso 1: Infraestructura Base).
@@ -389,7 +389,7 @@ Reglas técnicas de cumplimiento obligatorio:
   const isGogliteDefault = selectedSlug === 'goglite';
   const iframeUrl = isGogliteDefault 
     ? 'https://goglite.com/?goglite_edit=true' 
-    : (currentSite.dominio?.startsWith('http') ? `${currentSite.dominio}?goglite_edit=true` : `https://${currentSite.dominio}?goglite_edit=true`);
+    : (currentSite?.dominio?.startsWith('http') ? `${currentSite.dominio}?goglite_edit=true` : `https://${currentSite?.dominio || 'sitio.com'}?goglite_edit=true`);
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#080b11] p-6 text-slate-100 flex flex-col gap-5">
@@ -629,7 +629,7 @@ Reglas técnicas de cumplimiento obligatorio:
                 <div className="flex-1 max-w-md mx-4 bg-[#0a0d14] rounded-lg px-3 py-1 text-[11px] font-mono text-slate-300 border border-slate-700/60 text-center truncate flex items-center justify-center gap-1.5">
                   <span className="text-emerald-400">🔒</span>
                   <span className="text-slate-400">https://</span>
-                  <span className="text-white font-bold">{currentSite.dominio}</span>
+                  <span className="text-white font-bold">{currentSite?.dominio || 'goglite.com'}</span>
                   <span className="text-orange-400">?goglite_edit=true</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -649,7 +649,7 @@ Reglas técnicas de cumplimiento obligatorio:
               <iframe
                 ref={iframeRef}
                 src={iframeUrl}
-                title={`Editor Visual - ${currentSite.nombre}`}
+                title={`Editor Visual - ${currentSite?.nombre || 'Sitio'}`}
                 className="w-full flex-1 border-0 bg-white"
                 allow="clipboard-write"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
@@ -674,7 +674,7 @@ Reglas técnicas de cumplimiento obligatorio:
                     <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded font-mono">Fase 4 · Paso 1</span>
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Sitio: <span className="text-white font-semibold">{currentSite.nombre}</span> (ID: <code className="text-amber-400">{selectedSlug}</code>)
+                    Sitio: <span className="text-white font-semibold">{currentSite?.nombre || 'Goglite'}</span> (ID: <code className="text-amber-400">{selectedSlug}</code>)
                   </p>
                 </div>
               </div>
