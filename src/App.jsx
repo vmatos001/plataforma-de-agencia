@@ -16,7 +16,8 @@ import {
   Layers,
   PanelLeftClose,
   PanelLeftOpen,
-  Globe
+  Globe,
+  ShieldCheck
 } from 'lucide-react';
 import PresupuestosContratosModule from './components/PresupuestosContratosModule';
 import MotorSeoQaModule from './components/MotorSeoQaModule';
@@ -389,7 +390,7 @@ export default function App() {
 
                 {/* Fase 5 */}
                 <button
-                  onClick={() => { setActiveModule('seo_motor'); setSeoInitialTab('seo_geo'); setToolsDropdownOpen(false); }}
+                  onClick={() => { setActiveModule('seo_motor'); setToolsDropdownOpen(false); }}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
                     activeModule === 'seo_motor' 
                       ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
@@ -397,8 +398,8 @@ export default function App() {
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <Search className="w-3.5 h-3.5 text-orange-400" />
-                    <span>5. Motor SEO & Launch QA</span>
+                    <ShieldCheck className="w-3.5 h-3.5 text-orange-400" />
+                    <span>5. Launch QA (Control de Calidad)</span>
                   </div>
                   <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Fase 5</span>
                 </button>
@@ -586,13 +587,12 @@ export default function App() {
                 </div>
               </button>
 
-              {/* Motor SEO & Launch QA */}
+              {/* Control de Calidad Launch QA */}
               <button
                 onClick={() => {
                   setActiveModule('seo_motor');
-                  setSeoInitialTab('seo_geo');
                 }}
-                title="Motor SEO & Launch QA"
+                title="Launch QA & Control de Calidad"
                 className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'justify-between px-2.5 py-1.5'} rounded-lg text-xs font-semibold transition-all relative ${
                   activeModule === 'seo_motor'
                     ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
@@ -600,8 +600,8 @@ export default function App() {
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <Search className="w-3.5 h-3.5" />
-                  {!isSidebarCollapsed && <span>Motor SEO & QA</span>}
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  {!isSidebarCollapsed && <span>Launch QA & Calidad</span>}
                 </div>
               </button>
 

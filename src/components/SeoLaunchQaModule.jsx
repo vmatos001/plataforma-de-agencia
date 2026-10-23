@@ -1,502 +1,644 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../services/apiClient';
-import { getStoredProyectos } from '../services/contractGenerator';
+import { getStoredProyectos, saveStoredProyectos } from '../services/contractGenerator';
 import {
   ShieldCheck,
-  Sparkles,
-  Copy,
-  Check,
-  Save,
   CheckCircle2,
   AlertCircle,
-  Code2,
-  Globe,
-  Share2,
-  Activity,
-  Zap,
-  Smartphone,
-  Lock,
-  Search,
   ExternalLink,
   Printer,
-  Award,
-  Layers,
-  CheckSquare
+  Check,
+  RotateCcw,
+  Globe,
+  Zap,
+  Lock,
+  Smartphone,
+  Search,
+  Share2,
+  FileText,
+  MapPin,
+  Sparkles,
+  Award
 } from 'lucide-react';
+
+const DEFAULT_CHECKLIST_ITEMS = [
+  // 1. SEO Semántico & Indexabilidad
+  {
+    id: 'chk-title',
+    categoria: 'SEO & Indexabilidad',
+    item: 'Meta Title optimizado (50-60 caracteres) con palabra clave principal y ciudad',
+    descripcion: 'Aparece en la pestaña del navegador y en el enlace azul de Google.',
+    critico: true,
+    toolLink: null
+  },
+  {
+    id: 'chk-desc',
+    categoria: 'SEO & Indexabilidad',
+    item: 'Meta Description con gancho comercial y llamada a la acción (< 155 caracteres)',
+    descripcion: 'Texto que resume el servicio bajo el título en Google.',
+    critico: true,
+    toolLink: null
+  },
+  {
+    id: 'chk-h1',
+    categoria: 'SEO & Indexabilidad',
+    item: 'Jerarquía semántica de encabezados (único H1 descriptivo por página)',
+    descripcion: 'Google y los lectores de pantalla leen la estructura H1 > H2 > H3.',
+    critico: true,
+    toolLink: null
+  },
+  {
+    id: 'chk-schema',
+    categoria: 'SEO & Indexabilidad',
+    item: 'Schema.org JSON-LD específico implementado a medida en código y validado',
+    descripcion: 'Datos estructurados para LocalBusiness, MedicalBusiness, etc. sin errores.',
+    critico: true,
+    toolType: 'rich_results'
+  },
+  {
+    id: 'chk-robots',
+    categoria: 'SEO & Indexabilidad',
+    item: 'Archivo robots.txt y sitemap.xml accesibles en la raíz del dominio',
+    descripcion: 'Permite el rastreo de Google y autoriza a bots de IA (GPTBot, PerplexityBot).',
+    critico: false,
+    toolType: 'robots'
+  },
+  {
+    id: 'chk-og',
+    categoria: 'SEO & Indexabilidad',
+    item: 'Etiquetas Open Graph (og:title, og:image, og:description) configuradas',
+    descripcion: 'Genera la tarjeta visual con imagen al compartir el enlace por WhatsApp o redes.',
+    critico: false,
+    toolLink: null
+  },
+
+  // 2. Rendimiento & Core Web Vitals (Lighthouse)
+  {
+    id: 'chk-pagespeed',
+    categoria: 'Rendimiento & Lighthouse',
+    item: 'Puntuación móvil en Google Lighthouse / PageSpeed superior a 90 puntos',
+    descripcion: 'Velocidad de carga inmediata en redes móviles 4G/5G de El Salvador y Rep. Dominicana.',
+    critico: true,
+    toolType: 'pagespeed'
+  },
+  {
+    id: 'chk-webp',
+    categoria: 'Rendimiento & Lighthouse',
+    item: 'Imágenes comprimidas en formato moderno WebP/AVIF con dimensiones explícitas',
+    descripcion: 'Reduce el peso de la página a menos de 1.5 MB y previene saltos de diseño (CLS).',
+    critico: true,
+    toolLink: null
+  },
+  {
+    id: 'chk-defer',
+    categoria: 'Rendimiento & Lighthouse',
+    item: 'Cero bloqueo de renderizado inicial (scripts diferidos con defer o async)',
+    descripcion: 'El navegador pinta el contenido visible (LCP) en menos de 1.2 segundos.',
+    critico: false,
+    toolLink: null
+  },
+
+  // 3. Canales de Conversión & Mobile UX
+  {
+    id: 'chk-whatsapp',
+    categoria: 'Conversión & Mobile UX',
+    item: 'Botón flotante de WhatsApp verificado con mensaje comercial predeterminado',
+    descripcion: 'Al presionar abre la app oficial con el texto: "Hola, vi su sitio web y deseo información..."',
+    critico: true,
+    toolLink: null
+  },
+  {
+    id: 'chk-call',
+    categoria: 'Conversión & Mobile UX',
+    item: 'Enlace telefónico directo Click-to-Call (tel:) probado en teléfono inteligente',
+    descripcion: 'Permite marcar en 1 solo toque desde el móvil sin tener que memorizar el número.',
+    critico: true,
+    toolLink: null
+  },
+  {
+    id: 'chk-form',
+    categoria: 'Conversión & Mobile UX',
+    item: 'Formulario de contacto probado de punta a punta con confirmación visual',
+    descripcion: 'Valida correo/teléfono y muestra mensaje de éxito al prospecto.',
+    critico: true,
+    toolLink: null
+  },
+  {
+    id: 'chk-responsive',
+    categoria: 'Conversión & Mobile UX',
+    item: 'Diseño 100% responsive probado en pantallas móviles sin desbordamiento horizontal',
+    descripcion: 'Sin barras de desplazamiento horizontal molestas; botones con tamaño táctil adecuado (>44px).',
+    critico: true,
+    toolLink: null
+  },
+
+  // 4. Seguridad, Dominio & Analítica
+  {
+    id: 'chk-ssl',
+    categoria: 'Seguridad & Analítica',
+    item: 'Certificado SSL / HTTPS forzado sin contenido mixto ni advertencias',
+    descripcion: 'El candado de seguridad verde protege los datos del cliente e impulsa el SEO.',
+    critico: true,
+    toolType: 'ssl'
+  },
+  {
+    id: 'chk-analytics',
+    categoria: 'Seguridad & Analítica',
+    item: 'Google Analytics 4 / Píxel de Meta disparando eventos de conversión',
+    descripcion: 'Registra clics en WhatsApp (click_whatsapp) y llamadas telefónicas (click_to_call).',
+    critico: true,
+    toolType: 'analytics'
+  },
+  {
+    id: 'chk-maps',
+    categoria: 'Seguridad & Analítica',
+    item: 'Ficha de Google Maps / Google Business vinculada con la URL y dirección oficial',
+    descripcion: 'Sincroniza la ficha local en Google Maps con la web para dominar el Local Pack.',
+    critico: false,
+    toolType: 'maps'
+  }
+];
 
 export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
   const [proyectos, setProyectos] = useState([]);
   const [selectedProyectoId, setSelectedProyectoId] = useState('');
-  const [activeSeo, setActiveSeo] = useState(null);
+  const [siteUrl, setSiteUrl] = useState('');
+  const [checklist, setChecklist] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Tabs: 'schema' | 'metatags_tracking' | 'checklist'
-  const [activeTab, setActiveTab] = useState('checklist');
-
-  // Copy states
-  const [copiedSchema, setCopiedSchema] = useState(false);
-  const [copiedMeta, setCopiedMeta] = useState(false);
-  const [copiedTracking, setCopiedTracking] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
-    fetchInitialData();
-  }, []);
+    loadProyectosAndChecklist();
+  }, [selectedCountry]);
 
-  const fetchInitialData = async () => {
-    let projs = getStoredProyectos();
+  const loadProyectosAndChecklist = async () => {
     try {
-      const res = await apiClient.get('/api/proyectos');
-      const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
-        const apiProjs = await res.json();
-        if (Array.isArray(apiProjs) && apiProjs.length > 0) {
-          projs = apiProjs;
+      setLoading(true);
+      let list = getStoredProyectos();
+
+      try {
+        const res = await apiClient.get('/api/proyectos');
+        const cType = res.headers.get('content-type') || '';
+        if (res.ok && cType.includes('application/json')) {
+          const apiList = await res.json();
+          if (Array.isArray(apiList) && apiList.length > 0) {
+            list = apiList;
+          }
         }
+      } catch (err) {
+        console.warn('Cargando proyectos desde almacenamiento local:', err);
       }
-    } catch (err) {
-      console.warn('Usando proyectos locales para SEO QA:', err);
+
+      // Si no hay proyectos creados aún, generar proyecto de muestra para El Salvador o Rep. Dominicana
+      if (!list || list.length === 0) {
+        list = [
+          {
+            id: 'proj-demo-1',
+            codigo: 'P-2026-001',
+            cliente: {
+              empresa: selectedCountry === 'DO' ? 'Inmobiliaria Punta Cana Prime' : 'Clínicas Dentales San Salvador Don Pedro',
+              nombre: selectedCountry === 'DO' ? 'Lic. Carlos Morales' : 'Dr. Pedro Ramírez',
+              pais: selectedCountry
+            },
+            bovedaRepos: {
+              stagingUrl: selectedCountry === 'DO' ? 'https://puntacanaprime.web.app' : 'https://donpedrodental.web.app',
+              urlProduccion: selectedCountry === 'DO' ? 'https://puntacanaprime.com' : 'https://donpedrodental.com'
+            }
+          }
+        ];
+      }
+
+      setProyectos(list);
+      const initialProjId = list[0]?.id || '';
+      setSelectedProyectoId(initialProjId);
+      loadChecklistForProject(initialProjId, list);
     } finally {
-      setProyectos(projs);
-      if (projs.length > 0) {
-        const firstId = projs[0].id;
-        setSelectedProyectoId(firstId);
-        fetchSeoForProject(firstId);
-      }
       setLoading(false);
     }
   };
 
-  const fetchSeoForProject = async (projId) => {
+  const loadChecklistForProject = (projId, projsList = proyectos) => {
+    const proj = projsList.find(p => p.id === projId) || projsList[0];
+    if (!proj) return;
+
+    // Detectar URL inicial del proyecto
+    const initialUrl = 
+      proj.bovedaRepos?.urlProduccion ||
+      proj.bovedaRepos?.stagingUrl ||
+      proj.stagingUrl ||
+      (proj.cliente?.empresa ? `https://${proj.cliente.empresa.toLowerCase().replace(/[^a-z0-9]/g, '')}.com` : 'https://cliente-oficial.com');
+    setSiteUrl(initialUrl);
+
+    // Cargar checklist guardado localmente para este proyecto
+    const storageKey = `goglite_launch_qa_${proj.id}`;
+    let savedData = null;
     try {
-      const res = await apiClient.get(`/api/seo/proyecto/${projId}`);
-      const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
-        const data = await res.json();
-        setActiveSeo(data);
-      } else {
-        handleGenerateForProject(projId);
-      }
-    } catch (err) {
-      console.warn('Error fetching SEO:', err);
+      const raw = localStorage.getItem(storageKey);
+      if (raw) savedData = JSON.parse(raw);
+    } catch (e) {}
+
+    if (savedData && Array.isArray(savedData.items)) {
+      setChecklist(savedData.items);
+      if (savedData.url) setSiteUrl(savedData.url);
+    } else if (proj.launchQa && Array.isArray(proj.launchQa.items)) {
+      setChecklist(proj.launchQa.items);
+      if (proj.launchQa.url) setSiteUrl(proj.launchQa.url);
+    } else {
+      // Inicializar con la lista estándar de 15 puntos
+      setChecklist(DEFAULT_CHECKLIST_ITEMS.map(item => ({ ...item, completado: false })));
     }
   };
 
   const handleSelectProject = (projId) => {
     setSelectedProyectoId(projId);
-    fetchSeoForProject(projId);
+    loadChecklistForProject(projId);
   };
 
-  const handleGenerateForProject = async (projId) => {
-    const pId = projId || selectedProyectoId;
-    if (!pId) return;
-
-    setIsGenerating(true);
-    try {
-      const res = await apiClient.post(`/api/seo/generar/${pId}`);
-      const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
-        const data = await res.json();
-        setActiveSeo(data.seo);
-        showNotification();
-      }
-    } catch (err) {
-      console.warn('Error generando SEO:', err);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleToggleChecklist = async (itemId, currentStatus) => {
-    // Actualización optimista en estado local
-    setActiveSeo(prev => {
-      if (!prev || !Array.isArray(prev.checklist)) return prev;
-      const updatedList = prev.checklist.map(item =>
-        item.id === itemId ? { ...item, completado: !currentStatus } : item
+  const handleToggleItem = (itemId) => {
+    setChecklist(prev => {
+      const updated = prev.map(item =>
+        item.id === itemId ? { ...item, completado: !item.completado } : item
       );
-      const doneCount = updatedList.filter(i => i.completado).length;
-      const scoreSalud = Math.round((doneCount / updatedList.length) * 100);
-      return { ...prev, checklist: updatedList, scoreSalud };
+      saveChecklistState(updated, siteUrl);
+      return updated;
     });
+  };
 
+  const handleResetChecklist = () => {
+    if (!window.confirm('¿Deseas reiniciar todas las casillas de verificación de este proyecto?')) return;
+    const resetList = DEFAULT_CHECKLIST_ITEMS.map(item => ({ ...item, completado: false }));
+    setChecklist(resetList);
+    saveChecklistState(resetList, siteUrl);
+  };
+
+  const handleMarkAll = () => {
+    const allDone = checklist.map(item => ({ ...item, completado: true }));
+    setChecklist(allDone);
+    saveChecklistState(allDone, siteUrl);
+  };
+
+  const saveChecklistState = (itemsToSave, currentUrl) => {
+    if (!selectedProyectoId) return;
+    const dataToSave = {
+      proyectoId: selectedProyectoId,
+      url: currentUrl,
+      items: itemsToSave,
+      ultimaActualizacion: new Date().toISOString()
+    };
+
+    // Guardar en localStorage
     try {
-      const res = await apiClient.post(`/api/seo/${selectedProyectoId}/checklist`, {
-        itemId,
-        completado: !currentStatus
+      localStorage.setItem(`goglite_launch_qa_${selectedProyectoId}`, JSON.stringify(dataToSave));
+
+      // Sincronizar dentro del objeto proyecto si existe
+      const projs = getStoredProyectos();
+      const updatedProjs = projs.map(p => {
+        if (p.id === selectedProyectoId) {
+          return {
+            ...p,
+            launchQa: dataToSave
+          };
+        }
+        return p;
       });
-      const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
-        const data = await res.json();
-        if (data.seo) setActiveSeo(data.seo);
-      }
-    } catch (err) {
-      console.warn('Checklist actualizado localmente:', err);
+      saveStoredProyectos(updatedProjs);
+    } catch (e) {
+      console.warn('Error guardando checklist en localStorage:', e);
     }
-  };
 
-  const handleSaveSeo = async () => {
-    if (!activeSeo) return;
-    try {
-      const res = await apiClient.post('/api/seo', activeSeo);
-      const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
-        showNotification();
-      } else {
-        showNotification();
-      }
-    } catch (err) {
-      showNotification();
-    }
-  };
-
-  const showNotification = () => {
     setSavedNotice(true);
-    setTimeout(() => setSavedNotice(false), 2500);
+    setTimeout(() => setSavedNotice(false), 2000);
   };
 
-  const copyToClipboard = (text, setCopiedFn) => {
-    navigator.clipboard.writeText(text);
-    setCopiedFn(true);
-    setTimeout(() => setCopiedFn(false), 2000);
+  // Cálculo de Métricas de Calidad
+  const totalItems = checklist.length;
+  const completadosCount = checklist.filter(i => i.completado).length;
+  const criticosTotal = checklist.filter(i => i.critico).length;
+  const criticosCompletados = checklist.filter(i => i.critico && i.completado).length;
+  const criticosPendientes = criticosTotal - criticosCompletados;
+
+  const scoreSalud = totalItems > 0 ? Math.round((completadosCount / totalItems) * 100) : 0;
+  const isAprobado = scoreSalud >= 90 && criticosPendientes === 0;
+
+  // Extraer dominio limpio para enlaces externos
+  const cleanDomain = siteUrl.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
+
+  // Generadores de Enlaces Oficiales de Google
+  const getToolUrl = (toolType) => {
+    const encodedUrl = encodeURIComponent(siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`);
+    switch (toolType) {
+      case 'pagespeed':
+        return `https://pagespeed.web.dev/analysis?url=${encodedUrl}`;
+      case 'rich_results':
+        return `https://search.google.com/test/rich-results?url=${encodedUrl}`;
+      case 'ssl':
+        return `https://www.sslshopper.com/ssl-checker.html#hostname=${encodeURIComponent(cleanDomain || 'google.com')}`;
+      case 'robots':
+        return siteUrl.startsWith('http') ? `${siteUrl.replace(/\/+$/, '')}/robots.txt` : `https://${cleanDomain}/robots.txt`;
+      case 'analytics':
+        return 'https://tagassistant.google.com/';
+      case 'maps': {
+        const currentProj = proyectos.find(p => p.id === selectedProyectoId);
+        const term = encodeURIComponent(currentProj?.cliente?.empresa || cleanDomain);
+        return `https://www.google.com/maps/search/${term}`;
+      }
+      default:
+        return null;
+    }
   };
 
-  const selectedProj = proyectos.find(p => p.id === selectedProyectoId);
-
-  // Group checklist by category
-  const categories = ['SEO & Indexabilidad', 'Rendimiento & CWV', 'Mobile & UX', 'Seguridad & Legal', 'Tracking & Analítica', 'Google Maps & Local'];
-  const score = activeSeo?.scoreSalud || 0;
+  const currentProject = proyectos.find(p => p.id === selectedProyectoId) || proyectos[0];
+  const categories = ['SEO & Indexabilidad', 'Rendimiento & Lighthouse', 'Conversión & Mobile UX', 'Seguridad & Analítica'];
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto text-slate-100">
       
       {/* Toast Notification */}
       {savedNotice && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-2xl font-semibold text-xs animate-bounce">
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-2xl font-bold text-xs animate-bounce">
           <Check className="w-4 h-4" />
-          <span>¡Optimizaciones SEO y Auditoría guardadas con éxito!</span>
+          <span>Verificación guardada</span>
         </div>
       )}
 
-      {/* Top Banner / Hero */}
-      <div className="p-6 rounded-2xl bg-gradient-to-r from-[#0d121f] via-[#101726] to-[#141b2d] border border-orange-500/20 shadow-xl relative overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+      {/* Header Ejecutivo */}
+      <div className="p-6 rounded-2xl bg-gradient-to-r from-[#0d121f] via-[#101726] to-[#141b2d] border border-orange-500/20 shadow-xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-xs font-bold text-orange-400 uppercase tracking-wider mb-1">
               <ShieldCheck className="w-4 h-4 text-orange-400" />
-              <span>Módulo 5 · SEO Local, Tracking & Auditoría Pre-Lanzamiento</span>
+              <span>Fase 5 · Control de Calidad Pre-Lanzamiento (Launch QA)</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-white">
-              Control de Calidad Pre-Lanzamiento & Rich Snippets Google
+              Checklist de Verificación & Control de Calidad Técnica
             </h1>
-            <p className="text-xs text-slate-400 max-w-2xl mt-1 leading-relaxed">
-              Genera Schema.org JSON-LD para Google Maps, configura píxeles de conversión sin costes de software y audita los 15 puntos críticos de rendimiento antes de entregar el proyecto al cliente.
+            <p className="text-xs text-slate-400 max-w-3xl mt-1 leading-relaxed">
+              Protocolo riguroso antes de liberar cualquier proyecto al cliente. Verifica la programación a medida del agente (Schema, robots, meta tags) y audita velocidad, formularios, WhatsApp y certificados con herramientas oficiales.
             </p>
           </div>
 
-          {/* Action Buttons & Project Switcher */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {/* Selector de Proyecto */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
             <select
               value={selectedProyectoId}
               onChange={(e) => handleSelectProject(e.target.value)}
-              className="px-3 py-2 rounded-xl bg-[#080b11] border border-slate-800 text-xs font-bold text-slate-200 focus:outline-none focus:border-orange-500"
+              className="px-3.5 py-2.5 rounded-xl bg-[#080b11] border border-slate-700 text-xs font-bold text-white focus:outline-none focus:border-orange-500 shadow-inner"
             >
               {proyectos.map(p => (
                 <option key={p.id} value={p.id}>
-                  {p.codigo} · {p.cliente?.empresa || p.cliente?.nombre}
+                  {p.codigo || 'PROJ'} · {p.cliente?.empresa || p.cliente?.nombre || 'Cliente'}
                 </option>
               ))}
             </select>
 
             <button
-              onClick={() => handleGenerateForProject()}
-              disabled={isGenerating}
-              className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 shadow-glow-sm transition-all"
+              onClick={() => window.print()}
+              className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700 transition-colors shadow-sm"
             >
-              <Sparkles className="w-4 h-4" />
-              <span>{isGenerating ? 'Generando...' : 'Regenerar con IA'}</span>
-            </button>
-
-            <button
-              onClick={handleSaveSeo}
-              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>Guardar</span>
+              <Printer className="w-3.5 h-3.5" />
+              <span>Imprimir Certificado</span>
             </button>
           </div>
         </div>
 
-        {/* Health Score Summary Bar */}
-        {activeSeo && (
-          <div className="mt-5 pt-5 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500/20 to-emerald-500/20 border border-orange-500/30 flex items-center justify-center font-mono font-black text-xl text-white">
-                {score}%
-              </div>
-              <div>
-                <div className="text-xs font-bold text-white flex items-center gap-2">
-                  <span>Score de Lanzamiento Goglite</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    score >= 90 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300'
-                  }`}>
-                    {score >= 90 ? '✅ Listo para Producción' : '⚠️ Ajustes Pendientes'}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  {activeSeo.checklist?.filter(c => c.completado).length} de {activeSeo.checklist?.length} verificaciones técnicas superadas
-                </div>
-              </div>
+        {/* Barra de URL del Proyecto & Accesos Directos Oficiales */}
+        <div className="mt-5 pt-5 border-t border-slate-800/80 space-y-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="flex items-center gap-2 bg-[#080b11] border border-slate-700 rounded-xl px-3 py-1.5 flex-1 shadow-inner">
+              <Globe className="w-4 h-4 text-orange-400 shrink-0" />
+              <span className="text-[11px] text-slate-400 font-mono shrink-0">URL del Sitio:</span>
+              <input
+                type="text"
+                value={siteUrl}
+                onChange={(e) => {
+                  setSiteUrl(e.target.value);
+                  saveChecklistState(checklist, e.target.value);
+                }}
+                placeholder="https://cliente-oficial.com o https://staging.web.app"
+                className="bg-transparent text-xs text-white font-mono w-full focus:outline-none placeholder-slate-600"
+              />
             </div>
 
-            <button
-              onClick={() => window.print()}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Imprimir Certificado de QA</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleMarkAll}
+                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700"
+              >
+                Marcar Todo
+              </button>
+              <button
+                onClick={handleResetChecklist}
+                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 flex items-center gap-1"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reiniciar</span>
+              </button>
+            </div>
           </div>
-        )}
+
+          {/* Enlaces de 1-Clic a Herramientas Oficiales */}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mr-1">
+              Validadores Oficiales:
+            </span>
+
+            <a
+              href={getToolUrl('pagespeed')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 border border-orange-500/30 text-[11px] font-semibold transition-colors"
+            >
+              <Zap className="w-3 h-3 text-orange-400" />
+              <span>Google PageSpeed</span>
+              <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+            </a>
+
+            <a
+              href={getToolUrl('rich_results')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[11px] font-semibold transition-colors"
+            >
+              <Search className="w-3 h-3 text-blue-400" />
+              <span>Google Rich Results (Schema)</span>
+              <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+            </a>
+
+            <a
+              href={getToolUrl('ssl')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold transition-colors"
+            >
+              <Lock className="w-3 h-3 text-emerald-400" />
+              <span>SSL Checker</span>
+              <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+            </a>
+
+            <a
+              href={getToolUrl('robots')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[11px] font-semibold transition-colors"
+            >
+              <FileText className="w-3 h-3 text-purple-400" />
+              <span>Ver /robots.txt</span>
+              <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+            </a>
+
+            <a
+              href="https://search.google.com/search-console"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] font-semibold transition-colors"
+            >
+              <Globe className="w-3 h-3 text-slate-400" />
+              <span>Search Console</span>
+              <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+            </a>
+          </div>
+        </div>
+
+        {/* Resumen de Certificación de Calidad */}
+        <div className="mt-5 pt-5 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className={`w-16 h-16 rounded-2xl border flex flex-col items-center justify-center font-mono font-black shadow-inner ${
+              isAprobado
+                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                : scoreSalud >= 60
+                ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+            }`}>
+              <span className="text-2xl leading-none">{scoreSalud}%</span>
+              <span className="text-[9px] uppercase tracking-wider text-slate-400 mt-1">Calidad</span>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-white">Estado de Aprobación:</span>
+                <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                  isAprobado
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                }`}>
+                  {isAprobado ? '✅ APROBADO PARA ENTREGA' : '⚠️ AJUSTES PENDIENTES'}
+                </span>
+              </div>
+              <div className="text-xs text-slate-400 mt-1">
+                <strong>{completadosCount} de {totalItems}</strong> requisitos superados · 
+                {criticosPendientes === 0 ? (
+                  <span className="text-emerald-400 font-semibold ml-1">Todos los puntos críticos cubiertos</span>
+                ) : (
+                  <span className="text-amber-400 font-semibold ml-1">{criticosPendientes} requisito(s) crítico(s) pendientes</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="text-right hidden sm:block">
+            <div className="text-[11px] text-slate-400 font-mono">Proyecto Auditado:</div>
+            <div className="text-xs font-bold text-white truncate max-w-xs">
+              {currentProject?.cliente?.empresa || 'Cliente Oficial'}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
-        {[
-          { id: 'checklist', label: '1. Checklist de Calidad (15 Puntos)', icon: CheckSquare },
-          { id: 'schema', label: '2. Schema.org JSON-LD (Google Maps)', icon: Code2 },
-          { id: 'metatags_tracking', label: '3. Meta Tags & Píxeles de Conversión', icon: Share2 }
-        ].map(tab => {
-          const Icon = tab.icon;
+      {/* Checklist Maestro de Verificación (Dividido por Categorías Claras) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {categories.map((cat, catIdx) => {
+          const items = checklist.filter(c => c.categoria === cat);
+          const catCompletados = items.filter(i => i.completado).length;
+          const isCatComplete = items.length > 0 && catCompletados === items.length;
+
           return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
-                activeTab === tab.id
-                  ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30'
-                  : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{tab.label}</span>
-            </button>
+            <div key={catIdx} className="p-5 rounded-2xl bg-[#0d121c] border border-slate-800 space-y-3.5 shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-black uppercase text-white tracking-wider">
+                    {cat}
+                  </h3>
+                  {isCatComplete && (
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.2 rounded-full font-bold">
+                      ✓ Completo
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px] text-slate-400 font-mono font-bold">
+                  {catCompletados} / {items.length}
+                </span>
+              </div>
+
+              <div className="space-y-2.5">
+                {items.map(item => {
+                  const directToolUrl = item.toolType ? getToolUrl(item.toolType) : null;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-3.5 rounded-xl border transition-all ${
+                        item.completado
+                          ? 'bg-emerald-950/20 border-emerald-500/30'
+                          : 'bg-[#111622] border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Checkbox grande interactivo */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleItem(item.id)}
+                          className={`w-5 h-5 rounded-lg mt-0.5 flex items-center justify-center border shrink-0 transition-all cursor-pointer ${
+                            item.completado
+                              ? 'bg-emerald-500 border-emerald-400 text-white shadow-sm'
+                              : 'border-slate-700 bg-slate-900 text-transparent hover:border-orange-500'
+                          }`}
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        </button>
+
+                        <div className="flex-1 min-w-0">
+                          <div 
+                            onClick={() => handleToggleItem(item.id)}
+                            className={`text-xs font-bold cursor-pointer select-none leading-snug ${
+                              item.completado ? 'line-through text-slate-400' : 'text-slate-100'
+                            }`}
+                          >
+                            {item.item}
+                          </div>
+
+                          <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                            {item.descripcion}
+                          </p>
+
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            {item.critico && (
+                              <span className="text-[9px] font-mono font-bold text-orange-400 uppercase tracking-wider bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">
+                                Requisito Crítico
+                              </span>
+                            )}
+
+                            {directToolUrl && (
+                              <a
+                                href={directToolUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] text-sky-400 hover:text-sky-300 font-semibold underline underline-offset-2 ml-auto"
+                              >
+                                <span>Abrir Validador Oficial</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </div>
-
-      {/* =========================================================================
-          PESTAÑA 1: CHECKLIST DE AUDITORÍA PRE-LANZAMIENTO
-          ========================================================================= */}
-      {activeTab === 'checklist' && activeSeo && (
-        <div className="space-y-6">
-          <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 text-xs text-orange-300 flex items-start gap-3">
-            <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-orange-400" />
-            <div>
-              <strong>Auditoría de Calidad Técnica:</strong> Cada elemento garantiza que el sitio web cargue en menos de 1.2 segundos, cumpla con la indexación semántica en Google y dispare conversiones inmediatas al hacer clic en llamadas o WhatsApp.
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {categories.map((cat, catIdx) => {
-              const items = activeSeo.checklist?.filter(c => c.categoria === cat) || [];
-              if (items.length === 0) return null;
-
-              return (
-                <div key={catIdx} className="p-5 rounded-2xl bg-[#0d121c] border border-slate-800 space-y-3">
-                  <h3 className="text-xs font-black uppercase text-slate-300 flex items-center justify-between border-b border-slate-800 pb-2">
-                    <span>{cat}</span>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      {items.filter(i => i.completado).length}/{items.length}
-                    </span>
-                  </h3>
-
-                  <div className="space-y-2">
-                    {items.map(item => (
-                      <div
-                        key={item.id}
-                        onClick={() => handleToggleChecklist(item.id, item.completado)}
-                        className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
-                          item.completado
-                            ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
-                            : 'bg-[#111622] border-slate-800 hover:border-slate-700 text-slate-300'
-                        }`}
-                      >
-                        <div className={`w-4 h-4 rounded mt-0.5 flex items-center justify-center border shrink-0 ${
-                          item.completado 
-                            ? 'bg-emerald-500 border-emerald-400 text-white' 
-                            : 'border-slate-700 bg-slate-800 text-transparent'
-                        }`}>
-                          <Check className="w-3 h-3 stroke-[3]" />
-                        </div>
-
-                        <div className="flex-1">
-                          <div className={`text-xs font-semibold ${item.completado ? 'line-through text-slate-400' : 'text-slate-200'}`}>
-                            {item.item}
-                          </div>
-                          {item.critico && (
-                            <span className="text-[9px] font-mono font-bold text-orange-400 uppercase tracking-wider inline-block mt-0.5">
-                              • Verificación Crítica
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
-          PESTAÑA 2: SCHEMA.ORG JSON-LD (GOOGLE MAPS & RICH SNIPPETS)
-          ========================================================================= */}
-      {activeTab === 'schema' && activeSeo && (
-        <div className="space-y-6">
-          <div className="p-5 rounded-2xl bg-[#0d121c] border border-slate-800 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Code2 className="w-4 h-4 text-orange-400" />
-                  <span>Datos Estructurados Schema.org JSON-LD</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Inserta este bloque en la cabecera <code>&lt;head&gt;</code> de la web para aparecer en el Local Pack de Google Maps con horarios y teléfono.
-                </p>
-              </div>
-
-              <button
-                onClick={() => copyToClipboard(JSON.stringify(activeSeo.schemaJsonLd, null, 2), setCopiedSchema)}
-                className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-glow-sm transition-all shrink-0"
-              >
-                {copiedSchema ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedSchema ? '¡Copiado!' : 'Copiar Código JSON-LD'}</span>
-              </button>
-            </div>
-
-            {/* Code Block Display */}
-            <div className="p-4 rounded-xl bg-[#080b11] border border-slate-800 font-mono text-xs text-emerald-400 overflow-x-auto max-h-96">
-              <pre>{JSON.stringify(activeSeo.schemaJsonLd, null, 2)}</pre>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs text-slate-400 pt-2 border-t border-slate-800">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Compatible al 100% con la herramienta oficial de prueba de resultados enriquecidos de Google.</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
-          PESTAÑA 3: META TAGS & TRACKING PÍXELES
-          ========================================================================= */}
-      {activeTab === 'metatags_tracking' && activeSeo && (
-        <div className="space-y-6">
-          
-          {/* Meta Tags Box */}
-          <div className="p-5 rounded-2xl bg-[#0d121c] border border-slate-800 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Search className="w-4 h-4 text-orange-400" />
-                <span>Meta Tags Esenciales (SEO & Open Graph)</span>
-              </h3>
-
-              <button
-                onClick={() => {
-                  const tags = `<title>${activeSeo.metaTags?.title}</title>\n<meta name="description" content="${activeSeo.metaTags?.description}" />\n<meta property="og:title" content="${activeSeo.metaTags?.ogTitle}" />\n<meta property="og:description" content="${activeSeo.metaTags?.ogDescription}" />\n<meta property="og:image" content="${activeSeo.metaTags?.ogImage}" />\n<meta name="twitter:card" content="${activeSeo.metaTags?.twitterCard}" />`;
-                  copyToClipboard(tags, setCopiedMeta);
-                }}
-                className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-              >
-                {copiedMeta ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedMeta ? 'Copiado' : 'Copiar HTML Meta Tags'}</span>
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <div className="flex items-center justify-between text-[11px] mb-1">
-                  <span className="text-slate-400 font-medium">Meta Title:</span>
-                  <span className="font-mono text-emerald-400">{activeSeo.metaTags?.title?.length || 0} / 60 caracteres</span>
-                </div>
-                <input
-                  type="text"
-                  value={activeSeo.metaTags?.title || ''}
-                  onChange={e => setActiveSeo(prev => ({
-                    ...prev,
-                    metaTags: { ...prev.metaTags, title: e.target.value }
-                  }))}
-                  className="w-full p-2.5 rounded-lg bg-[#080b11] border border-slate-800 text-xs text-white focus:outline-none focus:border-orange-500 font-semibold"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between text-[11px] mb-1">
-                  <span className="text-slate-400 font-medium">Meta Description:</span>
-                  <span className="font-mono text-emerald-400">{activeSeo.metaTags?.description?.length || 0} / 155 caracteres</span>
-                </div>
-                <textarea
-                  rows={2}
-                  value={activeSeo.metaTags?.description || ''}
-                  onChange={e => setActiveSeo(prev => ({
-                    ...prev,
-                    metaTags: { ...prev.metaTags, description: e.target.value }
-                  }))}
-                  className="w-full p-2.5 rounded-lg bg-[#080b11] border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-orange-500"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Conversion Tracking Box */}
-          <div className="p-5 rounded-2xl bg-[#0d121c] border border-slate-800 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Zap className="w-4 h-4 text-orange-400" />
-                <span>Configuración de Píxeles & Eventos de Conversión ($0)</span>
-              </h3>
-
-              <button
-                onClick={() => {
-                  const trackingCode = `// GOGLITE NATIVE TRACKING SNIPPET\n// Track Click-to-Call\ndocument.querySelectorAll("a[href^='tel:']").forEach(el => {\n  el.addEventListener('click', () => {\n    if (typeof gtag === 'function') gtag('event', 'click_to_call', { event_category: 'lead' });\n    if (typeof fbq === 'function') fbq('track', 'Contact');\n  });\n});\n// Track WhatsApp Click\ndocument.querySelectorAll("a[href*='wa.me']").forEach(el => {\n  el.addEventListener('click', () => {\n    if (typeof gtag === 'function') gtag('event', 'click_whatsapp', { event_category: 'lead' });\n    if (typeof fbq === 'function') fbq('track', 'Lead');\n  });\n});`;
-                  copyToClipboard(trackingCode, setCopiedTracking);
-                }}
-                className="px-3.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
-              >
-                {copiedTracking ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedTracking ? 'Copiado' : 'Copiar Snippet JS'}</span>
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-400">
-              Registra llamadas directas de auxilio vial y clics hacia WhatsApp en Google Ads y Meta Ads sin comprar herramientas externas de analítica.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-3 rounded-xl bg-[#111622] border border-slate-800">
-                <div className="text-[10px] text-slate-500 font-mono">Evento 1:</div>
-                <div className="text-xs font-bold text-white mt-1">click_to_call</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Disparado al presionar botones de teléfono</div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-[#111622] border border-slate-800">
-                <div className="text-[10px] text-slate-500 font-mono">Evento 2:</div>
-                <div className="text-xs font-bold text-white mt-1">click_whatsapp</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Disparado al abrir chat de WhatsApp</div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-[#111622] border border-slate-800">
-                <div className="text-[10px] text-slate-500 font-mono">Evento 3:</div>
-                <div className="text-xs font-bold text-white mt-1">form_submit</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Disparado al enviar cotización</div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      )}
 
     </div>
   );
