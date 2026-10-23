@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import apiClient from '../services/apiClient';
 import { saveCmsSiteToFirestore, getCmsSiteFromFirestore } from '../services/firebase';
 import GoogleBusinessProfileView from './GoogleBusinessProfileView';
+import GoogleSiteKitView from './GoogleSiteKitView';
 import {
   Globe,
   Layout,
@@ -25,7 +26,8 @@ import {
   Sparkles,
   Sliders,
   MapPin,
-  Star
+  Star,
+  Activity
 } from 'lucide-react';
 
 const GOGLITE_DEFAULT_SITE = {
@@ -487,11 +489,32 @@ Reglas técnicas de cumplimiento obligatorio:
             <span>{currentSite?.slug === 'goglite' ? '5.0 (3)' : '5.0'}</span>
           </span>
         </button>
+
+        <button
+          onClick={() => setActiveView('site_kit')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
+            activeView === 'site_kit'
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-950/50'
+              : 'bg-[#0e1320] text-slate-400 hover:text-white'
+          }`}
+        >
+          <Activity className="w-4 h-4 text-emerald-300" />
+          <span>⚡ Google Site Kit (Search Console, GA4 & Ads)</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>En Vivo</span>
+          </span>
+        </button>
       </div>
 
       {/* 3. VISTA A: PANTALLA OFICIAL DE GOOGLE BUSINESS & RESEÑAS CON IA */}
       {activeView === 'google_profile' && (
         <GoogleBusinessProfileView currentSite={currentSite} />
+      )}
+
+      {/* 3. VISTA B: PANTALLA GOOGLE SITE KIT (SEARCH CONSOLE, GA4, ADS & PAGESPEED) */}
+      {activeView === 'site_kit' && (
+        <GoogleSiteKitView currentSite={currentSite} />
       )}
 
       {/* 3. VISTA B: PANTALLA DE EDITOR VISUAL EN VIVO (CLICK-TO-EDIT CANVAS) */}
