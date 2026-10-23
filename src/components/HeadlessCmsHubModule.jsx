@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import apiClient from '../services/apiClient';
 import { saveCmsSiteToFirestore, getCmsSiteFromFirestore } from '../services/firebase';
+import GoogleBusinessProfileView from './GoogleBusinessProfileView';
 import {
   Globe,
   Layout,
@@ -22,7 +23,9 @@ import {
   Bot,
   X,
   Sparkles,
-  Sliders
+  Sliders,
+  MapPin,
+  Star
 } from 'lucide-react';
 
 const GOGLITE_DEFAULT_SITE = {
@@ -71,6 +74,9 @@ export default function HeadlessCmsHubModule() {
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [previewDevice, setPreviewDevice] = useState('desktop'); // 'desktop' | 'tablet' | 'mobile'
+
+  // Pantallas Principales: 'editor_visual' (Web) | 'google_profile' (Ficha Google Maps & Reseñas)
+  const [activeView, setActiveView] = useState('editor_visual');
 
   // Modales
   const [showAgentPromptModal, setShowAgentPromptModal] = useState(false);
@@ -332,7 +338,6 @@ export default function HeadlessCmsHubModule() {
       setEditableContent(created.contenido);
       setNewSiteForm({ nombre: '', dominio: '', pais: 'SV', telefono: '', colorPrimario: '#FF6B00' });
       setShowNewSiteModal(false);
-      // Abrir inmediatamente el modal con el prompt del agente para conectar este nuevo sitio
       setShowAgentPromptModal(true);
     } catch (e) {
       console.error('Error creando sitio:', e);
@@ -373,7 +378,7 @@ Reglas técnicas de cumplimiento obligatorio:
     return (
       <div className="flex-1 flex items-center justify-center p-12 text-slate-400">
         <RefreshCw className="w-6 h-6 animate-spin text-orange-500 mr-3" />
-        <span>Cargando Hub Visual Headless CMS...</span>
+        <span>Cargando Hub Headless CMS...</span>
       </div>
     );
   }
@@ -393,14 +398,14 @@ Reglas técnicas de cumplimiento obligatorio:
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-black text-white">Hub Headless CMS · Goglite Care</h2>
             <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
-              $0 Servidores · Auto-Escaneo
+              $0 Servidores · Google API
             </span>
             <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
-              Fase 4 · Conexión Agéntica
+              Retainer $99 - $199/mes
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Editor visual interactivo estilo Elementor/Webflow. Haz clic sobre cualquier texto o botón en la pantalla para editarlo y publica en caliente a Firestore.
+            Centro de Mando de Presencia Digital: Edición visual del sitio web y administración oficial de la Ficha de Google Business con respuestas IA.
           </p>
         </div>
 
@@ -438,158 +443,198 @@ Reglas técnicas de cumplimiento obligatorio:
             <span>Nuevo Sitio</span>
           </button>
 
-          <a
-            href={iframeUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700"
-            title="Abrir web en pestaña completa"
-          >
-            <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-            <span>Ver Web</span>
-          </a>
+          {activeView === 'editor_visual' && (
+            <a
+              href={iframeUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700"
+              title="Abrir web en pestaña completa"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+              <span>Ver Web</span>
+            </a>
+          )}
         </div>
       </div>
 
-      {/* 2. EDITOR VISUAL EN VIVO (CLICK-TO-EDIT CANVAS) */}
-      <div className="flex-1 flex flex-col gap-3">
-        {/* Top Control Bar */}
-        <div className="p-3.5 bg-[#0e1320] border border-slate-800 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md">
-          {/* Viewport switcher */}
-          <div className="flex items-center gap-1.5 bg-[#131926] p-1 rounded-xl border border-slate-700/80">
-            <button
-              onClick={() => setPreviewDevice('desktop')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                previewDevice === 'desktop' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Monitor className="w-3.5 h-3.5" />
-              <span>Desktop 100%</span>
-            </button>
-            <button
-              onClick={() => setPreviewDevice('tablet')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                previewDevice === 'tablet' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Tablet className="w-3.5 h-3.5" />
-              <span>Tablet 768px</span>
-            </button>
-            <button
-              onClick={() => setPreviewDevice('mobile')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                previewDevice === 'mobile' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>Mobile 390px</span>
-            </button>
-          </div>
+      {/* 2. SUB-NAVIGATION TABS (EDITOR VISUAL VS FICHA GOOGLE) */}
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveView('editor_visual')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
+            activeView === 'editor_visual'
+              ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-lg shadow-orange-950/50'
+              : 'bg-[#0e1320] text-slate-400 hover:text-white'
+          }`}
+        >
+          <MousePointerClick className="w-4 h-4 text-orange-300" />
+          <span>🎨 Editor Visual Web (Click-to-Edit)</span>
+        </button>
 
-          {/* Indicator & Actions */}
-          <div className="flex items-center gap-3">
-            {discoveredPageInfo && (
-              <span className="text-[11px] bg-slate-800/90 text-amber-300 px-3 py-1 rounded-xl border border-slate-700 font-mono font-bold flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3 text-amber-400" />
-                <span>{discoveredPageInfo.elementsCount} campos editables</span>
-              </span>
-            )}
-
-            {unsavedChangesCount > 0 ? (
-              <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-xl animate-pulse">
-                ● {unsavedChangesCount} {unsavedChangesCount === 1 ? 'cambio pendiente' : 'cambios pendientes'}
-              </span>
-            ) : (
-              <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-xl flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5" />
-                <span>Sincronizado con Firestore</span>
-              </span>
-            )}
-
-            <button
-              onClick={handleSaveContent}
-              disabled={saving}
-              className={`px-5 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg transition-all ${
-                savedSuccess
-                  ? 'bg-emerald-600 text-white shadow-emerald-950'
-                  : unsavedChangesCount > 0
-                  ? 'bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white shadow-orange-950 animate-bounce'
-                  : 'bg-orange-600 hover:bg-orange-500 text-white shadow-orange-950'
-              }`}
-            >
-              {saving ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : savedSuccess ? (
-                <Check className="w-4 h-4" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              <span>{savedSuccess ? '¡Publicado con Éxito!' : 'Publicar Cambios en Vivo'}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Instructions helper strip */}
-        <div className="px-4 py-2 rounded-xl bg-orange-500/10 border border-orange-500/20 text-xs text-orange-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MousePointerClick className="w-4 h-4 text-orange-400 shrink-0" />
-            <span>
-              <strong className="text-orange-400">Modo Click-to-Edit Activo:</strong> Pasa el ratón sobre cualquier texto o botón en la web de abajo para ver la silueta naranja. Haz clic y escribe directamente sobre la pantalla. Al terminar, pulsa Enter o haz clic fuera y publica.
-            </span>
-          </div>
-          <span className="text-[11px] font-mono text-slate-400 hidden lg:inline">
-            contenteditable="plaintext-only" (Protegido contra ruptura)
+        <button
+          onClick={() => setActiveView('google_profile')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
+            activeView === 'google_profile'
+              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-950/50'
+              : 'bg-[#0e1320] text-slate-400 hover:text-white'
+          }`}
+        >
+          <MapPin className="w-4 h-4 text-blue-300" />
+          <span>📍 Ficha de Google Business & Reseñas IA</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono font-bold flex items-center gap-1">
+            <Star className="w-2.5 h-2.5 fill-amber-400" />
+            <span>4.9 (48)</span>
           </span>
-        </div>
+        </button>
+      </div>
 
-        {/* Iframe Viewport Container (Mac Browser Bezel) */}
-        <div className="flex-1 flex justify-center items-start min-h-[680px] bg-[#05070a] rounded-2xl p-4 border border-slate-800 shadow-inner overflow-x-auto">
-          <div
-            className="transition-all duration-300 rounded-2xl overflow-hidden border border-slate-700/80 shadow-2xl flex flex-col bg-white"
-            style={{
-              width: previewDevice === 'mobile' ? '390px' : previewDevice === 'tablet' ? '768px' : '100%',
-              minHeight: '660px',
-              height: '75vh'
-            }}
-          >
-            {/* Fake Mac Window Bar */}
-            <div className="px-4 py-2.5 bg-[#171d2b] border-b border-slate-700/70 flex items-center justify-between shrink-0 select-none">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-rose-500/90 inline-block shadow-sm"></span>
-                <span className="w-3 h-3 rounded-full bg-amber-500/90 inline-block shadow-sm"></span>
-                <span className="w-3 h-3 rounded-full bg-emerald-500/90 inline-block shadow-sm"></span>
-              </div>
-              <div className="flex-1 max-w-md mx-4 bg-[#0a0d14] rounded-lg px-3 py-1 text-[11px] font-mono text-slate-300 border border-slate-700/60 text-center truncate flex items-center justify-center gap-1.5">
-                <span className="text-emerald-400">🔒</span>
-                <span className="text-slate-400">https://</span>
-                <span className="text-white font-bold">{currentSite.dominio}</span>
-                <span className="text-orange-400">?goglite_edit=true</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    if (iframeRef.current) iframeRef.current.src = iframeUrl;
-                  }}
-                  className="p-1 rounded text-slate-400 hover:text-white"
-                  title="Recargar frame"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                </button>
-              </div>
+      {/* 3. VISTA A: PANTALLA OFICIAL DE GOOGLE BUSINESS & RESEÑAS CON IA */}
+      {activeView === 'google_profile' && (
+        <GoogleBusinessProfileView currentSite={currentSite} />
+      )}
+
+      {/* 3. VISTA B: PANTALLA DE EDITOR VISUAL EN VIVO (CLICK-TO-EDIT CANVAS) */}
+      {activeView === 'editor_visual' && (
+        <div className="flex-1 flex flex-col gap-3">
+          {/* Top Control Bar */}
+          <div className="p-3.5 bg-[#0e1320] border border-slate-800 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md">
+            {/* Viewport switcher */}
+            <div className="flex items-center gap-1.5 bg-[#131926] p-1 rounded-xl border border-slate-700/80">
+              <button
+                onClick={() => setPreviewDevice('desktop')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  previewDevice === 'desktop' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Monitor className="w-3.5 h-3.5" />
+                <span>Desktop 100%</span>
+              </button>
+              <button
+                onClick={() => setPreviewDevice('tablet')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  previewDevice === 'tablet' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Tablet className="w-3.5 h-3.5" />
+                <span>Tablet 768px</span>
+              </button>
+              <button
+                onClick={() => setPreviewDevice('mobile')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  previewDevice === 'mobile' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>Mobile 390px</span>
+              </button>
             </div>
 
-            {/* Embedded Webpage Iframe */}
-            <iframe
-              ref={iframeRef}
-              src={iframeUrl}
-              title={`Editor Visual - ${currentSite.nombre}`}
-              className="w-full flex-1 border-0 bg-white"
-              allow="clipboard-write"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
-            />
+            {/* Indicator & Actions */}
+            <div className="flex items-center gap-3">
+              {discoveredPageInfo && (
+                <span className="text-[11px] bg-slate-800/90 text-amber-300 px-3 py-1 rounded-xl border border-slate-700 font-mono font-bold flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-amber-400" />
+                  <span>{discoveredPageInfo.elementsCount} campos editables</span>
+                </span>
+              )}
+
+              {unsavedChangesCount > 0 ? (
+                <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-xl animate-pulse">
+                  ● {unsavedChangesCount} {unsavedChangesCount === 1 ? 'cambio pendiente' : 'cambios pendientes'}
+                </span>
+              ) : (
+                <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-xl flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Sincronizado con Firestore</span>
+                </span>
+              )}
+
+              <button
+                onClick={handleSaveContent}
+                disabled={saving}
+                className={`px-5 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg transition-all ${
+                  savedSuccess
+                    ? 'bg-emerald-600 text-white shadow-emerald-950'
+                    : unsavedChangesCount > 0
+                    ? 'bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white shadow-orange-950 animate-bounce'
+                    : 'bg-orange-600 hover:bg-orange-500 text-white shadow-orange-950'
+                }`}
+              >
+                {saving ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : savedSuccess ? (
+                  <Check className="w-4 h-4" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                <span>{savedSuccess ? '¡Publicado con Éxito!' : 'Publicar Cambios en Vivo'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Instructions helper strip */}
+          <div className="px-4 py-2 rounded-xl bg-orange-500/10 border border-orange-500/20 text-xs text-orange-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MousePointerClick className="w-4 h-4 text-orange-400 shrink-0" />
+              <span>
+                <strong className="text-orange-400">Modo Click-to-Edit Activo:</strong> Pasa el ratón sobre cualquier texto o botón en la web de abajo para ver la silueta naranja. Haz clic y escribe directamente sobre la pantalla. Al terminar, pulsa Enter o haz clic fuera y publica.
+              </span>
+            </div>
+            <span className="text-[11px] font-mono text-slate-400 hidden lg:inline">
+              contenteditable="plaintext-only" (Protegido contra ruptura)
+            </span>
+          </div>
+
+          {/* Iframe Viewport Container (Mac Browser Bezel) */}
+          <div className="flex-1 flex justify-center items-start min-h-[680px] bg-[#05070a] rounded-2xl p-4 border border-slate-800 shadow-inner overflow-x-auto">
+            <div
+              className="transition-all duration-300 rounded-2xl overflow-hidden border border-slate-700/80 shadow-2xl flex flex-col bg-white"
+              style={{
+                width: previewDevice === 'mobile' ? '390px' : previewDevice === 'tablet' ? '768px' : '100%',
+                minHeight: '660px',
+                height: '75vh'
+              }}
+            >
+              {/* Fake Mac Window Bar */}
+              <div className="px-4 py-2.5 bg-[#171d2b] border-b border-slate-700/70 flex items-center justify-between shrink-0 select-none">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-rose-500/90 inline-block shadow-sm"></span>
+                  <span className="w-3 h-3 rounded-full bg-amber-500/90 inline-block shadow-sm"></span>
+                  <span className="w-3 h-3 rounded-full bg-emerald-500/90 inline-block shadow-sm"></span>
+                </div>
+                <div className="flex-1 max-w-md mx-4 bg-[#0a0d14] rounded-lg px-3 py-1 text-[11px] font-mono text-slate-300 border border-slate-700/60 text-center truncate flex items-center justify-center gap-1.5">
+                  <span className="text-emerald-400">🔒</span>
+                  <span className="text-slate-400">https://</span>
+                  <span className="text-white font-bold">{currentSite.dominio}</span>
+                  <span className="text-orange-400">?goglite_edit=true</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (iframeRef.current) iframeRef.current.src = iframeUrl;
+                    }}
+                    className="p-1 rounded text-slate-400 hover:text-white"
+                    title="Recargar frame"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Embedded Webpage Iframe */}
+              <iframe
+                ref={iframeRef}
+                src={iframeUrl}
+                title={`Editor Visual - ${currentSite.nombre}`}
+                className="w-full flex-1 border-0 bg-white"
+                allow="clipboard-write"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* MODAL 1: PROMPT PARA EL AGENTE DE IA (FASE 4 · PASO 1) */}
       {showAgentPromptModal && (

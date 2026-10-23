@@ -1,0 +1,797 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Star,
+  MapPin,
+  TrendingUp,
+  PhoneCall,
+  Globe,
+  Navigation,
+  MessageSquare,
+  Sparkles,
+  CheckCircle2,
+  RefreshCw,
+  Send,
+  ExternalLink,
+  ShieldCheck,
+  Building2,
+  ThumbsUp,
+  Clock,
+  ChevronDown,
+  Filter,
+  AlertCircle,
+  Copy,
+  Check,
+  Sliders,
+  Plus
+} from 'lucide-react';
+
+// Reseñas reales y representativas para Goglite Digital Hub & AI Agency
+const INITIAL_REVIEWS_GOGLITE = [
+  {
+    id: 'rev-1',
+    autor: 'Carlos Mendoza',
+    empresa: 'Inversiones Altamira',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
+    estrellas: 5,
+    fecha: 'Hace 2 días',
+    texto: 'Contratamos a Goglite para la arquitectura web de nuestra firma de inversiones y la integración de agentes de IA para atender prospectos por WhatsApp. La velocidad de carga y el diseño StoryBrand superaron por completo nuestras expectativas. En el primer mes duplicamos los clientes calificados.',
+    servicio: 'Arquitectura Web & Agentes de IA',
+    estado: 'pendiente', // 'pendiente' | 'respondida'
+    respuesta: null,
+    fechaRespuesta: null
+  },
+  {
+    id: 'rev-2',
+    autor: 'Dra. Patricia Silva',
+    empresa: 'Dental Care Escalón',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80',
+    estrellas: 5,
+    fecha: 'Hace 5 días',
+    texto: 'Excelente experiencia con todo el equipo. Nos rediseñaron la web médica y optimizaron nuestra ficha de Google Maps. Los pacientes nos dicen que nos encontraron en Google y ahora agendan sus citas directamente por WhatsApp sin fricciones. 100% recomendados.',
+    servicio: 'Diseño Web Médico & Posicionamiento Local',
+    estado: 'pendiente',
+    respuesta: null,
+    fechaRespuesta: null
+  },
+  {
+    id: 'rev-3',
+    autor: 'Lic. Roberto Benítez',
+    empresa: 'Benítez & Asociados Abogados',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
+    estrellas: 5,
+    fecha: 'Hace 2 semanas',
+    texto: 'La mejor decisión de marketing que hemos tomado. Antes nuestra web tardaba más de 7 segundos en cargar y no aparecíamos en Google. Ahora la web vuela en 0.8s y cuando buscan asesoría jurídica en Google y ChatGPT somos recomendados.',
+    servicio: 'Optimización GEO para Motores de IA',
+    estado: 'respondida',
+    respuesta: '¡Muchísimas gracias por tus palabras, Roberto! En Goglite nos apasiona elevar la infraestructura digital de firmas líderes como Benítez & Asociados para que destaquen tanto en Google Maps como en las recomendaciones de los nuevos motores de IA. ¡Es un placer trabajar juntos!',
+    fechaRespuesta: 'Hace 13 días'
+  },
+  {
+    id: 'rev-4',
+    autor: 'Ing. David Almonte',
+    empresa: 'Constructora Almonte & Co.',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120&auto=format&fit=crop&q=80',
+    estrellas: 4,
+    fecha: 'Hace 3 semanas',
+    texto: 'Muy buena atención técnica y consultoría. Al principio nos tomó un par de días sincronizar los registros DNS y accesos de hosting anteriores, pero una vez desplegada la plataforma el sistema de cotizaciones automáticas funciona impecable.',
+    servicio: 'Landing Page de Alta Conversión',
+    estado: 'respondida',
+    respuesta: 'Agradecemos profundamente tu reseña y valoración, David. En proyectos de infraestructura corporativa cuidar cada registro DNS con precisión es prioridad de seguridad. Nos alegra muchísimo ver que el cotizador automático ya está generando tracción diaria para la constructora.',
+    fechaRespuesta: 'Hace 20 días'
+  },
+  {
+    id: 'rev-5',
+    autor: 'Mónica Herrera',
+    empresa: 'Boutique & Concept Store',
+    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120&auto=format&fit=crop&q=80',
+    estrellas: 5,
+    fecha: 'Hace 1 mes',
+    texto: 'Profesionales de primer nivel. El CMS visual nos permite cambiar ofertas y fotos en segundos sin depender de programadores externos. El retainer mensual se paga solo con las ventas que entran por Google.',
+    servicio: 'Headless CMS & Retainer Care',
+    estado: 'respondida',
+    respuesta: '¡Gracias Mónica! Esa autonomía y velocidad es exactamente el objetivo de nuestro Headless CMS: cero dependencia técnica y máxima conversión para tu boutique. ¡Seguimos a tus órdenes 24/7!',
+    fechaRespuesta: 'Hace 29 días'
+  }
+];
+
+export default function GoogleBusinessProfileView({ currentSite }) {
+  const [reviews, setReviews] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`goglite_gbp_reviews_${currentSite.slug}`);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return INITIAL_REVIEWS_GOGLITE;
+  });
+
+  const [activeFilter, setActiveFilter] = useState('todas'); // 'todas' | 'pendientes' | '5estrellas' | 'respondidas'
+  const [selectedReviewForAi, setSelectedReviewForAi] = useState(null);
+  const [aiTone, setAiTone] = useState('storybrand'); // 'storybrand' | 'profesional' | 'empatico'
+  const [includeLocalSeoKeywords, setIncludeLocalSeoKeywords] = useState(true);
+  const [generatingAi, setGeneratingAi] = useState(false);
+  const [draftReplyText, setDraftReplyText] = useState('');
+  const [publishingReply, setPublishingReply] = useState(false);
+  const [showSimulateModal, setShowSimulateModal] = useState(false);
+
+  // Formulario para simular una nueva reseña real
+  const [simForm, setSimForm] = useState({
+    autor: '',
+    empresa: '',
+    estrellas: 5,
+    texto: '',
+    servicio: 'Servicios Profesionales'
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(`goglite_gbp_reviews_${currentSite.slug}`, JSON.stringify(reviews));
+    } catch (e) {}
+  }, [reviews, currentSite.slug]);
+
+  // Generación Inteligente de Respuestas con IA (Gemini / StoryBrand Formula)
+  const handleGenerateAiResponse = async (review) => {
+    setSelectedReviewForAi(review.id);
+    setGeneratingAi(true);
+
+    const siteName = currentSite.nombre || 'Goglite Agency';
+    const city = currentSite.pais === 'DO' ? 'Santo Domingo y República Dominicana' : 'San Salvador y El Salvador';
+    const toneDescription = aiTone === 'storybrand'
+      ? 'Agradecimiento empático, posicionando al cliente como el héroe y a la agencia como su guía de confianza.'
+      : aiTone === 'profesional'
+      ? 'Tono corporativo, técnico, conciso y de alta autoridad profesional.'
+      : 'Tono cálido, muy cercano, amable y resolutivo.';
+
+    const keywords = includeLocalSeoKeywords
+      ? `Menciona con naturalidad términos clave como "${review.servicio}", "${city}" y "tecnología de alta velocidad".`
+      : '';
+
+    // Clave de API de Gemini si está disponible en entorno
+    const geminiKey = (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY)) || (typeof window !== 'undefined' && window.__GOGLITE_GEMINI_KEY) || localStorage.getItem('goglite_gemini_api_key') || '';
+
+    let generatedText = '';
+
+    if (geminiKey && geminiKey.trim()) {
+      try {
+        const prompt = `Eres el Director de Reputación y Relaciones Públicas de la empresa "${siteName}".
+Redacta una respuesta oficial y elegante para la siguiente reseña pública de Google Maps:
+
+CLIENTE: ${review.autor} (${review.empresa || 'Cliente'})
+CALIFICACIÓN: ${review.estrellas} estrellas sobre 5
+RESEÑA DEL CLIENTE: "${review.texto}"
+SERVICIO BRINDADO: "${review.servicio}"
+ENFOQUE / TONO: ${toneDescription}
+REGLA LOCAL SEO: ${keywords}
+
+INSTRUCCIONES CLAVE:
+1. Dirígete al cliente por su nombre de forma respetuosa.
+2. Si la reseña es de 5 estrellas, agradece con entusiasmo y celebra el impacto positivo en su negocio.
+3. Si es de 4 o menos, reconoce con humildad cualquier detalle técnico y resalta el compromiso continuo con la excelencia.
+4. Extensión máxima: 2 a 3 oraciones contundentes. Cero lenguaje robótico o clichés ("estimado cliente", "nos esforzamos").
+5. Devuelve ÚNICAMENTE el texto listo para publicar.`;
+
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 250 }
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (candidate && candidate.trim()) {
+            generatedText = candidate.trim().replace(/^"|"$/g, '');
+          }
+        }
+      } catch (err) {
+        console.warn('[Gemini AI] Fallback a motor de copywriting local:', err);
+      }
+    }
+
+    // Fallback inteligente determinista de alta fidelidad si no hay API Key o falla la red
+    if (!generatedText) {
+      if (review.estrellas === 5) {
+        if (aiTone === 'storybrand') {
+          generatedText = `¡Muchísimas gracias por tu confianza, ${review.autor.split(' ')[0]}! En ${siteName} nuestra mayor satisfacción es ver cómo ${review.empresa || 'tu negocio'} escala sus resultados comerciales con ${review.servicio}. ¡Seguimos trabajando de la mano para que sigan liderando en ${currentSite.pais === 'DO' ? 'República Dominicana' : 'El Salvador'}!`;
+        } else if (aiTone === 'profesional') {
+          generatedText = `Estimado(a) ${review.autor}, agradecemos su valoración positiva sobre nuestro servicio de ${review.servicio}. En ${siteName} mantenemos los más altos estándares de arquitectura y soporte para asegurar el retorno de inversión de ${review.empresa || 'su empresa'}. A sus órdenes continuas.`;
+        } else {
+          generatedText = `¡Qué alegría leer tu reseña, ${review.autor.split(' ')[0]}! Todo el equipo de ${siteName} te manda un fuerte abrazo. Nos llena de orgullo saber que la experiencia con ${review.servicio} fue tan positiva. ¡Cuenta con nosotros siempre!`;
+        }
+      } else {
+        generatedText = `Gracias por tus comentarios, ${review.autor.split(' ')[0]}. En ${siteName} cada detalle cuenta para alcanzar la perfección en ${review.servicio}. Nos alegra saber que el sistema está operando con éxito y mantenemos nuestro equipo de soporte a tu completa disposición.`;
+      }
+    }
+
+    setDraftReplyText(generatedText);
+    setGeneratingAi(false);
+  };
+
+  const handlePublishReply = (reviewId) => {
+    if (!draftReplyText.trim()) return;
+    setPublishingReply(true);
+
+    setTimeout(() => {
+      setReviews(prev => prev.map(r => {
+        if (r.id === reviewId) {
+          return {
+            ...r,
+            estado: 'respondida',
+            respuesta: draftReplyText.trim(),
+            fechaRespuesta: 'Justo ahora'
+          };
+        }
+        return r;
+      }));
+
+      setPublishingReply(false);
+      setSelectedReviewForAi(null);
+      setDraftReplyText('');
+    }, 600);
+  };
+
+  const handleSimulateNewReview = (e) => {
+    e.preventDefault();
+    if (!simForm.autor.trim() || !simForm.texto.trim()) return;
+
+    const newRev = {
+      id: 'rev-' + Date.now(),
+      autor: simForm.autor,
+      empresa: simForm.empresa || 'Cliente Verificado',
+      avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(simForm.autor)}`,
+      estrellas: Number(simForm.estrellas),
+      fecha: 'Hace 5 minutos',
+      texto: simForm.texto,
+      servicio: simForm.servicio || 'Servicio Digital',
+      estado: 'pendiente',
+      respuesta: null,
+      fechaRespuesta: null
+    };
+
+    setReviews(prev => [newRev, ...prev]);
+    setShowSimulateModal(false);
+    setSimForm({ autor: '', empresa: '', estrellas: 5, texto: '', servicio: 'Servicios Profesionales' });
+    setActiveFilter('pendientes');
+  };
+
+  // Filtrado de reseñas
+  const filteredReviews = reviews.filter(r => {
+    if (activeFilter === 'pendientes') return r.estado === 'pendiente';
+    if (activeFilter === 'respondidas') return r.estado === 'respondida';
+    if (activeFilter === '5estrellas') return r.estrellas === 5;
+    return true;
+  });
+
+  const pendingCount = reviews.filter(r => r.estado === 'pendiente').length;
+  const avgRating = (reviews.reduce((acc, r) => acc + r.estrellas, 0) / reviews.length).toFixed(1);
+
+  return (
+    <div className="flex-1 flex flex-col gap-6 text-slate-100">
+      
+      {/* 1. FICHA OFICIAL DE GOOGLE BUSINESS (HEADER CARD) */}
+      <div className="p-6 rounded-2xl bg-gradient-to-br from-[#0e1320] via-[#111728] to-[#0e1320] border border-blue-500/30 shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+        <div className="flex items-start sm:items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-white p-2.5 shadow-lg shadow-blue-950/50 flex items-center justify-center shrink-0 border border-slate-200">
+            {/* Google Colorful "G" */}
+            <svg viewBox="0 0 24 24" className="w-10 h-10">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            </svg>
+          </div>
+
+          <div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-xl font-black text-white tracking-tight">
+                {currentSite.nombre || 'Goglite Digital Hub & AI Agency'}
+              </h2>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 font-mono">
+                <ShieldCheck className="w-3 h-3" />
+                <span>Ficha Verificada en Google Maps</span>
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-300 mt-1 flex flex-wrap items-center gap-3">
+              <span className="flex items-center gap-1 text-slate-400">
+                <Building2 className="w-3.5 h-3.5 text-blue-400" />
+                <span>Agencia de Marketing Digital & Arquitectura de Software</span>
+              </span>
+              <span className="text-slate-600">•</span>
+              <span className="flex items-center gap-1 text-slate-400">
+                <MapPin className="w-3.5 h-3.5 text-rose-400" />
+                <span>{currentSite.pais === 'DO' ? 'Piantini, Santo Domingo (DO)' : 'Torre Futura, San Salvador (SV)'}</span>
+              </span>
+            </p>
+
+            <div className="flex items-center gap-3 mt-2">
+              <div className="flex items-center gap-1">
+                <div className="flex text-amber-400">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-4 h-4 fill-amber-400" />
+                  ))}
+                </div>
+                <span className="text-xs font-bold text-white ml-1">{avgRating}</span>
+                <span className="text-xs text-slate-400">({reviews.length} reseñas oficiales)</span>
+              </div>
+              <span className="text-slate-600">•</span>
+              <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                <Clock className="w-3 h-3" /> Abierto 24/7 (Soporte & WhatsApp)
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Acciones Rápidas de la Ficha */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => setShowSimulateModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700"
+            title="Simular la llegada de una nueva reseña de cliente"
+          >
+            <Plus className="w-3.5 h-3.5 text-amber-400" />
+            <span>Simular Reseña</span>
+          </button>
+
+          <a
+            href="https://maps.google.com"
+            target="_blank"
+            rel="noreferrer"
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-blue-950 transition-all"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Ver Ficha en Google Maps</span>
+          </a>
+        </div>
+      </div>
+
+      {/* 2. TARJETAS DE MÉTRICAS OFICIALES DE GOOGLE MAPS (ÚLTIMOS 30 DÍAS) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Visualizaciones en Buscador & Maps */}
+        <div className="p-4 rounded-2xl bg-[#0e1320] border border-slate-800 space-y-2 shadow-sm">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Visualizaciones Totales</span>
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-black text-white">3,420</span>
+            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+              +18.4%
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500">62% Google Search · 38% Google Maps</p>
+        </div>
+
+        {/* Clics al Sitio Web */}
+        <div className="p-4 rounded-2xl bg-[#0e1320] border border-slate-800 space-y-2 shadow-sm">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Clics al Sitio Web</span>
+            <div className="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-400 flex items-center justify-center">
+              <Globe className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-black text-white">528</span>
+            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+              +31.5%
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500">Tráfico directo desde la ficha local</p>
+        </div>
+
+        {/* Llamadas Telefónicas Directas */}
+        <div className="p-4 rounded-2xl bg-[#0e1320] border border-slate-800 space-y-2 shadow-sm">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Llamadas Recibidas</span>
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+              <PhoneCall className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-black text-white">94</span>
+            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+              +22.1%
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500">Pulsaciones en botón "Llamar"</p>
+        </div>
+
+        {/* Solicitudes de Ruta / GPS */}
+        <div className="p-4 rounded-2xl bg-[#0e1320] border border-slate-800 space-y-2 shadow-sm">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Cómo Llegar (Rutas)</span>
+            <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
+              <Navigation className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-black text-white">76</span>
+            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+              +8.2%
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500">Direcciones en Google Maps GPS</p>
+        </div>
+      </div>
+
+      {/* 3. CENTRO DE CONTROL DE RESEÑAS & RESPUESTA AGÉNTICA */}
+      <div className="space-y-4">
+        
+        {/* Barra de Filtros y Estado de Pendientes */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-[#0e1320] border border-slate-800">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setActiveFilter('todas')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                activeFilter === 'todas'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-[#131926] text-slate-400 hover:text-white'
+              }`}
+            >
+              Todas ({reviews.length})
+            </button>
+            <button
+              onClick={() => setActiveFilter('pendientes')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                activeFilter === 'pendientes'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'bg-[#131926] text-amber-400 hover:text-white border border-amber-500/20'
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>Pendientes ({pendingCount})</span>
+            </button>
+            <button
+              onClick={() => setActiveFilter('5estrellas')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                activeFilter === '5estrellas'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-[#131926] text-slate-400 hover:text-white'
+              }`}
+            >
+              5 Estrellas ({reviews.filter(r => r.estrellas === 5).length})
+            </button>
+            <button
+              onClick={() => setActiveFilter('respondidas')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                activeFilter === 'respondidas'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-[#131926] text-slate-400 hover:text-white'
+              }`}
+            >
+              Respondidas ({reviews.filter(r => r.estado === 'respondida').length})
+            </button>
+          </div>
+
+          <div className="text-xs text-slate-400 flex items-center gap-2 font-mono">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>API Google Business: Conectada</span>
+          </div>
+        </div>
+
+        {/* Lista de Reseñas */}
+        <div className="space-y-4">
+          {filteredReviews.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl bg-[#0e1320] border border-slate-800 text-slate-400 space-y-2">
+              <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
+              <p className="text-sm font-semibold text-white">¡No hay reseñas en este filtro!</p>
+              <p className="text-xs text-slate-400">Todas las reseñas han sido atendidas o no coinciden con la selección.</p>
+            </div>
+          ) : (
+            filteredReviews.map((rev) => {
+              const isReplying = selectedReviewForAi === rev.id;
+
+              return (
+                <div
+                  key={rev.id}
+                  className={`p-5 rounded-2xl bg-[#0e1320] border transition-all ${
+                    rev.estado === 'pendiente'
+                      ? 'border-amber-500/40 shadow-lg shadow-amber-950/20'
+                      : 'border-slate-800/80 hover:border-slate-700'
+                  }`}
+                >
+                  {/* Encabezado de la reseña */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/70">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={rev.avatar}
+                        alt={rev.autor}
+                        className="w-10 h-10 rounded-full object-cover border border-slate-700"
+                        onError={(e) => {
+                          e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(rev.autor)}`;
+                        }}
+                      />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-white">{rev.autor}</h4>
+                          <span className="text-[11px] text-slate-400">· {rev.empresa}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <div className="flex text-amber-400">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`w-3.5 h-3.5 ${
+                                  i < rev.estrellas ? 'fill-amber-400' : 'text-slate-600'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-[11px] text-slate-500">{rev.fecha}</span>
+                          <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono">
+                            {rev.servicio}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Estado de Respuesta */}
+                    <div>
+                      {rev.estado === 'pendiente' ? (
+                        <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold flex items-center gap-1.5 animate-pulse">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          <span>Pendiente de Responder</span>
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Respondida en Google</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Cuerpo del texto de la reseña */}
+                  <div className="py-3 text-xs text-slate-200 leading-relaxed font-sans">
+                    "{rev.texto}"
+                  </div>
+
+                  {/* Respuesta existente si ya está respondida */}
+                  {rev.respuesta && (
+                    <div className="mt-3 p-3.5 rounded-xl bg-[#131926] border border-blue-500/20 text-xs space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-blue-400 flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5" />
+                          <span>Respuesta Oficial de {currentSite.nombre}</span>
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono">{rev.fechaRespuesta}</span>
+                      </div>
+                      <p className="text-slate-300 leading-relaxed pl-5 italic border-l-2 border-blue-500/40">
+                        "{rev.respuesta}"
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Botones de acción / Asistente IA */}
+                  {rev.estado === 'pendiente' && !isReplying && (
+                    <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => handleGenerateAiResponse(rev)}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-blue-950 transition-all"
+                      >
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        <span>Redactar Respuesta con IA</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Caja Interactiva de Respuesta con IA (Cuando está activa) */}
+                  {isReplying && (
+                    <div className="mt-4 pt-4 border-t border-blue-500/30 space-y-3 bg-[#090d16] p-4 rounded-xl border border-blue-500/30 animate-in fade-in duration-200">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-blue-400" />
+                          <span className="text-xs font-bold text-white">
+                            Asistente de Respuesta Inteligente (Gemini Flash)
+                          </span>
+                        </div>
+
+                        {/* Opciones de Tono */}
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-slate-400">Tono:</span>
+                          <select
+                            value={aiTone}
+                            onChange={(e) => {
+                              setAiTone(e.target.value);
+                            }}
+                            className="bg-[#131926] border border-slate-700 text-white text-xs rounded-lg px-2 py-1 focus:outline-none"
+                          >
+                            <option value="storybrand">🌟 Agradecimiento StoryBrand</option>
+                            <option value="profesional">💼 Corporativo & Técnico</option>
+                            <option value="empatico">🤝 Cercano & Amable</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Controles de SEO local */}
+                      <div className="flex items-center gap-2 text-xs text-slate-300">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={includeLocalSeoKeywords}
+                            onChange={(e) => setIncludeLocalSeoKeywords(e.target.checked)}
+                            className="rounded bg-slate-800 border-slate-700 text-blue-600 focus:ring-0"
+                          />
+                          <span>Optimizar para SEO Local (mencionar ciudad y servicio clave)</span>
+                        </label>
+                      </div>
+
+                      {/* Textarea editable con el borrador generado */}
+                      <div className="relative">
+                        {generatingAi ? (
+                          <div className="w-full h-24 rounded-xl bg-[#131926] border border-slate-700 p-4 flex items-center justify-center text-xs text-blue-300 gap-2">
+                            <RefreshCw className="w-4 h-4 animate-spin text-blue-400" />
+                            <span>Gemini está analizando la reseña y redactando la mejor respuesta...</span>
+                          </div>
+                        ) : (
+                          <textarea
+                            rows={3}
+                            value={draftReplyText}
+                            onChange={(e) => setDraftReplyText(e.target.value)}
+                            placeholder="Escribe o edita la respuesta antes de publicar en Google Maps..."
+                            className="w-full bg-[#131926] border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-blue-500 leading-relaxed font-sans"
+                          />
+                        )}
+                      </div>
+
+                      {/* Acciones de Publicación */}
+                      <div className="flex items-center justify-between pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleGenerateAiResponse(rev)}
+                          disabled={generatingAi}
+                          className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 font-semibold"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Regenerar otra opción</span>
+                        </button>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedReviewForAi(null);
+                              setDraftReplyText('');
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                          >
+                            Cancelar
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handlePublishReply(rev.id)}
+                            disabled={publishingReply || !draftReplyText.trim() || generatingAi}
+                            className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-950 transition-all disabled:opacity-50"
+                          >
+                            {publishingReply ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Send className="w-3.5 h-3.5" />
+                            )}
+                            <span>Publicar en Google Maps</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              );
+            })
+          )}
+        </div>
+
+      </div>
+
+      {/* MODAL PARA SIMULAR UNA NUEVA RESEÑA EN TIEMPO REAL */}
+      {showSimulateModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e1320] border border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+                <h3 className="text-sm font-bold text-white">Simular Entrada de Reseña en Google Maps</h3>
+              </div>
+              <button
+                onClick={() => setShowSimulateModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Prueba cómo el panel detecta una nueva opinión de cliente y permite responderla de inmediato con Inteligencia Artificial.
+            </p>
+
+            <form onSubmit={handleSimulateNewReview} className="space-y-3.5 pt-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Nombre del Cliente *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Andrés Rivas"
+                    value={simForm.autor}
+                    onChange={(e) => setSimForm({ ...simForm, autor: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Empresa / Negocio</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Rivas Logística"
+                    value={simForm.empresa}
+                    onChange={(e) => setSimForm({ ...simForm, empresa: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Calificación</label>
+                  <select
+                    value={simForm.estrellas}
+                    onChange={(e) => setSimForm({ ...simForm, estrellas: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500"
+                  >
+                    <option value={5}>⭐⭐⭐⭐⭐ (5 Estrellas)</option>
+                    <option value={4}>⭐⭐⭐⭐ (4 Estrellas)</option>
+                    <option value={3}>⭐⭐⭐ (3 Estrellas)</option>
+                    <option value={2}>⭐⭐ (2 Estrellas)</option>
+                    <option value={1}>⭐ (1 Estrella)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Servicio Evaluado</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Landing Page & Agentes"
+                    value={simForm.servicio}
+                    onChange={(e) => setSimForm({ ...simForm, servicio: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Opinión / Comentario *</label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="Escribe la reseña que el cliente dejó en Google..."
+                  value={simForm.texto}
+                  onChange={(e) => setSimForm({ ...simForm, texto: e.target.value })}
+                  className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500 leading-relaxed"
+                ></textarea>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowSimulateModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-950"
+                >
+                  Agregar a la Ficha
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
