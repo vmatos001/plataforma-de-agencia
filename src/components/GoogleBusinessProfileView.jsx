@@ -23,7 +23,6 @@ import {
   Copy,
   Check,
   Sliders,
-  Plus,
   Users,
   UserCheck,
   X,
@@ -116,7 +115,6 @@ export default function GoogleBusinessProfileView({ currentSite }) {
   const [publishingReply, setPublishingReply] = useState(false);
 
   // Modales
-  const [showSimulateModal, setShowSimulateModal] = useState(false);
   const [showDelegationModal, setShowDelegationModal] = useState(false);
   const [copiedDelegationText, setCopiedDelegationText] = useState(false);
 
@@ -442,17 +440,8 @@ Con esto, tu ficha quedará enlazada automáticamente a tu panel en tiempo real 
 
         {/* Acciones Rápidas de la Ficha */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            onClick={() => setShowSimulateModal(true)}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700"
-            title="Simular la llegada de una nueva reseña de cliente para probar respuesta IA"
-          >
-            <Plus className="w-3.5 h-3.5 text-amber-400" />
-            <span>Simular Reseña</span>
-          </button>
-
           <a
-            href="https://www.google.com/maps/place/Goglite+%7C+Dise%C3%B1o+Web+Profesional+en+Rep%C3%BAblica+Dominicana./@18.5304903,-69.9078898,17z"
+            href="https://www.google.com/maps/place/Goglite+%7C+Dise%C3%B1o+Web+Profesional+en+Rep%C3%BAblica+Dominicana./@18.5304954,-69.9104647,17z/data=!4m8!3m7!1s0x8eaf8979c74962f9:0xdb861c27130c04a1!8m2!3d18.5304903!4d-69.9078898!9m1!1b1!16s%2Fg%2F11xfjb46jv?entry=ttu&g_ep=EgoyMDI2MTAyMC4wIKXMDSoASAFQAw%3D%3D"
             target="_blank"
             rel="noreferrer"
             className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-blue-950 transition-all"
@@ -901,129 +890,6 @@ Con esto, tu ficha quedará enlazada automáticamente a tu panel en tiempo real 
                 Cerrar
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL PARA SIMULAR UNA NUEVA RESEÑA EN TIEMPO REAL */}
-      {showSimulateModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0e1320] border border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
-                <h3 className="text-sm font-bold text-white">Simular Entrada de Reseña en Google Maps</h3>
-              </div>
-              <button
-                onClick={() => setShowSimulateModal(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-400">
-              Prueba cómo el panel detecta una nueva opinión de cliente y permite responderla de inmediato con Inteligencia Artificial.
-            </p>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const form = e.target;
-                const newRev = {
-                  id: 'rev-' + Date.now(),
-                  autor: form.autor.value,
-                  detalles: form.empresa.value || 'Cliente Verificado',
-                  avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(form.autor.value)}`,
-                  estrellas: Number(form.estrellas.value),
-                  fecha: 'Hace un momento',
-                  texto: form.texto.value,
-                  servicio: form.servicio.value || 'Servicios Profesionales',
-                  estado: 'pendiente',
-                  respuesta: null,
-                  fechaRespuesta: null
-                };
-                setReviews(prev => [newRev, ...prev]);
-                setShowSimulateModal(false);
-                setActiveFilter('pendientes');
-                handleOpenReplyPanel(newRev);
-              }}
-              className="space-y-3.5 pt-1"
-            >
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Nombre del Cliente *</label>
-                  <input
-                    type="text"
-                    name="autor"
-                    required
-                    placeholder="Ej. Andrés Rivas"
-                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Empresa / Negocio</label>
-                  <input
-                    type="text"
-                    name="empresa"
-                    placeholder="Ej. Rivas Logística"
-                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Calificación</label>
-                  <select
-                    name="estrellas"
-                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value={5}>⭐⭐⭐⭐⭐ (5 Estrellas)</option>
-                    <option value={4}>⭐⭐⭐⭐ (4 Estrellas)</option>
-                    <option value={3}>⭐⭐⭐ (3 Estrellas)</option>
-                    <option value={2}>⭐⭐ (2 Estrellas)</option>
-                    <option value={1}>⭐ (1 Estrella)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Servicio Evaluado</label>
-                  <input
-                    type="text"
-                    name="servicio"
-                    placeholder="Ej. Landing Page & Agentes"
-                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">Opinión / Comentario *</label>
-                <textarea
-                  name="texto"
-                  rows={3}
-                  required
-                  placeholder="Escribe la reseña que el cliente dejó en Google..."
-                  className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-blue-500 leading-relaxed"
-                ></textarea>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowSimulateModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-950"
-                >
-                  Agregar a la Ficha
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
