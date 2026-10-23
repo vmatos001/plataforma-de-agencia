@@ -1,9 +1,9 @@
 /**
- * Goglite Headless CMS — Universal Client Script (v1.4.0)
+ * Goglite Headless CMS — Universal Client Script (v1.4.1)
  * Ultra-rápido, tolerante a fallos, 0ms en visitas recurrentes con caché local.
  * Conectado en tiempo real a Google Cloud Firestore REST API.
  * Motor Universal de Auto-Escaneo de Textos & Edición Visual Inline (Click-to-Edit).
- * Protege la estructura del sitio: solo permite editar textos puros sin alterar diseño.
+ * Protege la estructura del sitio: solo permite editar textos puros sin alterar diseño ni CSS.
  */
 (function() {
   var scriptTag = document.currentScript || (function() {
@@ -36,11 +36,11 @@
   // ===============================================================
   function scanAndTagAllTextElements() {
     var sectionCounters = {};
-    
+
     function walk(node) {
       if (node.nodeType === Node.ELEMENT_NODE) {
         var tag = node.tagName.toLowerCase();
-        
+
         // Ignorar scripts, estilos, SVGs, iframes y elementos del CMS
         if (['script', 'style', 'svg', 'noscript', 'iframe'].indexOf(tag) !== -1 ||
             (node.classList && (node.classList.contains('goglite-cms-badge') || node.classList.contains('goglite-cms-toolbar')))) {
@@ -61,9 +61,9 @@
         var isMeaningfulText = directText.length > 1 || (directText.length === 1 && /[a-zA-Z0-9]/.test(directText));
 
         if (isTextContainer && isMeaningfulText) {
-          // Si es un div/span contenedor con elementos de bloque hijos, no lo etiquetamos
+          // Si es un contenedor con elementos de bloque hijos, no lo etiquetamos (etiquetaremos sus hijos)
           var hasBlockChildren = node.querySelector('h1, h2, h3, h4, h5, h6, p, ul, ol, table, form, section, article, header, footer');
-          
+
           if (!hasBlockChildren) {
             if (!node.hasAttribute('data-cms')) {
               var section = node.closest('section, header, footer, nav, [id], article, main, .hero-grid-layout, .w-layout-grid');
@@ -103,12 +103,10 @@
       var key = el.getAttribute('data-cms');
       var val = getVal(key, c);
       if (typeof val === 'string' && val.trim() !== '') {
-        // Preservar estructura interna si tiene iconos o imágenes hijas
         var hasImg = el.querySelector('img, svg');
         if (!hasImg) {
           el.textContent = val;
         } else {
-          // Si tiene icono/imagen, reemplazar solo el nodo de texto
           for (var i = 0; i < el.childNodes.length; i++) {
             if (el.childNodes[i].nodeType === Node.TEXT_NODE && el.childNodes[i].nodeValue.trim()) {
               el.childNodes[i].nodeValue = val;
@@ -259,24 +257,13 @@
     // 1. Escanear todo el texto de la página
     scanAndTagAllTextElements();
 
-    // 2. Trampa de navegación: Desactivar saltos de enlaces y submits en modo editor
+    // 2. Desactivar navegación nativa de enlaces para evitar saltos de pantalla
     document.querySelectorAll('a').forEach(function(a) {
       if (!a.hasAttribute('data-cms-orig-href')) {
         a.setAttribute('data-cms-orig-href', a.getAttribute('href') || '');
         a.setAttribute('href', 'javascript:void(0);');
       }
     });
-
-    // Intercepción en fase de CAPTURA para bloquear clics en enlaces o botones
-    function trapNavigation(e) {
-      var interactive = e.target.closest('a, button, [role="button"], input[type="submit"]');
-      if (interactive) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    }
-    window.addEventListener('click', trapNavigation, true);
-    window.addEventListener('submit', trapNavigation, true);
 
     // 3. Inyectar estilos visuales del editor en la página
     var style = document.createElement('style');
@@ -333,10 +320,7 @@
     badge.style.display = 'none';
     document.body.appendChild(badge);
 
-    var currentHoveredEl = null;
-
     function positionBadge(el, label, hasLink) {
-      currentHoveredEl = el;
       var rect = el.getBoundingClientRect();
       var top = rect.top - 30;
       if (top < 10) top = rect.bottom + 6;
@@ -372,50 +356,64 @@
       }
     }
 
-    var discoveredElements = [];
-
-    // 4. Configurar TODOS los elementos de texto [data-cms]
-    document.querySelectorAll('[data-cms]').forEach(function(el) {
-      var key = el.getAttribute('data-cms');
-      var label = key.replace('textos.', '').replace('hero.', '');
-      var isLink = !!el.closest('a, button');
-
-      discoveredElements.push({
-        type: 'text',
-        key: key,
-        tag: el.tagName.toLowerCase(),
-        text: (el.innerText || el.textContent || '').trim().slice(0, 80)
-      });
-
-      el.setAttribute('title', 'Clic para editar este texto en vivo');
-
-      el.addEventListener('mouseenter', function() {
+    // 4. Delegación de Eventos para Mouseover (Hover badge)
+    document.addEventListener('mouseover', function(e) {
+      if (!isEditorMode) return;
+      var el = e.target.closest('[data-cms]');
+      if (el) {
         if (document.activeElement === el) return;
         el.classList.add('goglite-cms-field-hover');
+        var key = el.getAttribute('data-cms') || '';
+        var label = key.replace('textos.', '').replace('hero.', '');
+        var isLink = !!el.closest('a, button');
         positionBadge(el, label, isLink);
-      });
+      }
+    }, true);
 
-      el.addEventListener('mouseleave', function(e) {
+    document.addEventListener('mouseout', function(e) {
+      if (!isEditorMode) return;
+      var el = e.target.closest('[data-cms]');
+      if (el) {
         el.classList.remove('goglite-cms-field-hover');
         if (document.activeElement !== el) {
-          // Si el mouse entra al badge, no ocultarlo
           if (e.relatedTarget && e.relatedTarget.closest('.goglite-cms-badge')) return;
           badge.style.display = 'none';
         }
-      });
+      }
+    }, true);
 
-      // Al hacer clic: activar edición de texto puro (plaintext-only evita que rompan HTML o CSS)
-      el.addEventListener('click', function(e) {
+    // 5. Delegación de Clics: Activar contenteditable sin saltar de página
+    document.addEventListener('click', function(e) {
+      if (!isEditorMode) return;
+
+      // Si hace clic en el botón del badge para editar el enlace
+      if (e.target.closest('#goglite-btn-edit-link')) return;
+
+      // Interceptar clics en enlaces o botones para evitar navegación
+      var clickable = e.target.closest('a, button, [role="button"], input[type="submit"]');
+      if (clickable) {
         e.preventDefault();
-        e.stopPropagation();
-        
+      }
+
+      var el = e.target.closest('[data-cms]');
+      if (el) {
+        e.preventDefault();
+
+        // Desactivar cualquier otro campo activo
+        document.querySelectorAll('.goglite-cms-field-active').forEach(function(item) {
+          if (item !== el) {
+            item.removeAttribute('contenteditable');
+            item.classList.remove('goglite-cms-field-active');
+          }
+        });
+
+        // Activar modo texto puro (plaintext-only garantiza que no se altere HTML ni CSS)
         el.setAttribute('contenteditable', 'plaintext-only');
         el.classList.add('goglite-cms-field-active');
         el.classList.remove('goglite-cms-field-hover');
         badge.style.display = 'none';
         el.focus();
 
-        // Colocar el cursor al final del texto
         try {
           var range = document.createRange();
           var sel = window.getSelection();
@@ -424,15 +422,20 @@
           sel.removeAllRanges();
           sel.addRange(range);
         } catch (err) {}
-      }, true);
+      }
+    }, true);
 
-      // Al salir de foco: Guardar cambio y enviar a la plataforma
-      el.addEventListener('blur', function() {
+    // 6. Focusout: Guardar el texto editado y notificar a la plataforma
+    document.addEventListener('focusout', function(e) {
+      var el = e.target.closest('[data-cms]');
+      if (el && el.hasAttribute('contenteditable')) {
         el.removeAttribute('contenteditable');
         el.classList.remove('goglite-cms-field-active');
         badge.style.display = 'none';
 
+        var key = el.getAttribute('data-cms');
         var newVal = (el.innerText || el.textContent || '').trim();
+
         if (window.parent && window.parent !== window) {
           window.parent.postMessage({
             type: 'GOGLITE_CMS_INLINE_CHANGE',
@@ -440,60 +443,34 @@
             value: newVal
           }, '*');
         }
-      });
+      }
+    }, true);
 
-      // Guardar con Enter en títulos, botones o líneas individuales
-      el.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
+    // 7. Enter: Salir de edición en títulos, botones o líneas únicas
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        var el = document.activeElement;
+        if (el && el.hasAttribute('contenteditable')) {
           var tag = el.tagName.toLowerCase();
           if (['h1','h2','h3','h4','h5','h6','button','a','span','label'].indexOf(tag) !== -1 || el.closest('a, button')) {
             e.preventDefault();
             el.blur();
           }
         }
-      });
-    });
+      }
+    }, true);
 
-    // 5. Configurar elementos de imagen para reemplazo rápido
-    document.querySelectorAll('[data-cms-src]').forEach(function(el) {
-      var key = el.getAttribute('data-cms-src');
+    // 8. Reportar elementos descubiertos a la plataforma
+    var discoveredElements = [];
+    document.querySelectorAll('[data-cms]').forEach(function(el) {
       discoveredElements.push({
-        type: 'src',
-        key: key,
-        tag: 'img',
-        src: el.getAttribute('src')
+        type: 'text',
+        key: el.getAttribute('data-cms'),
+        tag: el.tagName.toLowerCase(),
+        text: (el.innerText || el.textContent || '').trim().slice(0, 80)
       });
-
-      el.addEventListener('mouseenter', function() {
-        el.classList.add('goglite-cms-field-hover');
-        positionBadge(el, '🖼️ Imagen', false);
-      });
-
-      el.addEventListener('mouseleave', function() {
-        el.classList.remove('goglite-cms-field-hover');
-        badge.style.display = 'none';
-      });
-
-      el.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        var curSrc = el.getAttribute('src') || '';
-        var newSrc = window.prompt('Ingresa la nueva URL de la imagen:', curSrc);
-        if (newSrc !== null && newSrc.trim() !== '') {
-          var cleanSrc = newSrc.trim();
-          el.setAttribute('src', cleanSrc);
-          if (window.parent && window.parent !== window) {
-            window.parent.postMessage({
-              type: 'GOGLITE_CMS_INLINE_CHANGE',
-              key: key,
-              value: cleanSrc
-            }, '*');
-          }
-        }
-      }, true);
     });
 
-    // 6. Reportar los elementos descubiertos a la plataforma
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({
         type: 'GOGLITE_CMS_PAGE_DISCOVERED',
