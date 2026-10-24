@@ -161,6 +161,9 @@ export default function HeadlessCmsHubModule() {
 
       if (!Array.isArray(loaded)) loaded = [];
 
+      // Filtrar sitios mockups como 'gruas-andrea'
+      loaded = loaded.filter(s => s.slug !== 'gruas-andrea');
+
       // Garantizar que el sitio oficial Goglite Digital Hub esté siempre disponible al inicio
       const existingGogliteIdx = loaded.findIndex(s => s.slug === 'goglite');
       if (existingGogliteIdx === -1) {
@@ -399,12 +402,6 @@ Reglas técnicas de cumplimiento obligatorio:
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-black text-white">Hub Headless CMS · Goglite Care</h2>
-            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
-              $0 Servidores · Google API
-            </span>
-            <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
-              Retainer $99 - $199/mes
-            </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Centro de Mando de Presencia Digital: Edición visual del sitio web y administración oficial de la Ficha de Google Business con respuestas IA.
@@ -460,7 +457,7 @@ Reglas técnicas de cumplimiento obligatorio:
         </div>
       </div>
 
-      {/* 2. SUB-NAVIGATION TABS (EDITOR VISUAL VS FICHA GOOGLE) */}
+      {/* 2. SUB-NAVIGATION TABS (EDITOR VISUAL VS FICHA GOOGLE VS SITE KIT) */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveView('editor_visual')}
@@ -471,7 +468,7 @@ Reglas técnicas de cumplimiento obligatorio:
           }`}
         >
           <MousePointerClick className="w-4 h-4 text-orange-300" />
-          <span>🎨 Editor Visual Web (Click-to-Edit)</span>
+          <span>🎨 Editor Visual Web</span>
         </button>
 
         <button
@@ -484,10 +481,6 @@ Reglas técnicas de cumplimiento obligatorio:
         >
           <MapPin className="w-4 h-4 text-blue-300" />
           <span>📍 Ficha de Google Business & Reseñas IA</span>
-          <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono font-bold flex items-center gap-1">
-            <Star className="w-2.5 h-2.5 fill-amber-400" />
-            <span>{currentSite?.slug === 'goglite' ? '5.0 (3)' : '5.0'}</span>
-          </span>
         </button>
 
         <button
@@ -499,11 +492,7 @@ Reglas técnicas de cumplimiento obligatorio:
           }`}
         >
           <Activity className="w-4 h-4 text-emerald-300" />
-          <span>⚡ Google Site Kit (Search Console, GA4 & Ads)</span>
-          <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>En Vivo</span>
-          </span>
+          <span>⚡ Google Site Kit</span>
         </button>
       </div>
 
