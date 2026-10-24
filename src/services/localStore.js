@@ -4,6 +4,8 @@
  * y garantiza una limpieza exhaustiva y segura del entorno de demostración.
  */
 
+import { INITIAL_PROD_CRM_LEADS } from '../constants/initialCrmData';
+
 export const STORAGE_KEYS = {
   // Navegación y estado global
   ACTIVE_MODULE: 'goglite_active_module',
@@ -12,9 +14,9 @@ export const STORAGE_KEYS = {
   // Módulo 1: Prospección & Outbound
   OUTBOUND_LEADS: 'goglite_outbound_leads',
 
-  // Módulo 2: CRM & WhatsApp
-  CRM_LEADS: 'goglite_crm_leads_v3',
-  CRM_LEADS_LEGACY: 'goglite_crm_leads',
+  // Módulo 2: CRM & WhatsApp (Clave v4 de Producción Limpia)
+  CRM_LEADS: 'goglite_crm_leads_v4_prod',
+  CRM_LEADS_LEGACY: 'goglite_crm_leads_v3',
   CRM_COUNTRY: 'goglite_crm_country',
   CRM_ACTIVE_TAB: 'goglite_crm_active_tab',
   CRM_SELECTED_WA_ID: 'goglite_crm_selected_wa_id',
@@ -148,33 +150,25 @@ export function syncCrmLeadsWithPresupuestos(crmLeads) {
 export function getStoredCrmLeads() {
   if (typeof window === 'undefined') return [];
   try {
-    let leads = [];
-    const v3 = localStorage.getItem(STORAGE_KEYS.CRM_LEADS);
-    if (v3) {
-      const parsed = JSON.parse(v3);
-      if (Array.isArray(parsed) && parsed.length > 0) leads = parsed;
-    }
-
-    if (leads.length === 0) {
-      // Fallback a clave anterior y auto-migración
-      const legacy = localStorage.getItem(STORAGE_KEYS.CRM_LEADS_LEGACY);
-      if (legacy) {
-        const parsed = JSON.parse(legacy);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          leads = parsed;
-          setLocalItem(STORAGE_KEYS.CRM_LEADS, parsed);
-        }
+    const stored = localStorage.getItem(STORAGE_KEYS.CRM_LEADS);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return syncCrmLeadsWithPresupuestos(parsed);
       }
     }
 
-    if (leads.length > 0) {
-      return syncCrmLeadsWithPresupuestos(leads);
-    }
+    // Inicialización limpia de producción: Cargar el lead real de Evelin Jasbet
+    const initialLeads = Array.isArray(INITIAL_PROD_PROD_LEADS_SAFE) ? INITIAL_PROD_PROD_LEADS_SAFE : INITIAL_PROD_CRM_LEADS;
+    saveStoredCrmLeads(initialLeads);
+    return syncCrmLeadsWithPresupuestos(initialLeads);
   } catch (e) {
     console.warn('[LocalStore] Error leyendo leads de CRM:', e);
   }
-  return [];
+  return INITIAL_PROD_CRM_LEADS || [];
 }
+
+const INITIAL_PROD_PROD_LEADS_SAFE = INITIAL_PROD_CRM_LEADS;
 
 /**
  * Guarda los leads de CRM en la clave estandarizada v3 normalizando etapas legacy
