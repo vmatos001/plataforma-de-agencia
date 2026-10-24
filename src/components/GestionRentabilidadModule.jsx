@@ -1879,13 +1879,6 @@ export default function GestionRentabilidadModule({
     } catch {}
   };
 
-  // Auto-seleccionar la primera factura al entrar a la pestaña Facturas si ninguna está seleccionada
-  useEffect(() => {
-    if (activeTab === 'facturas' && !selectedInvoice && filteredFacturas.length > 0) {
-      handleSelectInvoice(filteredFacturas[0]);
-    }
-  }, [activeTab, selectedInvoice, filteredFacturas]);
-
   // Create Invoice (Local-First + Backend Sync)
   const handleCreateInvoice = async (e) => {
     e.preventDefault();
@@ -2507,6 +2500,13 @@ export default function GestionRentabilidadModule({
       f.origenModulo?.toLowerCase().includes(term);
     return matchCountry && matchStatus && matchSearch;
   });
+
+  // Auto-seleccionar la primera factura al entrar a la pestaña Facturas si ninguna está seleccionada
+  useEffect(() => {
+    if (activeTab === 'facturas' && !selectedInvoice && filteredFacturas.length > 0) {
+      handleSelectInvoice(filteredFacturas[0]);
+    }
+  }, [activeTab, selectedInvoice, filteredFacturas]);
 
   const filteredRentabilidad = proyectosRentabilidad.filter(p => {
     const matchCountry = resumenCountry === 'ALL' || p.pais === resumenCountry;
