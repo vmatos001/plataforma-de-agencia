@@ -13,7 +13,6 @@ import {
   ShieldCheck, 
   Upload, 
   RefreshCw,
-  CreditCard,
   Users,
   UserPlus,
   Trash2,
@@ -62,32 +61,11 @@ export default function AgencyWhiteLabelSettingsModal({
       serperApiKey: 'serper_api_active',
       geminiApiKey: 'AIzaSy_storybrand_active',
       whatsappGatewayStatus: 'Conectado (Baileys v6)'
-    },
-    cuentasBancarias: {
-      elSalvador: {
-        banco: 'Banco Agrícola',
-        tipo: 'Cuenta Corriente',
-        numero: '500-128941-01',
-        titular: 'Goglite Studio S.A. de C.V.',
-        chivoUglyCash: '$goglite.sv'
-      },
-      republicaDominicana: {
-        banco: 'Banreservas / Banco Popular',
-        tipo: 'Cuenta Corriente Corredores',
-        numero: '960-441208-5',
-        titular: 'Goglite Digital Dominicana SRL',
-        rnc: '1-32-88901-4'
-      },
-      internacional: {
-        metodo: 'Zelle / Stripe / Wire Transfer',
-        destinatario: 'billing@goglite.com',
-        swift: 'AGRISVSX'
-      }
     }
   });
 
   const [activeTab, setActiveTab] = useState('branding'); 
-  // 'branding' | 'colaboradores' | 'bancos' | 'contacto' | 'paises' | 'apis'
+  // 'branding' | 'colaboradores' | 'contacto' | 'paises' | 'apis'
   
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -114,10 +92,6 @@ export default function AgencyWhiteLabelSettingsModal({
         apisIntegraciones: {
           ...prev.apisIntegraciones,
           ...(agencySettings.apisIntegraciones || {})
-        },
-        cuentasBancarias: {
-          ...prev.cuentasBancarias,
-          ...(agencySettings.cuentasBancarias || {})
         }
       }));
     }
@@ -364,19 +338,6 @@ export default function AgencyWhiteLabelSettingsModal({
 
           <button
             type="button"
-            onClick={() => setActiveTab('bancos')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
-              activeTab === 'bancos'
-                ? 'border-orange-500 text-orange-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <CreditCard className="w-3.5 h-3.5" />
-            <span>3. Cuentas de Banco</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setActiveTab('contacto')}
             className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
               activeTab === 'contacto'
@@ -385,7 +346,7 @@ export default function AgencyWhiteLabelSettingsModal({
             }`}
           >
             <Phone className="w-3.5 h-3.5" />
-            <span>4. Contacto & Soporte</span>
+            <span>3. Contacto & Soporte</span>
           </button>
 
           <button
@@ -398,7 +359,7 @@ export default function AgencyWhiteLabelSettingsModal({
             }`}
           >
             <Globe className="w-3.5 h-3.5" />
-            <span>5. Países & Monedas</span>
+            <span>4. Países & Monedas</span>
           </button>
 
           <button
@@ -411,7 +372,7 @@ export default function AgencyWhiteLabelSettingsModal({
             }`}
           >
             <Cpu className="w-3.5 h-3.5" />
-            <span>6. APIs & Conexiones</span>
+            <span>5. APIs & Conexiones</span>
           </button>
         </div>
 
@@ -756,209 +717,7 @@ export default function AgencyWhiteLabelSettingsModal({
             </div>
           )}
 
-          {/* TAB 3: CUENTAS BANCARIAS */}
-          {activeTab === 'bancos' && (
-            <div className="space-y-4">
-              <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>
-                  Estas cuentas se imprimen en los contratos, facturas y en la pantalla de pago del Portal del Cliente.
-                </span>
-              </div>
-
-              {/* El Salvador */}
-              <div className="p-4 rounded-xl bg-[#121724] border border-slate-800 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-base">🇸🇻</span>
-                  <span className="text-xs font-bold text-white">Cuentas Oficiales El Salvador (SV)</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-400 block mb-1">Banco e Institución</label>
-                    <input
-                      type="text"
-                      value={form.cuentasBancarias?.elSalvador?.banco || ''}
-                      onChange={(e) => setForm({
-                        ...form,
-                        cuentasBancarias: {
-                          ...form.cuentasBancarias,
-                          elSalvador: { ...form.cuentasBancarias?.elSalvador, banco: e.target.value }
-                        }
-                      })}
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-400 block mb-1">Número de Cuenta</label>
-                    <input
-                      type="text"
-                      value={form.cuentasBancarias?.elSalvador?.numero || ''}
-                      onChange={(e) => setForm({
-                        ...form,
-                        cuentasBancarias: {
-                          ...form.cuentasBancarias,
-                          elSalvador: { ...form.cuentasBancarias?.elSalvador, numero: e.target.value }
-                        }
-                      })}
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-400 block mb-1">Titular de la Cuenta</label>
-                    <input
-                      type="text"
-                      value={form.cuentasBancarias?.elSalvador?.titular || ''}
-                      onChange={(e) => setForm({
-                        ...form,
-                        cuentasBancarias: {
-                          ...form.cuentasBancarias,
-                          elSalvador: { ...form.cuentasBancarias?.elSalvador, titular: e.target.value }
-                        }
-                      })}
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-400 block mb-1">Chivo Wallet / UglyCash</label>
-                    <input
-                      type="text"
-                      value={form.cuentasBancarias?.elSalvador?.chivoUglyCash || ''}
-                      onChange={(e) => setForm({
-                        ...form,
-                        cuentasBancarias: {
-                          ...form.cuentasBancarias,
-                          elSalvador: { ...form.cuentasBancarias?.elSalvador, chivoUglyCash: e.target.value }
-                        }
-                      })}
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* República Dominicana */}
-              <div className="p-4 rounded-xl bg-[#121724] border border-slate-800 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-base">🇩🇴</span>
-                  <span className="text-xs font-bold text-white">Cuentas Oficiales República Dominicana (DO)</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-400 block mb-1">Banco e Institución</label>
-                    <input
-                      type="text"
-                      value={form.cuentasBancarias?.republicaDominicana?.banco || ''}
-                      onChange={(e) => setForm({
-                        ...form,
-                        cuentasBancarias: {
-                          ...form.cuentasBancarias,
-                          republicaDominicana: { ...form.cuentasBancarias?.republicaDominicana, banco: e.target.value }
-                        }
-                      })}
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-400 block mb-1">Número de Cuenta</label>
-                    <input
-                      type="text"
-                      value={form.cuentasBancarias?.republicaDominicana?.numero || ''}
-                      onChange={(e) => setForm({
-                        ...form,
-                        cuentasBancarias: {
-                          ...form.cuentasBancarias,
-                          republicaDominicana: { ...form.cuentasBancarias?.republicaDominicana, numero: e.target.value }
-                        }
-                      })}
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-400 block mb-1">Titular de la Cuenta</label>
-                    <input
-                      type="text"
-                      value={form.cuentasBancarias?.republicaDominicana?.titular || ''}
-                      onChange={(e) => setForm({
-                        ...form,
-                        cuentasBancarias: {
-                          ...form.cuentasBancarias,
-                          republicaDominicana: { ...form.cuentasBancarias?.republicaDominicana, titular: e.target.value }
-                        }
-                      })}
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-400 block mb-1">RNC o Cédula Fiscal</label>
-                    <input
-                      type="text"
-                      value={form.cuentasBancarias?.republicaDominicana?.rnc || ''}
-                      onChange={(e) => setForm({
-                        ...form,
-                        cuentasBancarias: {
-                          ...form.cuentasBancarias,
-                          republicaDominicana: { ...form.cuentasBancarias?.republicaDominicana, rnc: e.target.value }
-                        }
-                      })}
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Internacional */}
-              <div className="p-4 rounded-xl bg-[#121724] border border-slate-800 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-base">🌎</span>
-                  <span className="text-xs font-bold text-white">Canales de Pago Internacionales</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-400 block mb-1">Métodos Habilitados</label>
-                    <input
-                      type="text"
-                      value={form.cuentasBancarias?.internacional?.metodo || ''}
-                      onChange={(e) => setForm({
-                        ...form,
-                        cuentasBancarias: {
-                          ...form.cuentasBancarias,
-                          internacional: { ...form.cuentasBancarias?.internacional, metodo: e.target.value }
-                        }
-                      })}
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-400 block mb-1">Destinatario / Correo Zelle o Stripe</label>
-                    <input
-                      type="text"
-                      value={form.cuentasBancarias?.internacional?.destinatario || ''}
-                      onChange={(e) => setForm({
-                        ...form,
-                        cuentasBancarias: {
-                          ...form.cuentasBancarias,
-                          internacional: { ...form.cuentasBancarias?.internacional, destinatario: e.target.value }
-                        }
-                      })}
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: CONTACTO & SOPORTE DE LA EMPRESA */}
+          {/* TAB 3: CONTACTO & SOPORTE DE LA EMPRESA */}
           {activeTab === 'contacto' && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1048,7 +807,7 @@ export default function AgencyWhiteLabelSettingsModal({
             </div>
           )}
 
-          {/* TAB 5: PAÍSES DE OPERACIÓN & MONEDAS */}
+          {/* TAB 4: PAÍSES DE OPERACIÓN & MONEDAS */}
           {activeTab === 'paises' && (
             <div className="space-y-4">
               <div>
@@ -1133,7 +892,7 @@ export default function AgencyWhiteLabelSettingsModal({
             </div>
           )}
 
-          {/* TAB 6: APIS & CONEXIONES */}
+          {/* TAB 5: APIS & CONEXIONES */}
           {activeTab === 'apis' && (
             <div className="space-y-4">
               <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs">
