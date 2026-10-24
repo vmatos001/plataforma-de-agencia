@@ -1909,6 +1909,18 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
           </div>
 
           <div className="flex items-center gap-2.5">
+            {matchingFactura && (
+              <button
+                type="button"
+                onClick={() => setSelectedClientInvoiceModal(matchingFactura)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold shadow-lg shadow-orange-950/40 border border-orange-500/30 transition-all transform hover:scale-[1.02]"
+                title="Consultar e Imprimir Factura Oficial"
+              >
+                <FileText className="w-3.5 h-3.5 text-orange-200" />
+                <span className="hidden sm:inline">Factura Oficial</span>
+                <span className="sm:hidden">Factura</span>
+              </button>
+            )}
             {onBackToAdmin && (
               <button
                 onClick={onBackToAdmin}
