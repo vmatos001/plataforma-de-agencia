@@ -246,7 +246,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   const handlePrintClientInvoicePdf = (fac) => {
     if (!fac) return;
-    const html = buildCorporateInvoiceHtml(fac, portalConfig);
+    const html = buildCorporateInvoiceHtml(fac, data?.portalConfig);
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(html);
