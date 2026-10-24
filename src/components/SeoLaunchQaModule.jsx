@@ -323,7 +323,7 @@ export const QA_CATEGORIES = [
   '3. Legal, Privacidad & Cumplimiento',
   '4. Seguridad, Infraestructura & Código',
   '5. Rendimiento, UX & Conversión Mobile',
-  '6. DevOps, DNS & Respaldo'
+  '6. DevOps, Infraestructura & Respaldo'
 ];
 
 export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
