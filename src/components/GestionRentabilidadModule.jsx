@@ -249,25 +249,37 @@ const INITIAL_SEED_STATE = {
 };
 
 /**
- * Normaliza y calibra matemáticamente los ítems de una factura para garantizar 100% de coherencia
+ * Normaliza y calibra matemáticamente los ítems de una factura para garantizar 100% de coherencia.
+ * Elimina cualquier desglose individual de costo por módulo para respetar la política de precio total cerrado.
  */
 export function normalizeFacturaItems(fac) {
   if (!fac) return fac;
-  const total = Number(fac.total) || Number(fac.subtotal) || 1500;
+  const total = Number(fac.total) || Number(fac.subtotal) || 300;
   let items = Array.isArray(fac.items) && fac.items.length > 0 ? fac.items : [];
-  
-  if (items.length === 0) {
+
+  // Si los ítems contienen desglose de costo por módulo ("MÓDULO 1...", etc.), consolidar en un solo servicio integral
+  const hasModuleBreakdown = items.some(it => 
+    (it.descripcion || '').toLowerCase().includes('módulo') ||
+    (it.descripcion || '').toLowerCase().includes('modulo')
+  );
+
+  if (hasModuleBreakdown || items.length === 0) {
+    const modulosText = items
+      .map(it => (it.descripcion || '').replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '').trim())
+      .filter(Boolean)
+      .join(' · ');
+    const desc = fac.concepto || (modulosText ? `Servicio Integral Web & Posicionamiento (${modulosText})` : 'Servicio Profesional de Desarrollo Digital & GEO IA');
     items = [{
       id: 'item-1',
-      descripcion: fac.concepto || 'Servicio Profesional de Desarrollo Digital & GEO IA',
+      descripcion: desc,
       cantidad: 1,
       precioUnitario: total,
       total: total
     }];
   } else {
-    // Si los precios no cuadran exactamente con el total facturado, recalibrar proporcionalmente
+    // Si hay un solo ítem o ítems no modulares, recalibrar proporcionalmente para que sume exactamente el total
     const currentSum = items.reduce((acc, it) => acc + (Number(it.total) || (Number(it.precioUnitario) * (Number(it.cantidad) || 1)) || 0), 0);
-    if (Math.abs(currentSum - total) > 1 && currentSum > 0) {
+    if (Math.abs(currentSum - total) > 0.01 && currentSum > 0) {
       let acc = 0;
       items = items.map((it, idx) => {
         const isLast = idx === items.length - 1;
@@ -563,11 +575,12 @@ function computeFinanzasSummary(rawState) {
 }
 
 /**
- * Convierte un Presupuesto del Módulo 3 en un objeto Factura Proforma compatible con Módulo 4
+ * Convierte un Presupuesto del Módulo 3 en un objeto Factura Proforma compatible con Módulo 4.
+ * En Goglite el acuerdo comercial es a precio total cerrado; la factura no desglosa precios por módulo.
  */
 export function buildInvoiceFromPresupuesto(prop, existingCount = 0, configuracion = DEFAULT_CONFIGURACION) {
   const nextNum = String(existingCount + 1).padStart(3, '0');
-  const subtotal = Number(prop.inversion?.precioTotal) || 250;
+  const subtotal = Number(prop.inversion?.precioTotal) || 300;
   const anticipo = Number(prop.inversion?.anticipo) ?? Math.round(subtotal * 0.5);
   const pais = prop.pais || (prop.cliente?.ubicacion?.toLowerCase().includes('dominicana') ? 'DO' : 'SV');
 
@@ -577,37 +590,30 @@ export function buildInvoiceFromPresupuesto(prop, existingCount = 0, configuraci
     : 0;
   const horasInvertidasEstimadas = modulosHoras > 0 ? modulosHoras : Math.max(5, Math.round(subtotal / 50));
 
-  let items = [];
-  if (Array.isArray(prop.modulos) && prop.modulos.length > 0) {
-    const rawTotal = prop.modulos.reduce((acc, m) => acc + (Number(m.precio) || 1), 0);
-    let acumulado = 0;
-    items = prop.modulos.map((m, idx) => {
-      const isLast = idx === prop.modulos.length - 1;
-      let unitPrice = Math.round(((Number(m.precio) || 1) / (rawTotal || 1)) * subtotal);
-      if (isLast) {
-        unitPrice = subtotal - acumulado;
-      } else {
-        acumulado += unitPrice;
-      }
-      return {
-        id: `item-${idx + 1}`,
-        descripcion: `${m.numero ? m.numero + ': ' : ''}${m.titulo || 'Entregable del Proyecto'}`,
-        cantidad: 1,
-        precioUnitario: unitPrice,
-        total: unitPrice
-      };
-    });
-  } else {
-    items = [
-      {
-        id: 'item-1',
-        descripcion: prop.titulo || 'Desarrollo de Sistema Digital Web & Posicionamiento IA',
-        cantidad: 1,
-        precioUnitario: subtotal,
-        total: subtotal
-      }
-    ];
-  }
+  const cleanModuleTitle = (t) => (t || '')
+    .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '')
+    .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\)/gi, '')
+    .trim();
+
+  const modulosNombres = Array.isArray(prop.modulos) && prop.modulos.length > 0
+    ? prop.modulos.map(m => `${m.numero ? m.numero + ': ' : ''}${cleanModuleTitle(m.titulo)}`).join(' · ')
+    : '';
+
+  const itemDescripcion = prop.portada?.proyecto
+    ? `${prop.titulo || 'Solución Web Corporativa VIP'}: ${prop.portada.proyecto}`
+    : (modulosNombres
+        ? `${prop.titulo || 'Desarrollo Digital VIP'} (Entregables: ${modulosNombres})`
+        : (prop.titulo || 'Desarrollo de Sistema Digital Web & Posicionamiento IA'));
+
+  const items = [
+    {
+      id: 'item-1',
+      descripcion: itemDescripcion,
+      cantidad: 1,
+      precioUnitario: subtotal,
+      total: subtotal
+    }
+  ];
 
   const today = new Date().toISOString().split('T')[0];
   const due = new Date(Date.now() + (Number(prop.vigenciaDias) || 15) * 86400000).toISOString().split('T')[0];
@@ -650,6 +656,65 @@ export function buildInvoiceFromPresupuesto(prop, existingCount = 0, configuraci
       return m?.id || null;
     })(),
     horasInvertidasEstimadas,
+    items
+  };
+}
+
+/**
+ * Reconcilia una factura existente con el presupuesto actual.
+ * Asegura total comercial cerrado ($300 USD), anticipo exacto ($150 USD) y cero desglose por módulo.
+ */
+export function reconcileInvoiceWithPresupuesto(fac, prop) {
+  if (!fac) return buildInvoiceFromPresupuesto(prop);
+  if (!prop) return fac;
+
+  const subtotal = Number(prop.inversion?.precioTotal) || Number(fac.total) || 300;
+  const anticipo = Number(prop.inversion?.anticipo) ?? Math.round(subtotal * 0.5);
+  const pais = prop.pais || fac.cliente?.pais || (prop.cliente?.ubicacion?.toLowerCase().includes('dominicana') ? 'DO' : 'SV');
+
+  const cleanModuleTitle = (t) => (t || '')
+    .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '')
+    .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\)/gi, '')
+    .trim();
+
+  const modulosNombres = Array.isArray(prop.modulos) && prop.modulos.length > 0
+    ? prop.modulos.map(m => `${m.numero ? m.numero + ': ' : ''}${cleanModuleTitle(m.titulo)}`).join(' · ')
+    : '';
+
+  const itemDescripcion = prop.portada?.proyecto
+    ? `${prop.titulo || 'Solución Web Corporativa VIP'}: ${prop.portada.proyecto}`
+    : (modulosNombres
+        ? `${prop.titulo || 'Desarrollo Digital VIP'} (Entregables: ${modulosNombres})`
+        : (prop.titulo || fac.concepto || 'Desarrollo de Sistema Digital Web & Posicionamiento IA'));
+
+  const items = [
+    {
+      id: 'item-1',
+      descripcion: itemDescripcion,
+      cantidad: 1,
+      precioUnitario: subtotal,
+      total: subtotal
+    }
+  ];
+
+  return {
+    ...fac,
+    presupuestoId: prop.id || fac.presupuestoId,
+    codigoPresupuesto: prop.codigo || fac.codigoPresupuesto,
+    cliente: {
+      ...fac.cliente,
+      empresa: prop.cliente?.empresa || fac.cliente?.empresa || 'Cliente de Agencia',
+      contacto: prop.cliente?.nombre || fac.cliente?.contacto || 'Director',
+      email: prop.cliente?.email || fac.cliente?.email || '',
+      telefono: prop.cliente?.telefono || fac.cliente?.telefono || '',
+      identificacion: prop.cliente?.identificacion || fac.cliente?.identificacion || 'ID Fiscal Comercial',
+      pais
+    },
+    concepto: `${prop.titulo || 'Propuesta Digital VIP'} ${prop.subtitulo || ''}`.trim(),
+    subtotal,
+    total: subtotal,
+    montoCobrado: anticipo,
+    saldoPendiente: Math.max(0, subtotal - anticipo),
     items
   };
 }

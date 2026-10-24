@@ -54,6 +54,7 @@ import {
   CorporateInvoiceDocument, 
   buildCorporateInvoiceHtml, 
   buildInvoiceFromPresupuesto, 
+  reconcileInvoiceWithPresupuesto,
   normalizeFacturaItems 
 } from './GestionRentabilidadModule';
 
@@ -309,14 +310,40 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         (targetPresupuestoCodigo && (f.codigoPresupuesto === targetPresupuestoCodigo || f.numeroFactura?.includes(targetPresupuestoCodigo))) ||
         (targetEmpresa && f.cliente?.empresa && f.cliente.empresa.toLowerCase().trim() === targetEmpresa)
       );
-      if (!found && clientFacturaList[0]) found = clientFacturaList[0];
     }
 
     if (!found && data?.presupuesto) {
       found = buildInvoiceFromPresupuesto(data.presupuesto);
+    } else if (!found && data?.lead) {
+      found = buildInvoiceFromPresupuesto({
+        id: data.lead.id,
+        codigo: data.lead.presupuestoCodigo || 'P-2026-001',
+        titulo: 'Propuesta de Desarrollo Digital VIP',
+        cliente: {
+          empresa: data.lead.empresa,
+          nombre: data.lead.contacto,
+          telefono: data.lead.telefono,
+          email: data.lead.email,
+          ubicacion: data.lead.ubicacion
+        },
+        pais: data.lead.pais || 'DO',
+        inversion: {
+          precioTotal: Number(data.lead.valorEstimado) || 300,
+          anticipo: Math.round((Number(data.lead.valorEstimado) || 300) * 0.5)
+        }
+      });
+    }
+
+    // Sincronizar y reconciliar siempre con la propuesta actual para reflejar $300 / $150 y sin costo por módulo
+    if (found && data?.presupuesto) {
+      found = reconcileInvoiceWithPresupuesto(found, data.presupuesto);
+    }
+
+    if (found) {
       if (data?.portalConfig?.fase2Firmada || data?.presupuesto?.anticipoPagado) {
         found.estado = 'parcial';
-        found.montoCobrado = data.presupuesto.inversion?.anticipo || (Number(found.total) * 0.5);
+        found.montoCobrado = data?.presupuesto?.inversion?.anticipo || Math.round(Number(found.total) * 0.5);
+        found.saldoPendiente = Math.max(0, Number(found.total) - Number(found.montoCobrado));
       }
     }
 
