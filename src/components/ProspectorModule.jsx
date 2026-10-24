@@ -82,18 +82,17 @@ export default function ProspectorModule({
     return generateClientPitch(lead, audit, lead.pais || selectedCountry);
   };
 
-  // Ajustes de API
+  // Ajustes de API cargados desde el servidor/Railway
   const [settings, setSettings] = useState({
     geminiApiKey: '',
     serperApiKey: '',
     apolloApiKey: ''
   });
-  const [settingsSaved, setSettingsSaved] = useState(false);
 
   // Sincronizar activeSubTab si cambia externamente
   useEffect(() => {
     if (activeSubTab && activeSubTab !== activeTab) {
-      setActiveTab(activeSubTab);
+      setActiveTab(activeSubTab === 'ajustes' ? 'buscar' : activeSubTab);
     }
   }, [activeSubTab]);
 
@@ -557,18 +556,6 @@ export default function ProspectorModule({
     }
   };
 
-  // Guardar configuración
-  const handleSaveSettings = async (e) => {
-    e.preventDefault();
-    try {
-      await apiClient.post('/api/settings', settings);
-      setSettingsSaved(true);
-      setTimeout(() => setSettingsSaved(false), 3000);
-    } catch (err) {
-      alert('Error guardando ajustes: ' + err.message);
-    }
-  };
-
   const handleCopyPitch = (text) => {
     navigator.clipboard.writeText(text);
     setCopiedPitch(true);
@@ -685,18 +672,6 @@ export default function ProspectorModule({
           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300">
             {leads.length}
           </span>
-        </button>
-
-        <button
-          onClick={() => handleTabSwitch('ajustes')}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-            activeTab === 'ajustes'
-              ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-          }`}
-        >
-          <Zap className="w-3.5 h-3.5" />
-          <span>Ajustes & APIs</span>
         </button>
       </div>
 
@@ -1216,106 +1191,6 @@ export default function ProspectorModule({
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-
-      {/* TAB 4: AJUSTES & APIS */}
-      {activeTab === 'ajustes' && (
-        <div className="max-w-2xl mx-auto space-y-6">
-          <div>
-            <h1 className="text-base font-bold text-slate-100">Ajustes & Conectores de APIs</h1>
-            <p className="text-xs text-slate-400">
-              Configura tus credenciales para enriquecimiento automático, prospección y envíos de correo.
-            </p>
-          </div>
-
-          {/* STACK $0.00 SHOWCASE */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-[#0e131d] to-slate-900 border border-emerald-500/30 flex items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  STACK GRATUITO ($0.00 / MES)
-                </span>
-                <span className="text-xs text-slate-300 font-semibold">Infraestructura Outbound & Web</span>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Tu plataforma corre con servicios de nivel corporativo en su tier gratuito: <strong>Firebase Hosting</strong> ($0.00), <strong>Neon PostgreSQL</strong> ($0.00), <strong>Google Gemini AI</strong> ($0.00), <strong>Serper Google SERP</strong> ($0.00) y envíos directos vía <strong>Gmail Web / Workspace</strong>.
-              </p>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <span className="text-2xl font-black text-emerald-400 font-mono">$0.00</span>
-              <p className="text-[10px] text-slate-500">Costo mensual</p>
-            </div>
-          </div>
-
-          <form onSubmit={handleSaveSettings} className="p-5 rounded-2xl bg-[#0e131d] border border-slate-800 space-y-5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Google Gemini API Key (IA de Auditorías y Pitches)
-              </label>
-              <input
-                type="password"
-                value={settings.geminiApiKey || ''}
-                onChange={(e) => setSettings({ ...settings, geminiApiKey: e.target.value })}
-                placeholder="AIzaSy..."
-                className="w-full bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-orange-500"
-              />
-              <p className="text-[10px] text-slate-500 mt-1">Capa gratuita disponible con hasta 15 consultas por minuto.</p>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Serper.dev API Key (Scraping de Google SERP y Maps)
-              </label>
-              <input
-                type="password"
-                value={settings.serperApiKey || ''}
-                onChange={(e) => setSettings({ ...settings, serperApiKey: e.target.value })}
-                placeholder="serper_..."
-                className="w-full bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-orange-500"
-              />
-              <p className="text-[10px] text-slate-500 mt-1">2,500 búsquedas gratuitas de bienvenida.</p>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Apollo.io API Key (Extracción de Decisores y Emails)
-              </label>
-              <input
-                type="password"
-                value={settings.apolloApiKey || ''}
-                onChange={(e) => setSettings({ ...settings, apolloApiKey: e.target.value })}
-                placeholder="apollo_api_..."
-                className="w-full bg-[#080b11] border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-orange-500"
-              />
-            </div>
-
-            {/* EMAIL PROVIDERS SECTION */}
-            <div className="pt-2 border-t border-slate-800/80 space-y-4">
-              <div>
-                <h3 className="text-xs font-bold text-slate-200">Envíos de Correo y Prospección Directa</h3>
-                <p className="text-[11px] text-slate-400">
-                  Los correos de prospección se redactan y envían con 1 clic mediante <strong>Gmail Web</strong> o tu cliente de correo corporativo, garantizando 100% de entrega desde tu propia cuenta sin requerir claves externas.
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-2 flex items-center justify-between">
-              <button
-                type="submit"
-                className="px-5 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs shadow-md transition-all"
-              >
-                Guardar Configuración
-              </button>
-
-              {settingsSaved && (
-                <span className="text-xs text-emerald-400 font-medium flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Guardado con éxito
-                </span>
-              )}
-            </div>
-          </form>
         </div>
       )}
 

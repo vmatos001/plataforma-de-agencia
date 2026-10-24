@@ -117,6 +117,68 @@ app.post('/api/settings', (req, res) => {
   res.json({ success: true, settings: updated });
 });
 
+app.post('/api/settings/test', async (req, res) => {
+  try {
+    const { provider, apiKey } = req.body || {};
+    const settings = getSettings();
+    const keyToTest = (apiKey && apiKey.trim()) || settings[`${provider}ApiKey`];
+
+    if (!keyToTest) {
+      return res.status(400).json({ ok: false, message: 'No hay ninguna clave configurada para probar.' });
+    }
+
+    if (provider === 'gemini') {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(keyToTest)}`);
+      if (resp.ok) {
+        return res.json({ ok: true, message: 'Google Gemini API conectada y respondiendo correctamente (HTTP 200).' });
+      }
+      const data = await resp.json().catch(() => ({}));
+      return res.status(400).json({ ok: false, message: data.error?.message || 'Error de autenticación con Google Gemini API.' });
+    }
+
+    if (provider === 'serper') {
+      const resp = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: {
+          'X-API-KEY': keyToTest,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ q: 'ping test', num: 1 })
+      });
+      if (resp.ok) {
+        return res.json({ ok: true, message: 'Serper.dev conectado y respondiendo correctamente (HTTP 200).' });
+      }
+      const data = await resp.json().catch(() => ({}));
+      return res.status(400).json({ ok: false, message: data.message || 'Clave de Serper rechazada o inválida.' });
+    }
+
+    if (provider === 'apollo') {
+      const resp = await fetch('https://api.apollo.io/v1/auth/health', {
+        headers: { 'Cache-Control': 'no-cache', 'X-Api-Key': keyToTest }
+      });
+      if (resp.ok) {
+        return res.json({ ok: true, message: 'Apollo.io conectado y respondiendo correctamente (HTTP 200).' });
+      }
+      return res.status(400).json({ ok: false, message: 'Clave de Apollo rechazada o sin permisos de acceso.' });
+    }
+
+    if (provider === 'resend') {
+      const resp = await fetch('https://api.resend.com/api-keys', {
+        headers: { Authorization: `Bearer ${keyToTest}` }
+      });
+      if (resp.ok) {
+        return res.json({ ok: true, message: 'Resend conectado y respondiendo correctamente (HTTP 200).' });
+      }
+      const data = await resp.json().catch(() => ({}));
+      return res.status(400).json({ ok: false, message: data.message || 'Clave de Resend rechazada o inválida.' });
+    }
+
+    return res.status(400).json({ ok: false, message: `Proveedor "${provider}" no reconocido para pruebas.` });
+  } catch (err) {
+    return res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
 // 1.1 White-Label Agency Settings
 app.get('/api/agency/settings', (req, res) => {
   try {

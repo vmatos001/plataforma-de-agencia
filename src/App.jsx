@@ -594,18 +594,6 @@ export default function App() {
                     <span>Leads Guardados</span>
                   </div>
                 </button>
-
-                <button
-                  onClick={() => setProspectorSubTab('ajustes')}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                    prospectorSubTab === 'ajustes' 
-                      ? 'bg-orange-600/15 text-orange-400 border border-orange-500/30' 
-                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
-                  }`}
-                >
-                  <SettingsIcon className="w-4 h-4" />
-                  <span>Ajustes & APIs</span>
-                </button>
               </nav>
             )}
           </div>

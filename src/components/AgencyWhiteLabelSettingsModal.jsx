@@ -24,8 +24,14 @@ import {
   CheckCircle2,
   AlertCircle,
   Cpu,
-  Coins
+  Coins,
+  Eye,
+  EyeOff,
+  Save,
+  Server,
+  Zap
 } from 'lucide-react';
+import { apiClient } from '../services/apiClient';
 
 export default function AgencyWhiteLabelSettingsModal({
   isOpen,
@@ -81,6 +87,180 @@ export default function AgencyWhiteLabelSettingsModal({
     permisos: ['desarrollo_prd', 'seo_motor', 'headless_cms']
   });
   const [colabSuccess, setColabSuccess] = useState(false);
+
+  // Estado real de APIs y Variables de Entorno (Railway)
+  const [apiSettings, setApiSettings] = useState({
+    geminiApiKey: '',
+    serperApiKey: '',
+    apolloApiKey: '',
+    resendApiKey: '',
+    resendFromEmail: 'Goglite Digital <contacto@goglite.com>'
+  });
+
+  const [maskedApiKeys, setMaskedApiKeys] = useState({
+    geminiApiKeyMasked: '',
+    serperApiKeyMasked: '',
+    apolloApiKeyMasked: '',
+    resendApiKeyMasked: ''
+  });
+
+  const [showKeyPassword, setShowKeyPassword] = useState({
+    gemini: false,
+    serper: false,
+    apollo: false,
+    resend: false
+  });
+
+  const [apiFeedback, setApiFeedback] = useState({});
+  const [testingService, setTestingService] = useState(null);
+  const [savingService, setSavingService] = useState(null);
+  const [backendStatus, setBackendStatus] = useState(null);
+  const [loadingBackendStatus, setLoadingBackendStatus] = useState(false);
+
+  const fetchApiSettings = async () => {
+    try {
+      setLoadingBackendStatus(true);
+      const [settingsRes, statusRes] = await Promise.allSettled([
+        apiClient.get('/api/settings'),
+        apiClient.get('/api/status')
+      ]);
+
+      if (settingsRes.status === 'fulfilled' && settingsRes.value.ok) {
+        const data = await settingsRes.value.json();
+        setMaskedApiKeys({
+          geminiApiKeyMasked: data.geminiApiKeyMasked || '',
+          serperApiKeyMasked: data.serperApiKeyMasked || '',
+          apolloApiKeyMasked: data.apolloApiKeyMasked || '',
+          resendApiKeyMasked: data.resendApiKeyMasked || ''
+        });
+        setApiSettings(prev => ({
+          ...prev,
+          geminiApiKey: data.geminiApiKey || prev.geminiApiKey || '',
+          serperApiKey: data.serperApiKey || prev.serperApiKey || '',
+          apolloApiKey: data.apolloApiKey || prev.apolloApiKey || '',
+          resendApiKey: data.resendApiKey || prev.resendApiKey || '',
+          resendFromEmail: data.resendFromEmail || prev.resendFromEmail || 'Goglite Digital <contacto@goglite.com>'
+        }));
+      }
+
+      if (statusRes.status === 'fulfilled' && statusRes.value.ok) {
+        const statusData = await statusRes.value.json();
+        setBackendStatus({ online: true, services: statusData.services || {} });
+      } else {
+        setBackendStatus({ online: false });
+      }
+    } catch (err) {
+      console.warn('[APIs] Error cargando configuración de APIs:', err);
+      setBackendStatus({ online: false });
+    } finally {
+      setLoadingBackendStatus(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchApiSettings();
+    }
+  }, [isOpen]);
+
+  const handleSaveIndividualApi = async (serviceKey, label) => {
+    try {
+      setSavingService(serviceKey);
+      const payload = {
+        [serviceKey]: apiSettings[serviceKey]
+      };
+      if (serviceKey === 'resendApiKey') {
+        payload.resendFromEmail = apiSettings.resendFromEmail;
+      }
+      await apiClient.post('/api/settings', payload);
+      
+      try {
+        const currentLocal = JSON.parse(localStorage.getItem('goglite_api_settings') || '{}');
+        localStorage.setItem('goglite_api_settings', JSON.stringify({ ...currentLocal, ...payload }));
+      } catch (e) {}
+
+      setApiFeedback(prev => ({
+        ...prev,
+        [serviceKey]: { type: 'success', msg: `Clave de ${label} guardada con éxito.` }
+      }));
+      setTimeout(() => {
+        setApiFeedback(prev => ({ ...prev, [serviceKey]: null }));
+      }, 4000);
+      fetchApiSettings();
+    } catch (err) {
+      setApiFeedback(prev => ({
+        ...prev,
+        [serviceKey]: { type: 'error', msg: `Error al guardar: ${err.message}` }
+      }));
+    } finally {
+      setSavingService(null);
+    }
+  };
+
+  const handleDeleteApi = async (serviceKey, label) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar la clave de ${label}?`)) return;
+    try {
+      setSavingService(serviceKey);
+      const payload = { [serviceKey]: '' };
+      await apiClient.post('/api/settings', payload);
+
+      setApiSettings(prev => ({ ...prev, [serviceKey]: '' }));
+      setMaskedApiKeys(prev => ({ ...prev, [`${serviceKey}Masked`]: '' }));
+      
+      try {
+        const currentLocal = JSON.parse(localStorage.getItem('goglite_api_settings') || '{}');
+        delete currentLocal[serviceKey];
+        localStorage.setItem('goglite_api_settings', JSON.stringify(currentLocal));
+      } catch (e) {}
+
+      setApiFeedback(prev => ({
+        ...prev,
+        [serviceKey]: { type: 'success', msg: `Clave de ${label} eliminada correctamente.` }
+      }));
+      setTimeout(() => {
+        setApiFeedback(prev => ({ ...prev, [serviceKey]: null }));
+      }, 4000);
+      fetchApiSettings();
+    } catch (err) {
+      setApiFeedback(prev => ({
+        ...prev,
+        [serviceKey]: { type: 'error', msg: `Error al eliminar: ${err.message}` }
+      }));
+    } finally {
+      setSavingService(null);
+    }
+  };
+
+  const handleTestApi = async (provider, serviceKey, label) => {
+    try {
+      setTestingService(serviceKey);
+      setApiFeedback(prev => ({ ...prev, [serviceKey]: null }));
+      
+      const res = await apiClient.post('/api/settings/test', {
+        provider,
+        apiKey: apiSettings[serviceKey]
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setApiFeedback(prev => ({
+          ...prev,
+          [serviceKey]: { type: 'success', msg: `✅ ${data.message || 'Conexión verificada (HTTP 200)'}` }
+        }));
+      } else {
+        setApiFeedback(prev => ({
+          ...prev,
+          [serviceKey]: { type: 'error', msg: `❌ ${data.message || 'Error validando credencial'}` }
+        }));
+      }
+    } catch (err) {
+      setApiFeedback(prev => ({
+        ...prev,
+        [serviceKey]: { type: 'error', msg: `❌ Error de conexión: ${err.message}` }
+      }));
+    } finally {
+      setTestingService(null);
+    }
+  };
 
   useEffect(() => {
     if (agencySettings) {
@@ -189,6 +369,13 @@ export default function AgencyWhiteLabelSettingsModal({
 
       // 2. Persistir en almacenamiento institucional y notificar a App
       await onSaveAgencySettings(form);
+
+      // Persistir APIs en el servidor backend (Railway)
+      try {
+        await apiClient.post('/api/settings', apiSettings);
+      } catch (apiErr) {
+        console.warn('[APIs] No se pudo guardar configuración en backend remoto:', apiErr);
+      }
 
       // 3. Emitir evento global para actualización instantánea en toda la interfaz
       window.dispatchEvent(new CustomEvent('goglite_agency_settings_updated', { detail: form }));
@@ -892,79 +1079,477 @@ export default function AgencyWhiteLabelSettingsModal({
             </div>
           )}
 
-          {/* TAB 5: APIS & CONEXIONES */}
+          {/* TAB 5: APIS & CONEXIONES EN VIVO */}
           {activeTab === 'apis' && (
-            <div className="space-y-4">
-              <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs">
-                <span className="font-bold">Ecosistema de Integraciones Antigravity:</span>
-                <p className="text-[11px] text-slate-300 mt-0.5">
-                  Conexión directa con Google Workspace / Gmail Web, Gemini IA y WhatsApp Baileys.
-                </p>
+            <div className="space-y-5">
+              {/* Encabezado Railway & Backend */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-[#0e1424] to-slate-900 border border-blue-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Server className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs font-bold text-white">Servidor Backend & Variables de Entorno (Railway)</span>
+                    <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                      backendStatus?.online 
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${backendStatus?.online ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                      {backendStatus?.online ? 'Railway En Línea (200 OK)' : 'Conectando / Modo Local'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Las credenciales maestras residen en tu entorno de Railway. Puedes editarlas, probarlas o eliminarlas en tiempo real sin reiniciar el despliegue.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchApiSettings}
+                  disabled={loadingBackendStatus}
+                  className="px-3 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 self-start sm:self-center"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingBackendStatus ? 'animate-spin' : ''}`} />
+                  <span>Verificar Estado</span>
+                </button>
               </div>
 
-              <div className="space-y-3">
-                {/* Google Site Kit & Drive */}
-                <div className="p-3.5 rounded-xl bg-[#121724] border border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
-                      G
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <span>Google Site Kit, Console & Drive Vault</span>
-                        <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-bold">
-                          Conectado
-                        </span>
+              {/* LISTA DE CONECTORES DE APIS */}
+              <div className="space-y-4">
+                
+                {/* 1. GOOGLE GEMINI */}
+                <div className="p-4 rounded-xl bg-[#121724] border border-slate-800 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0">
+                        <Sparkles className="w-5 h-5" />
                       </div>
-                      <p className="text-[11px] text-slate-400">
-                        Bóvedas automáticas en Google Drive y auditoría de Google Search Console.
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-bold text-white">Google Gemini AI (1.5 / 2.0 Flash)</h4>
+                          <span className="text-[9px] font-mono bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">
+                            GEMINI_API_KEY
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Motor de IA para auditorías técnicas automáticas, generación de copy StoryBrand, cold pitches de prospección y análisis de objeciones.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                        backendStatus?.services?.gemini || maskedApiKeys.geminiApiKeyMasked || apiSettings.geminiApiKey
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {backendStatus?.services?.gemini || maskedApiKeys.geminiApiKeyMasked || apiSettings.geminiApiKey
+                          ? '● Conectada'
+                          : '○ Sin configurar'}
+                      </span>
                     </div>
                   </div>
-                  <span className="text-xs font-mono text-emerald-400 font-bold">Activo</span>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-mono text-slate-400 flex items-center justify-between">
+                      <span>Clave Secreta de API (Google AI Studio)</span>
+                      {maskedApiKeys.geminiApiKeyMasked && !apiSettings.geminiApiKey && (
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          Activa en servidor: {maskedApiKeys.geminiApiKeyMasked}
+                        </span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showKeyPassword.gemini ? 'text' : 'password'}
+                        value={apiSettings.geminiApiKey}
+                        onChange={(e) => setApiSettings({ ...apiSettings, geminiApiKey: e.target.value })}
+                        placeholder={maskedApiKeys.geminiApiKeyMasked ? `Guardada (${maskedApiKeys.geminiApiKeyMasked})` : 'AIzaSy...'}
+                        className="w-full bg-[#141b2a] border border-slate-700 rounded-xl pl-3.5 pr-10 py-2 text-xs text-white font-mono focus:outline-none focus:border-orange-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKeyPassword({ ...showKeyPassword, gemini: !showKeyPassword.gemini })}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                        title={showKeyPassword.gemini ? 'Ocultar' : 'Ver'}
+                      >
+                        {showKeyPassword.gemini ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {apiFeedback['geminiApiKey'] && (
+                    <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
+                      apiFeedback['geminiApiKey'].type === 'success' 
+                        ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300' 
+                        : 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
+                    }`}>
+                      {apiFeedback['geminiApiKey'].type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />}
+                      <span>{apiFeedback['geminiApiKey'].msg}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/80">
+                    <button
+                      type="button"
+                      onClick={() => handleTestApi('gemini', 'geminiApiKey', 'Google Gemini')}
+                      disabled={testingService === 'geminiApiKey'}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      <Zap className={`w-3.5 h-3.5 text-amber-400 ${testingService === 'geminiApiKey' ? 'animate-spin' : ''}`} />
+                      <span>{testingService === 'geminiApiKey' ? 'Probando...' : 'Probar Conexión'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteApi('geminiApiKey', 'Google Gemini')}
+                      disabled={savingService === 'geminiApiKey'}
+                      className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Eliminar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSaveIndividualApi('geminiApiKey', 'Google Gemini')}
+                      disabled={savingService === 'geminiApiKey'}
+                      className="px-3.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{savingService === 'geminiApiKey' ? 'Guardando...' : 'Guardar Clave'}</span>
+                    </button>
+                  </div>
                 </div>
 
-                {/* Google Workspace & Gmail Direct */}
-                <div className="p-3.5 rounded-xl bg-[#121724] border border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center">
-                      <Mail className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <span>Google Workspace & Gmail Web Direct</span>
-                        <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-bold">
-                          Directo
-                        </span>
+                {/* 2. SERPER.DEV */}
+                <div className="p-4 rounded-xl bg-[#121724] border border-slate-800 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                        <Globe className="w-5 h-5" />
                       </div>
-                      <p className="text-[11px] text-slate-400">
-                        Envío y redacción instantánea de auditorías y cold pitches desde tu cuenta corporativa con 100% de entrega.
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-bold text-white">Serper.dev (Google Maps & SERP Scraper)</h4>
+                          <span className="text-[9px] font-mono bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">
+                            SERPER_API_KEY
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Extracción de prospectos locales en Google Maps y Google SERP con filtros de negocios sin página web, reseñas y teléfonos de contacto.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                        backendStatus?.services?.serper || maskedApiKeys.serperApiKeyMasked || apiSettings.serperApiKey
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {backendStatus?.services?.serper || maskedApiKeys.serperApiKeyMasked || apiSettings.serperApiKey
+                          ? '● Conectada'
+                          : '○ Sin configurar'}
+                      </span>
                     </div>
                   </div>
-                  <span className="text-xs font-mono text-emerald-400 font-bold">Sin límites</span>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-mono text-slate-400 flex items-center justify-between">
+                      <span>Clave de API Serper (serper.dev)</span>
+                      {maskedApiKeys.serperApiKeyMasked && !apiSettings.serperApiKey && (
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          Activa en servidor: {maskedApiKeys.serperApiKeyMasked}
+                        </span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showKeyPassword.serper ? 'text' : 'password'}
+                        value={apiSettings.serperApiKey}
+                        onChange={(e) => setApiSettings({ ...apiSettings, serperApiKey: e.target.value })}
+                        placeholder={maskedApiKeys.serperApiKeyMasked ? `Guardada (${maskedApiKeys.serperApiKeyMasked})` : 'serper_api_...'}
+                        className="w-full bg-[#141b2a] border border-slate-700 rounded-xl pl-3.5 pr-10 py-2 text-xs text-white font-mono focus:outline-none focus:border-orange-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKeyPassword({ ...showKeyPassword, serper: !showKeyPassword.serper })}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                        title={showKeyPassword.serper ? 'Ocultar' : 'Ver'}
+                      >
+                        {showKeyPassword.serper ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {apiFeedback['serperApiKey'] && (
+                    <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
+                      apiFeedback['serperApiKey'].type === 'success' 
+                        ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300' 
+                        : 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
+                    }`}>
+                      {apiFeedback['serperApiKey'].type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />}
+                      <span>{apiFeedback['serperApiKey'].msg}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/80">
+                    <button
+                      type="button"
+                      onClick={() => handleTestApi('serper', 'serperApiKey', 'Serper.dev')}
+                      disabled={testingService === 'serperApiKey'}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      <Zap className={`w-3.5 h-3.5 text-amber-400 ${testingService === 'serperApiKey' ? 'animate-spin' : ''}`} />
+                      <span>{testingService === 'serperApiKey' ? 'Probando...' : 'Probar Conexión'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteApi('serperApiKey', 'Serper.dev')}
+                      disabled={savingService === 'serperApiKey'}
+                      className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Eliminar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSaveIndividualApi('serperApiKey', 'Serper.dev')}
+                      disabled={savingService === 'serperApiKey'}
+                      className="px-3.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{savingService === 'serperApiKey' ? 'Guardando...' : 'Guardar Clave'}</span>
+                    </button>
+                  </div>
                 </div>
 
-                {/* WhatsApp Baileys */}
-                <div className="p-3.5 rounded-xl bg-[#121724] border border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                      <Phone className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <span>WhatsApp Web Gateway (Baileys v6)</span>
-                        <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-bold">
-                          QR Autenticado
-                        </span>
+                {/* 3. APOLLO.IO */}
+                <div className="p-4 rounded-xl bg-[#121724] border border-slate-800 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+                        <Users className="w-5 h-5" />
                       </div>
-                      <p className="text-[11px] text-slate-400">
-                        Conexión segura 100% nativa sin coste mensual para envío de mensajes en el CRM.
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-bold text-white">Apollo.io B2B Enrichment</h4>
+                          <span className="text-[9px] font-mono bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">
+                            APOLLO_API_KEY
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Enriquecimiento comercial de empresas para descubrir nombres de decisores (CEOs, Directores de Marketing) y correos de contacto corporativos.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                        backendStatus?.services?.apollo || maskedApiKeys.apolloApiKeyMasked || apiSettings.apolloApiKey
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {backendStatus?.services?.apollo || maskedApiKeys.apolloApiKeyMasked || apiSettings.apolloApiKey
+                          ? '● Conectada'
+                          : '○ Sin configurar'}
+                      </span>
                     </div>
                   </div>
-                  <span className="text-xs font-mono text-emerald-400 font-bold">Listo</span>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-mono text-slate-400 flex items-center justify-between">
+                      <span>Clave de API Apollo (apollo.io)</span>
+                      {maskedApiKeys.apolloApiKeyMasked && !apiSettings.apolloApiKey && (
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          Activa en servidor: {maskedApiKeys.apolloApiKeyMasked}
+                        </span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showKeyPassword.apollo ? 'text' : 'password'}
+                        value={apiSettings.apolloApiKey}
+                        onChange={(e) => setApiSettings({ ...apiSettings, apolloApiKey: e.target.value })}
+                        placeholder={maskedApiKeys.apolloApiKeyMasked ? `Guardada (${maskedApiKeys.apolloApiKeyMasked})` : 'apollo_api_...'}
+                        className="w-full bg-[#141b2a] border border-slate-700 rounded-xl pl-3.5 pr-10 py-2 text-xs text-white font-mono focus:outline-none focus:border-orange-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKeyPassword({ ...showKeyPassword, apollo: !showKeyPassword.apollo })}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                        title={showKeyPassword.apollo ? 'Ocultar' : 'Ver'}
+                      >
+                        {showKeyPassword.apollo ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {apiFeedback['apolloApiKey'] && (
+                    <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
+                      apiFeedback['apolloApiKey'].type === 'success' 
+                        ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300' 
+                        : 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
+                    }`}>
+                      {apiFeedback['apolloApiKey'].type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />}
+                      <span>{apiFeedback['apolloApiKey'].msg}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/80">
+                    <button
+                      type="button"
+                      onClick={() => handleTestApi('apollo', 'apolloApiKey', 'Apollo.io')}
+                      disabled={testingService === 'apolloApiKey'}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      <Zap className={`w-3.5 h-3.5 text-amber-400 ${testingService === 'apolloApiKey' ? 'animate-spin' : ''}`} />
+                      <span>{testingService === 'apolloApiKey' ? 'Probando...' : 'Probar Conexión'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteApi('apolloApiKey', 'Apollo.io')}
+                      disabled={savingService === 'apolloApiKey'}
+                      className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Eliminar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSaveIndividualApi('apolloApiKey', 'Apollo.io')}
+                      disabled={savingService === 'apolloApiKey'}
+                      className="px-3.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{savingService === 'apolloApiKey' ? 'Guardando...' : 'Guardar Clave'}</span>
+                    </button>
+                  </div>
                 </div>
+
+                {/* 4. RESEND EMAIL GATEWAY */}
+                <div className="p-4 rounded-xl bg-[#121724] border border-slate-800 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                        <Mail className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-bold text-white">Resend Email Gateway (Facturas & Contratos)</h4>
+                          <span className="text-[9px] font-mono bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">
+                            RESEND_API_KEY
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Entrega transaccional y automatizada de presupuestos SOW, enlaces de pago de anticipo, facturas fiscales y contratos con clientes.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                        backendStatus?.services?.resend || maskedApiKeys.resendApiKeyMasked || apiSettings.resendApiKey
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {backendStatus?.services?.resend || maskedApiKeys.resendApiKeyMasked || apiSettings.resendApiKey
+                          ? '● Conectada'
+                          : '○ Sin configurar'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-mono text-slate-400 flex items-center justify-between">
+                        <span>Clave de API Resend (resend.com)</span>
+                        {maskedApiKeys.resendApiKeyMasked && !apiSettings.resendApiKey && (
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {maskedApiKeys.resendApiKeyMasked}
+                          </span>
+                        )}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showKeyPassword.resend ? 'text' : 'password'}
+                          value={apiSettings.resendApiKey}
+                          onChange={(e) => setApiSettings({ ...apiSettings, resendApiKey: e.target.value })}
+                          placeholder={maskedApiKeys.resendApiKeyMasked ? `Guardada (${maskedApiKeys.resendApiKeyMasked})` : 're_...'}
+                          className="w-full bg-[#141b2a] border border-slate-700 rounded-xl pl-3.5 pr-10 py-2 text-xs text-white font-mono focus:outline-none focus:border-orange-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowKeyPassword({ ...showKeyPassword, resend: !showKeyPassword.resend })}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                          title={showKeyPassword.resend ? 'Ocultar' : 'Ver'}
+                        >
+                          {showKeyPassword.resend ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-mono text-slate-400">
+                        Remitente Oficial de Correos (From Header)
+                      </label>
+                      <input
+                        type="text"
+                        value={apiSettings.resendFromEmail}
+                        onChange={(e) => setApiSettings({ ...apiSettings, resendFromEmail: e.target.value })}
+                        placeholder="Goglite Agencia <contacto@goglite.com>"
+                        className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+
+                  {apiFeedback['resendApiKey'] && (
+                    <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
+                      apiFeedback['resendApiKey'].type === 'success' 
+                        ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300' 
+                        : 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
+                    }`}>
+                      {apiFeedback['resendApiKey'].type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />}
+                      <span>{apiFeedback['resendApiKey'].msg}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/80">
+                    <button
+                      type="button"
+                      onClick={() => handleTestApi('resend', 'resendApiKey', 'Resend')}
+                      disabled={testingService === 'resendApiKey'}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      <Zap className={`w-3.5 h-3.5 text-amber-400 ${testingService === 'resendApiKey' ? 'animate-spin' : ''}`} />
+                      <span>{testingService === 'resendApiKey' ? 'Probando...' : 'Probar Conexión'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteApi('resendApiKey', 'Resend')}
+                      disabled={savingService === 'resendApiKey'}
+                      className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Eliminar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSaveIndividualApi('resendApiKey', 'Resend')}
+                      disabled={savingService === 'resendApiKey'}
+                      className="px-3.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{savingService === 'resendApiKey' ? 'Guardando...' : 'Guardar Clave'}</span>
+                    </button>
+                  </div>
+                </div>
+
               </div>
             </div>
           )}
