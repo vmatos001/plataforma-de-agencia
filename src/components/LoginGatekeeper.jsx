@@ -15,6 +15,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { signInWithGoogle, signOutUser } from '../services/firebase';
+import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 
 // Algoritmo RFC 6238 TOTP en cliente usando Web Cryptography API nativa
 function base32ToBytes(base32) {
@@ -123,9 +124,9 @@ export default function LoginGatekeeper({
       .catch(() => {});
   }, []);
 
-  const rawLogo = agencySettings?.logoUrl || fetchedLogo;
+  const rawLogo = agencySettings?.logoUrl || fetchedLogo || DEFAULT_AGENCY_BRANDING.logoUrl;
   const resolvedLogo = (!imgError && rawLogo) ? rawLogo : null;
-  const agencyName = agencySettings?.nombreAgencia || fetchedName || 'Goglite Digital Hub';
+  const agencyName = agencySettings?.nombreAgencia || fetchedName || DEFAULT_AGENCY_BRANDING.nombreAgencia || 'Goglite Digital Hub';
 
   // MFA State
   const [totpCode, setTotpCode] = useState('');

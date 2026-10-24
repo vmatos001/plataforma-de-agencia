@@ -27,6 +27,7 @@ import HeadlessCmsHubModule from './components/HeadlessCmsHubModule';
 import CentroDesarrolloPrdModule from './components/CentroDesarrolloPrdModule';
 import PublicClientPortal from './components/PublicClientPortal';
 import AgencyWhiteLabelSettingsModal from './components/AgencyWhiteLabelSettingsModal';
+import { DEFAULT_AGENCY_BRANDING } from './constants/defaultAgencyBranding';
 import UserProfileModal from './components/UserProfileModal';
 import ProspectorModule from './components/ProspectorModule';
 import LoginGatekeeper from './components/LoginGatekeeper';
@@ -71,15 +72,7 @@ export default function App() {
   // White-Label Agency Settings State
   const [agencySettings, setAgencySettings] = useState(() => {
     const defaultSettings = {
-      nombreAgencia: 'Goglite Digital Hub',
-      eslogan: 'Suite Integral de Crecimiento Digital & Desarrollo Web Antigravity',
-      logoUrl: '/assets/goglite_logo.png',
-      colorPrimario: '#FF6B00',
-      colorSecundario: '#1E293B',
-      dominioWeb: 'goglite.com',
-      emailContacto: 'contacto@goglite.com',
-      telefonoWhatsapp: '+503 7000-1122',
-      ubicacionPrincipal: 'San Salvador (SV) & Santo Domingo (DO)'
+      ...DEFAULT_AGENCY_BRANDING
     };
 
     const stored = getLocalItem(STORAGE_KEYS.AGENCY_SETTINGS, null);
