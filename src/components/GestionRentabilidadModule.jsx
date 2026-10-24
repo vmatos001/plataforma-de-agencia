@@ -35,7 +35,8 @@ import {
   Pause,
   Square,
   RotateCcw,
-  Timer
+  Timer,
+  Calendar
 } from 'lucide-react';
 
 import { getStoredCrmLeads } from '../services/localStore';
@@ -245,6 +246,138 @@ const INITIAL_SEED_STATE = {
   timeEntries: [],
   configuracion: DEFAULT_CONFIGURACION
 };
+
+/**
+ * Validador de pertenencia de una fecha a un período contable
+ */
+export function isDateInPeriod(dateStr, period) {
+  if (!period || period === 'historico') return true;
+  if (!dateStr) return true;
+  
+  const normalizedStr = typeof dateStr === 'string' && dateStr.length === 10 
+    ? `${dateStr}T12:00:00` 
+    : dateStr;
+  const d = new Date(normalizedStr);
+  if (isNaN(d.getTime())) return true;
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-indexed (0=Enero, 9=Octubre)
+
+  const dYear = d.getFullYear();
+  const dMonth = d.getMonth();
+
+  if (period === 'este_mes') {
+    return dYear === year && dMonth === month;
+  }
+  if (period === 'mes_anterior') {
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    return dYear === prevYear && dMonth === prevMonth;
+  }
+  if (period === 'trimestre') {
+    const currentQ = Math.floor(month / 3);
+    const dQ = Math.floor(dMonth / 3);
+    return dYear === year && currentQ === dQ;
+  }
+  if (period === 'anio') {
+    return dYear === year;
+  }
+  return true;
+}
+
+/**
+ * Etiqueta legible para el período activo
+ */
+export function getPeriodLabel(period) {
+  const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const now = new Date();
+  const currentMonthName = months[now.getMonth()];
+  const currentYear = now.getFullYear();
+  
+  if (period === 'este_mes') {
+    return `${currentMonthName} ${currentYear}`;
+  }
+  if (period === 'mes_anterior') {
+    const prevMonthIdx = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    const prevYear = now.getMonth() === 0 ? currentYear - 1 : currentYear;
+    return `${months[prevMonthIdx]} ${prevYear}`;
+  }
+  if (period === 'trimestre') {
+    const q = Math.floor(now.getMonth() / 3) + 1;
+    return `T${q} (${currentYear})`;
+  }
+  if (period === 'anio') {
+    return `Año ${currentYear}`;
+  }
+  return 'Histórico Completo';
+}
+
+/**
+ * Cálculo dinámico de KPIs de P&L filtrados por período y mercado
+ */
+export function computeKpiMetrics(rawState, period = 'este_mes', market = 'ALL') {
+  const allFacturas = Array.isArray(rawState?.facturas) ? rawState.facturas : [];
+  const allGastos = Array.isArray(rawState?.gastos) ? rawState.gastos : [];
+  const allTimeEntries = Array.isArray(rawState?.timeEntries) ? rawState.timeEntries : [];
+  const configuracion = {
+    ...DEFAULT_CONFIGURACION,
+    ...(rawState?.configuracion || {})
+  };
+  const costoHora = Number(configuracion.costoHoraInterno) || 20;
+
+  // Filtrar facturas por fecha y mercado
+  const facturasPeriodo = allFacturas.filter(f => {
+    const inPeriod = isDateInPeriod(f.fechaEmision, period);
+    const inMarket = market === 'ALL' || f.cliente?.pais === market || f.pais === market;
+    return inPeriod && inMarket;
+  });
+
+  // Filtrar gastos por fecha y mercado
+  const gastosPeriodo = allGastos.filter(g => {
+    const inPeriod = isDateInPeriod(g.fecha, period);
+    const inMarket = market === 'ALL' || g.pais === market || (g.clienteAsociado && g.clienteAsociado.includes(market));
+    return inPeriod && inMarket;
+  });
+
+  // Filtrar horas por fecha
+  const timeEntriesPeriodo = allTimeEntries.filter(t => {
+    return isDateInPeriod(t.fecha, period);
+  });
+
+  const totalFacturado = facturasPeriodo.reduce((acc, f) => acc + (Number(f.total) || 0), 0);
+  const totalCobrado = facturasPeriodo.reduce((acc, f) => acc + (Number(f.montoCobrado) || 0), 0);
+  const saldoPorCobrar = facturasPeriodo.reduce((acc, f) => {
+    const total = Number(f.total) || 0;
+    const cobrado = Number(f.montoCobrado) || 0;
+    return acc + Math.max(0, total - cobrado);
+  }, 0);
+
+  const totalGastosOperativos = gastosPeriodo.reduce((acc, g) => acc + (Number(g.monto) || 0), 0);
+
+  const horasRealesTotales = timeEntriesPeriodo.reduce((acc, t) => acc + (Number(t.horas) || 0), 0);
+  const horasTotalesFacturas = facturasPeriodo.reduce((acc, f) => acc + (Number(f.horasInvertidasEstimadas) || 10), 0);
+  const horasTotales = horasRealesTotales > 0 ? horasRealesTotales : (facturasPeriodo.length > 0 ? horasTotalesFacturas : 0);
+  const costeManoObraTotal = horasTotales * costoHora;
+
+  const totalCostosReales = totalGastosOperativos + costeManoObraTotal;
+  const beneficioNetoReal = totalFacturado - totalCostosReales;
+  const margenNetoPorcentaje = totalFacturado > 0 
+    ? Math.round((beneficioNetoReal / totalFacturado) * 100) 
+    : (totalCostosReales > 0 ? -100 : 0);
+
+  return {
+    totalFacturado,
+    totalCobrado,
+    saldoPorCobrar,
+    totalGastosOperativos,
+    costeManoObraTotal,
+    totalCostosReales,
+    beneficioNetoReal,
+    margenNetoPorcentaje,
+    proyectosCount: facturasPeriodo.length
+  };
+}
 
 /**
  * Motor Contable Reactivo Isomórfico ($0 Cost Client + Server)
@@ -676,8 +809,35 @@ export default function GestionRentabilidadModule({
   });
 
   const [activeTab, setActiveTab] = useState('resumen'); // 'resumen' | 'facturas' | 'gastos' | 'horas' | 'config'
-  const [countryFilter, setCountryFilter] = useState('ALL'); // 'ALL' | 'SV' | 'DO'
-  const [searchTerm, setSearchTerm] = useState('');
+
+  // 1. Filtros Ejecutivos de KPIs Superiores (Período & Mercado)
+  const [kpiPeriod, setKpiPeriod] = useState('este_mes'); // 'este_mes' | 'mes_anterior' | 'trimestre' | 'anio' | 'historico'
+  const [kpiMarket, setKpiMarket] = useState('ALL'); // 'ALL' | 'SV' | 'DO'
+
+  // 2. Filtros Contextuales por Pestaña
+  // Pestaña 'resumen' (Rentabilidad Unitaria)
+  const [resumenSearch, setResumenSearch] = useState('');
+  const [resumenMarginFilter, setResumenMarginFilter] = useState('ALL'); // 'ALL' | 'healthy' | 'warning'
+  const [resumenCountry, setResumenCountry] = useState('ALL'); // 'ALL' | 'SV' | 'DO'
+
+  // Pestaña 'facturas' (Facturas & Proformas)
+  const [facturaSearch, setFacturaSearch] = useState('');
+  const [facturaStatus, setFacturaStatus] = useState('ALL'); // 'ALL' | 'cobrada' | 'parcial' | 'pendiente'
+  const [facturaCountry, setFacturaCountry] = useState('ALL'); // 'ALL' | 'SV' | 'DO' | 'US'
+
+  // Pestaña 'gastos' (Gastos Operativos)
+  const [gastoSearch, setGastoSearch] = useState('');
+  const [gastoCategory, setGastoCategory] = useState('ALL'); // 'ALL' | 'infraestructura' | 'software' | 'subcontratista' | 'operativo'
+
+  // Pestaña 'horas' (Time Tracking)
+  const [horasSearch, setHorasSearch] = useState('');
+
+  // Retrocompatibilidad segura
+  const countryFilter = kpiMarket;
+  const setCountryFilter = setKpiMarket;
+  const searchTerm = resumenSearch;
+  const setSearchTerm = setResumenSearch;
+
   const [toastMsg, setToastMsg] = useState('');
 
   // Sources from Modules 1, 2, and 3 for retrospective compatibility
@@ -1099,6 +1259,11 @@ export default function GestionRentabilidadModule({
   // Calcular resumen reactivo en 0ms
   const data = useMemo(() => computeFinanzasSummary(finanzasState), [finanzasState]);
   const { kpis, facturas, gastos, timeEntries, proyectosRentabilidad, configuracion } = data;
+
+  // KPIs reactivos ejecutivos filtrados por período temporal y mercado
+  const kpiDerived = useMemo(() => {
+    return computeKpiMetrics(finanzasState, kpiPeriod, kpiMarket);
+  }, [finanzasState, kpiPeriod, kpiMarket]);
 
   // Autocompletar formulario de Nueva Factura al elegir un origen de M1, M2 o M3
   const handleSelectImportSource = (value) => {
@@ -1848,26 +2013,48 @@ export default function GestionRentabilidadModule({
     showToast('Reporte contable CSV exportado.');
   };
 
-  // Filtered lists
+  // Listas filtradas contextualmente por cada pestaña especializada
   const filteredFacturas = facturas.filter(f => {
-    const matchCountry = countryFilter === 'ALL' || f.cliente?.pais === countryFilter;
-    const term = searchTerm.toLowerCase();
+    const matchCountry = facturaCountry === 'ALL' || f.cliente?.pais === facturaCountry || (facturaCountry === 'US' && (f.cuentaBancariaId?.includes('uglycash') || f.metodoPago?.toLowerCase().includes('uglycash') || f.cliente?.pais === 'US'));
+    const matchStatus = facturaStatus === 'ALL' || f.estado === facturaStatus;
+    const term = facturaSearch.toLowerCase().trim();
     const matchSearch = !term ||
       f.cliente?.empresa?.toLowerCase().includes(term) ||
       f.numeroFactura?.toLowerCase().includes(term) ||
       f.concepto?.toLowerCase().includes(term) ||
       f.origenModulo?.toLowerCase().includes(term);
-    return matchCountry && matchSearch;
+    return matchCountry && matchStatus && matchSearch;
   });
 
   const filteredRentabilidad = proyectosRentabilidad.filter(p => {
-    const matchCountry = countryFilter === 'ALL' || p.pais === countryFilter;
-    const term = searchTerm.toLowerCase();
+    const matchCountry = resumenCountry === 'ALL' || p.pais === resumenCountry;
+    const matchHealth = resumenMarginFilter === 'ALL' || 
+      (resumenMarginFilter === 'healthy' && p.esSaludable) || 
+      (resumenMarginFilter === 'warning' && !p.esSaludable);
+    const term = resumenSearch.toLowerCase().trim();
     const matchSearch = !term ||
       p.cliente?.toLowerCase().includes(term) ||
       p.numeroFactura?.toLowerCase().includes(term) ||
       p.origenModulo?.toLowerCase().includes(term);
-    return matchCountry && matchSearch;
+    return matchCountry && matchHealth && matchSearch;
+  });
+
+  const filteredGastos = gastos.filter(g => {
+    const matchCategory = gastoCategory === 'ALL' || g.categoria === gastoCategory;
+    const term = gastoSearch.toLowerCase().trim();
+    const matchSearch = !term ||
+      g.concepto?.toLowerCase().includes(term) ||
+      g.proveedor?.toLowerCase().includes(term) ||
+      g.clienteAsociado?.toLowerCase().includes(term);
+    return matchCategory && matchSearch;
+  });
+
+  const filteredTimeEntries = timeEntries.filter(t => {
+    const term = horasSearch.toLowerCase().trim();
+    return !term ||
+      t.cliente?.toLowerCase().includes(term) ||
+      t.concepto?.toLowerCase().includes(term) ||
+      t.responsable?.toLowerCase().includes(term);
   });
 
   return (
@@ -1881,7 +2068,93 @@ export default function GestionRentabilidadModule({
         </div>
       )}
 
-      {/* 1. TOP METRICS P&L DASHBOARD */}
+      {/* 1. EXECUTIVE P&L HEADER & TIME / MARKET PERIOD CONTROLS */}
+      <div className="p-4 rounded-xl bg-[#0e131f] border border-slate-800/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-white flex items-center gap-1.5">
+              <TrendingUp className="w-4 h-4 text-orange-500" />
+              <span>Flujo Financiero & Margen Operativo</span>
+            </span>
+            <span className="text-[11px] font-mono text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
+              <Calendar className="w-3 h-3 text-orange-400" />
+              <span>{getPeriodLabel(kpiPeriod)}</span>
+            </span>
+            {kpiMarket !== 'ALL' && (
+              <span className="text-[11px] font-mono text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-full font-semibold">
+                {kpiMarket === 'SV' ? '🇸🇻 El Salvador' : '🇩🇴 Rep. Dominicana'}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            Consolidado ejecutivo en tiempo real: Facturación emitida, recaudación en caja bancaria y costes de producción.
+          </p>
+        </div>
+
+        {/* Period & Market Filter Controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Market Segment */}
+          <div className="flex items-center bg-[#131926] border border-slate-800 rounded-lg p-0.5 text-xs">
+            <button
+              onClick={() => setKpiMarket('ALL')}
+              className={`px-2.5 py-1 rounded-md transition-colors ${kpiMarket === 'ALL' ? 'bg-orange-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Consolidado Global"
+            >
+              Global
+            </button>
+            <button
+              onClick={() => setKpiMarket('SV')}
+              className={`px-2.5 py-1 rounded-md transition-colors ${kpiMarket === 'SV' ? 'bg-orange-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Filtrar por El Salvador"
+            >
+              🇸🇻 SV
+            </button>
+            <button
+              onClick={() => setKpiMarket('DO')}
+              className={`px-2.5 py-1 rounded-md transition-colors ${kpiMarket === 'DO' ? 'bg-orange-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Filtrar por República Dominicana"
+            >
+              🇩🇴 DO
+            </button>
+          </div>
+
+          {/* Period Segment */}
+          <div className="flex items-center bg-[#131926] border border-slate-800 rounded-lg p-0.5 text-xs">
+            <button
+              onClick={() => setKpiPeriod('este_mes')}
+              className={`px-2.5 py-1 rounded-md transition-colors ${kpiPeriod === 'este_mes' ? 'bg-slate-800 text-orange-400 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              Este Mes
+            </button>
+            <button
+              onClick={() => setKpiPeriod('mes_anterior')}
+              className={`px-2.5 py-1 rounded-md transition-colors ${kpiPeriod === 'mes_anterior' ? 'bg-slate-800 text-orange-400 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              Mes Anterior
+            </button>
+            <button
+              onClick={() => setKpiPeriod('trimestre')}
+              className={`px-2.5 py-1 rounded-md transition-colors ${kpiPeriod === 'trimestre' ? 'bg-slate-800 text-orange-400 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              Trimestre
+            </button>
+            <button
+              onClick={() => setKpiPeriod('anio')}
+              className={`px-2.5 py-1 rounded-md transition-colors ${kpiPeriod === 'anio' ? 'bg-slate-800 text-orange-400 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              Año
+            </button>
+            <button
+              onClick={() => setKpiPeriod('historico')}
+              className={`px-2.5 py-1 rounded-md transition-colors ${kpiPeriod === 'historico' ? 'bg-slate-800 text-orange-400 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              Histórico
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. TOP METRICS P&L DASHBOARD (DRIVEN BY KPI PERIOD & MARKET) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         
         {/* Facturación Total */}
@@ -1892,9 +2165,9 @@ export default function GestionRentabilidadModule({
           </div>
           <div className="mt-2">
             <div className="text-2xl font-black text-white font-mono">
-              ${kpis.totalFacturado.toLocaleString()} <span className="text-xs font-normal text-slate-400">USD</span>
+              ${kpiDerived.totalFacturado.toLocaleString()} <span className="text-xs font-normal text-slate-400">USD</span>
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">{facturas.length} proyectos facturados</div>
+            <div className="text-[10px] text-slate-500 mt-0.5">{kpiDerived.proyectosCount} proyectos en período</div>
           </div>
         </div>
 
@@ -1906,7 +2179,7 @@ export default function GestionRentabilidadModule({
           </div>
           <div className="mt-2">
             <div className="text-2xl font-black text-emerald-400 font-mono">
-              ${kpis.totalCobrado.toLocaleString()} <span className="text-xs font-normal text-slate-400">USD</span>
+              ${kpiDerived.totalCobrado.toLocaleString()} <span className="text-xs font-normal text-slate-400">USD</span>
             </div>
             <div className="text-[10px] text-emerald-500/80 mt-0.5">Liquidez efectiva en banco</div>
           </div>
@@ -1920,7 +2193,7 @@ export default function GestionRentabilidadModule({
           </div>
           <div className="mt-2">
             <div className="text-2xl font-black text-amber-400 font-mono">
-              ${kpis.saldoPorCobrar.toLocaleString()} <span className="text-xs font-normal text-slate-400">USD</span>
+              ${kpiDerived.saldoPorCobrar.toLocaleString()} <span className="text-xs font-normal text-slate-400">USD</span>
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">Saldos contra entrega final</div>
           </div>
@@ -1934,10 +2207,10 @@ export default function GestionRentabilidadModule({
           </div>
           <div className="mt-2">
             <div className="text-2xl font-black text-rose-400 font-mono">
-              ${(kpis.totalGastosOperativos + kpis.costeManoObraTotal).toLocaleString()} <span className="text-xs font-normal text-slate-400">USD</span>
+              ${kpiDerived.totalCostosReales.toLocaleString()} <span className="text-xs font-normal text-slate-400">USD</span>
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">
-              Directos (${kpis.totalGastosOperativos.toFixed(0)}) + Horas (${kpis.costeManoObraTotal.toFixed(0)})
+              Directos (${kpiDerived.totalGastosOperativos.toFixed(0)}) + Horas (${kpiDerived.costeManoObraTotal.toFixed(0)})
             </div>
           </div>
         </div>
@@ -1950,20 +2223,18 @@ export default function GestionRentabilidadModule({
           </div>
           <div className="mt-2">
             <div className="text-2xl font-black text-sky-400 font-mono">
-              {kpis.margenNetoPorcentaje}%
+              {kpiDerived.margenNetoPorcentaje}%
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">
-              Beneficio Neto: <span className="font-bold text-white">${kpis.beneficioNetoReal.toLocaleString()} USD</span>
+              Beneficio Neto: <span className="font-bold text-white">${kpiDerived.beneficioNetoReal.toLocaleString()} USD</span>
             </div>
           </div>
         </div>
 
       </div>
 
-      {/* 2. NAVIGATION BAR & FILTER CONTROLS */}
-      <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 p-3.5 rounded-xl bg-[#0e131f] border border-slate-800/80">
-        
-        {/* Tabs Switch */}
+      {/* 3. NAVIGATION BAR (SUB-PESTAÑAS LIMPIAS) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-2 overflow-x-auto">
         <div className="flex flex-wrap items-center bg-[#131926] border border-slate-800 rounded-lg p-0.5 text-xs gap-0.5">
           <button
             onClick={() => setActiveTab('resumen')}
@@ -2005,151 +2276,44 @@ export default function GestionRentabilidadModule({
           </button>
         </div>
 
-        {/* Actions & Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar cliente o factura..."
-              className="bg-[#131926] border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500 w-44"
-            />
-          </div>
-
-          {/* Country Filter */}
-          <div className="flex items-center bg-[#131926] border border-slate-800 rounded-lg p-0.5 text-xs">
+        {/* Mini Stopwatch Live Pill if timer is running or has elapsed time */}
+        {(activeTimer.isRunning || displaySeconds > 0) && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-mono self-start sm:self-auto">
+            <span className={`w-2 h-2 rounded-full ${activeTimer.isRunning && !activeTimer.isPaused ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
             <button
-              onClick={() => setCountryFilter('ALL')}
-              className={`px-2.5 py-1 rounded-md transition-colors ${countryFilter === 'ALL' ? 'bg-orange-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+              onClick={() => setActiveTab('horas')}
+              className="flex items-center gap-1 font-bold hover:text-white transition-colors"
+              title="Ir a pestaña Time Tracking"
             >
-              Todos
+              <Timer className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{formatTime(displaySeconds)}</span>
             </button>
-            <button
-              onClick={() => setCountryFilter('SV')}
-              className={`px-2.5 py-1 rounded-md transition-colors ${countryFilter === 'SV' ? 'bg-orange-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              🇸🇻 SV
-            </button>
-            <button
-              onClick={() => setCountryFilter('DO')}
-              className={`px-2.5 py-1 rounded-md transition-colors ${countryFilter === 'DO' ? 'bg-orange-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              🇩🇴 DO
-            </button>
-            <button
-              onClick={() => setCountryFilter('US')}
-              className={`px-2.5 py-1 rounded-md transition-colors ${countryFilter === 'US' ? 'bg-orange-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              🇺🇸 US (uglyCash)
-            </button>
-          </div>
-
-          {/* Sync M1-M2-M3 Button */}
-          <button
-            onClick={handleSyncRetrospectiveModules}
-            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700"
-            title="Sincronizar presupuestos aceptados (Módulo 3) y cierres CRM (Módulo 2)"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-orange-400" />
-            <span>Sync M1-M3</span>
-          </button>
-
-          {/* Export CSV */}
-          <button
-            onClick={handleExportCsv}
-            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700"
-            title="Exportar P&L y Facturas a Excel CSV ($0)"
-          >
-            <Download className="w-3.5 h-3.5 text-emerald-400" />
-            <span>CSV</span>
-          </button>
-
-          {/* Limpiar Pruebas */}
-          <button
-            onClick={handleClearFinanzasData}
-            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700 hover:border-rose-500/40"
-            title="Vaciar facturas, gastos y horas para prueba manual limpia"
-          >
-            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-            <span>Limpiar Pruebas</span>
-          </button>
-
-          {/* Mini Stopwatch Live Pill if timer is running or has elapsed time */}
-          {(activeTimer.isRunning || displaySeconds > 0) && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-mono">
-              <span className={`w-2 h-2 rounded-full ${activeTimer.isRunning && !activeTimer.isPaused ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            {activeTimer.isRunning && !activeTimer.isPaused ? (
               <button
-                onClick={() => setActiveTab('horas')}
-                className="flex items-center gap-1 font-bold hover:text-white transition-colors"
-                title="Ir a pestaña Time Tracking"
-              >
-                <Timer className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{formatTime(displaySeconds)}</span>
-              </button>
-              {activeTimer.isRunning && !activeTimer.isPaused ? (
-                <button
-                  onClick={handlePauseTimer}
-                  title="Pausar cronómetro"
-                  className="p-0.5 hover:text-white"
-                >
-                  <Pause className="w-3 h-3 text-amber-300" />
-                </button>
-              ) : activeTimer.isPaused ? (
-                <button
-                  onClick={() => handleStartTimer()}
-                  title="Reanudar cronómetro"
-                  className="p-0.5 hover:text-white"
-                >
-                  <Play className="w-3 h-3 text-emerald-400" />
-                </button>
-              ) : null}
-              <button
-                onClick={handleOpenStopModal}
-                title="Detener y registrar en bitácora"
+                onClick={handlePauseTimer}
+                title="Pausar cronómetro"
                 className="p-0.5 hover:text-white"
               >
-                <Square className="w-3 h-3 text-rose-400" />
+                <Pause className="w-3 h-3 text-amber-300" />
               </button>
-            </div>
-          )}
-
-          {/* Primary CTA depending on active tab */}
-          {(activeTab === 'resumen' || activeTab === 'facturas') && (
+            ) : activeTimer.isPaused ? (
+              <button
+                onClick={() => handleStartTimer()}
+                title="Reanudar cronómetro"
+                className="p-0.5 hover:text-white"
+              >
+                <Play className="w-3 h-3 text-emerald-400" />
+              </button>
+            ) : null}
             <button
-              onClick={() => {
-                loadRetrospectiveModules();
-                setNewInvoiceModalOpen(true);
-              }}
-              className="px-3.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-glow-sm transition-all shrink-0"
+              onClick={handleOpenStopModal}
+              title="Detener y registrar en bitácora"
+              className="p-0.5 hover:text-white"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Nueva Factura</span>
+              <Square className="w-3 h-3 text-rose-400" />
             </button>
-          )}
-
-          {activeTab === 'gastos' && (
-            <button
-              onClick={() => setNewExpenseModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all shrink-0"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Registrar Gasto</span>
-            </button>
-          )}
-
-          {activeTab === 'horas' && (
-            <button
-              onClick={() => setNewTimeModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all shrink-0"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Registrar Horas</span>
-            </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* 3. TAB 1: RENTABILIDAD POR PROYECTO (UNIT ECONOMICS) */}
@@ -2179,6 +2343,88 @@ export default function GestionRentabilidadModule({
               <span className="text-[11px] font-mono bg-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-full font-semibold">
                 Autohosteado: $0 USD/mes
               </span>
+            </div>
+          </div>
+
+          {/* Tab 1 Dedicated Controls Toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-[#0e131f] border border-slate-800 rounded-xl">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Search */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={resumenSearch}
+                  onChange={(e) => setResumenSearch(e.target.value)}
+                  placeholder="Buscar proyecto o cliente..."
+                  className="bg-[#131926] border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500 w-48"
+                />
+              </div>
+
+              {/* Margin Health Filter */}
+              <div className="flex items-center bg-[#131926] border border-slate-800 rounded-lg p-0.5 text-xs">
+                <button
+                  onClick={() => setResumenMarginFilter('ALL')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${resumenMarginFilter === 'ALL' ? 'bg-orange-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Todos
+                </button>
+                <button
+                  onClick={() => setResumenMarginFilter('healthy')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${resumenMarginFilter === 'healthy' ? 'bg-emerald-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Saludables ≥60%
+                </button>
+                <button
+                  onClick={() => setResumenMarginFilter('warning')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${resumenMarginFilter === 'warning' ? 'bg-rose-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  En Riesgo &lt;60%
+                </button>
+              </div>
+
+              {/* Country Filter */}
+              <div className="flex items-center bg-[#131926] border border-slate-800 rounded-lg p-0.5 text-xs">
+                <button
+                  onClick={() => setResumenCountry('ALL')}
+                  className={`px-2 py-1 rounded-md transition-colors ${resumenCountry === 'ALL' ? 'bg-slate-700 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Todos
+                </button>
+                <button
+                  onClick={() => setResumenCountry('SV')}
+                  className={`px-2 py-1 rounded-md transition-colors ${resumenCountry === 'SV' ? 'bg-slate-700 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  🇸🇻 SV
+                </button>
+                <button
+                  onClick={() => setResumenCountry('DO')}
+                  className={`px-2 py-1 rounded-md transition-colors ${resumenCountry === 'DO' ? 'bg-slate-700 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  🇩🇴 DO
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExportCsv}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700"
+                title="Exportar reporte contable a Excel CSV ($0)"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-400" />
+                <span>CSV</span>
+              </button>
+              <button
+                onClick={() => {
+                  loadRetrospectiveModules();
+                  setNewInvoiceModalOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Nueva Factura</span>
+              </button>
             </div>
           </div>
 
@@ -2284,7 +2530,103 @@ export default function GestionRentabilidadModule({
 
       {/* 4. TAB 2: GESTOR DE FACTURAS & PROFORMAS */}
       {activeTab === 'facturas' && (
-        <div className="bg-[#0c1017] border border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
+        <div className="space-y-4">
+          {/* Tab 2 Dedicated Controls Toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-[#0e131f] border border-slate-800 rounded-xl">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Search */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={facturaSearch}
+                  onChange={(e) => setFacturaSearch(e.target.value)}
+                  placeholder="Buscar factura, cliente o concepto..."
+                  className="bg-[#131926] border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500 w-52"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex items-center bg-[#131926] border border-slate-800 rounded-lg p-0.5 text-xs">
+                <button
+                  onClick={() => setFacturaStatus('ALL')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${facturaStatus === 'ALL' ? 'bg-orange-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={() => setFacturaStatus('cobrada')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${facturaStatus === 'cobrada' ? 'bg-emerald-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Cobradas 100%
+                </button>
+                <button
+                  onClick={() => setFacturaStatus('parcial')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${facturaStatus === 'parcial' ? 'bg-sky-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Parciales
+                </button>
+                <button
+                  onClick={() => setFacturaStatus('pendiente')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${facturaStatus === 'pendiente' ? 'bg-amber-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Pendientes
+                </button>
+              </div>
+
+              {/* Country / Gateway Filter */}
+              <div className="flex items-center bg-[#131926] border border-slate-800 rounded-lg p-0.5 text-xs">
+                <button
+                  onClick={() => setFacturaCountry('ALL')}
+                  className={`px-2 py-1 rounded-md transition-colors ${facturaCountry === 'ALL' ? 'bg-slate-700 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Todos
+                </button>
+                <button
+                  onClick={() => setFacturaCountry('SV')}
+                  className={`px-2 py-1 rounded-md transition-colors ${facturaCountry === 'SV' ? 'bg-slate-700 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  🇸🇻 SV
+                </button>
+                <button
+                  onClick={() => setFacturaCountry('DO')}
+                  className={`px-2 py-1 rounded-md transition-colors ${facturaCountry === 'DO' ? 'bg-slate-700 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  🇩🇴 DO
+                </button>
+                <button
+                  onClick={() => setFacturaCountry('US')}
+                  className={`px-2 py-1 rounded-md transition-colors ${facturaCountry === 'US' ? 'bg-slate-700 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                  title="uglyCash (EE.UU.)"
+                >
+                  🇺🇸 uglyCash
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSyncRetrospectiveModules}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700"
+                title="Sincronizar presupuestos aceptados (M3) y cierres CRM (M2)"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-orange-400" />
+                <span>Sync M1-M3</span>
+              </button>
+              <button
+                onClick={() => {
+                  loadRetrospectiveModules();
+                  setNewInvoiceModalOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Nueva Factura</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-[#0c1017] border border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
           <div className="p-3 bg-[#101522] border-b border-slate-800 text-xs font-bold text-slate-200 flex items-center justify-between">
             <span>Listado de Facturas Comerciales, Proformas & Cobros (50% / 50%)</span>
             <span className="text-[11px] font-mono text-slate-400">{filteredFacturas.length} registradas</span>
@@ -2392,32 +2734,93 @@ export default function GestionRentabilidadModule({
             </table>
           </div>
         </div>
+      </div>
       )}
 
       {/* 5. TAB 3: CONTROL DE GASTOS OPERATIVOS */}
       {activeTab === 'gastos' && (
-        <div className="bg-[#0c1017] border border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
-          <div className="p-3 bg-[#101522] border-b border-slate-800 text-xs font-bold text-slate-200 flex items-center justify-between">
-            <span>Registro de Gastos Operativos Directos por Cliente & Agencia ($0 Suscripciones)</span>
-            <span className="text-[11px] font-mono text-slate-400">Total: ${kpis.totalGastosOperativos.toFixed(2)} USD</span>
+        <div className="space-y-4">
+          {/* Tab 3 Dedicated Controls Toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-[#0e131f] border border-slate-800 rounded-xl">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Search */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={gastoSearch}
+                  onChange={(e) => setGastoSearch(e.target.value)}
+                  placeholder="Buscar gasto o proveedor..."
+                  className="bg-[#131926] border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500 w-48"
+                />
+              </div>
+
+              {/* Category Filter */}
+              <div className="flex items-center bg-[#131926] border border-slate-800 rounded-lg p-0.5 text-xs">
+                <button
+                  onClick={() => setGastoCategory('ALL')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${gastoCategory === 'ALL' ? 'bg-orange-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={() => setGastoCategory('infraestructura')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${gastoCategory === 'infraestructura' ? 'bg-rose-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Infraestructura
+                </button>
+                <button
+                  onClick={() => setGastoCategory('software')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${gastoCategory === 'software' ? 'bg-rose-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Software & APIs
+                </button>
+                <button
+                  onClick={() => setGastoCategory('subcontratista')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${gastoCategory === 'subcontratista' ? 'bg-rose-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Subcontratistas
+                </button>
+                <button
+                  onClick={() => setGastoCategory('operativo')}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${gastoCategory === 'operativo' ? 'bg-rose-600 text-white font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Operativo
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setNewExpenseModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Registrar Gasto</span>
+            </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-[#0d121c] border-b border-slate-800 text-[11px] font-mono uppercase text-slate-400">
-                <tr>
-                  <th className="p-3">Concepto</th>
-                  <th className="p-3">Proyecto / Cliente Asociado</th>
-                  <th className="p-3">Categoría</th>
-                  <th className="p-3">Proveedor</th>
-                  <th className="p-3">Fecha</th>
-                  <th className="p-3">Frecuencia</th>
-                  <th className="p-3 text-right">Monto USD</th>
-                  <th className="p-3 text-right">Acción</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 font-sans">
-                {gastos.map(g => (
+          <div className="bg-[#0c1017] border border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
+            <div className="p-3 bg-[#101522] border-b border-slate-800 text-xs font-bold text-slate-200 flex items-center justify-between">
+              <span>Registro de Gastos Operativos Directos por Cliente & Agencia ($0 Suscripciones)</span>
+              <span className="text-[11px] font-mono text-slate-400">Total: ${kpis.totalGastosOperativos.toFixed(2)} USD ({filteredGastos.length} registrados)</span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-[#0d121c] border-b border-slate-800 text-[11px] font-mono uppercase text-slate-400">
+                  <tr>
+                    <th className="p-3">Concepto</th>
+                    <th className="p-3">Proyecto / Cliente Asociado</th>
+                    <th className="p-3">Categoría</th>
+                    <th className="p-3">Proveedor</th>
+                    <th className="p-3">Fecha</th>
+                    <th className="p-3">Frecuencia</th>
+                    <th className="p-3 text-right">Monto USD</th>
+                    <th className="p-3 text-right">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-sans">
+                  {filteredGastos.map(g => (
                   <tr key={g.id} className="hover:bg-slate-800/30 transition-colors">
                     <td className="p-3 font-semibold text-white">
                       {g.concepto}
@@ -2459,7 +2862,7 @@ export default function GestionRentabilidadModule({
                     </td>
                   </tr>
                 ))}
-                {gastos.length === 0 && (
+                {filteredGastos.length === 0 && (
                   <tr>
                     <td colSpan="8" className="p-8 text-center text-slate-500">
                       <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-30 text-slate-400" />
@@ -2474,6 +2877,7 @@ export default function GestionRentabilidadModule({
             </table>
           </div>
         </div>
+      </div>
       )}
 
       {/* 6. TAB 4: CONTROL DE HORAS & TIME TRACKING */}
@@ -2793,11 +3197,23 @@ export default function GestionRentabilidadModule({
 
           {/* Table: Time Entries Log */}
           <div className="bg-[#0c1017] border border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
-            <div className="p-3 bg-[#101522] border-b border-slate-800 text-xs font-bold text-slate-200 flex items-center justify-between">
-              <span>Bitácora de Tiempos Registrados</span>
+            <div className="p-3 bg-[#101522] border-b border-slate-800 text-xs font-bold text-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <span>Bitácora de Tiempos Registrados ({filteredTimeEntries.length})</span>
+                <div className="relative">
+                  <Search className="w-3 h-3 text-slate-500 absolute left-2 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={horasSearch}
+                    onChange={(e) => setHorasSearch(e.target.value)}
+                    placeholder="Filtrar por cliente, tarea o dev..."
+                    className="bg-[#131926] border border-slate-700 rounded-lg pl-7 pr-2.5 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-emerald-500 w-52 font-normal"
+                  />
+                </div>
+              </div>
               <button
                 onClick={() => setNewTimeModalOpen(true)}
-                className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[11px] flex items-center gap-1 transition-all shadow-sm"
+                className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[11px] flex items-center gap-1 transition-all shadow-sm self-start sm:self-auto"
               >
                 <Plus className="w-3 h-3" />
                 <span>Agregar Registro</span>
@@ -2818,7 +3234,7 @@ export default function GestionRentabilidadModule({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-sans">
-                  {timeEntries.map(t => (
+                  {filteredTimeEntries.map(t => (
                     <tr key={t.id} className="hover:bg-slate-800/30 transition-colors">
                       <td className="p-3 font-mono text-[11px] text-slate-500">{t.fecha}</td>
                       <td className="p-3 font-semibold text-white">{t.cliente}</td>
@@ -2843,7 +3259,7 @@ export default function GestionRentabilidadModule({
                       </td>
                     </tr>
                   ))}
-                  {timeEntries.length === 0 && (
+                  {filteredTimeEntries.length === 0 && (
                     <tr>
                       <td colSpan="7" className="p-8 text-center text-slate-500">
                         <Timer className="w-8 h-8 mx-auto mb-2 opacity-30 text-slate-400" />
@@ -2864,6 +3280,31 @@ export default function GestionRentabilidadModule({
       {/* 7. TAB 5: CONFIGURACIÓN FINANCIERA, TARIFAS & BANCOS REGIONALES */}
       {activeTab === 'config' && (
         <form onSubmit={handleSaveConfig} className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-xs">
+          {/* Header Card with Clean Settings Info & Discrete Maintenance Action */}
+          <div className="col-span-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-[#0e131f] border border-slate-800 rounded-xl">
+            <div>
+              <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                <Settings className="w-3.5 h-3.5 text-orange-400" />
+                <span>Configuración de Finanzas & Cuentas Bancarias</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Cuentas receptoras oficiales (El Salvador, Rep. Dominicana y uglyCash EE.UU.) y parámetros de coste horario.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleClearFinanzasData}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700 hover:border-rose-500/40"
+                title="Vaciar facturas, gastos y horas para prueba manual limpia"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span>Limpiar Pruebas</span>
+              </button>
+            </div>
+          </div>
+
           {/* Parámetros de Rentabilidad y Costes */}
           <div className="p-5 rounded-xl bg-[#0c1017] border border-slate-800 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
