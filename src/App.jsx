@@ -114,6 +114,17 @@ export default function App() {
   const [usersList, setUsersList] = useState([defaultMasterAdmin]);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
+  // Protocolo de Seguridad de Sesiones (NIST SP 800-63B / OWASP)
+  const SESSION_POLICIES = {
+    ABSOLUTE_LIFETIME_MS: 8 * 60 * 60 * 1000, // 8 horas máximas continuas
+    IDLE_TIMEOUT_ADMIN_MS: 15 * 60 * 1000,    // 15 minutos sin actividad para Administrador
+    IDLE_TIMEOUT_COLAB_MS: 30 * 60 * 1000,    // 30 minutos sin actividad para Colaboradores
+    ACTIVITY_THROTTLE_MS: 15 * 1000,          // Throttling de registro de actividad (15s)
+    CHECK_INTERVAL_MS: 10 * 1000              // Intervalo de evaluación de estado (10s)
+  };
+
+  const [sessionExpiredNotice, setSessionExpiredNotice] = useState('');
+
   // Gatekeeper de Seguridad: Verificación de sesión con Google OAuth + MFA Authenticator
   const [isAuthenticatedSession, setIsAuthenticatedSession] = useState(() => {
     try {
@@ -121,6 +132,18 @@ export default function App() {
         const stored = sessionStorage.getItem('goglite_auth_session');
         if (stored) {
           const parsed = JSON.parse(stored);
+          const now = Date.now();
+          const loginTime = parsed?.loginTimestamp || now;
+          const lastActivity = parsed?.lastActivityTimestamp || now;
+          const isAdmin = parsed?.rol === 'admin' || parsed?.email === 'sitesgoglite@gmail.com' || parsed?.email === 'victor@goglite.com';
+          const idleLimit = isAdmin ? 15 * 60 * 1000 : 30 * 60 * 1000;
+
+          // Si superó la jornada de 8h o el límite de inactividad, invalidar de inmediato
+          if (now - loginTime > 8 * 60 * 60 * 1000 || now - lastActivity > idleLimit) {
+            sessionStorage.removeItem('goglite_auth_session');
+            return false;
+          }
+
           if (parsed?.mfaVerified && (parsed?.email === 'sitesgoglite@gmail.com' || parsed?.email === 'victor@goglite.com' || parsed?.email)) {
             return true;
           }
@@ -131,12 +154,13 @@ export default function App() {
   });
 
   const handleLoginSuccess = (user) => {
+    setSessionExpiredNotice('');
     setCurrentUser(user);
     setLocalItem(STORAGE_KEYS.CURRENT_USER, user);
     setIsAuthenticatedSession(true);
   };
 
-  const handleLogout = async () => {
+  const handleLogout = async (expiredMessage = '') => {
     try {
       await signOutUser();
     } catch {}
@@ -145,8 +169,79 @@ export default function App() {
         sessionStorage.removeItem('goglite_auth_session');
       }
     } catch {}
+    if (expiredMessage) {
+      setSessionExpiredNotice(expiredMessage);
+    }
     setIsAuthenticatedSession(false);
   };
+
+  // Protocolo de Sesión Activa: Auditoría de Inactividad y Duración Absoluta
+  useEffect(() => {
+    if (!isAuthenticatedSession) return;
+
+    const getStoredSession = () => {
+      try {
+        const raw = sessionStorage.getItem('goglite_auth_session');
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const session = getStoredSession();
+    if (!session) return;
+
+    const isAdmin = currentUser?.rol === 'admin' || session?.email === 'sitesgoglite@gmail.com' || session?.email === 'victor@goglite.com';
+    const idleLimit = isAdmin ? SESSION_POLICIES.IDLE_TIMEOUT_ADMIN_MS : SESSION_POLICIES.IDLE_TIMEOUT_COLAB_MS;
+    const idleMinutes = isAdmin ? 15 : 30;
+
+    let lastRecordedActivity = session.lastActivityTimestamp || Date.now();
+
+    const handleUserInteraction = () => {
+      const now = Date.now();
+      if (now - lastRecordedActivity > SESSION_POLICIES.ACTIVITY_THROTTLE_MS) {
+        lastRecordedActivity = now;
+        try {
+          const current = getStoredSession();
+          if (current) {
+            current.lastActivityTimestamp = now;
+            sessionStorage.setItem('goglite_auth_session', JSON.stringify(current));
+          }
+        } catch {}
+      } else {
+        lastRecordedActivity = now;
+      }
+    };
+
+    const monitoredEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    monitoredEvents.forEach(evt => window.addEventListener(evt, handleUserInteraction, { passive: true }));
+
+    const sessionWatcher = setInterval(() => {
+      const now = Date.now();
+      const current = getStoredSession();
+      if (!current) return;
+
+      const loginTime = current.loginTimestamp || now;
+      const activityTime = current.lastActivityTimestamp || lastRecordedActivity;
+
+      // 1. Verificación de Duración Absoluta (8 Horas)
+      if (now - loginTime > SESSION_POLICIES.ABSOLUTE_LIFETIME_MS) {
+        handleLogout('Tu jornada de sesión segura (8 horas) ha concluido. Por favor, inicia sesión nuevamente.');
+        return;
+      }
+
+      // 2. Verificación de Inactividad (15 min Admin / 30 min Colaborador)
+      if (now - activityTime > idleLimit) {
+        handleLogout(`Sesión suspendida por inactividad (${idleMinutes} minutos sin interacción). Valida tus credenciales para continuar.`);
+        return;
+      }
+    }, SESSION_POLICIES.CHECK_INTERVAL_MS);
+
+    return () => {
+      monitoredEvents.forEach(evt => window.removeEventListener(evt, handleUserInteraction));
+      clearInterval(sessionWatcher);
+    };
+  }, [isAuthenticatedSession, currentUser]);
 
   // Sidebar Collapsed State
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -350,6 +445,7 @@ export default function App() {
         agencySettings={agencySettings}
         onLoginSuccess={handleLoginSuccess}
         onUpdateUserMfa={handleUpdateUserMfa}
+        sessionExpiredNotice={sessionExpiredNotice}
       />
     );
   }

@@ -12,7 +12,8 @@ import {
   Copy, 
   Check, 
   QrCode,
-  ArrowRight
+  ArrowRight,
+  Clock
 } from 'lucide-react';
 import { signInWithGoogle, signOutUser } from '../services/firebase';
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
@@ -83,7 +84,8 @@ export default function LoginGatekeeper({
   usersList = [],
   agencySettings = null,
   onLoginSuccess,
-  onUpdateUserMfa
+  onUpdateUserMfa,
+  sessionExpiredNotice = ''
 }) {
   const [step, setStep] = useState('google'); // 'google' | 'mfa'
   const [loadingGoogle, setLoadingGoogle] = useState(false);
@@ -278,7 +280,8 @@ export default function LoginGatekeeper({
             nombre: matchedAppUser.nombre,
             rol: matchedAppUser.rol,
             mfaVerified: true,
-            loginTimestamp: Date.now()
+            loginTimestamp: Date.now(),
+            lastActivityTimestamp: Date.now()
           };
           sessionStorage.setItem('goglite_auth_session', JSON.stringify(sessionPayload));
         } catch {}
@@ -348,6 +351,14 @@ export default function LoginGatekeeper({
             </p>
           </div>
         </div>
+
+        {/* Notificación de Expiración de Sesión */}
+        {sessionExpiredNotice && !errorMessage && (
+          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5 animate-fade-in">
+            <Clock className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+            <span className="leading-relaxed">{sessionExpiredNotice}</span>
+          </div>
+        )}
 
         {/* Mensaje de Error si ocurre */}
         {errorMessage && (
