@@ -207,20 +207,41 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   // Agency White-Label Branding State
   const [agencyBranding, setAgencyBranding] = useState(() => {
-    if (initialAgencySettings) return initialAgencySettings;
-    try {
-      const raw = localStorage.getItem('goglite_agency_settings');
-      if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    return {
+    const fallback = {
       nombreAgencia: 'Goglite Digital Hub',
-      logoUrl: '',
+      logoUrl: '/assets/goglite_logo.png',
       colorPrimario: '#FF6B00',
       telefonoWhatsapp: '+503 7000-1122',
       emailContacto: 'contacto@goglite.com',
       dominioWeb: 'goglite.com',
       ubicacionPrincipal: 'San Salvador (SV) & Santo Domingo (DO)'
     };
+    if (initialAgencySettings && typeof initialAgencySettings === 'object') {
+      return {
+        ...fallback,
+        ...initialAgencySettings,
+        logoUrl: initialAgencySettings.logoUrl || fallback.logoUrl
+      };
+    }
+    try {
+      const raw = localStorage.getItem('goglite_agency_settings');
+      const storedLogo = localStorage.getItem('goglite_agency_logo');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return {
+          ...fallback,
+          ...parsed,
+          logoUrl: parsed.logoUrl || storedLogo || fallback.logoUrl
+        };
+      }
+      if (storedLogo) {
+        return {
+          ...fallback,
+          logoUrl: storedLogo
+        };
+      }
+    } catch (e) {}
+    return fallback;
   });
 
   // Client Post-Payment Authentication State

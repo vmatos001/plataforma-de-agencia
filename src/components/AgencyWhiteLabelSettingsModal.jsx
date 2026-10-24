@@ -106,9 +106,11 @@ export default function AgencyWhiteLabelSettingsModal({
 
   useEffect(() => {
     if (agencySettings) {
+      const storedLogo = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null;
       setForm(prev => ({
         ...prev,
         ...agencySettings,
+        logoUrl: agencySettings.logoUrl || storedLogo || prev.logoUrl || '/assets/goglite_logo.png',
         apisIntegraciones: {
           ...prev.apisIntegraciones,
           ...(agencySettings.apisIntegraciones || {})
@@ -134,27 +136,94 @@ export default function AgencyWhiteLabelSettingsModal({
 
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    // SVG se lee directamente sin compresión
+    if (file.type === 'image/svg+xml') {
       const reader = new FileReader();
       reader.onload = (event) => {
-        if (event.target?.result) {
-          setForm(prev => ({ ...prev, logoUrl: event.target.result }));
+        const svgResult = event.target?.result;
+        if (svgResult) {
+          setForm(prev => ({ ...prev, logoUrl: svgResult }));
+          try {
+            localStorage.setItem('goglite_agency_logo', svgResult);
+          } catch (err) {
+            console.warn('[Logo] Error guardando SVG en localStorage:', err);
+          }
         }
       };
       reader.readAsDataURL(file);
+      return;
     }
+
+    // Para imágenes raster (PNG, JPEG, WebP): Redimensionar vía Canvas offscreen a máx 512px para evitar desbordar cuota
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX_DIM = 512;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Exportar a PNG ligero con canal alfa transparente preservado (~15-30 KB)
+        const optimizedDataUrl = canvas.toDataURL('image/png');
+        setForm(prev => ({ ...prev, logoUrl: optimizedDataUrl }));
+
+        try {
+          localStorage.setItem('goglite_agency_logo', optimizedDataUrl);
+        } catch (err) {
+          console.warn('[Logo] Error guardando logo optimizado en localStorage:', err);
+        }
+      };
+      img.src = event.target?.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     setSaving(true);
     try {
+      // 1. Asegurar copia de seguridad del logo en clave independiente
+      if (form.logoUrl) {
+        try {
+          localStorage.setItem('goglite_agency_logo', form.logoUrl);
+        } catch (err) {
+          console.warn('[Logo] Error persistiendo logo dedicado:', err);
+        }
+      }
+
+      // 2. Persistir en almacenamiento institucional y notificar a App
       await onSaveAgencySettings(form);
+
+      // 3. Emitir evento global para actualización instantánea en toda la interfaz
+      window.dispatchEvent(new CustomEvent('goglite_agency_settings_updated', { detail: form }));
+
       setSavedSuccess(true);
       setTimeout(() => {
         setSavedSuccess(false);
         onClose();
-      }, 1200);
+      }, 1000);
     } catch (err) {
       alert('Error guardando ajustes: ' + err.message);
     } finally {

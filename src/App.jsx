@@ -67,17 +67,33 @@ export default function App() {
 
   // White-Label Agency Settings State
   const [agencySettings, setAgencySettings] = useState(() => {
-    return getLocalItem(STORAGE_KEYS.AGENCY_SETTINGS, {
+    const defaultSettings = {
       nombreAgencia: 'Goglite Digital Hub',
       eslogan: 'Suite Integral de Crecimiento Digital & Desarrollo Web Antigravity',
-      logoUrl: '',
+      logoUrl: '/assets/goglite_logo.png',
       colorPrimario: '#FF6B00',
       colorSecundario: '#1E293B',
       dominioWeb: 'goglite.com',
       emailContacto: 'contacto@goglite.com',
       telefonoWhatsapp: '+503 7000-1122',
       ubicacionPrincipal: 'San Salvador (SV) & Santo Domingo (DO)'
-    });
+    };
+
+    const stored = getLocalItem(STORAGE_KEYS.AGENCY_SETTINGS, null);
+    const storedLogo = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null;
+
+    if (stored && typeof stored === 'object') {
+      return {
+        ...defaultSettings,
+        ...stored,
+        logoUrl: stored.logoUrl || storedLogo || defaultSettings.logoUrl
+      };
+    }
+
+    if (storedLogo) {
+      defaultSettings.logoUrl = storedLogo;
+    }
+    return defaultSettings;
   });
   const [showAgencySettingsModal, setShowAgencySettingsModal] = useState(false);
 
@@ -145,15 +161,37 @@ export default function App() {
   useEffect(() => {
     fetchAgencySettings();
     fetchUsers();
+
+    // Sincronización reactiva en tiempo real al actualizar ajustes
+    const handleSettingsUpdated = (e) => {
+      if (e.detail && typeof e.detail === 'object') {
+        setAgencySettings(prev => ({
+          ...prev,
+          ...e.detail,
+          logoUrl: e.detail.logoUrl || prev.logoUrl
+        }));
+      }
+    };
+    window.addEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
+    return () => window.removeEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
   }, []);
 
   const fetchAgencySettings = async () => {
     try {
       const res = await apiClient.get('/api/agency/settings');
-      if (res.ok) {
+      const cType = res.headers.get('content-type') || '';
+      // Validar estrictamente que sea JSON del backend y no la plantilla HTML de Vite
+      if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
-        setAgencySettings(data);
-        setLocalItem(STORAGE_KEYS.AGENCY_SETTINGS, data);
+        if (data && typeof data === 'object') {
+          const storedLogo = localStorage.getItem('goglite_agency_logo');
+          const merged = {
+            ...data,
+            logoUrl: data.logoUrl || storedLogo || '/assets/goglite_logo.png'
+          };
+          setAgencySettings(merged);
+          setLocalItem(STORAGE_KEYS.AGENCY_SETTINGS, merged);
+        }
       }
     } catch {
       console.warn('[App] Usando configuración de agencia local persistida');
@@ -163,7 +201,8 @@ export default function App() {
   const fetchUsers = async () => {
     try {
       const res = await apiClient.get('/api/users');
-      if (res.ok) {
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           setUsersList(data);
@@ -178,7 +217,16 @@ export default function App() {
     try {
       setAgencySettings(newSettings);
       setLocalItem(STORAGE_KEYS.AGENCY_SETTINGS, newSettings);
-      await apiClient.post('/api/agency/settings', newSettings);
+      if (newSettings?.logoUrl) {
+        try {
+          localStorage.setItem('goglite_agency_logo', newSettings.logoUrl);
+        } catch (e) {
+          console.warn('[App] Error guardando logo en clave dedicada:', e);
+        }
+      }
+      try {
+        await apiClient.post('/api/agency/settings', newSettings);
+      } catch {}
     } catch (err) {
       console.warn('[App] Guardado de ajustes local:', err.message);
     }
