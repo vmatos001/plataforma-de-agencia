@@ -26,7 +26,8 @@ export default function UserProfileModal({
   currentUser,
   usersList = [],
   onSwitchUser,
-  onUpdateCurrentUser
+  onUpdateCurrentUser,
+  onLogout
 }) {
   const [activeTab, setActiveTab] = useState('perfil'); // 'perfil' | 'password' | '2fa' | 'roles'
   
@@ -621,10 +622,11 @@ export default function UserProfileModal({
             type="button"
             onClick={() => {
               if (window.confirm('¿Deseas cerrar la sesión activa?')) {
-                window.location.reload();
+                onClose();
+                if (onLogout) onLogout();
               }
             }}
-            className="flex items-center gap-1.5 text-xs text-rose-400 hover:text-rose-300 font-semibold px-2.5 py-1.5 rounded-lg hover:bg-rose-500/10 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-rose-400 hover:text-rose-300 font-semibold px-2.5 py-1.5 rounded-lg hover:bg-rose-500/10 transition-colors cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Cerrar Sesión</span>

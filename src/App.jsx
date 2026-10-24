@@ -16,7 +16,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Globe,
-  ShieldCheck
+  ShieldCheck,
+  LogOut
 } from 'lucide-react';
 import PresupuestosContratosModule from './components/PresupuestosContratosModule';
 import MotorSeoQaModule from './components/MotorSeoQaModule';
@@ -28,6 +29,8 @@ import PublicClientPortal from './components/PublicClientPortal';
 import AgencyWhiteLabelSettingsModal from './components/AgencyWhiteLabelSettingsModal';
 import UserProfileModal from './components/UserProfileModal';
 import ProspectorModule from './components/ProspectorModule';
+import LoginGatekeeper from './components/LoginGatekeeper';
+import { signOutUser } from './services/firebase';
 import { apiClient } from './services/apiClient';
 import {
   STORAGE_KEYS,
@@ -97,53 +100,60 @@ export default function App() {
   });
   const [showAgencySettingsModal, setShowAgencySettingsModal] = useState(false);
 
-  // Users & Role-Based Authentication State (RBAC)
+  // Users & Role-Based Authentication State (RBAC) - Solo Administrador Maestro Activo
+  const defaultMasterAdmin = {
+    id: 'user-admin-victor',
+    nombre: 'Víctor Matos',
+    email: 'sitesgoglite@gmail.com',
+    secondaryEmail: 'victor@goglite.com',
+    cargo: 'CEO & Director General',
+    rol: 'admin',
+    avatar: 'VM',
+    mfaActivo: true,
+    totpKeySecret: 'JBSWY3DPEHPK3PXP',
+    permisos: ['all']
+  };
+
   const [currentUser, setCurrentUser] = useState(() => {
-    return getLocalItem(STORAGE_KEYS.CURRENT_USER, {
-      id: 'user-admin-victor',
-      nombre: 'Víctor Matos',
-      email: 'victor@goglite.com',
-      cargo: 'CEO & Director General',
-      rol: 'admin',
-      avatar: 'VM',
-      mfaActivo: true,
-      permisos: ['all']
-    });
+    return getLocalItem(STORAGE_KEYS.CURRENT_USER, defaultMasterAdmin);
   });
 
-  const [usersList, setUsersList] = useState([
-    {
-      id: 'user-admin-victor',
-      nombre: 'Víctor Matos',
-      email: 'victor@goglite.com',
-      cargo: 'CEO & Director General',
-      rol: 'admin',
-      avatar: 'VM',
-      mfaActivo: true,
-      permisos: ['all']
-    },
-    {
-      id: 'user-colab-carlos',
-      nombre: 'Carlos Méndez',
-      email: 'carlos.dev@goglite.com',
-      cargo: 'Desarrollador Web Antigravity & QA',
-      rol: 'colaborador',
-      avatar: 'CM',
-      mfaActivo: false,
-      permisos: ['desarrollo_prd', 'seo_motor', 'headless_cms']
-    },
-    {
-      id: 'user-colab-sofia',
-      nombre: 'Sofía Valiente',
-      email: 'sofia.copy@goglite.com',
-      cargo: 'Estratega de Contenidos & StoryBrand',
-      rol: 'colaborador',
-      avatar: 'SV',
-      mfaActivo: false,
-      permisos: ['lead_scrapper', 'crm_portal', 'presupuestos', 'headless_cms']
-    }
-  ]);
+  const [usersList, setUsersList] = useState([defaultMasterAdmin]);
   const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Gatekeeper de Seguridad: Verificación de sesión con Google OAuth + MFA Authenticator
+  const [isAuthenticatedSession, setIsAuthenticatedSession] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = sessionStorage.getItem('goglite_auth_session');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.mfaVerified && (parsed?.email === 'sitesgoglite@gmail.com' || parsed?.email === 'victor@goglite.com' || parsed?.email)) {
+            return true;
+          }
+        }
+      }
+    } catch {}
+    return false;
+  });
+
+  const handleLoginSuccess = (user) => {
+    setCurrentUser(user);
+    setLocalItem(STORAGE_KEYS.CURRENT_USER, user);
+    setIsAuthenticatedSession(true);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOutUser();
+    } catch {}
+    try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('goglite_auth_session');
+      }
+    } catch {}
+    setIsAuthenticatedSession(false);
+  };
 
   // Sidebar Collapsed State
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -205,7 +215,9 @@ export default function App() {
       if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          setUsersList(data);
+          // Filtrar colaboradores de prueba y asegurar que Víctor Matos esté con sus datos correctos
+          const cleaned = data.filter(u => u.id !== 'user-colab-carlos' && u.id !== 'user-colab-sofia');
+          setUsersList(cleaned.length > 0 ? cleaned : [defaultMasterAdmin]);
         }
       }
     } catch {
@@ -327,6 +339,16 @@ export default function App() {
     );
   }
 
+  // Gatekeeper de Seguridad: Bloqueo de Acceso hasta validar Google OAuth + MFA Authenticator
+  if (!isAuthenticatedSession) {
+    return (
+      <LoginGatekeeper
+        usersList={usersList}
+        onLoginSuccess={handleLoginSuccess}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#080b11] text-slate-100 flex flex-col selection:bg-orange-600 selection:text-white">
       {/* 1. TOP NAVIGATION BAR */}
@@ -382,7 +404,7 @@ export default function App() {
           {/* User Profile & Security */}
           <button
             onClick={() => setShowAuthModal(true)}
-            className="flex items-center gap-2 pl-2 border-l border-slate-800 hover:opacity-90 transition-opacity text-left"
+            className="flex items-center gap-2 pl-2 border-l border-slate-800 hover:opacity-90 transition-opacity text-left cursor-pointer"
             title="Mi Perfil, Contraseña & Google Authenticator 2FA"
           >
             <div className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-bold ${
@@ -402,9 +424,19 @@ export default function App() {
                 </span>
               </div>
               <div className="text-[10px] text-slate-500 leading-tight">
-                {currentUser.cargo || 'Admin · Goglite'}
+                {currentUser.email || 'sitesgoglite@gmail.com'}
               </div>
             </div>
+          </button>
+
+          {/* Botón Cerrar Sesión */}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="p-1.5 rounded-lg bg-[#101522] hover:bg-rose-500/15 border border-slate-800 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+            title="Cerrar Sesión Segura"
+          >
+            <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
       </header>
@@ -754,6 +786,7 @@ export default function App() {
         usersList={usersList}
         onSwitchUser={handleSwitchUser}
         onUpdateCurrentUser={handleUpdateCurrentUser}
+        onLogout={handleLogout}
       />
     </div>
   );

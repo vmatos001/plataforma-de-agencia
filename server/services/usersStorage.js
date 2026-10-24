@@ -10,41 +10,16 @@ const defaultUsers = [
   {
     id: 'user-admin-victor',
     nombre: 'Víctor Matos',
-    email: 'victor@goglite.com',
+    email: 'sitesgoglite@gmail.com',
+    secondaryEmail: 'victor@goglite.com',
     cargo: 'CEO & Director General',
     rol: 'admin', // 'admin' | 'colaborador' | 'cliente'
     avatar: 'VM',
     authProvider: 'google_authenticator', // 'google' | 'google_authenticator' | 'password'
     mfaActivo: true,
-    totpKeySecret: 'JBSWY3DPEHPK3PXP', // Simulación estándar RFC 6238 TOTP
+    totpKeySecret: 'JBSWY3DPEHPK3PXP', // Estándar RFC 6238 TOTP
     permisos: ['all'],
     creadoEn: '2026-10-01T00:00:00Z',
-    ultimoAcceso: new Date().toISOString()
-  },
-  {
-    id: 'user-colab-carlos',
-    nombre: 'Carlos Méndez',
-    email: 'carlos.dev@goglite.com',
-    cargo: 'Desarrollador Web Antigravity & QA',
-    rol: 'colaborador',
-    avatar: 'CM',
-    authProvider: 'google',
-    mfaActivo: false,
-    permisos: ['desarrollo_prd', 'seo_motor', 'headless_cms'],
-    creadoEn: '2026-10-05T00:00:00Z',
-    ultimoAcceso: new Date().toISOString()
-  },
-  {
-    id: 'user-colab-sofia',
-    nombre: 'Sofía Valiente',
-    email: 'sofia.copy@goglite.com',
-    cargo: 'Estratega de Contenidos & StoryBrand',
-    rol: 'colaborador',
-    avatar: 'SV',
-    authProvider: 'google',
-    mfaActivo: false,
-    permisos: ['lead_scrapper', 'crm_portal', 'presupuestos', 'headless_cms'],
-    creadoEn: '2026-10-08T00:00:00Z',
     ultimoAcceso: new Date().toISOString()
   }
 ];

@@ -108,4 +108,31 @@ export async function connectGoogleSiteKitAccount() {
   }
 }
 
-export default { app, db, auth, ensureAuth, saveCmsSiteToFirestore, getCmsSiteFromFirestore, connectGoogleBusinessAccount, connectGoogleSiteKitAccount };
+/**
+ * Inicia sesión oficial del Administrador o Colaborador con cuenta de Google
+ */
+export async function signInWithGoogle() {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  return signInWithPopup(auth, provider);
+}
+
+/**
+ * Cierra la sesión activa en Firebase Auth
+ */
+export async function signOutUser() {
+  return auth.signOut();
+}
+
+export default { 
+  app, 
+  db, 
+  auth, 
+  ensureAuth, 
+  signInWithGoogle, 
+  signOutUser, 
+  saveCmsSiteToFirestore, 
+  getCmsSiteFromFirestore, 
+  connectGoogleBusinessAccount, 
+  connectGoogleSiteKitAccount 
+};
