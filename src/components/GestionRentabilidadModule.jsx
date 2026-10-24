@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Download,
+  ExternalLink,
   Building2,
   Users,
   Search,
@@ -248,6 +249,61 @@ const INITIAL_SEED_STATE = {
 };
 
 /**
+ * Normaliza y calibra matemáticamente los ítems de una factura para garantizar 100% de coherencia
+ */
+export function normalizeFacturaItems(fac) {
+  if (!fac) return fac;
+  const total = Number(fac.total) || Number(fac.subtotal) || 1500;
+  let items = Array.isArray(fac.items) && fac.items.length > 0 ? fac.items : [];
+  
+  if (items.length === 0) {
+    items = [{
+      id: 'item-1',
+      descripcion: fac.concepto || 'Servicio Profesional de Desarrollo Digital & GEO IA',
+      cantidad: 1,
+      precioUnitario: total,
+      total: total
+    }];
+  } else {
+    // Si los precios no cuadran exactamente con el total facturado, recalibrar proporcionalmente
+    const currentSum = items.reduce((acc, it) => acc + (Number(it.total) || (Number(it.precioUnitario) * (Number(it.cantidad) || 1)) || 0), 0);
+    if (Math.abs(currentSum - total) > 1 && currentSum > 0) {
+      let acc = 0;
+      items = items.map((it, idx) => {
+        const isLast = idx === items.length - 1;
+        const currentItemTotal = Number(it.total) || (Number(it.precioUnitario) * (Number(it.cantidad) || 1)) || 1;
+        let newPrice = Math.round((currentItemTotal / currentSum) * total);
+        if (isLast) {
+          newPrice = total - acc;
+        } else {
+          acc += newPrice;
+        }
+        return {
+          ...it,
+          cantidad: Number(it.cantidad) || 1,
+          precioUnitario: newPrice,
+          total: newPrice
+        };
+      });
+    }
+  }
+
+  const montoCobrado = Number(fac.montoCobrado) || 0;
+  const saldoPendiente = Math.max(0, total - montoCobrado);
+  const estado = montoCobrado >= total ? 'cobrada' : montoCobrado > 0 ? 'parcial' : 'pendiente';
+
+  return {
+    ...fac,
+    subtotal: total,
+    total,
+    items,
+    montoCobrado,
+    saldoPendiente,
+    estado
+  };
+}
+
+/**
  * Validador de pertenencia de una fecha a un período contable
  */
 export function isDateInPeriod(dateStr, period) {
@@ -317,7 +373,7 @@ export function getPeriodLabel(period) {
  * Cálculo dinámico de KPIs de P&L filtrados por período y mercado
  */
 export function computeKpiMetrics(rawState, period = 'este_mes', market = 'ALL') {
-  const allFacturas = Array.isArray(rawState?.facturas) ? rawState.facturas : [];
+  const allFacturas = (Array.isArray(rawState?.facturas) ? rawState.facturas : []).map(normalizeFacturaItems);
   const allGastos = Array.isArray(rawState?.gastos) ? rawState.gastos : [];
   const allTimeEntries = Array.isArray(rawState?.timeEntries) ? rawState.timeEntries : [];
   const configuracion = {
@@ -384,7 +440,7 @@ export function computeKpiMetrics(rawState, period = 'este_mes', market = 'ALL')
  * Calcula KPIs P&L, Unit Economics por proyecto y Alertas de Dilución Horaria en 0ms.
  */
 function computeFinanzasSummary(rawState) {
-  const facturas = Array.isArray(rawState?.facturas) ? rawState.facturas : [];
+  const facturas = (Array.isArray(rawState?.facturas) ? rawState.facturas : []).map(normalizeFacturaItems);
   const gastos = Array.isArray(rawState?.gastos) ? rawState.gastos : [];
   const timeEntries = Array.isArray(rawState?.timeEntries) ? rawState.timeEntries : [];
   const configuracion = {
@@ -521,21 +577,37 @@ function buildInvoiceFromPresupuesto(prop, existingCount = 0, configuracion = DE
     : 0;
   const horasInvertidasEstimadas = modulosHoras > 0 ? modulosHoras : Math.max(5, Math.round(subtotal / 50));
 
-  const items = Array.isArray(prop.modulos) && prop.modulos.length > 0
-    ? prop.modulos.map(m => ({
-        descripcion: `${m.numero ? m.numero + ': ' : ''}${m.titulo}`,
+  let items = [];
+  if (Array.isArray(prop.modulos) && prop.modulos.length > 0) {
+    const rawTotal = prop.modulos.reduce((acc, m) => acc + (Number(m.precio) || 1), 0);
+    let acumulado = 0;
+    items = prop.modulos.map((m, idx) => {
+      const isLast = idx === prop.modulos.length - 1;
+      let unitPrice = Math.round(((Number(m.precio) || 1) / (rawTotal || 1)) * subtotal);
+      if (isLast) {
+        unitPrice = subtotal - acumulado;
+      } else {
+        acumulado += unitPrice;
+      }
+      return {
+        id: `item-${idx + 1}`,
+        descripcion: `${m.numero ? m.numero + ': ' : ''}${m.titulo || 'Entregable del Proyecto'}`,
         cantidad: 1,
-        precioUnitario: Number(m.precio) || Math.round(subtotal / prop.modulos.length),
-        total: Number(m.precio) || Math.round(subtotal / prop.modulos.length)
-      }))
-    : [
-        {
-          descripcion: prop.titulo || 'Desarrollo de Sistema Digital Web & Posicionamiento IA',
-          cantidad: 1,
-          precioUnitario: subtotal,
-          total: subtotal
-        }
-      ];
+        precioUnitario: unitPrice,
+        total: unitPrice
+      };
+    });
+  } else {
+    items = [
+      {
+        id: 'item-1',
+        descripcion: prop.titulo || 'Desarrollo de Sistema Digital Web & Posicionamiento IA',
+        cantidad: 1,
+        precioUnitario: subtotal,
+        total: subtotal
+      }
+    ];
+  }
 
   const today = new Date().toISOString().split('T')[0];
   const due = new Date(Date.now() + (Number(prop.vigenciaDias) || 15) * 86400000).toISOString().split('T')[0];
@@ -586,7 +658,7 @@ function buildInvoiceFromPresupuesto(prop, existingCount = 0, configuracion = DE
  * Generador de Factura Comercial HTML/PDF Autosuficiente (Skill: automated-html-invoice)
  * Sigue estrictamente la paleta corporativa (#FF6B00, #1A1A1A, #FAFAFA)
  */
-function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFIGURACION) {
+export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFIGURACION) {
   const emisor = configuracion?.emisor || DEFAULT_CONFIGURACION.emisor;
   const pais = invoice.cliente?.pais || 'SV';
   const cuentas = normalizeCuentasBancarias(configuracion?.cuentasBancarias);
@@ -776,6 +848,176 @@ function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFIGURACIO
 </html>`;
 }
 
+/**
+ * Componente A4 de Factura Corporativa Oficial (Goglite Studio)
+ * Reutilizable en Split-View, Modal y Portal del Cliente con 0 discrepancias visuales.
+ */
+export function CorporateInvoiceDocument({ invoice, configuracion = DEFAULT_CONFIGURACION }) {
+  if (!invoice) return null;
+  const emisor = configuracion?.emisor || DEFAULT_CONFIGURACION.emisor;
+  const cuentas = normalizeCuentasBancarias(configuracion?.cuentasBancarias);
+  const p = invoice.cliente?.pais || 'SV';
+  let activeAcc = null;
+  if (invoice.cuentaBancariaId) {
+    activeAcc = cuentas.find(c => c.id === invoice.cuentaBancariaId);
+  }
+  if (!activeAcc && invoice.metodoPago) {
+    activeAcc = cuentas.find(c => c.banco?.toLowerCase().includes(invoice.metodoPago.toLowerCase()) || invoice.metodoPago.toLowerCase().includes(c.banco?.toLowerCase()));
+  }
+  if (!activeAcc) {
+    activeAcc = cuentas.find(c => c.pais === p && c.activa && c.predeterminada)
+      || cuentas.find(c => c.pais === p && c.activa)
+      || cuentas.find(c => c.activa)
+      || cuentas[0];
+  }
+  const uglyCashAcc = cuentas.find(c => (c.pais === 'US' || c.banco?.toLowerCase().includes('uglycash')) && c.activa);
+  const extraAccounts = cuentas.filter(c => c.pais === p && c.activa && c.id !== activeAcc?.id);
+
+  return (
+    <div className="bg-white p-6 sm:p-8 rounded-xl border border-[#EBEBEB] shadow-sm space-y-6 text-[#1A1A1A] font-sans">
+      {/* 1. Header de Factura */}
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-4 pb-5 border-b-2 border-[#1A1A1A]">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-[#FF6B00] flex items-center justify-center font-black text-white text-xl shadow-sm">
+            G
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-[#1A1A1A] tracking-tight">
+              GOG<span className="text-[#FF6B00]">LITE</span>
+            </h1>
+            <p className="text-[11px] text-[#555555] font-medium">{emisor?.subtitulo || 'Estudio de Ingeniería Web & Software'}</p>
+            <p className="text-[10px] text-[#555555]">{emisor?.ubicacion || 'San Salvador (SV) · Santo Domingo (DO)'}</p>
+          </div>
+        </div>
+
+        <div className="sm:text-right">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-[#888888] font-bold">
+            FACTURA COMERCIAL / PROFORMA
+          </div>
+          <div className="text-xl font-mono font-black text-[#FF6B00]">{invoice.numeroFactura}</div>
+          <div className="text-[11px] text-[#555555] mt-0.5">
+            Emisión: <strong>{invoice.fechaEmision}</strong> · Vence: <strong>{invoice.fechaVencimiento}</strong>
+          </div>
+          <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+            invoice.estado === 'cobrada'
+              ? 'bg-emerald-100 text-emerald-800'
+              : invoice.estado === 'parcial'
+              ? 'bg-sky-100 text-sky-800'
+              : 'bg-[#FFF0E6] text-[#FF6B00]'
+          }`}>
+            {invoice.estado === 'cobrada'
+              ? 'PAGADA 100%'
+              : invoice.estado === 'parcial'
+              ? 'ANTICIPO COBRADO (50%)'
+              : 'PENDIENTE DE PAGO'}
+          </span>
+        </div>
+      </div>
+
+      {/* 2. Bloque Bilateral (De / Para) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+        <div className="p-3.5 rounded-xl bg-[#FAFAFA] border border-[#EEEEEE]">
+          <span className="font-extrabold text-[#FF6B00] uppercase tracking-wider text-[10px] block mb-1">
+            DE (EMISOR):
+          </span>
+          <div className="font-extrabold text-xs text-[#1A1A1A]">{emisor?.empresa || 'Goglite Studio'}</div>
+          <div className="text-[#555555] text-[11px] mt-0.5">{emisor?.identificacion}</div>
+          <div className="text-[#555555] text-[11px]">{emisor?.email}</div>
+          <div className="text-[#555555] text-[11px]">{emisor?.telefono}</div>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-[#FAFAFA] border border-[#EEEEEE]">
+          <span className="font-extrabold text-[#FF6B00] uppercase tracking-wider text-[10px] block mb-1">
+            PARA (CLIENTE):
+          </span>
+          <div className="font-extrabold text-xs text-[#1A1A1A]">{invoice.cliente?.empresa}</div>
+          <div className="text-[#555555] text-[11px] mt-0.5">Atención: {invoice.cliente?.contacto}</div>
+          <div className="text-[#555555] text-[11px]">{invoice.cliente?.email} · {invoice.cliente?.telefono}</div>
+          <div className="font-semibold text-[#1A1A1A] text-[11px] mt-0.5">
+            {invoice.cliente?.pais === 'DO' ? '🇩🇴 República Dominicana' : '🇸🇻 El Salvador'}
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Tabla de Servicios con cabecera #1A1A1A */}
+      <div className="border border-[#EEEEEE] rounded-xl overflow-hidden">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-[#1A1A1A] text-white font-bold uppercase text-[10px]">
+            <tr>
+              <th className="py-2.5 px-3.5">Descripción del Servicio / Entregable</th>
+              <th className="py-2.5 px-3.5 text-center">Cant.</th>
+              <th className="py-2.5 px-3.5 text-right">Precio Unitario</th>
+              <th className="py-2.5 px-3.5 text-right">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#EEEEEE] text-[#1A1A1A]">
+            {invoice.items?.map((item, idx) => (
+              <tr key={item.id || idx} className={idx % 2 === 1 ? 'bg-[#FAFAFA]' : 'bg-white'}>
+                <td className="py-2.5 px-3.5 font-medium text-xs leading-relaxed">{item.descripcion}</td>
+                <td className="py-2.5 px-3.5 text-center font-mono text-xs">{item.cantidad}</td>
+                <td className="py-2.5 px-3.5 text-right font-mono text-xs">${Number(item.precioUnitario).toLocaleString()} USD</td>
+                <td className="py-2.5 px-3.5 text-right font-mono font-bold text-xs">${Number(item.total).toLocaleString()} USD</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 4. Caja de Totales */}
+      <div className="flex justify-end">
+        <div className="w-72 bg-[#FAFAFA] p-3.5 rounded-xl border border-[#EEEEEE] space-y-1.5 text-xs">
+          <div className="flex justify-between text-[#555555]">
+            <span>Subtotal Neto:</span>
+            <span className="font-mono font-bold text-[#1A1A1A]">${Number(invoice.subtotal || invoice.total).toLocaleString()} USD</span>
+          </div>
+          {Number(invoice.impuestoPorcentaje) > 0 && (
+            <div className="flex justify-between text-[#555555]">
+              <span>Impuestos ({invoice.impuestoPorcentaje}%):</span>
+              <span className="font-mono">${Number(invoice.impuestoTotal || 0).toLocaleString()} USD</span>
+            </div>
+          )}
+          <div className="flex justify-between text-[#1A1A1A] font-black text-sm pt-2 border-t-2 border-[#1A1A1A]">
+            <span>Total Facturado:</span>
+            <span className="font-mono text-[#FF6B00]">${Number(invoice.total).toLocaleString()} USD</span>
+          </div>
+          <div className="flex justify-between text-emerald-700 font-bold pt-1">
+            <span>Monto Cobrado / Anticipo:</span>
+            <span className="font-mono">${Number(invoice.montoCobrado || 0).toLocaleString()} USD</span>
+          </div>
+          <div className="flex justify-between text-amber-700 font-bold pt-1 border-t border-[#E5E7EB]">
+            <span>Saldo Pendiente:</span>
+            <span className="font-mono">${Math.max(0, Number(invoice.total) - Number(invoice.montoCobrado || 0)).toLocaleString()} USD</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. Caja de Confirmación del Sistema & Datos Bancarios */}
+      <div className="bg-[#FAFAFA] border-l-4 border-[#FF6B00] p-3.5 rounded-r-lg text-xs text-[#444444] space-y-1.5">
+        <div className="font-extrabold text-[#1A1A1A] flex items-center justify-between">
+          <span className="text-[11px]">CONFIRMACIÓN DEL SISTEMA & INSTRUCCIONES BANCARIAS:</span>
+          <span className="text-[10px] px-2 py-0.5 rounded bg-orange-100 text-[#FF6B00] font-mono font-bold">
+            {activeAcc?.moneda || 'USD'}
+          </span>
+        </div>
+        <div className="text-[11px]">
+          • <strong>Método Principal:</strong> {activeAcc?.banco} ({activeAcc?.tipo}) — <span className="font-mono font-bold text-[#1A1A1A]">{activeAcc?.numero}</span> ({activeAcc?.titular})
+          {activeAcc?.instrucciones && <span className="block text-[#666666] text-[10px] mt-0.5">• Instrucciones: {activeAcc.instrucciones}</span>}
+        </div>
+        {(p === 'US' || uglyCashAcc) && uglyCashAcc?.id !== activeAcc?.id && (
+          <div className="mt-1 p-2 rounded bg-orange-50 border-l-2 border-[#FF6B00] text-[11px] text-orange-950">
+            ⚡ <strong>Clientes en Estados Unidos (Remesa Instantánea):</strong> Transfiere sin comisiones mediante la app <strong>uglyCash</strong> al tag <span className="font-mono font-bold text-[#FF6B00]">{uglyCashAcc.numero}</span> ({uglyCashAcc.titular}).
+          </div>
+        )}
+        {extraAccounts.length > 0 && (
+          <div className="text-[10.5px] text-[#666666]">
+            • <strong>Cuentas Adicionales:</strong> {extraAccounts.map(ca => `${ca.banco}: ${ca.numero}`).join(' · ')}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function GestionRentabilidadModule({
   selectedCountry = 'SV',
   presupuestoToBill,
@@ -791,7 +1033,7 @@ export default function GestionRentabilidadModule({
           const parsed = JSON.parse(saved);
           if (parsed && typeof parsed === 'object') {
             return {
-              facturas: Array.isArray(parsed.facturas) ? parsed.facturas : [],
+              facturas: Array.isArray(parsed.facturas) ? parsed.facturas.map(normalizeFacturaItems) : [],
               gastos: Array.isArray(parsed.gastos) ? parsed.gastos : [],
               timeEntries: Array.isArray(parsed.timeEntries) ? parsed.timeEntries : [],
               configuracion: {
@@ -848,6 +1090,7 @@ export default function GestionRentabilidadModule({
   // Invoice view / print modal
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [customPaymentAmount, setCustomPaymentAmount] = useState('');
+  const [isInvoiceFullscreenModalOpen, setIsInvoiceFullscreenModalOpen] = useState(false);
 
   // New Invoice Modal
   const [newInvoiceModalOpen, setNewInvoiceModalOpen] = useState(false);
@@ -1403,6 +1646,245 @@ export default function GestionRentabilidadModule({
       await fetch(getBackendEndpoint(`/api/finanzas/facturas/${facturaId}`), { method: 'DELETE' });
     } catch {}
   };
+
+  // Sincronizar factura con el proyecto del cliente en goglite_proyectos (Habilita el acceso en el portal del cliente)
+  const syncInvoiceWithClientProject = (invoice) => {
+    if (typeof window === 'undefined' || !invoice) return;
+    try {
+      const rawProjs = localStorage.getItem('goglite_proyectos');
+      if (rawProjs) {
+        const projs = JSON.parse(rawProjs);
+        if (Array.isArray(projs)) {
+          let modified = false;
+          const isAnticipoApproved = Number(invoice.montoCobrado) >= (Number(invoice.total) * 0.45);
+          const isLiquidated = Number(invoice.montoCobrado) >= Number(invoice.total);
+          const nowStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+
+          const updatedProjs = projs.map(p => {
+            const match = 
+              (invoice.presupuestoId && (p.presupuestoId === invoice.presupuestoId || p.id === invoice.presupuestoId)) ||
+              (invoice.codigoPresupuesto && (p.presupuestoCodigo === invoice.codigoPresupuesto || p.codigo === invoice.codigoPresupuesto)) ||
+              (invoice.cliente?.empresa && p.cliente?.empresa && invoice.cliente.empresa.toLowerCase().trim() === p.cliente.empresa.toLowerCase().trim());
+
+            if (match) {
+              modified = true;
+              const curPagos = p.pagos || {};
+              return {
+                ...p,
+                anticipoPagado: isAnticipoApproved || p.anticipoPagado,
+                saldoPagado: isLiquidated || p.saldoPagado,
+                facturaNumero: invoice.numeroFactura,
+                facturaId: invoice.id,
+                pagos: {
+                  ...curPagos,
+                  anticipoMonto: Math.round(Number(invoice.total) * 0.5),
+                  anticipoEstado: isAnticipoApproved ? 'confirmado' : (curPagos.anticipoEstado || 'pendiente'),
+                  anticipoFecha: isAnticipoApproved ? (curPagos.anticipoFecha || nowStr) : curPagos.anticipoFecha,
+                  saldoMonto: Math.max(0, Number(invoice.total) - Math.round(Number(invoice.total) * 0.5)),
+                  saldoEstado: isLiquidated ? 'confirmado' : (curPagos.saldoEstado || 'pendiente'),
+                  saldoFecha: isLiquidated ? (curPagos.saldoFecha || nowStr) : curPagos.saldoFecha,
+                  facturaEmitida: true,
+                  facturaNumero: invoice.numeroFactura,
+                  facturaUrlHabilitada: true
+                }
+              };
+            }
+            return p;
+          });
+
+          if (modified) {
+            localStorage.setItem('goglite_proyectos', JSON.stringify(updatedProjs));
+            window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: updatedProjs } }));
+          }
+        }
+      }
+
+      window.dispatchEvent(new CustomEvent('goglite_facturas_updated', { detail: { factura: invoice } }));
+    } catch (e) {
+      console.warn('[Sync] Error syncing invoice with project:', e);
+    }
+  };
+
+  // Seleccionar factura para vista previa y editor en vivo
+  const handleSelectInvoice = (fac) => {
+    if (!fac) return;
+    const normalized = normalizeFacturaItems(fac);
+    setSelectedInvoice(normalized);
+    setCustomPaymentAmount(String(normalized.montoCobrado || 0));
+  };
+
+  // Modificar campo de cabecera de la factura activa
+  const handleUpdateActiveInvoiceField = (field, value) => {
+    setSelectedInvoice(prev => {
+      if (!prev) return prev;
+      return { ...prev, [field]: value };
+    });
+  };
+
+  // Modificar ítem/entregable específico de la factura activa y recalcular totales en 0ms
+  const handleUpdateActiveInvoiceItem = (idx, key, val) => {
+    setSelectedInvoice(prev => {
+      if (!prev) return prev;
+      const nextItems = [...(prev.items || [])];
+      const target = { ...nextItems[idx] };
+      if (key === 'cantidad' || key === 'precioUnitario') {
+        const num = Math.max(0, Number(val) || 0);
+        target[key] = num;
+        target.total = Math.round((Number(target.cantidad) || 1) * (Number(target.precioUnitario) || 0));
+      } else {
+        target[key] = val;
+      }
+      nextItems[idx] = target;
+
+      const subtotal = nextItems.reduce((acc, it) => acc + (Number(it.total) || 0), 0);
+      const taxPct = Number(prev.impuestoPorcentaje) || 0;
+      const impuestoTotal = Math.round(subtotal * (taxPct / 100) * 100) / 100;
+      const total = Math.round((subtotal + impuestoTotal) * 100) / 100;
+      const cobrado = Number(prev.montoCobrado) || 0;
+      const saldo = Math.max(0, total - cobrado);
+      const estado = cobrado >= total ? 'cobrada' : cobrado > 0 ? 'parcial' : 'pendiente';
+
+      return {
+        ...prev,
+        items: nextItems,
+        subtotal,
+        impuestoTotal,
+        total,
+        saldoPendiente: saldo,
+        estado
+      };
+    });
+  };
+
+  // Agregar nuevo entregable a la factura activa
+  const handleAddNewItemToActiveInvoice = () => {
+    setSelectedInvoice(prev => {
+      if (!prev) return prev;
+      const nextItems = [
+        ...(prev.items || []),
+        {
+          id: `item-${Date.now()}`,
+          descripcion: 'Nuevo entregable o requerimiento acordado',
+          cantidad: 1,
+          precioUnitario: 250,
+          total: 250
+        }
+      ];
+      const subtotal = nextItems.reduce((acc, it) => acc + (Number(it.total) || 0), 0);
+      const taxPct = Number(prev.impuestoPorcentaje) || 0;
+      const impuestoTotal = Math.round(subtotal * (taxPct / 100) * 100) / 100;
+      const total = Math.round((subtotal + impuestoTotal) * 100) / 100;
+      const cobrado = Number(prev.montoCobrado) || 0;
+      const saldo = Math.max(0, total - cobrado);
+      const estado = cobrado >= total ? 'cobrada' : cobrado > 0 ? 'parcial' : 'pendiente';
+
+      return {
+        ...prev,
+        items: nextItems,
+        subtotal,
+        impuestoTotal,
+        total,
+        saldoPendiente: saldo,
+        estado
+      };
+    });
+  };
+
+  // Eliminar ítem de la factura activa
+  const handleDeleteItemFromActiveInvoice = (idx) => {
+    setSelectedInvoice(prev => {
+      if (!prev) return prev;
+      if ((prev.items || []).length <= 1) {
+        showToast('La factura debe tener al menos un entregable.');
+        return prev;
+      }
+      const nextItems = prev.items.filter((_, i) => i !== idx);
+      const subtotal = nextItems.reduce((acc, it) => acc + (Number(it.total) || 0), 0);
+      const taxPct = Number(prev.impuestoPorcentaje) || 0;
+      const impuestoTotal = Math.round(subtotal * (taxPct / 100) * 100) / 100;
+      const total = Math.round((subtotal + impuestoTotal) * 100) / 100;
+      const cobrado = Number(prev.montoCobrado) || 0;
+      const saldo = Math.max(0, total - cobrado);
+      const estado = cobrado >= total ? 'cobrada' : cobrado > 0 ? 'parcial' : 'pendiente';
+
+      return {
+        ...prev,
+        items: nextItems,
+        subtotal,
+        impuestoTotal,
+        total,
+        saldoPendiente: saldo,
+        estado
+      };
+    });
+  };
+
+  // Guardar factura activa y sincronizar con proyecto y portal
+  const handleSaveActiveInvoice = async () => {
+    if (!selectedInvoice) return;
+    const toSave = { ...selectedInvoice };
+    setFinanzasState(prev => {
+      const nextFacturas = (prev.facturas || []).map(f => f.id === toSave.id ? toSave : f);
+      return { ...prev, facturas: nextFacturas };
+    });
+
+    syncInvoiceWithClientProject(toSave);
+    showToast(`✓ Factura ${toSave.numeroFactura} guardada y sincronizada.`);
+
+    try {
+      await fetch(getBackendEndpoint(`/api/finanzas/facturas/${toSave.id}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(toSave)
+      });
+    } catch {}
+  };
+
+  // Aprobación rápida de depósito (50% anticipo o 100% liquidación)
+  const handleQuickApprovePayment = (tipo = 'anticipo') => {
+    if (!selectedInvoice) return;
+    const total = Number(selectedInvoice.total) || 0;
+    const newMonto = tipo === '100' || tipo === 'liquidacion' ? total : Math.round(total * 0.5);
+    const newSaldo = Math.max(0, total - newMonto);
+    const newEstado = newMonto >= total ? 'cobrada' : newMonto > 0 ? 'parcial' : 'pendiente';
+
+    const updated = {
+      ...selectedInvoice,
+      montoCobrado: newMonto,
+      saldoPendiente: newSaldo,
+      estado: newEstado
+    };
+
+    setSelectedInvoice(updated);
+    setCustomPaymentAmount(String(newMonto));
+
+    setFinanzasState(prev => {
+      const list = (prev.facturas || []).map(f => f.id === updated.id ? updated : f);
+      return { ...prev, facturas: list };
+    });
+
+    syncInvoiceWithClientProject(updated);
+
+    const msg = (tipo === '100' || tipo === 'liquidacion')
+      ? `✓ Factura ${updated.numeroFactura} liquidada al 100% ($${newMonto} USD). Cliente habilitado completamente.`
+      : `✓ Anticipo del 50% ($${newMonto} USD) aprobado con éxito. Factura oficial habilitada en el portal del cliente.`;
+    showToast(msg);
+
+    try {
+      fetch(getBackendEndpoint(`/api/finanzas/facturas/${updated.id}`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ montoCobrado: newMonto, estado: newEstado })
+      }).catch(() => {});
+    } catch {}
+  };
+
+  // Auto-seleccionar la primera factura al entrar a la pestaña Facturas si ninguna está seleccionada
+  useEffect(() => {
+    if (activeTab === 'facturas' && !selectedInvoice && filteredFacturas.length > 0) {
+      handleSelectInvoice(filteredFacturas[0]);
+    }
+  }, [activeTab, selectedInvoice, filteredFacturas]);
 
   // Create Invoice (Local-First + Backend Sync)
   const handleCreateInvoice = async (e) => {
@@ -2498,8 +2980,8 @@ export default function GestionRentabilidadModule({
                           onClick={() => {
                             const found = facturas.find(f => f.id === p.facturaId);
                             if (found) {
-                              setSelectedInvoice(found);
-                              setCustomPaymentAmount(String(found.montoCobrado || 0));
+                              handleSelectInvoice(found);
+                              setActiveTab('facturas');
                             }
                           }}
                           className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
@@ -2626,114 +3108,382 @@ export default function GestionRentabilidadModule({
             </div>
           </div>
 
-          <div className="bg-[#0c1017] border border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
-          <div className="p-3 bg-[#101522] border-b border-slate-800 text-xs font-bold text-slate-200 flex items-center justify-between">
-            <span>Listado de Facturas Comerciales, Proformas & Cobros (50% / 50%)</span>
-            <span className="text-[11px] font-mono text-slate-400">{filteredFacturas.length} registradas</span>
-          </div>
+          {/* Split-View: Historial y Editor a la Izquierda + Live Preview A4 a la Derecha */}
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            
+            {/* COLUMNA IZQUIERDA (5 cols): Historial por Cuenta y Editor Interactivo */}
+            <div className="xl:col-span-5 space-y-4">
+              
+              {/* 1. Historial de Facturas por Cuenta */}
+              <div className="bg-[#0c1017] border border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
+                <div className="p-3 bg-[#101522] border-b border-slate-800 flex items-center justify-between text-xs font-bold text-slate-200">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Historial de Facturas por Cuenta</span>
+                  </div>
+                  <span className="text-[11px] font-mono text-slate-400">{filteredFacturas.length} registradas</span>
+                </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-[#0d121c] border-b border-slate-800 text-[11px] font-mono uppercase text-slate-400">
-                <tr>
-                  <th className="p-3">Nº Factura</th>
-                  <th className="p-3">Cliente & Concepto</th>
-                  <th className="p-3">Fechas</th>
-                  <th className="p-3 text-right">Total USD</th>
-                  <th className="p-3 text-right">Cobrado</th>
-                  <th className="p-3 text-right">Saldo</th>
-                  <th className="p-3 text-center">Estado</th>
-                  <th className="p-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 font-sans">
-                {filteredFacturas.map(fac => (
-                  <tr key={fac.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="p-3 font-mono">
-                      <div className="font-bold text-orange-400">{fac.numeroFactura}</div>
-                      <div className="text-[10px] text-slate-500">{fac.origenModulo || 'Directa'}</div>
-                    </td>
-                    <td className="p-3">
-                      <div className="font-semibold text-white">{fac.cliente?.empresa}</div>
-                      <div className="text-[11px] text-slate-500 truncate max-w-xs">{fac.concepto}</div>
-                    </td>
-                    <td className="p-3 font-mono text-[11px] text-slate-400">
-                      <div>Emisión: {fac.fechaEmision}</div>
-                      <div className="text-slate-500">Vence: {fac.fechaVencimiento}</div>
-                    </td>
-                    <td className="p-3 text-right font-mono font-bold text-white">
-                      ${Number(fac.total).toLocaleString()}
-                    </td>
-                    <td className="p-3 text-right font-mono text-emerald-400 font-semibold">
-                      ${Number(fac.montoCobrado).toLocaleString()}
-                    </td>
-                    <td className="p-3 text-right font-mono text-amber-400">
-                      ${Math.max(0, Number(fac.total) - Number(fac.montoCobrado)).toLocaleString()}
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold uppercase ${
-                        fac.estado === 'cobrada' ? 'bg-emerald-500/20 text-emerald-400' :
-                        fac.estado === 'parcial' ? 'bg-sky-500/20 text-sky-400' :
+                <div className="max-h-72 overflow-y-auto divide-y divide-slate-800/60 font-sans p-2 space-y-1.5">
+                  {filteredFacturas.map(fac => {
+                    const isSelected = (selectedInvoice?.id === fac.id);
+                    return (
+                      <div
+                        key={fac.id}
+                        onClick={() => handleSelectInvoice(fac)}
+                        className={`p-3 rounded-lg cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-orange-500/10 border border-orange-500/50 shadow-sm ring-1 ring-orange-500/30'
+                            : 'bg-[#0f1422] border border-slate-800/80 hover:border-slate-700 hover:bg-slate-800/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-xs text-orange-400">{fac.numeroFactura}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
+                              {fac.origenModulo || 'Directa'}
+                            </span>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded-full font-mono text-[9px] font-bold uppercase ${
+                            fac.estado === 'cobrada' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                            fac.estado === 'parcial' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' :
+                            'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          }`}>
+                            {fac.estado === 'cobrada' ? 'Cobrada 100%' : fac.estado === 'parcial' ? 'Anticipo 50%' : 'Pendiente'}
+                          </span>
+                        </div>
+
+                        <div className="mt-1.5 flex items-baseline justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-xs text-white truncate">{fac.cliente?.empresa || 'Cliente Comercial'}</div>
+                            <div className="text-[11px] text-slate-400 truncate max-w-xs">{fac.concepto}</div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="font-mono font-bold text-xs text-white">${Number(fac.total).toLocaleString()} USD</div>
+                            <div className="text-[10px] font-mono text-emerald-400">Cobrado: ${Number(fac.montoCobrado || 0).toLocaleString()}</div>
+                          </div>
+                        </div>
+
+                        <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                          <span>Emisión: {fac.fechaEmision}</span>
+                          <span className="text-amber-400/90 font-semibold">
+                            Saldo: ${Math.max(0, Number(fac.total) - Number(fac.montoCobrado || 0)).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {filteredFacturas.length === 0 && (
+                    <div className="p-6 text-center text-slate-500">
+                      <FileText className="w-6 h-6 mx-auto mb-1.5 opacity-30 text-slate-400" />
+                      <p className="font-semibold text-xs text-slate-300">No hay facturas registradas</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 2. Editor Interactivo en Tiempo Real */}
+              {selectedInvoice && (
+                <div className="bg-[#0c1017] border border-slate-800/80 rounded-xl overflow-hidden shadow-sm space-y-4 p-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-orange-400" />
+                      <div>
+                        <h3 className="text-xs font-bold text-white">Editor de Factura en Vivo</h3>
+                        <p className="text-[10px] text-slate-400">{selectedInvoice.numeroFactura} · Reflejo inmediato en preview</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteInvoice(selectedInvoice.id)}
+                      className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-colors"
+                      title="Eliminar factura"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Aprobación rápida de depósito (Habilita factura en el portal del cliente) */}
+                  <div className="p-3 rounded-lg bg-[#111728] border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-300 font-semibold">Aprobación de Depósito / Cobro:</span>
+                      <span className={`font-mono text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        selectedInvoice.estado === 'cobrada' ? 'bg-emerald-500/20 text-emerald-400' :
+                        selectedInvoice.estado === 'parcial' ? 'bg-sky-500/20 text-sky-400' :
                         'bg-amber-500/20 text-amber-400'
                       }`}>
-                        {fac.estado === 'cobrada' ? 'Cobrada 100%' : fac.estado === 'parcial' ? 'Parcial (Anticipo)' : 'Pendiente'}
+                        {selectedInvoice.estado === 'cobrada' ? 'Cobrada 100%' : selectedInvoice.estado === 'parcial' ? 'Anticipo 50%' : 'Pendiente'}
                       </span>
-                    </td>
-                    <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {fac.estado === 'pendiente' && (
-                          <button
-                            onClick={() => handleUpdatePayment(fac.id, Math.round(Number(fac.total) * 0.5))}
-                            className="px-2 py-1 rounded bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 text-[11px] font-semibold transition-colors"
-                            title="Registrar cobro de anticipo (50%)"
-                          >
-                            50%
-                          </button>
-                        )}
-                        {fac.estado !== 'cobrada' && (
-                          <button
-                            onClick={() => handleUpdatePayment(fac.id, fac.total)}
-                            className="px-2 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 text-[11px] font-semibold transition-colors"
-                            title="Marcar como cobrada 100%"
-                          >
-                            ✓ 100%
-                          </button>
-                        )}
-                        <button
-                          onClick={() => {
-                            setSelectedInvoice(fac);
-                            setCustomPaymentAmount(String(fac.montoCobrado || 0));
-                          }}
-                          className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
-                        >
-                          Factura PDF
-                        </button>
-                        <button
-                          onClick={() => handleDeleteInvoice(fac.id)}
-                          className="p-1 rounded text-slate-500 hover:text-rose-400 transition-colors"
-                          title="Eliminar factura"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleQuickApprovePayment('anticipo')}
+                        className={`py-1.5 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                          selectedInvoice.estado === 'parcial'
+                            ? 'bg-sky-600 text-white shadow'
+                            : 'bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30'
+                        }`}
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Aprobar Anticipo (50%)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickApprovePayment('100')}
+                        className={`py-1.5 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                          selectedInvoice.estado === 'cobrada'
+                            ? 'bg-emerald-600 text-white shadow'
+                            : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Aprobar Cobro 100%</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Datos del Cliente y Fechas */}
+                  <div className="space-y-2.5 text-xs">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-mono text-slate-400 block mb-1">Nº Factura:</label>
+                        <input
+                          type="text"
+                          value={selectedInvoice.numeroFactura || ''}
+                          onChange={(e) => handleUpdateActiveInvoiceField('numeroFactura', e.target.value)}
+                          className="w-full bg-[#131926] border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-orange-500"
+                        />
                       </div>
-                    </td>
-                  </tr>
-                ))}
-                {filteredFacturas.length === 0 && (
-                  <tr>
-                    <td colSpan="8" className="p-8 text-center text-slate-500">
-                      <FileText className="w-8 h-8 mx-auto mb-2 opacity-30 text-slate-400" />
-                      <p className="font-semibold text-slate-300">No hay facturas emitidas</p>
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        Pulsa el botón "Nueva Factura" o sincroniza con presupuestos aceptados del Módulo 3.
-                      </p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      <div>
+                        <label className="text-[10px] font-mono text-slate-400 block mb-1">Empresa Cliente:</label>
+                        <input
+                          type="text"
+                          value={selectedInvoice.cliente?.empresa || ''}
+                          onChange={(e) => {
+                            const cl = { ...(selectedInvoice.cliente || {}), empresa: e.target.value };
+                            handleUpdateActiveInvoiceField('cliente', cl);
+                          }}
+                          className="w-full bg-[#131926] border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-mono text-slate-400 block mb-1">Fecha Emisión:</label>
+                        <input
+                          type="date"
+                          value={selectedInvoice.fechaEmision || ''}
+                          onChange={(e) => handleUpdateActiveInvoiceField('fechaEmision', e.target.value)}
+                          className="w-full bg-[#131926] border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-300 font-mono focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-mono text-slate-400 block mb-1">Fecha Vencimiento:</label>
+                        <input
+                          type="date"
+                          value={selectedInvoice.fechaVencimiento || ''}
+                          onChange={(e) => handleUpdateActiveInvoiceField('fechaVencimiento', e.target.value)}
+                          className="w-full bg-[#131926] border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-300 font-mono focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-mono text-slate-400 block mb-1">Cuenta Bancaria de Destino:</label>
+                      <select
+                        value={selectedInvoice.cuentaBancariaId || ''}
+                        onChange={(e) => {
+                          const accId = e.target.value;
+                          const accList = normalizeCuentasBancarias(configuracion.cuentasBancarias);
+                          const chosen = accList.find(c => c.id === accId);
+                          setSelectedInvoice(prev => ({
+                            ...prev,
+                            cuentaBancariaId: accId,
+                            metodoPago: chosen?.banco || prev.metodoPago
+                          }));
+                        }}
+                        className="w-full bg-[#131926] border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                      >
+                        {normalizeCuentasBancarias(configuracion.cuentasBancarias).map(acc => (
+                          <option key={acc.id} value={acc.id}>
+                            {acc.pais === 'DO' ? '🇩🇴' : acc.pais === 'US' ? '🇺🇸' : '🇸🇻'} {acc.banco} — {acc.numero} ({acc.moneda})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Entregables e Ítems (Coherentes con el presupuesto) */}
+                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-200 uppercase tracking-wider">
+                        Ítems & Entregables Facturados
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleAddNewItemToActiveInvoice}
+                        className="px-2 py-1 rounded bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border border-orange-500/30 text-[10px] font-bold flex items-center gap-1 transition-colors"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Agregar Ítem</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {(selectedInvoice.items || []).map((item, idx) => (
+                        <div key={item.id || idx} className="p-2.5 rounded-lg bg-[#111728] border border-slate-800/80 space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <input
+                              type="text"
+                              value={item.descripcion || ''}
+                              onChange={(e) => handleUpdateActiveInvoiceItem(idx, 'descripcion', e.target.value)}
+                              placeholder="Descripción del entregable..."
+                              className="flex-1 bg-[#161e31] border border-slate-700/80 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-orange-500 font-medium"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteItemFromActiveInvoice(idx)}
+                              disabled={(selectedInvoice.items || []).length <= 1}
+                              className="p-1 rounded text-slate-500 hover:text-rose-400 disabled:opacity-30 transition-colors"
+                              title="Eliminar este ítem"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] font-mono text-slate-400">Cant:</span>
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.cantidad || 1}
+                                onChange={(e) => handleUpdateActiveInvoiceItem(idx, 'cantidad', e.target.value)}
+                                className="w-12 bg-[#161e31] border border-slate-700/80 rounded px-1.5 py-0.5 text-center text-xs font-mono text-white focus:outline-none focus:border-orange-500"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] font-mono text-slate-400">Precio $:</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={item.precioUnitario || 0}
+                                onChange={(e) => handleUpdateActiveInvoiceItem(idx, 'precioUnitario', e.target.value)}
+                                className="w-20 bg-[#161e31] border border-slate-700/80 rounded px-1.5 py-0.5 text-right text-xs font-mono text-emerald-400 focus:outline-none focus:border-orange-500"
+                              />
+                            </div>
+                            <div className="flex-1 text-right font-mono text-xs text-white font-bold">
+                              Subtotal: ${Number(item.total || 0).toLocaleString()} USD
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Resumen de Totales y Saldo */}
+                  <div className="p-3 rounded-lg bg-[#101522] border border-slate-800 space-y-1.5 text-xs">
+                    <div className="flex justify-between text-slate-400">
+                      <span>Subtotal Calculado:</span>
+                      <span className="font-mono text-white">${Number(selectedInvoice.subtotal || selectedInvoice.total || 0).toLocaleString()} USD</span>
+                    </div>
+                    <div className="flex justify-between text-slate-400">
+                      <span>Total Facturado:</span>
+                      <span className="font-mono font-bold text-orange-400 text-sm">${Number(selectedInvoice.total || 0).toLocaleString()} USD</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-400">
+                      <span>Monto Cobrado / Anticipo:</span>
+                      <span className="font-mono font-bold">${Number(selectedInvoice.montoCobrado || 0).toLocaleString()} USD</span>
+                    </div>
+                    <div className="flex justify-between text-amber-400 border-t border-slate-800 pt-1">
+                      <span>Saldo Pendiente:</span>
+                      <span className="font-mono font-bold">${Math.max(0, Number(selectedInvoice.total || 0) - Number(selectedInvoice.montoCobrado || 0)).toLocaleString()} USD</span>
+                    </div>
+                  </div>
+
+                  {/* Botón Guardar Cambios */}
+                  <button
+                    type="button"
+                    onClick={handleSaveActiveInvoice}
+                    className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Guardar y Sincronizar Factura</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* COLUMNA DERECHA (7 cols): Sticky Live Paper Sheet Preview */}
+            <div className="xl:col-span-7 sticky top-6 space-y-3">
+              {selectedInvoice ? (
+                <>
+                  {/* Top Preview Controls Bar */}
+                  <div className="p-3 bg-[#0e1320] border border-slate-800 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <Eye className="w-4 h-4 text-orange-400" />
+                      <span className="text-xs font-bold text-white">Vista Previa Oficial en Tiempo Real</span>
+                      <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                        selectedInvoice.montoCobrado > 0
+                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                      }`}>
+                        {selectedInvoice.montoCobrado > 0 ? '✓ Habilitada en Portal Cliente' : '🔒 Pendiente de Pago'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadInvoiceHtml(selectedInvoice)}
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1.5 border border-slate-700 transition-colors"
+                        title="Descargar archivo HTML autosuficiente ($0)"
+                      >
+                        <Download className="w-3.5 h-3.5 text-orange-400" />
+                        <span>HTML</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handlePrintInvoicePdf(selectedInvoice)}
+                        className="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                        title="Imprimir o guardar PDF"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Imprimir / PDF</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsInvoiceFullscreenModalOpen(true)}
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                        title="Ampliar en pantalla completa"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Hoja Corporativa Oficial A4 */}
+                  <div className="overflow-hidden rounded-xl border border-slate-700/80 shadow-2xl">
+                    <CorporateInvoiceDocument invoice={selectedInvoice} configuracion={configuracion} />
+                  </div>
+                </>
+              ) : (
+                <div className="p-12 text-center rounded-xl bg-[#0e1320] border border-slate-800 text-slate-500 space-y-2">
+                  <FileText className="w-10 h-10 mx-auto opacity-30 text-slate-400" />
+                  <p className="font-semibold text-white text-sm">Selecciona una factura</p>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    Elige una factura del historial a la izquierda para ver su vista previa oficial en tiempo real y editar sus conceptos.
+                  </p>
+                </div>
+              )}
+            </div>
+
           </div>
-        </div>
       </div>
       )}
 
@@ -3609,8 +4359,8 @@ export default function GestionRentabilidadModule({
         </form>
       )}
 
-      {/* MODAL: PRINTABLE OFFICIAL CORPORATE INVOICE (automated-html-invoice style) */}
-      {selectedInvoice && (
+      {/* MODAL: PRINTABLE OFFICIAL CORPORATE INVOICE FULLSCREEN (automated-html-invoice style) */}
+      {isInvoiceFullscreenModalOpen && selectedInvoice && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0e1320] border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
             
@@ -3624,25 +4374,9 @@ export default function GestionRentabilidadModule({
                 </span>
               </div>
 
-              {/* Quick Payment Adjuster inside Modal */}
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1 bg-[#0b0f19] border border-slate-700 rounded-lg px-2 py-1 text-xs">
-                  <span className="text-slate-400 text-[11px]">Cobrado $:</span>
-                  <input
-                    type="number"
-                    value={customPaymentAmount}
-                    onChange={(e) => setCustomPaymentAmount(e.target.value)}
-                    className="w-20 bg-transparent text-emerald-400 font-mono font-bold focus:outline-none text-xs"
-                  />
-                  <button
-                    onClick={() => handleUpdatePayment(selectedInvoice.id, customPaymentAmount)}
-                    className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold"
-                  >
-                    Aplicar
-                  </button>
-                </div>
-
                 <button
+                  type="button"
                   onClick={() => handleDownloadInvoiceHtml(selectedInvoice)}
                   className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs flex items-center gap-1.5 border border-slate-700 transition-all"
                   title="Descargar archivo HTML autosuficiente ($0)"
@@ -3652,6 +4386,7 @@ export default function GestionRentabilidadModule({
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => handlePrintInvoicePdf(selectedInvoice)}
                   className="px-3.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
                 >
@@ -3660,7 +4395,8 @@ export default function GestionRentabilidadModule({
                 </button>
 
                 <button
-                  onClick={() => setSelectedInvoice(null)}
+                  type="button"
+                  onClick={() => setIsInvoiceFullscreenModalOpen(false)}
                   className="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
                 >
                   <X className="w-4 h-4" />
@@ -3668,182 +4404,9 @@ export default function GestionRentabilidadModule({
               </div>
             </div>
 
-            {/* Corporate Invoice Preview (#FF6B00, #1A1A1A, #FAFAFA) */}
-            <div className="p-6 sm:p-10 overflow-y-auto space-y-6 bg-[#FAFAFA] text-[#1A1A1A] font-sans">
-              <div className="bg-white p-6 sm:p-10 rounded-xl border border-[#EBEBEB] shadow-sm space-y-7">
-                
-                {/* 1. Header de Factura */}
-                <div className="flex flex-col sm:flex-row items-start justify-between gap-4 pb-6 border-b-2 border-[#1A1A1A]">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-xl bg-[#FF6B00] flex items-center justify-center font-black text-white text-2xl shadow-sm">
-                      G
-                    </div>
-                    <div>
-                      <h1 className="text-2xl font-black text-[#1A1A1A] tracking-tight">
-                        GOG<span className="text-[#FF6B00]">LITE</span>
-                      </h1>
-                      <p className="text-xs text-[#555555] font-medium">{configuracion.emisor?.subtitulo}</p>
-                      <p className="text-xs text-[#555555]">{configuracion.emisor?.ubicacion}</p>
-                    </div>
-                  </div>
-
-                  <div className="sm:text-right">
-                    <div className="text-[11px] font-mono uppercase tracking-wider text-[#888888] font-bold">
-                      FACTURA COMERCIAL / PROFORMA
-                    </div>
-                    <div className="text-2xl font-mono font-black text-[#FF6B00]">{selectedInvoice.numeroFactura}</div>
-                    <div className="text-xs text-[#555555] mt-1">
-                      Emisión: <strong>{selectedInvoice.fechaEmision}</strong> · Vence: <strong>{selectedInvoice.fechaVencimiento}</strong>
-                    </div>
-                    <span className={`inline-block mt-2 px-3 py-1 rounded-full text-[11px] font-extrabold ${
-                      selectedInvoice.estado === 'cobrada'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-[#FFF0E6] text-[#FF6B00]'
-                    }`}>
-                      {selectedInvoice.estado === 'cobrada'
-                        ? 'PAGADA 100%'
-                        : selectedInvoice.estado === 'parcial'
-                        ? 'ANTICIPO COBRADO (50%)'
-                        : 'PENDIENTE DE PAGO'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 2. Bloque Bilateral (De / Para) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
-                  <div className="p-4 rounded-xl bg-[#FAFAFA] border border-[#EEEEEE]">
-                    <span className="font-extrabold text-[#FF6B00] uppercase tracking-wider text-[10px] block mb-1">
-                      DE (EMISOR):
-                    </span>
-                    <div className="font-extrabold text-sm text-[#1A1A1A]">{configuracion.emisor?.empresa}</div>
-                    <div className="text-[#555555] mt-0.5">{configuracion.emisor?.identificacion}</div>
-                    <div className="text-[#555555]">{configuracion.emisor?.email}</div>
-                    <div className="text-[#555555]">{configuracion.emisor?.telefono}</div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-[#FAFAFA] border border-[#EEEEEE]">
-                    <span className="font-extrabold text-[#FF6B00] uppercase tracking-wider text-[10px] block mb-1">
-                      PARA (CLIENTE):
-                    </span>
-                    <div className="font-extrabold text-sm text-[#1A1A1A]">{selectedInvoice.cliente?.empresa}</div>
-                    <div className="text-[#555555] mt-0.5">Atención: {selectedInvoice.cliente?.contacto}</div>
-                    <div className="text-[#555555]">{selectedInvoice.cliente?.email} · {selectedInvoice.cliente?.telefono}</div>
-                    <div className="font-semibold text-[#1A1A1A] mt-1">
-                      {selectedInvoice.cliente?.pais === 'DO' ? '🇩🇴 República Dominicana' : '🇸🇻 El Salvador'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Tabla de Servicios con cabecera #1A1A1A */}
-                <div className="border border-[#EEEEEE] rounded-xl overflow-hidden">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-[#1A1A1A] text-white font-bold uppercase text-[11px]">
-                      <tr>
-                        <th className="py-3 px-4">Descripción del Servicio / Entregable</th>
-                        <th className="py-3 px-4 text-center">Cant.</th>
-                        <th className="py-3 px-4 text-right">Precio Unitario</th>
-                        <th className="py-3 px-4 text-right">Subtotal</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#EEEEEE] text-[#1A1A1A]">
-                      {selectedInvoice.items?.map((item, idx) => (
-                        <tr key={idx} className={idx % 2 === 1 ? 'bg-[#FAFAFA]' : 'bg-white'}>
-                          <td className="py-3.5 px-4 font-medium">{item.descripcion}</td>
-                          <td className="py-3.5 px-4 text-center font-mono">{item.cantidad}</td>
-                          <td className="py-3.5 px-4 text-right font-mono">${Number(item.precioUnitario).toLocaleString()} USD</td>
-                          <td className="py-3.5 px-4 text-right font-mono font-bold">${Number(item.total).toLocaleString()} USD</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* 4. Caja de Totales */}
-                <div className="flex justify-end">
-                  <div className="w-80 bg-[#FAFAFA] p-4 rounded-xl border border-[#EEEEEE] space-y-2 text-xs">
-                    <div className="flex justify-between text-[#555555]">
-                      <span>Subtotal Neto:</span>
-                      <span className="font-mono font-bold text-[#1A1A1A]">${Number(selectedInvoice.subtotal || selectedInvoice.total).toLocaleString()} USD</span>
-                    </div>
-                    <div className="flex justify-between text-[#555555]">
-                      <span>Impuestos ({selectedInvoice.impuestoPorcentaje || 0}%):</span>
-                      <span className="font-mono">${Number(selectedInvoice.impuestoTotal || 0).toLocaleString()} USD</span>
-                    </div>
-                    <div className="flex justify-between text-[#1A1A1A] font-black text-base pt-2 border-t-2 border-[#1A1A1A]">
-                      <span>Total Facturado:</span>
-                      <span className="font-mono text-[#FF6B00]">${Number(selectedInvoice.total).toLocaleString()} USD</span>
-                    </div>
-                    <div className="flex justify-between text-emerald-700 font-bold pt-1">
-                      <span>Monto Cobrado / Anticipo:</span>
-                      <span className="font-mono">${Number(selectedInvoice.montoCobrado).toLocaleString()} USD</span>
-                    </div>
-                    <div className="flex justify-between text-amber-700 font-bold pt-1 border-t border-[#E5E7EB]">
-                      <span>Saldo Pendiente:</span>
-                      <span className="font-mono">${Math.max(0, Number(selectedInvoice.total) - Number(selectedInvoice.montoCobrado)).toLocaleString()} USD</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 5. Caja de Confirmación del Sistema & Datos Bancarios */}
-                {(() => {
-                  const cuentas = normalizeCuentasBancarias(configuracion.cuentasBancarias);
-                  const p = selectedInvoice.cliente?.pais || 'SV';
-                  let activeAcc = null;
-                  if (selectedInvoice.cuentaBancariaId) {
-                    activeAcc = cuentas.find(c => c.id === selectedInvoice.cuentaBancariaId);
-                  }
-                  if (!activeAcc && selectedInvoice.metodoPago) {
-                    activeAcc = cuentas.find(c => c.banco?.toLowerCase().includes(selectedInvoice.metodoPago.toLowerCase()) || selectedInvoice.metodoPago.toLowerCase().includes(c.banco?.toLowerCase()));
-                  }
-                  if (!activeAcc) {
-                    activeAcc = cuentas.find(c => c.pais === p && c.activa && c.predeterminada)
-                      || cuentas.find(c => c.pais === p && c.activa)
-                      || cuentas.find(c => c.activa)
-                      || cuentas[0];
-                  }
-                  const uglyCashAcc = cuentas.find(c => (c.pais === 'US' || c.banco?.toLowerCase().includes('uglycash')) && c.activa);
-                  const extraAccounts = cuentas.filter(c => c.pais === p && c.activa && c.id !== activeAcc?.id);
-
-                  return (
-                    <div className="bg-[#FAFAFA] border-l-4 border-[#FF6B00] p-4 rounded-r-lg text-xs text-[#444444] space-y-2">
-                      <div className="font-extrabold text-[#1A1A1A] flex items-center justify-between">
-                        <span>CONFIRMACIÓN DEL SISTEMA & INSTRUCCIONES BANCARIAS:</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-orange-100 text-[#FF6B00] font-mono font-bold">
-                          {activeAcc?.moneda || 'USD'}
-                        </span>
-                      </div>
-                      <div>
-                        • <strong>Método Principal:</strong> {activeAcc?.banco} ({activeAcc?.tipo}) — <span className="font-mono font-bold text-[#1A1A1A]">{activeAcc?.numero}</span> ({activeAcc?.titular})
-                        {activeAcc?.instrucciones && <span className="block text-[#666666] text-[11px] mt-0.5">• Instrucciones: {activeAcc.instrucciones}</span>}
-                      </div>
-
-                      {/* uglyCash Remesa Instantánea Callout */}
-                      {(p === 'US' || uglyCashAcc) && uglyCashAcc?.id !== activeAcc?.id && (
-                        <div className="p-2.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11.5px] space-y-0.5">
-                          <div className="font-bold flex items-center gap-1 text-emerald-800">
-                            <span>⚡ Clientes en EE.UU. (Remesa Instantánea $0 comisión):</span>
-                          </div>
-                          <div>
-                            Envío directo sin recargos vía app <strong>uglyCash</strong> al tag <span className="font-mono font-bold text-orange-600 bg-white px-1.5 py-0.5 rounded border border-orange-200">{uglyCashAcc?.numero || '$victormatos'}</span> ({uglyCashAcc?.titular || 'Víctor Matos'}).
-                          </div>
-                        </div>
-                      )}
-
-                      {extraAccounts.length > 0 && (
-                        <div className="text-[11px] text-[#555555] pt-1 border-t border-slate-200">
-                          • <strong>Cuentas alternativas en {p === 'DO' ? 'Rep. Dominicana' : p}:</strong>{' '}
-                          {extraAccounts.map(ea => `${ea.banco}: Nº ${ea.numero} (${ea.moneda})`).join(' · ')}
-                        </div>
-                      )}
-
-                      <div className="text-[11px] text-[#666666]">
-                        • <strong>Condiciones Comerciales:</strong> Anticipo 50% al inicio · Saldo 50% contra entrega final verificada.
-                      </div>
-                    </div>
-                  );
-                })()}
-
-              </div>
+            {/* Corporate Invoice Preview */}
+            <div className="p-6 sm:p-10 overflow-y-auto space-y-6 bg-[#FAFAFA]">
+              <CorporateInvoiceDocument invoice={selectedInvoice} configuracion={configuracion} />
             </div>
 
           </div>

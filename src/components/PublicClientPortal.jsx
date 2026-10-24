@@ -49,6 +49,7 @@ import {
   ensureProyectoForPresupuesto
 } from '../services/contractGenerator';
 import { evaluateProjectMilestones } from '../services/projectMilestoneSync';
+import { CorporateInvoiceDocument, buildCorporateInvoiceHtml } from './GestionRentabilidadModule';
 
 function GoogleProtectedCard({
   title,
@@ -205,6 +206,57 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const advanceReceiptInputRef = useRef(null);
   const [selectedBankTab, setSelectedBankTab] = useState('SV'); // 'SV' | 'DO' | 'US'
   const [previewReceiptModalUrl, setPreviewReceiptModalUrl] = useState(null);
+  const [selectedClientInvoiceModal, setSelectedClientInvoiceModal] = useState(null);
+  const [clientFacturaList, setClientFacturaList] = useState([]);
+
+  useEffect(() => {
+    const loadFacturas = () => {
+      try {
+        if (typeof window !== 'undefined') {
+          const raw = localStorage.getItem('goglite_facturas');
+          if (raw) {
+            const list = JSON.parse(raw);
+            if (Array.isArray(list)) setClientFacturaList(list);
+          }
+        }
+      } catch {}
+    };
+    loadFacturas();
+    window.addEventListener('goglite_facturas_updated', loadFacturas);
+    window.addEventListener('goglite_proyectos_synced', loadFacturas);
+    return () => {
+      window.removeEventListener('goglite_facturas_updated', loadFacturas);
+      window.removeEventListener('goglite_proyectos_synced', loadFacturas);
+    };
+  }, []);
+
+  const matchingFactura = React.useMemo(() => {
+    if (!Array.isArray(clientFacturaList) || clientFacturaList.length === 0) return null;
+    const targetEmpresa = (data?.presupuesto?.cliente?.empresa || data?.lead?.empresa || '').toLowerCase().trim();
+    const targetPresupuestoId = data?.presupuesto?.id;
+    const targetPresupuestoCodigo = data?.presupuesto?.codigo || data?.lead?.presupuestoCodigo;
+
+    const found = clientFacturaList.find(f => 
+      (targetPresupuestoId && (f.presupuestoId === targetPresupuestoId || f.id === targetPresupuestoId)) ||
+      (targetPresupuestoCodigo && (f.codigoPresupuesto === targetPresupuestoCodigo || f.numeroFactura?.includes(targetPresupuestoCodigo))) ||
+      (targetEmpresa && f.cliente?.empresa && f.cliente.empresa.toLowerCase().trim() === targetEmpresa)
+    );
+    return found || clientFacturaList[0] || null;
+  }, [clientFacturaList, data]);
+
+  const handlePrintClientInvoicePdf = (fac) => {
+    if (!fac) return;
+    const html = buildCorporateInvoiceHtml(fac, portalConfig);
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+      }, 450);
+    }
+  };
 
   const applyReceiptDataUrl = (finalUrl, fileName, target = 'advance') => {
     if (target === 'settlement') {
@@ -2399,6 +2451,42 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               </div>
             </div>
 
+            {/* Factura Oficial de Servicios Habilitada para el Cliente */}
+            {matchingFactura && (
+              <div className="no-print p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#0c1424] via-[#0f172a] to-[#141d33] border border-orange-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-400 flex items-center justify-center shrink-0 shadow-inner">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-bold text-white">Factura Comercial Oficial · {matchingFactura.numeroFactura}</span>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
+                        matchingFactura.estado === 'cobrada' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                        matchingFactura.estado === 'parcial' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' :
+                        'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      }`}>
+                        {matchingFactura.estado === 'cobrada' ? '✓ Pagada 100%' : '✓ Anticipo Acreditado (50%)'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Comprobante comercial oficial con desglose de entregables e inversión por <strong className="text-white">${Number(matchingFactura.total).toLocaleString()} USD</strong> disponible para consulta y descarga.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedClientInvoiceModal(matchingFactura)}
+                    className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-orange-950/40 transition-all transform hover:scale-[1.02]"
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span>Ver Factura Oficial</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* FULL PRINTABLE SOW CONTRACT SHEET (A4 Presentation idéntica al panel interno) */}
             <div 
               id="printable-client-contract"
@@ -3771,6 +3859,40 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 alt="Captura de Comprobante"
                 className="max-w-full max-h-[65vh] object-contain rounded-lg"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: FACTURA COMERCIAL OFICIAL CLIENTE */}
+      {selectedClientInvoiceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="bg-[#0e1320] border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-[#121828]">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-orange-400" />
+                <span className="font-bold text-sm text-white">Factura Comercial Oficial · {selectedClientInvoiceModal.numeroFactura}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePrintClientInvoicePdf(selectedClientInvoiceModal)}
+                  className="px-3.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shadow transition-all"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir / Guardar PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedClientInvoiceModal(null)}
+                  className="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 overflow-y-auto bg-[#FAFAFA]">
+              <CorporateInvoiceDocument invoice={selectedClientInvoiceModal} configuracion={portalConfig} />
             </div>
           </div>
         </div>
