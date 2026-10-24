@@ -75,4 +75,49 @@ export const apiClient = {
   delete: (endpoint, options) => apiFetch(endpoint, { method: 'DELETE', ...options })
 };
 
+/**
+ * Conexión resiliente a Server-Sent Events (SSE) en tiempo real
+ */
+export function subscribeToPlatformEvents(onEvent) {
+  if (typeof window === 'undefined' || typeof EventSource === 'undefined') return () => {};
+
+  const eventsUrl = getApiUrl('/api/events');
+  let es = null;
+  let retryTimer = null;
+
+  function connect() {
+    try {
+      es = new EventSource(eventsUrl);
+
+      es.onmessage = (event) => {
+        try {
+          if (!event.data || event.data.startsWith(':')) return;
+          const parsed = JSON.parse(event.data);
+          if (onEvent) onEvent(parsed);
+        } catch {}
+      };
+
+      es.onerror = () => {
+        if (es) {
+          es.close();
+          es = null;
+        }
+        if (!retryTimer) {
+          retryTimer = setTimeout(() => {
+            retryTimer = null;
+            connect();
+          }, 5000);
+        }
+      };
+    } catch {}
+  }
+
+  connect();
+
+  return () => {
+    if (retryTimer) clearTimeout(retryTimer);
+    if (es) es.close();
+  };
+}
+
 export default apiClient;

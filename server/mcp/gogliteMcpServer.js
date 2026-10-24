@@ -284,7 +284,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'create_budget_proposal',
-        description: 'Genera un borrador de propuesta comercial (Módulo 3) con desglose de entregables, plazos e inversión 50/50 para revisión del supervisor.',
+        description: 'Genera o actualiza una propuesta comercial formal con desglose completo de módulos turísticos/corporativos, fases e inversión 50/50.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -309,6 +309,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: 'Título descriptivo de la propuesta',
               default: 'PROPUESTA DE DESARROLLO DIGITAL VIP',
             },
+            subtitulo: {
+              type: 'string',
+              description: 'Subtítulo o alcance general entre paréntesis',
+            },
             moneda: {
               type: 'string',
               description: 'Moneda de la cotización: USD o DOP',
@@ -327,9 +331,26 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'number',
               description: 'Monto contra entrega final (normalmente 50% restante)',
             },
+            estado: {
+              type: 'string',
+              description: 'Estado de la propuesta: borrador, enviado, sin_abrir, visto, aceptado',
+              default: 'enviado',
+            },
             notasAlcance: {
               type: 'string',
               description: 'Notas adicionales sobre el alcance o condiciones especiales',
+            },
+            portada: {
+              type: 'object',
+              description: 'Bloques estratégicos de portada (proyecto, enfoqueEstrategico, tecnologiaMobileFirst, geoSeoLocal)',
+            },
+            modulos: {
+              type: 'array',
+              description: 'Lista de módulos entregables con id, numero, titulo, descripcion, tipo, horas, precio',
+            },
+            fases: {
+              type: 'array',
+              description: 'Lista de fases del proyecto con fase, plazo, detalle',
             },
           },
           required: ['clienteEmpresa', 'precioTotal'],
@@ -343,7 +364,62 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             budgetId: {
               type: 'string',
-              description: 'ID o código de la propuesta (ej. FAC-2026-001 o id)',
+              description: 'ID o código de la propuesta (ej. P-2026-001 o id)',
+            },
+          },
+          required: ['budgetId'],
+        },
+      },
+      {
+        name: 'update_budget_proposal',
+        description: 'HERRAMIENTA GRANULAR: Modifica bloques individuales de un presupuesto existente (título, subtítulo, inversión total, anticipo, contraEntrega, módulos entregables, fases del proyecto, alcance o estado) garantizando coherencia 50/50.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            budgetId: {
+              type: 'string',
+              description: 'ID o código del presupuesto a modificar (ej: prop-12345 o P-2026-001)',
+            },
+            titulo: {
+              type: 'string',
+              description: 'Título principal de la propuesta',
+            },
+            subtitulo: {
+              type: 'string',
+              description: 'Subtítulo o alcance general resumido',
+            },
+            precioTotal: {
+              type: 'number',
+              description: 'Nuevo monto de inversión total acordada (USD o moneda base)',
+            },
+            anticipo: {
+              type: 'number',
+              description: 'Monto de anticipo (por defecto 50% si no se especifica)',
+            },
+            contraEntrega: {
+              type: 'number',
+              description: 'Monto contra entrega final (por defecto 50% restante)',
+            },
+            modulos: {
+              type: 'array',
+              description: 'Lista de módulos entregables [{ id, numero, titulo, descripcion, tipo, horas, precio }]',
+            },
+            fases: {
+              type: 'array',
+              description: 'Cronograma de fases [{ fase, plazo, detalle }]',
+            },
+            portada: {
+              type: 'object',
+              description: 'Bloques de portada { proyecto, enfoqueEstrategico, tecnologiaMobileFirst, geoSeoLocal }',
+            },
+            estado: {
+              type: 'string',
+              description: 'Estado de la propuesta',
+              enum: ['borrador', 'enviado', 'sin_abrir', 'visto', 'aceptado', 'rechazado'],
+            },
+            vigenciaDias: {
+              type: 'number',
+              description: 'Días de vigencia de la oferta comercial',
             },
           },
           required: ['budgetId'],
@@ -895,47 +971,96 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (name === 'create_budget_proposal') {
       const presupuestos = getPresupuestos();
       const codeNumber = presupuestos.length + 1;
-      const codigo = `FAC-2026-${String(codeNumber).padStart(3, '0')}`;
+      const codigo = `P-2026-${String(codeNumber).padStart(3, '0')}`;
       const precioTotal = Number(args.precioTotal);
       const anticipo = args.anticipo ? Number(args.anticipo) : Math.round(precioTotal * 0.5);
       const contraEntrega = args.contraEntrega ? Number(args.contraEntrega) : precioTotal - anticipo;
 
       const nuevaPropuesta = {
-        id: `pres-${Date.now()}`,
+        id: `prop-${Date.now()}`,
         codigo,
         titulo: args.tituloPropuesta || 'PROPUESTA DE DESARROLLO DIGITAL VIP',
+        subtitulo: args.subtitulo || '(SISTEMA TURÍSTICO INTEGRAL WEB, CATÁLOGO TOURS & PAGOS PAYPAL)',
         moneda: args.moneda || 'USD',
-        fecha: new Date().toISOString().split('T')[0],
-        estado: 'borrador', // Creado como borrador para validación humana
+        fecha: new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
+        estado: args.estado || 'enviado',
         cliente: {
           nombre: args.clienteContacto || 'Tomador de Decisión',
           empresa: args.clienteEmpresa,
           telefono: args.clienteTelefono || '',
-          email: `contacto@${(args.clienteEmpresa || 'empresa').toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
+          email: args.email || `contacto@${(args.clienteEmpresa || 'empresa').toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
           leadId: args.leadId || null
         },
+        portada: args.portada || {
+          proyecto: args.notasAlcance || 'Desarrollo web corporativo de alta velocidad con metodología StoryBrand e integración directa a WhatsApp.',
+          enfoqueEstrategico: "Arquitectura orientada a la conversión directa con botones de llamada instantánea y embudo de respuesta inmediata.",
+          tecnologiaMobileFirst: "Arquitectura ultra-rápida optimizada al 100% para teléfonos inteligentes.",
+          geoSeoLocal: "Estructura semántica avanzada para asegurar máxima visibilidad en Google Maps y buscadores."
+        },
+        modulos: args.modulos || [],
+        fases: args.fases || [],
         inversion: {
           precioTotal,
           anticipo,
           contraEntrega,
-          precioMercadoReferencial: precioTotal * 2,
-          descuentoEspecial: precioTotal
+          precioMercadoReferencial: args.precioMercadoReferencial || 750,
+          descuentoEspecial: (args.precioMercadoReferencial || 750) - precioTotal,
+          beneficioExclusivo: args.beneficioExclusivo || "1 mes de soporte técnico, supervisión y acompañamiento gratuito tras el lanzamiento oficial.",
+          revisiones: "Dos (2) rondas completas de ajustes de diseño y contenido.",
+          requisitosInicio: args.requisitosInicio || "Logotipo, fotografías del negocio/servicios, número oficial de WhatsApp y datos de contacto."
         },
-        alcance: args.notasAlcance || 'Desarrollo web corporativo de alta velocidad con metodología StoryBrand e integración directa a WhatsApp.',
+        alcance: args.notasAlcance || '',
         creadoPor: 'Agente MCP Goglite'
       };
 
-      presupuestos.push(nuevaPropuesta);
+      // Si ya existe una propuesta para este cliente o leadId, actualizarla en sitio
+      const existingIdx = presupuestos.findIndex(p => 
+        (args.leadId && p.cliente?.leadId === args.leadId) ||
+        (p.cliente?.empresa && p.cliente.empresa.toLowerCase().includes(args.clienteEmpresa.toLowerCase())) ||
+        (args.clienteEmpresa && p.cliente?.empresa && args.clienteEmpresa.toLowerCase().includes(p.cliente.empresa.toLowerCase()))
+      );
+
+      if (existingIdx !== -1) {
+        nuevaPropuesta.id = presupuestos[existingIdx].id || nuevaPropuesta.id;
+        nuevaPropuesta.codigo = presupuestos[existingIdx].codigo || nuevaPropuesta.codigo;
+        presupuestos[existingIdx] = { ...presupuestos[existingIdx], ...nuevaPropuesta };
+      } else {
+        presupuestos.unshift(nuevaPropuesta);
+      }
+
       savePresupuestos(presupuestos);
+
+      // Vincular al CRM lead si existe
+      if (args.leadId) {
+        const crmLeads = getCrmLeads();
+        const lIdx = crmLeads.findIndex(l => l.id === args.leadId || l.leadId === args.leadId);
+        if (lIdx !== -1) {
+          crmLeads[lIdx].portalConfig = crmLeads[lIdx].portalConfig || {};
+          crmLeads[lIdx].portalConfig.presupuestoId = nuevaPropuesta.id;
+          saveCrmLeads(crmLeads);
+        }
+      }
+
+      const activeProp = existingIdx !== -1 ? presupuestos[existingIdx] : nuevaPropuesta;
 
       return {
         content: [{
           type: 'text',
-          text: `✅ [PRESUPUESTO CREADO EXITOSAMENTE EN MÓDULO 3]\n` +
-                `• Código Oficial: ${codigo}\n` +
-                `• Cliente: ${args.clienteEmpresa}\n` +
-                `• Inversión: $${precioTotal} ${nuevaPropuesta.moneda} (Anticipo 50%: $${anticipo} | Contra Entrega: $${contraEntrega})\n` +
-                `• Estado: BORRADOR (Listo en el panel de presupuestos para aprobación humana y generación de enlace público).`
+          text: JSON.stringify({
+            ok: true,
+            mensaje: `✅ [PROPUESTA COMERCIAL ${existingIdx !== -1 ? 'ACTUALIZADA' : 'CREADA'} EXITOSAMENTE]`,
+            codigo: activeProp.codigo,
+            id: activeProp.id,
+            cliente: activeProp.cliente.empresa,
+            contacto: activeProp.cliente.nombre,
+            inversionTotal: `$${activeProp.inversion.precioTotal} ${activeProp.moneda}`,
+            anticipo: `$${activeProp.inversion.anticipo} ${activeProp.moneda}`,
+            contraEntrega: `$${activeProp.inversion.contraEntrega} ${activeProp.moneda}`,
+            estado: activeProp.estado,
+            modulosCount: activeProp.modulos?.length || 0,
+            modulos: activeProp.modulos?.map(m => `${m.numero}: ${m.titulo}`),
+            portalUrl: `https://agencia.goglite.com/?token=${activeProp.id}`
+          }, null, 2)
         }]
       };
     }
@@ -953,6 +1078,81 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       return {
         content: [{ type: 'text', text: JSON.stringify(prop, null, 2) }]
+      };
+    }
+
+    if (name === 'update_budget_proposal') {
+      const presupuestos = getPresupuestos();
+      const idx = presupuestos.findIndex(p => p.id === args.budgetId || p.codigo === args.budgetId);
+
+      if (idx === -1) {
+        return {
+          content: [{ type: 'text', text: `Presupuesto con identificador "${args.budgetId}" no encontrado.` }],
+          isError: true
+        };
+      }
+
+      const p = presupuestos[idx];
+      if (args.titulo) p.titulo = args.titulo;
+      if (args.subtitulo) p.subtitulo = args.subtitulo;
+      if (args.vigenciaDias !== undefined) p.vigenciaDias = args.vigenciaDias;
+      if (args.estado) p.estado = args.estado;
+
+      if (args.portada) {
+        p.portada = {
+          ...(p.portada || {}),
+          ...args.portada
+        };
+      }
+
+      if (Array.isArray(args.modulos) && args.modulos.length > 0) {
+        p.modulos = args.modulos;
+      }
+
+      if (Array.isArray(args.fases) && args.fases.length > 0) {
+        p.fases = args.fases;
+      }
+
+      // Recalibración económica 50/50
+      if (args.precioTotal !== undefined || args.anticipo !== undefined || args.contraEntrega !== undefined) {
+        const total = args.precioTotal !== undefined ? Number(args.precioTotal) : (p.inversion?.precioTotal || 0);
+        let antic = args.anticipo !== undefined ? Number(args.anticipo) : (p.inversion?.anticipo || Math.round(total * 0.5));
+        let contra = args.contraEntrega !== undefined ? Number(args.contraEntrega) : (total - antic);
+
+        // Si se modificó el total pero no los desgloses, recalcular 50/50
+        if (args.precioTotal !== undefined && args.anticipo === undefined && args.contraEntrega === undefined) {
+          antic = Math.round(total * 0.5);
+          contra = total - antic;
+        }
+
+        p.inversion = {
+          ...(p.inversion || {}),
+          precioTotal: total,
+          anticipo: antic,
+          contraEntrega: contra,
+          precioMercadoReferencial: p.inversion?.precioMercadoReferencial || Math.round(total * 2.5),
+          descuentoEspecial: Math.max(0, (p.inversion?.precioMercadoReferencial || Math.round(total * 2.5)) - total)
+        };
+      }
+
+      p.actualizadoEn = new Date().toISOString();
+      savePresupuestos(presupuestos);
+
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            ok: true,
+            mensaje: `✅ Presupuesto ${p.codigo} (${p.cliente?.empresa}) actualizado granularmente con éxito.`,
+            id: p.id,
+            codigo: p.codigo,
+            titulo: p.titulo,
+            estado: p.estado,
+            inversion: p.inversion,
+            totalModulos: p.modulos?.length || 0,
+            portalUrl: `https://agencia.goglite.com/?token=${p.portalToken}`
+          }, null, 2)
+        }]
       };
     }
 

@@ -81,6 +81,42 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// ==========================================
+// CANAL SERVER-SENT EVENTS (SSE) EN VIVO
+// ==========================================
+const sseClients = new Set();
+
+export function broadcastPlatformEvent(eventType, payload = {}) {
+  const data = JSON.stringify({ type: eventType, payload, timestamp: Date.now() });
+  for (const client of sseClients) {
+    try {
+      client.write(`data: ${data}\n\n`);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
+app.get('/api/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  res.write(`data: ${JSON.stringify({ type: 'CONNECTED', message: 'SSE Goglite Hub Activo' })}\n\n`);
+  sseClients.add(res);
+
+  const heartbeat = setInterval(() => {
+    res.write(': heartbeat\n\n');
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    sseClients.delete(res);
+  });
+});
+
 // 1. Status & Settings (Zero-Exposure Architecture)
 app.get('/api/status', (req, res) => {
   const settings = getSettings();
@@ -858,6 +894,7 @@ app.post('/api/presupuestos', (req, res) => {
   try {
     syncPresupuestoToWorkflow(newProp);
   } catch (e) {}
+  broadcastPlatformEvent('budget:created', newProp);
   res.json(newProp);
 });
 
@@ -871,6 +908,7 @@ app.patch('/api/presupuestos/:id', (req, res) => {
   try {
     syncPresupuestoToWorkflow(list[idx]);
   } catch (e) {}
+  broadcastPlatformEvent('budget:updated', list[idx]);
   res.json(list[idx]);
 });
 
@@ -1291,6 +1329,7 @@ app.post('/api/crm/leads', (req, res) => {
 
   leads.unshift(nuevo);
   saveCrmLeads(leads);
+  broadcastPlatformEvent('crm:created', nuevo);
   res.status(201).json(nuevo);
 });
 
@@ -1379,6 +1418,7 @@ app.patch('/api/crm/leads/:id', (req, res) => {
 
   leads[idx] = { ...leads[idx], ...req.body, actualizadoEn: new Date().toISOString().split('T')[0] };
   saveCrmLeads(leads);
+  broadcastPlatformEvent('crm:updated', leads[idx]);
   res.json(leads[idx]);
 });
 
@@ -1389,6 +1429,7 @@ app.delete('/api/crm/leads/:id', (req, res) => {
   leads = leads.filter(l => l.id !== id);
   if (leads.length === len) return res.status(404).json({ error: 'Lead no encontrado' });
   saveCrmLeads(leads);
+  broadcastPlatformEvent('crm:deleted', { id });
   res.json({ success: true });
 });
 

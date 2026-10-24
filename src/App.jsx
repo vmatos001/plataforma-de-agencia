@@ -32,7 +32,7 @@ import UserProfileModal from './components/UserProfileModal';
 import ProspectorModule from './components/ProspectorModule';
 import LoginGatekeeper from './components/LoginGatekeeper';
 import { signOutUser } from './services/firebase';
-import { apiClient } from './services/apiClient';
+import { apiClient, subscribeToPlatformEvents } from './services/apiClient';
 import {
   STORAGE_KEYS,
   getLocalItem,
@@ -260,6 +260,19 @@ export default function App() {
     fetchAgencySettings();
     fetchUsers();
 
+    // Suscripción al Canal SSE en Tiempo Real (Server-Sent Events)
+    const unsubscribeSSE = subscribeToPlatformEvents((event) => {
+      if (!event || !event.type) return;
+
+      if (event.type === 'budget:created' || event.type === 'budget:updated') {
+        window.dispatchEvent(new CustomEvent('goglite_presupuestos_updated', { detail: event.payload }));
+      }
+
+      if (event.type === 'crm:created' || event.type === 'crm:updated' || event.type === 'crm:deleted') {
+        window.dispatchEvent(new CustomEvent('goglite_crm_updated', { detail: event.payload }));
+      }
+    });
+
     // Sincronización reactiva en tiempo real al actualizar ajustes
     const handleSettingsUpdated = (e) => {
       if (e.detail && typeof e.detail === 'object') {
@@ -271,7 +284,10 @@ export default function App() {
       }
     };
     window.addEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
-    return () => window.removeEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
+    return () => {
+      unsubscribeSSE();
+      window.removeEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
+    };
   }, []);
 
   const fetchAgencySettings = async () => {

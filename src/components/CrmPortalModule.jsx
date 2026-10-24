@@ -615,9 +615,32 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     });
   };
 
-  // Fetch leads de API y sincronizar con localStorage
+  // Fetch leads de API y sincronizar en tiempo real (Backend-First + SSE)
   useEffect(() => {
     fetchCrmLeads();
+
+    const handleRealtimeCrmUpdate = (e) => {
+      if (e.detail && typeof e.detail === 'object') {
+        const item = e.detail;
+        setLeads(prev => {
+          const idx = prev.findIndex(l => l.id === item.id);
+          let updated;
+          if (idx !== -1) {
+            updated = [...prev];
+            updated[idx] = { ...updated[idx], ...item };
+          } else {
+            updated = [item, ...prev];
+          }
+          saveStoredCrmLeads(updated);
+          return updated;
+        });
+      } else {
+        fetchCrmLeads();
+      }
+    };
+
+    window.addEventListener('goglite_crm_updated', handleRealtimeCrmUpdate);
+    return () => window.removeEventListener('goglite_crm_updated', handleRealtimeCrmUpdate);
   }, []);
 
   const fetchCrmLeads = async () => {
