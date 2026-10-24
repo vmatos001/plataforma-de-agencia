@@ -11,7 +11,7 @@
   "marcaBlancaActiva": true,
   "cuentasBancarias": {
     "elSalvador": {
-      "banco": "Banco Agrícola",
+      "banco": "Banco Agr\u00edcola",
       "tipo": "Cuenta Corriente",
       "numero": "500-128941-01",
       "titular": "Goglite Studio S.A. de C.V.",
@@ -30,5 +30,6 @@
       "swift": "AGRISVSX"
     }
   },
-  "actualizadoEn": "2026-10-14T08:43:03.844Z"
+  "actualizadoEn": "2026-10-14T08:43:03.844Z",
+  "mcpAgentKey": "gog_agent_live_3554881d91556ec76d8734f10fda7366"
 }

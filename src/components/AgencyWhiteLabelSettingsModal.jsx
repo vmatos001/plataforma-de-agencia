@@ -29,9 +29,13 @@ import {
   EyeOff,
   Save,
   Server,
-  Zap
+  Zap,
+  Bot,
+  Copy,
+  Key
 } from 'lucide-react';
 import { apiClient } from '../services/apiClient';
+import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 
 export default function AgencyWhiteLabelSettingsModal({
   isOpen,
@@ -60,6 +64,7 @@ export default function AgencyWhiteLabelSettingsModal({
     monedaDefecto: 'USD',
     tasaCambioDop: 58.50,
     tasaCambioEur: 0.92,
+    mcpAgentKey: DEFAULT_AGENCY_BRANDING.mcpAgentKey || 'gog_agent_live_3554881d91556ec76d8734f10fda7366',
     apisIntegraciones: {
       googleSiteKitConnected: true,
       googleDriveVault: 'Goglite Agency Drive Vault',
@@ -271,6 +276,9 @@ export default function AgencyWhiteLabelSettingsModal({
     }
   };
 
+  const [copiedMcpKey, setCopiedMcpKey] = useState(false);
+  const [showMcpKey, setShowMcpKey] = useState(false);
+
   useEffect(() => {
     if (agencySettings) {
       const storedLogo = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null;
@@ -278,6 +286,7 @@ export default function AgencyWhiteLabelSettingsModal({
         ...prev,
         ...agencySettings,
         logoUrl: agencySettings.logoUrl || storedLogo || prev.logoUrl || '/assets/goglite_logo.png',
+        mcpAgentKey: agencySettings.mcpAgentKey || prev.mcpAgentKey || DEFAULT_AGENCY_BRANDING.mcpAgentKey || 'gog_agent_live_3554881d91556ec76d8734f10fda7366',
         apisIntegraciones: {
           ...prev.apisIntegraciones,
           ...(agencySettings.apisIntegraciones || {})
@@ -285,6 +294,23 @@ export default function AgencyWhiteLabelSettingsModal({
       }));
     }
   }, [agencySettings, isOpen]);
+
+  const handleCopyMcpKey = () => {
+    if (!form.mcpAgentKey) return;
+    navigator.clipboard.writeText(form.mcpAgentKey);
+    setCopiedMcpKey(true);
+    setTimeout(() => setCopiedMcpKey(false), 2000);
+  };
+
+  const handleRegenerateMcpKey = () => {
+    if (window.confirm('¿Deseas generar una nueva clave de acceso para el agente IA? Si regeneras la clave, cualquier agente conectado previamente con la clave anterior perderá el acceso hasta que se actualice.')) {
+      const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      const newKey = `gog_agent_live_${randomHex}`;
+      setForm(prev => ({ ...prev, mcpAgentKey: newKey }));
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -1444,6 +1470,106 @@ export default function AgencyWhiteLabelSettingsModal({
                       <Zap className={`w-3.5 h-3.5 ${testingService === 'resend' ? 'animate-spin' : ''}`} />
                       <span>{testingService === 'resend' ? 'Verificando con Resend...' : 'Probar Conexión'}</span>
                     </button>
+                  </div>
+                </div>
+
+                {/* 5. PROTOCOLO MCP & AGENTES AUTÓNOMOS DE IA */}
+                <div className="p-4 rounded-xl bg-gradient-to-br from-[#121829] via-[#0d121f] to-[#161224] border border-orange-500/30 space-y-4 shadow-xl">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 border border-orange-500/30">
+                        <Bot className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-bold text-white">Servidor MCP & Agente IA Autónomo</h4>
+                          <span className="text-[9px] font-mono bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-full border border-orange-500/30 font-bold">
+                            API Key Oficial
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 mt-0.5">
+                          Llave de autorización exclusiva para que un agente de IA externo se conecte a la plataforma mediante el protocolo MCP sin tener acceso a finanzas maestras ni configuraciones críticas.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        ● Listo para Agentes
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Input Llave con Visualización, Copiado y Regeneración */}
+                  <div className="p-3.5 rounded-xl bg-[#090d16] border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Key className="w-3.5 h-3.5 text-orange-400" />
+                        <span className="text-[11px] font-mono font-bold text-slate-300">
+                          GOGLITE_AGENT_KEY
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400">
+                        Solo visible para Administradores autenticados con 2FA
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type={showMcpKey ? "text" : "password"}
+                          readOnly
+                          value={form.mcpAgentKey || 'gog_agent_live_3554881d91556ec76d8734f10fda7366'}
+                          className="w-full bg-[#111726] border border-slate-700/80 rounded-lg px-3 py-2 text-xs font-mono text-orange-300 pr-10 tracking-wider focus:outline-none select-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowMcpKey(!showMcpKey)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                          title={showMcpKey ? "Ocultar llave" : "Mostrar llave"}
+                        >
+                          {showMcpKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleCopyMcpKey}
+                          className="px-3.5 py-2 rounded-lg bg-orange-600/20 hover:bg-orange-600/30 text-orange-300 border border-orange-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                          title="Copiar llave al portapapeles"
+                        >
+                          {copiedMcpKey ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <span className="text-emerald-300 font-bold">¡Copiada!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Copiar Llave</span>
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleRegenerateMcpKey}
+                          className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-rose-300 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                          title="Revocar la llave actual y generar una nueva"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Regenerar</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 flex items-center gap-1.5 pt-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>
+                        Pega esta llave en la variable de entorno <code className="text-slate-200 bg-slate-800 px-1 py-0.5 rounded">GOGLITE_AGENT_KEY</code> de tu agente MCP. Al guardar ajustes se confirma el registro.
+                      </span>
+                    </div>
                   </div>
                 </div>
 
