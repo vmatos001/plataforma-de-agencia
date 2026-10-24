@@ -50,6 +50,7 @@ import {
   Star,
   Crown
 } from 'lucide-react';
+import { apiClient } from '../services/apiClient';
 import {
   getStoredCrmLeads,
   saveStoredCrmLeads,
@@ -231,206 +232,7 @@ const WHATSAPP_SCRIPTS = [
 ];
 
 // Semilla con los contactos y conversaciones reales de WhatsApp Web del usuario
-const SEED_CRM_LEADS = [
-  {
-    id: "wa-real-447974905044",
-    empresa: "+44 7974 905044",
-    contacto: "+44 7974 905044",
-    cargo: "Contacto WhatsApp",
-    email: "",
-    telefono: "+44 7974 905044",
-    pais: "DO",
-    etapa: "contactado",
-    valorEstimado: 0,
-    probabilidad: 20,
-    fuente: "WhatsApp Real DO (+18295284713)",
-    whatsappData: {
-      telefono: "+44 7974 905044",
-      temperatura: "tibio",
-      estadoSeguimiento: "esperando_respuesta",
-      ultimoMensajeFecha: "Ayer",
-      mensajes: [
-        { id: "msg-44-1", emisor: "cliente", texto: "I didn't request a code", fechaHora: "Ayer 18:42", leido: true, origen: "whatsapp_real_DO" }
-      ]
-    }
-  },
-  {
-    id: "wa-real-vmatosv",
-    empresa: "@vmatosv",
-    contacto: "@vmatosv",
-    cargo: "Contacto WhatsApp",
-    email: "",
-    telefono: "+1 829 000-0002",
-    pais: "DO",
-    etapa: "contactado",
-    valorEstimado: 0,
-    probabilidad: 25,
-    fuente: "WhatsApp Real DO (+18295284713)",
-    whatsappData: {
-      telefono: "+1 829 000-0002",
-      temperatura: "tibio",
-      estadoSeguimiento: "esperando_respuesta",
-      ultimoMensajeFecha: "Ayer",
-      mensajes: [
-        { id: "msg-vm-1", emisor: "cliente", texto: "📷 Foto", fechaHora: "Ayer 16:15", leido: true, origen: "whatsapp_real_DO" }
-      ]
-    }
-  },
-  {
-    id: "wa-real-18098210756",
-    empresa: "+1 (809) 821-0756",
-    contacto: "+1 (809) 821-0756",
-    cargo: "Contacto WhatsApp",
-    email: "",
-    telefono: "+1 809 821-0756",
-    pais: "DO",
-    etapa: "contactado",
-    valorEstimado: 500,
-    probabilidad: 50,
-    fuente: "WhatsApp Real DO (+18295284713)",
-    whatsappData: {
-      telefono: "+1 809 821-0756",
-      temperatura: "tibio",
-      estadoSeguimiento: "seguimiento",
-      ultimoMensajeFecha: "Jueves",
-      mensajes: [
-        { id: "msg-809-1", emisor: "cliente", texto: "Ok hermano", fechaHora: "Jueves 14:10", leido: true, origen: "whatsapp_real_DO" }
-      ]
-    }
-  },
-  {
-    id: "wa-real-pena-lavia",
-    empresa: "Caribes Tours",
-    contacto: "Sr. Peña Lavia Caribes Tours.",
-    cargo: "Director / Gerencia",
-    email: "",
-    telefono: "+1 809 221-4422",
-    pais: "DO",
-    etapa: "propuesta_enviada",
-    valorEstimado: 1800,
-    probabilidad: 60,
-    fuente: "WhatsApp Real DO (+18295284713)",
-    whatsappData: {
-      telefono: "+1 809 221-4422",
-      temperatura: "caliente",
-      estadoSeguimiento: "dia_3_seguimiento",
-      ultimoMensajeFecha: "Miércoles",
-      mensajes: [
-        { id: "msg-pena-1", emisor: "cliente", texto: "Sr. Peña Lavia Caribes Tours. usa una duración predeterminada para los mensajes temporales en los chats nuevos...", fechaHora: "Miércoles 11:25", leido: true, origen: "whatsapp_real_DO" }
-      ]
-    }
-  },
-  {
-    id: "wa-real-50375628574",
-    empresa: "+503 7562 8574",
-    contacto: "+503 7562 8574",
-    cargo: "Contacto WhatsApp El Salvador",
-    email: "",
-    telefono: "+503 7562 8574",
-    pais: "SV",
-    etapa: "contactado",
-    valorEstimado: 750,
-    probabilidad: 40,
-    fuente: "WhatsApp Real (+503 7562 8574)",
-    whatsappData: {
-      telefono: "+503 7562 8574",
-      temperatura: "tibio",
-      estadoSeguimiento: "dia_1_valor",
-      ultimoMensajeFecha: "Miércoles",
-      mensajes: [
-        { id: "msg-503-1", emisor: "cliente", texto: "https://youtube.com/shorts/8B2KniibJEo?si=N-k92F-i44K4kI1g", fechaHora: "Miércoles 17:02", leido: true, origen: "whatsapp_real_SV" }
-      ]
-    }
-  },
-  {
-    id: "wa-real-18099841958",
-    empresa: "+1 (809) 984-1958",
-    contacto: "+1 (809) 984-1958",
-    cargo: "Contacto WhatsApp",
-    email: "",
-    telefono: "+1 809 984-1958",
-    pais: "DO",
-    etapa: "contactado",
-    valorEstimado: 600,
-    probabilidad: 35,
-    fuente: "WhatsApp Real DO (+18295284713)",
-    whatsappData: {
-      telefono: "+1 809 984-1958",
-      temperatura: "tibio",
-      estadoSeguimiento: "esperando_respuesta",
-      ultimoMensajeFecha: "Martes",
-      mensajes: [
-        { id: "msg-809-2", emisor: "cliente", texto: "🎤 Nota de voz (0:09)", fechaHora: "Martes 13:45", leido: true, origen: "whatsapp_real_DO" }
-      ]
-    }
-  },
-  {
-    id: "wa-real-julio-alcantara",
-    empresa: "Cerámicas Taína",
-    contacto: "Julio Alcantara Ceramicas Taina",
-    cargo: "Gerente Comercial",
-    email: "ventas@ceramicastaina.com.do",
-    telefono: "+1 809 567-3311",
-    pais: "DO",
-    etapa: "reunion",
-    valorEstimado: 2100,
-    probabilidad: 70,
-    fuente: "WhatsApp Real DO (+18295284713)",
-    whatsappData: {
-      telefono: "+1 809 567-3311",
-      temperatura: "caliente",
-      estadoSeguimiento: "dia_1_valor",
-      ultimoMensajeFecha: "Martes",
-      mensajes: [
-        { id: "msg-julio-1", emisor: "cliente", texto: "Puede hacer publicaciones en redes con enlaces directos para que los clientes lleguen a cotizar las cerámicas por WhatsApp", fechaHora: "Martes 09:20", leido: true, origen: "whatsapp_real_DO" }
-      ]
-    }
-  },
-  {
-    id: "wa-real-airon-mrs",
-    empresa: "@airon_mrs",
-    contacto: "@airon_mrs",
-    cargo: "Contacto WhatsApp",
-    email: "",
-    telefono: "+1 829 000-0003",
-    pais: "DO",
-    etapa: "contactado",
-    valorEstimado: 0,
-    probabilidad: 15,
-    fuente: "WhatsApp Real DO (+18295284713)",
-    whatsappData: {
-      telefono: "+1 829 000-0003",
-      temperatura: "tibio",
-      estadoSeguimiento: "primer_contacto",
-      ultimoMensajeFecha: "24/9/2026",
-      mensajes: [
-        { id: "msg-airon-1", emisor: "cliente", texto: "Reaccionaste con 👍 a: 🎤 0:02", fechaHora: "24 Sep 20:12", leido: true, origen: "whatsapp_real_DO" }
-      ]
-    }
-  },
-  {
-    id: "wa-real-carro-tu",
-    empresa: "Carro (Tú)",
-    contacto: "Carro (Tú)",
-    cargo: "Notas Personales & Leads de Cotización",
-    email: "",
-    telefono: "+1 829 528-4713",
-    pais: "DO",
-    etapa: "propuesta_enviada",
-    valorEstimado: 1200,
-    probabilidad: 50,
-    fuente: "WhatsApp Real DO (+18295284713)",
-    whatsappData: {
-      telefono: "+1 829 528-4713",
-      temperatura: "caliente",
-      estadoSeguimiento: "dia_3_seguimiento",
-      ultimoMensajeFecha: "23/9/2026",
-      mensajes: [
-        { id: "msg-carro-1", emisor: "cliente", texto: "NUEVA SOLICITUD DE COTIZACIÓN ===\nNombre: Cliente Interesado\nServicio: Rediseño Web StoryBrand & Landing Page", fechaHora: "23 Sep 16:30", leido: true, origen: "whatsapp_real_DO" }
-      ]
-    }
-  }
-];
+const SEED_CRM_LEADS = [];
 
 export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato, onOpenPrd }) {
   // Persistencia local resiliente: Si recargas (F5), se lee de localStorage
@@ -821,19 +623,20 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   const fetchCrmLeads = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/crm/leads');
+      const res = await apiClient.get('/api/crm/leads');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           updateAndPersistLeads(data);
-          if (!selectedPortalLeadId) setSelectedPortalLeadId(data[0].id);
-          if (!selectedWaLeadId) setSelectedWaLeadId(data[0].id);
+          if (data.length > 0) {
+            if (!selectedPortalLeadId) setSelectedPortalLeadId(data[0].id);
+            if (!selectedWaLeadId) setSelectedWaLeadId(data[0].id);
+          }
         }
       }
     } catch (err) {
       console.warn('API de CRM offline o estática, operando con almacenamiento local:', err);
-      // Aseguramos persistencia de la semilla si estaba vacía
-      if (leads.length === 0) {
+      if (leads.length === 0 && SEED_CRM_LEADS.length > 0) {
         updateAndPersistLeads(SEED_CRM_LEADS);
       }
     } finally {
