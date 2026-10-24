@@ -13,7 +13,6 @@ import {
   Kanban,
   DollarSign,
   Lock,
-  Layers,
   PanelLeftClose,
   PanelLeftOpen,
   Globe,
@@ -61,7 +60,6 @@ export default function App() {
   const [seoInitialTab, setSeoInitialTab] = useState('seo_geo');
   const [leadForPresupuesto, setLeadForPresupuesto] = useState(null);
   const [presupuestoForFactura, setPresupuestoForFactura] = useState(null);
-  const [toolsDropdownOpen, setToolsDropdownOpen] = useState(false);
 
   useEffect(() => {
     setLocalItem(STORAGE_KEYS.ACTIVE_MODULE, activeModule);
@@ -307,137 +305,6 @@ export default function App() {
             </div>
           </div>
 
-          <span className="text-slate-700">|</span>
-
-          {/* Tools Menu Dropdown */}
-          <div className="relative">
-            <button 
-              onClick={() => setToolsDropdownOpen(!toolsDropdownOpen)}
-              className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1.5 px-2.5 py-1 rounded-md hover:bg-slate-800/60 transition-colors"
-            >
-              <Layers className="w-3.5 h-3.5 text-slate-500" />
-              <span>7 Fases de Agencia</span>
-              <ChevronRight className={`w-3 h-3 text-slate-500 transition-transform ${toolsDropdownOpen ? 'rotate-90' : ''}`} />
-            </button>
-
-            {toolsDropdownOpen && (
-              <div className="absolute left-0 mt-2 w-72 rounded-xl bg-[#0f1422] border border-slate-800 shadow-2xl p-2 z-50">
-                <div className="text-[10px] uppercase font-mono tracking-wider text-slate-500 px-2 py-1">Suite de 7 Fases Goglite</div>
-                
-                {/* Fase 1 */}
-                <button
-                  onClick={() => { setActiveModule('lead_scrapper'); setToolsDropdownOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
-                    activeModule === 'lead_scrapper' 
-                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
-                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-3.5 h-3.5 text-orange-400" />
-                    <span>1. Lead Scrapper (Outbound)</span>
-                  </div>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Fase 1</span>
-                </button>
-
-                {/* Fase 2 */}
-                <button
-                  onClick={() => { setActiveModule('crm_portal'); setToolsDropdownOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
-                    activeModule === 'crm_portal' 
-                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
-                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Kanban className="w-3.5 h-3.5 text-orange-400" />
-                    <span>2. CRM & WhatsApp Web</span>
-                  </div>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Fase 2</span>
-                </button>
-
-                {/* Fase 3 */}
-                <button
-                  onClick={() => { setActiveModule('presupuestos'); setPresupuestosInitialTab('presupuestos'); setToolsDropdownOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
-                    activeModule === 'presupuestos' 
-                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
-                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5 text-orange-400" />
-                    <span>3. Presupuestos & Contratos</span>
-                  </div>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Fase 3</span>
-                </button>
-
-                {/* Fase 4 */}
-                <button
-                  onClick={() => { setActiveModule('desarrollo_prd'); setToolsDropdownOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
-                    activeModule === 'desarrollo_prd' 
-                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
-                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Layout className="w-3.5 h-3.5 text-orange-400" />
-                    <span>4. Centro Desarrollo & PRD</span>
-                  </div>
-                  <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-mono">Fase 4</span>
-                </button>
-
-                {/* Fase 5 */}
-                <button
-                  onClick={() => { setActiveModule('seo_motor'); setToolsDropdownOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
-                    activeModule === 'seo_motor' 
-                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
-                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-3.5 h-3.5 text-orange-400" />
-                    <span>5. Launch QA (Control de Calidad)</span>
-                  </div>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Fase 5</span>
-                </button>
-
-                {/* Fase 6 */}
-                <button
-                  onClick={() => { setActiveModule('headless_cms'); setToolsDropdownOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
-                    activeModule === 'headless_cms' 
-                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
-                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Globe className="w-3.5 h-3.5 text-orange-400" />
-                    <span>6. Hub Headless CMS</span>
-                  </div>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Fase 6</span>
-                </button>
-
-                {/* Fase 7 */}
-                <button
-                  onClick={() => { setActiveModule('gestion_rentabilidad'); setToolsDropdownOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-xs border transition-colors mb-1 ${
-                    activeModule === 'gestion_rentabilidad' 
-                      ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' 
-                      : 'text-slate-300 border-transparent hover:bg-slate-800/60'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-3.5 h-3.5 text-orange-400" />
-                    <span>7. Rentabilidad & P&L 👑</span>
-                  </div>
-                  <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-mono font-bold">Fase 7</span>
-                </button>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Right Header Options */}
