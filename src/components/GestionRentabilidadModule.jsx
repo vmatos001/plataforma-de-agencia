@@ -565,7 +565,7 @@ function computeFinanzasSummary(rawState) {
 /**
  * Convierte un Presupuesto del Módulo 3 en un objeto Factura Proforma compatible con Módulo 4
  */
-function buildInvoiceFromPresupuesto(prop, existingCount = 0, configuracion = DEFAULT_CONFIGURACION) {
+export function buildInvoiceFromPresupuesto(prop, existingCount = 0, configuracion = DEFAULT_CONFIGURACION) {
   const nextNum = String(existingCount + 1).padStart(3, '0');
   const subtotal = Number(prop.inversion?.precioTotal) || 250;
   const anticipo = Number(prop.inversion?.anticipo) ?? Math.round(subtotal * 0.5);
@@ -1236,6 +1236,9 @@ export default function GestionRentabilidadModule({
     try {
       if (typeof window !== 'undefined' && finanzasState) {
         localStorage.setItem(STORAGE_KEY_FINANZAS, JSON.stringify(finanzasState));
+        if (Array.isArray(finanzasState.facturas)) {
+          localStorage.setItem('goglite_facturas', JSON.stringify(finanzasState.facturas));
+        }
       }
     } catch (e) {
       console.warn('Error guardando finanzas en localStorage:', e);

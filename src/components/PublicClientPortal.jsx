@@ -49,7 +49,12 @@ import {
   ensureProyectoForPresupuesto
 } from '../services/contractGenerator';
 import { evaluateProjectMilestones } from '../services/projectMilestoneSync';
-import { CorporateInvoiceDocument, buildCorporateInvoiceHtml } from './GestionRentabilidadModule';
+import { 
+  CorporateInvoiceDocument, 
+  buildCorporateInvoiceHtml, 
+  buildInvoiceFromPresupuesto, 
+  normalizeFacturaItems 
+} from './GestionRentabilidadModule';
 
 function GoogleProtectedCard({
   title,
@@ -62,7 +67,9 @@ function GoogleProtectedCard({
   clientAuthPass,
   setClientAuthPass,
   clientAuthEmail,
-  setClientAuthEmail
+  setClientAuthEmail,
+  matchingFactura,
+  onViewInvoice
 }) {
   return (
     <div className="rounded-2xl bg-gradient-to-b from-[#0f172a] to-[#090d16] border-2 border-amber-500/40 p-6 sm:p-10 shadow-2xl text-center max-w-2xl mx-auto space-y-6 my-4">
@@ -154,6 +161,35 @@ function GoogleProtectedCard({
         </form>
       </div>
 
+      {matchingFactura && (
+        <div className="pt-2 border-t border-slate-800/80 max-w-md mx-auto w-full">
+          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-orange-500/30 flex items-center justify-between gap-3 text-left">
+            <div className="flex items-center gap-2.5">
+              <FileText className="w-5 h-5 text-orange-400 shrink-0" />
+              <div>
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>Factura Oficial · {matchingFactura.numeroFactura}</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono">
+                    ${Number(matchingFactura.total).toLocaleString()} USD
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Comprobante y desglose de inversión disponible
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedClientInvoiceModal(matchingFactura)}
+              className="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs shrink-0 flex items-center gap-1 shadow-md transition-all"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Ver Factura</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="pt-2 text-[10px] text-slate-500 font-mono flex items-center justify-center gap-2">
         <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
         <span>Protección Confidencial SSL 256-Bit · Goglite Studio</span>
@@ -213,11 +249,20 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     const loadFacturas = () => {
       try {
         if (typeof window !== 'undefined') {
+          let list = [];
           const raw = localStorage.getItem('goglite_facturas');
           if (raw) {
-            const list = JSON.parse(raw);
-            if (Array.isArray(list)) setClientFacturaList(list);
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
           }
+          if (list.length === 0) {
+            const rawFinanzas = localStorage.getItem('goglite_finanzas_pnl');
+            if (rawFinanzas) {
+              const finanzas = JSON.parse(rawFinanzas);
+              if (Array.isArray(finanzas?.facturas)) list = finanzas.facturas;
+            }
+          }
+          if (Array.isArray(list)) setClientFacturaList(list);
         }
       } catch {}
     };
@@ -231,17 +276,29 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   }, []);
 
   const matchingFactura = React.useMemo(() => {
-    if (!Array.isArray(clientFacturaList) || clientFacturaList.length === 0) return null;
     const targetEmpresa = (data?.presupuesto?.cliente?.empresa || data?.lead?.empresa || '').toLowerCase().trim();
     const targetPresupuestoId = data?.presupuesto?.id;
     const targetPresupuestoCodigo = data?.presupuesto?.codigo || data?.lead?.presupuestoCodigo;
 
-    const found = clientFacturaList.find(f => 
-      (targetPresupuestoId && (f.presupuestoId === targetPresupuestoId || f.id === targetPresupuestoId)) ||
-      (targetPresupuestoCodigo && (f.codigoPresupuesto === targetPresupuestoCodigo || f.numeroFactura?.includes(targetPresupuestoCodigo))) ||
-      (targetEmpresa && f.cliente?.empresa && f.cliente.empresa.toLowerCase().trim() === targetEmpresa)
-    );
-    return found || clientFacturaList[0] || null;
+    let found = null;
+    if (Array.isArray(clientFacturaList) && clientFacturaList.length > 0) {
+      found = clientFacturaList.find(f => 
+        (targetPresupuestoId && (f.presupuestoId === targetPresupuestoId || f.id === targetPresupuestoId)) ||
+        (targetPresupuestoCodigo && (f.codigoPresupuesto === targetPresupuestoCodigo || f.numeroFactura?.includes(targetPresupuestoCodigo))) ||
+        (targetEmpresa && f.cliente?.empresa && f.cliente.empresa.toLowerCase().trim() === targetEmpresa)
+      );
+      if (!found && clientFacturaList[0]) found = clientFacturaList[0];
+    }
+
+    if (!found && data?.presupuesto) {
+      found = buildInvoiceFromPresupuesto(data.presupuesto);
+      if (data?.portalConfig?.fase2Firmada || data?.presupuesto?.anticipoPagado) {
+        found.estado = 'parcial';
+        found.montoCobrado = data.presupuesto.inversion?.anticipo || (Number(found.total) * 0.5);
+      }
+    }
+
+    return found ? normalizeFacturaItems(found) : null;
   }, [clientFacturaList, data]);
 
   const handlePrintClientInvoicePdf = (fac) => {
@@ -2079,6 +2136,8 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               setClientAuthPass={setClientAuthPass}
               clientAuthEmail={clientAuthEmail}
               setClientAuthEmail={setClientAuthEmail}
+              matchingFactura={matchingFactura}
+              onViewInvoice={setSelectedClientInvoiceModal}
             />
           ) : (
           <div className="space-y-6">
@@ -2397,6 +2456,8 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               setClientAuthPass={setClientAuthPass}
               clientAuthEmail={clientAuthEmail}
               setClientAuthEmail={setClientAuthEmail}
+              matchingFactura={matchingFactura}
+              onViewInvoice={setSelectedClientInvoiceModal}
             />
           ) : (
           <div className="space-y-6">
@@ -3071,7 +3132,36 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               </form>
             </div>
 
-            <div className="pt-2 text-[10px] text-slate-500 font-mono flex items-center justify-center gap-2">
+            {matchingFactura && (
+        <div className="pt-2 border-t border-slate-800/80 max-w-md mx-auto w-full">
+          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-orange-500/30 flex items-center justify-between gap-3 text-left">
+            <div className="flex items-center gap-2.5">
+              <FileText className="w-5 h-5 text-orange-400 shrink-0" />
+              <div>
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>Factura Oficial · {matchingFactura.numeroFactura}</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono">
+                    ${Number(matchingFactura.total).toLocaleString()} USD
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Comprobante y desglose de inversión disponible
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedClientInvoiceModal(matchingFactura)}
+              className="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs shrink-0 flex items-center gap-1 shadow-md transition-all"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Ver Factura</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="pt-2 text-[10px] text-slate-500 font-mono flex items-center justify-center gap-2">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
               <span>Protección SSL AES-256 · Bóveda confidencial Goglite Studio</span>
             </div>
