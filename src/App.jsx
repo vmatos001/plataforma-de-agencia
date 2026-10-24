@@ -332,6 +332,16 @@ export default function App() {
     );
   }
 
+  const handleUpdateUserMfa = (userId, mfaState = true) => {
+    setUsersList(prev => prev.map(u => u.id === userId ? { ...u, mfaActivo: mfaState } : u));
+    try {
+      const stored = getLocalItem(STORAGE_KEYS.USERS, []);
+      if (Array.isArray(stored) && stored.length > 0) {
+        setLocalItem(STORAGE_KEYS.USERS, stored.map(u => u.id === userId ? { ...u, mfaActivo: mfaState } : u));
+      }
+    } catch {}
+  };
+
   // Gatekeeper de Seguridad: Bloqueo de Acceso hasta validar Google OAuth + MFA Authenticator
   if (!isAuthenticatedSession) {
     return (
@@ -339,6 +349,7 @@ export default function App() {
         usersList={usersList}
         agencySettings={agencySettings}
         onLoginSuccess={handleLoginSuccess}
+        onUpdateUserMfa={handleUpdateUserMfa}
       />
     );
   }

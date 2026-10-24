@@ -82,7 +82,8 @@ async function verifyClientTotp(token, secret, tolerance = 1) {
 export default function LoginGatekeeper({
   usersList = [],
   agencySettings = null,
-  onLoginSuccess
+  onLoginSuccess,
+  onUpdateUserMfa
 }) {
   const [step, setStep] = useState('google'); // 'google' | 'mfa'
   const [loadingGoogle, setLoadingGoogle] = useState(false);
@@ -128,11 +129,11 @@ export default function LoginGatekeeper({
   const resolvedLogo = (!imgError && rawLogo) ? rawLogo : null;
   const agencyName = agencySettings?.nombreAgencia || fetchedName || DEFAULT_AGENCY_BRANDING.nombreAgencia || 'Goglite Digital Hub';
 
-  // MFA State
+  // MFA State & Regla de Enrolamiento Único
+  const isMfaEnrolled = Boolean(matchedAppUser?.mfaActivo);
   const [totpCode, setTotpCode] = useState('');
   const [verifyingMfa, setVerifyingMfa] = useState(false);
   const [mfaSuccess, setMfaSuccess] = useState(false);
-  const [showQrModal, setShowQrModal] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(30 - (Math.floor(Date.now() / 1000) % 30));
@@ -147,19 +148,19 @@ export default function LoginGatekeeper({
     return () => clearInterval(timer);
   }, []);
 
-  // Generar QR para vinculación inicial de Google Authenticator
+  // Generar QR para vinculación inicial ÚNICAMENTE si el usuario NO tiene MFA activo
   useEffect(() => {
-    if (showQrModal && (googleUser?.email || matchedAppUser?.email)) {
+    if (!isMfaEnrolled && (googleUser?.email || matchedAppUser?.email)) {
       const email = googleUser?.email || matchedAppUser?.email || 'sitesgoglite@gmail.com';
-      const issuer = 'Goglite Agency';
+      const issuer = agencyName || 'Goglite Digital Hub';
       const uri = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${totpSecret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
       QRCode.toDataURL(uri, {
         margin: 1,
-        width: 220,
+        width: 180,
         color: { dark: '#000000', light: '#ffffff' }
       }).then(url => setQrCodeDataUrl(url)).catch(() => {});
     }
-  }, [showQrModal, googleUser, matchedAppUser, totpSecret]);
+  }, [isMfaEnrolled, googleUser, matchedAppUser, totpSecret, agencyName]);
 
   // Paso 1: Iniciar Sesión con Google
   const handleGoogleSignIn = async () => {
@@ -252,6 +253,23 @@ export default function LoginGatekeeper({
 
       if (isValid) {
         setMfaSuccess(true);
+
+        // Si el usuario no tenía enrolado el 2FA, activarlo de forma permanente en su perfil
+        if (!isMfaEnrolled && matchedAppUser?.id) {
+          const updatedUser = { ...matchedAppUser, mfaActivo: true };
+          setMatchedAppUser(updatedUser);
+          if (onUpdateUserMfa) {
+            onUpdateUserMfa(matchedAppUser.id, true);
+          }
+          try {
+            fetch(`/api/users/${matchedAppUser.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mfaActivo: true })
+            }).catch(() => {});
+          } catch {}
+        }
+
         // Persistir sesión autenticada en sessionStorage
         try {
           const sessionPayload = {
@@ -266,7 +284,7 @@ export default function LoginGatekeeper({
         } catch {}
 
         setTimeout(() => {
-          onLoginSuccess(matchedAppUser);
+          onLoginSuccess({ ...matchedAppUser, mfaActivo: true });
         }, 1200);
       } else {
         setErrorMessage('Código incorrecto o expirado. Verifica el código actual de 6 dígitos que muestra tu app de Google Authenticator.');
@@ -405,15 +423,61 @@ export default function LoginGatekeeper({
               </button>
             </div>
 
+            {/* CONDICIONAL CRÍTICA DE SEGURIDAD (One-Time Enrollment):
+                Si el usuario NO tiene enrolado el MFA (primer acceso), se le presenta el código QR para que lo escanee en su app.
+                Si YA tiene mfaActivo === true (Administrador o usuarios ya enrolados), ESTE BLOQUE QUEDA 100% INACCESIBLE Y OCULTO. */}
+            {!isMfaEnrolled && (
+              <div className="p-4 rounded-2xl bg-[#0c1018] border border-orange-500/30 space-y-3 animate-fade-in text-center">
+                <div className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-400">
+                  <QrCode className="w-4 h-4" />
+                  <span>Configuración Inicial de Google Authenticator</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Es tu primer inicio de sesión. Abre <strong>Google Authenticator</strong> en tu teléfono móvil, pulsa <strong>"+"</strong> y escanea este código QR:
+                </p>
+
+                {qrCodeDataUrl ? (
+                  <div className="inline-block p-2 bg-white rounded-xl shadow-md my-1">
+                    <img src={qrCodeDataUrl} alt="QR Google Authenticator" className="w-40 h-40 object-contain" />
+                  </div>
+                ) : (
+                  <div className="w-40 h-40 mx-auto bg-slate-900 rounded-xl flex items-center justify-center text-xs text-slate-500">
+                    Generando código QR...
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <div className="text-[10px] text-slate-500 font-mono">Clave de respaldo manual:</div>
+                  <div className="inline-flex items-center gap-2 bg-[#121929] border border-slate-800 px-3 py-1.5 rounded-lg text-xs font-mono text-white">
+                    <span>{totpSecret}</span>
+                    <button
+                      type="button"
+                      onClick={handleCopySecret}
+                      className="text-slate-400 hover:text-white transition-colors"
+                      title="Copiar clave"
+                    >
+                      {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-slate-400">
+                  Una vez sincronizado, introduce abajo el código de 6 dígitos para validar y asegurar tu cuenta de forma definitiva.
+                </div>
+              </div>
+            )}
+
             {/* Formulario de Código de 6 dígitos */}
             <form onSubmit={handleVerifyTotp} className="space-y-4">
               <div className="space-y-1.5 text-center">
                 <label className="text-xs font-bold text-white flex items-center justify-center gap-1.5">
                   <Smartphone className="w-4 h-4 text-orange-400" />
-                  <span>Código de Google Authenticator</span>
+                  <span>{isMfaEnrolled ? 'Código de Google Authenticator' : 'Confirma tu primer código de 6 dígitos'}</span>
                 </label>
                 <p className="text-[11px] text-slate-400">
-                  Abre la app en tu teléfono e introduce el código dinámico de 6 dígitos.
+                  {isMfaEnrolled 
+                    ? 'Abre la app en tu teléfono e introduce el código dinámico de 6 dígitos.'
+                    : 'Ingresa los 6 dígitos generados en tu móvil para activar la protección.'}
                 </p>
 
                 <div className="pt-2">
@@ -458,57 +522,10 @@ export default function LoginGatekeeper({
                   ) : (
                     <ArrowRight className="w-4 h-4" />
                   )}
-                  <span>{verifyingMfa ? 'Validando con Google Authenticator...' : 'Verificar y Acceder'}</span>
+                  <span>{verifyingMfa ? 'Validando con Google Authenticator...' : (isMfaEnrolled ? 'Verificar y Acceder' : 'Activar MFA y Acceder')}</span>
                 </button>
               )}
             </form>
-
-            {/* Enlace para ver QR si es primera configuración */}
-            <div className="pt-2 border-t border-slate-800/80 text-center">
-              <button
-                type="button"
-                onClick={() => setShowQrModal(!showQrModal)}
-                className="text-[11px] text-orange-400 hover:text-orange-300 font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <QrCode className="w-3.5 h-3.5" />
-                <span>{showQrModal ? 'Ocultar código QR' : '¿Primera vez? Vincular Google Authenticator con QR'}</span>
-              </button>
-            </div>
-
-            {/* Tarjeta Desplegable de Configuración QR */}
-            {showQrModal && (
-              <div className="p-4 rounded-2xl bg-[#0c1018] border border-orange-500/30 space-y-3 animate-fade-in text-center">
-                <div className="text-xs font-bold text-white">Escanear con Google Authenticator</div>
-                <p className="text-[11px] text-slate-400">
-                  En la app de tu móvil, toca el icono <strong>"+"</strong> y selecciona <strong>"Escanear código QR"</strong>.
-                </p>
-
-                {qrCodeDataUrl ? (
-                  <div className="inline-block p-2 bg-white rounded-xl shadow-md my-1">
-                    <img src={qrCodeDataUrl} alt="QR Google Authenticator" className="w-44 h-44 object-contain" />
-                  </div>
-                ) : (
-                  <div className="w-44 h-44 mx-auto bg-slate-900 rounded-xl flex items-center justify-center text-xs text-slate-500">
-                    Generando QR...
-                  </div>
-                )}
-
-                <div className="space-y-1">
-                  <div className="text-[10px] text-slate-500 font-mono">Clave de respaldo manual:</div>
-                  <div className="inline-flex items-center gap-2 bg-[#121929] border border-slate-800 px-3 py-1.5 rounded-lg text-xs font-mono text-white">
-                    <span>{totpSecret}</span>
-                    <button
-                      type="button"
-                      onClick={handleCopySecret}
-                      className="text-slate-400 hover:text-white transition-colors"
-                      title="Copiar clave"
-                    >
-                      {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
 
           </div>
         )}
