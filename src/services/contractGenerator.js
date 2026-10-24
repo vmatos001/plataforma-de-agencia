@@ -54,12 +54,12 @@ export function buildProyectoFromPresupuesto(presupuesto, existingList = []) {
   const modulosList = (presupuesto.modulos && presupuesto.modulos.length > 0)
     ? presupuesto.modulos
     : [
-        { id: 'm-1', numero: 'MÓDULO 1', titulo: 'Plataforma Web de Alta Conversión Mobile-First', precio: 500 },
-        { id: 'm-2', numero: 'MÓDULO 2', titulo: 'Optimización de Motores de Búsqueda & Google Maps', precio: 300 },
-        { id: 'm-3', numero: 'MÓDULO 3', titulo: 'Ecosistema de Captación WhatsApp & Códigos QR', precio: 200 }
+        { id: 'm-1', numero: 'MÓDULO 1', titulo: 'Plataforma Web de Alta Conversión Mobile-First' },
+        { id: 'm-2', numero: 'MÓDULO 2', titulo: 'Optimización de Motores de Búsqueda & Google Maps' },
+        { id: 'm-3', numero: 'MÓDULO 3', titulo: 'Ecosistema de Captación WhatsApp & Códigos QR' }
       ];
 
-  const modulosResumenTexto = modulosList.map(m => `• ${m.numero || 'Módulo'}: ${m.titulo} ($${m.precio || 0} USD)`).join('\n');
+  const modulosResumenTexto = modulosList.map(m => `• ${m.numero || 'Módulo'}: ${m.titulo}`).join('\n');
 
   return {
     id: 'proj-' + (presupuesto.id || Date.now()),
