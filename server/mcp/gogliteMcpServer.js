@@ -119,6 +119,60 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 
       // 2. CRM & INTELIGENCIA COMERCIAL (FASE 2)
       {
+        name: 'create_lead_from_whatsapp',
+        description: 'HERRAMIENTA CLAVE: Registra un NUEVO prospecto proveniente de una conversación de WhatsApp externa con su resumen ejecutivo, temperatura y próxima acción comercial.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            empresa: {
+              type: 'string',
+              description: 'Nombre del negocio, empresa o marca del cliente',
+            },
+            contacto: {
+              type: 'string',
+              description: 'Nombre de la persona de contacto',
+            },
+            telefono: {
+              type: 'string',
+              description: 'Número de WhatsApp con código de país (ej: +503 7000-1122 o +1 829 555-0199)',
+            },
+            pais: {
+              type: 'string',
+              description: 'Código de país principal (SV, DO, US, ES, MX, CO)',
+              default: 'SV',
+            },
+            email: {
+              type: 'string',
+              description: 'Correo electrónico del cliente (opcional)',
+            },
+            dominio: {
+              type: 'string',
+              description: 'Sitio web actual o red social del prospecto (opcional)',
+            },
+            conversationSummary: {
+              type: 'string',
+              description: 'Resumen ejecutivo de lo conversado por WhatsApp: requerimientos, dolores, objeciones y expectativas del cliente.',
+            },
+            temperature: {
+              type: 'string',
+              description: 'Temperatura comercial de compra',
+              enum: ['caliente', 'tibio', 'frio'],
+            },
+            nextAction: {
+              type: 'string',
+              description: 'Próxima acción estratégica acordada (ej: "Enviar presupuesto Landing VIP mañana a las 10 AM")',
+            },
+            stage: {
+              type: 'string',
+              description: 'Etapa inicial en el pipeline',
+              enum: ['nuevo', 'contactado', 'calificado', 'reunion', 'propuesta_enviada', 'negociacion', 'ganado', 'perdido'],
+              default: 'contactado',
+            },
+          },
+          required: ['empresa', 'contacto', 'telefono', 'conversationSummary', 'temperature', 'nextAction'],
+        },
+      },
+      {
         name: 'get_pipeline_leads',
         description: 'Consulta los prospectos en el embudo comercial (Kanban), con filtros opcionales por etapa, país o temperatura de compra.',
         inputSchema: {
@@ -588,6 +642,93 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // ----------------------------------------------------
     // 2. CRM & INTELIGENCIA COMERCIAL
     // ----------------------------------------------------
+    if (name === 'create_lead_from_whatsapp') {
+      const leads = getCrmLeads();
+      const timestamp = Date.now();
+      const randomSuffix = Math.random().toString(36).substring(2, 6);
+      const todayStr = new Date().toISOString().split('T')[0];
+      const newLeadId = `crm-lead-${timestamp}-${randomSuffix}`;
+      const portalToken = `portal-${newLeadId}-${Math.random().toString(36).substring(2, 8)}`;
+
+      const newLead = {
+        id: newLeadId,
+        leadId: newLeadId,
+        empresa: args.empresa.trim(),
+        contacto: args.contacto.trim(),
+        cargo: 'Representante / Propietario',
+        email: args.email ? args.email.trim() : '',
+        telefono: args.telefono.trim(),
+        pais: args.pais || 'SV',
+        dominio: args.dominio ? args.dominio.trim() : '',
+        etapa: args.stage || 'contactado',
+        valorEstimado: 650,
+        probabilidad: args.temperature === 'caliente' ? 70 : (args.temperature === 'tibio' ? 40 : 15),
+        fuente: 'WhatsApp Inbound',
+        portalToken,
+        temperatura: args.temperature,
+        resumenEjecutivo: args.conversationSummary,
+        proximaAccion: args.nextAction,
+        interacciones: [
+          {
+            id: `int-${timestamp}`,
+            tipo: 'whatsapp_registro',
+            fecha: todayStr,
+            titulo: 'Registro de Conversación WhatsApp',
+            detalle: args.conversationSummary,
+            proximoPaso: args.nextAction,
+            fechaProximoPaso: todayStr
+          }
+        ],
+        portalConfig: {
+          portalActivo: true,
+          faseActual: 'Diagnóstico Comercial',
+          progresoPorcentaje: 20,
+          archivosSubidos: [],
+          notasCliente: args.nextAction,
+          presupuestoId: null,
+          proyectoId: null
+        },
+        whatsappData: {
+          telefono: args.telefono.trim(),
+          temperatura: args.temperature,
+          estadoSeguimiento: 'conversacion_activa',
+          resumenEjecutivo: args.conversationSummary,
+          proximaAccion: args.nextAction,
+          fechaResumen: todayStr,
+          mensajes: [
+            {
+              id: `wmsg-${timestamp}`,
+              fecha: new Date().toISOString(),
+              emisor: 'cliente',
+              texto: args.conversationSummary
+            }
+          ]
+        },
+        creadoEn: todayStr,
+        actualizadoEn: todayStr
+      };
+
+      leads.unshift(newLead);
+      saveCrmLeads(leads);
+
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            ok: true,
+            mensaje: `✅ Prospecto '${args.empresa}' registrado con éxito en el CRM de Goglite.`,
+            leadId: newLead.id,
+            empresa: newLead.empresa,
+            temperatura: newLead.temperatura,
+            etapa: newLead.etapa,
+            proximaAccion: newLead.proximaAccion,
+            portalToken: newLead.portalToken,
+            portalUrl: `https://agencia.goglite.com/?token=${newLead.portalToken}`
+          }, null, 2)
+        }]
+      };
+    }
+
     if (name === 'get_pipeline_leads') {
       const leads = getCrmLeads();
       const stage = args.stage || 'ALL';
