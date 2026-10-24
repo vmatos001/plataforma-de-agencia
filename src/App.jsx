@@ -344,6 +344,7 @@ export default function App() {
     return (
       <LoginGatekeeper
         usersList={usersList}
+        agencySettings={agencySettings}
         onLoginSuccess={handleLoginSuccess}
       />
     );

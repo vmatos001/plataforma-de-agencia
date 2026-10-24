@@ -80,6 +80,7 @@ async function verifyClientTotp(token, secret, tolerance = 1) {
 
 export default function LoginGatekeeper({
   usersList = [],
+  agencySettings = null,
   onLoginSuccess
 }) {
   const [step, setStep] = useState('google'); // 'google' | 'mfa'
@@ -88,6 +89,44 @@ export default function LoginGatekeeper({
   const [matchedAppUser, setMatchedAppUser] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   
+  // Logo & Branding de Agencia
+  const [imgError, setImgError] = useState(false);
+  const [fetchedLogo, setFetchedLogo] = useState('');
+  const [fetchedName, setFetchedName] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedDedicated = localStorage.getItem('goglite_agency_logo');
+      if (storedDedicated) {
+        setFetchedLogo(storedDedicated);
+      }
+      try {
+        const storedSettings = JSON.parse(localStorage.getItem('goglite_agency_settings') || '{}');
+        if (storedSettings?.logoUrl && !storedDedicated) {
+          setFetchedLogo(storedSettings.logoUrl);
+        }
+        if (storedSettings?.nombreAgencia) {
+          setFetchedName(storedSettings.nombreAgencia);
+        }
+      } catch {}
+    }
+
+    fetch('/api/agency/settings')
+      .then(res => {
+        const cType = res.headers.get('content-type') || '';
+        return (res.ok && cType.includes('application/json')) ? res.json() : null;
+      })
+      .then(data => {
+        if (data?.logoUrl) setFetchedLogo(data.logoUrl);
+        if (data?.nombreAgencia) setFetchedName(data.nombreAgencia);
+      })
+      .catch(() => {});
+  }, []);
+
+  const rawLogo = agencySettings?.logoUrl || fetchedLogo;
+  const resolvedLogo = (!imgError && rawLogo) ? rawLogo : null;
+  const agencyName = agencySettings?.nombreAgencia || fetchedName || 'Goglite Digital Hub';
+
   // MFA State
   const [totpCode, setTotpCode] = useState('');
   const [verifyingMfa, setVerifyingMfa] = useState(false);
@@ -266,12 +305,21 @@ export default function LoginGatekeeper({
         
         {/* Encabezado de Marca */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500/20 to-orange-600/10 border border-orange-500/30 text-orange-400 mb-1 shadow-lg shadow-orange-500/10">
-            <ShieldCheck className="w-7 h-7 stroke-[2.2]" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#121929] border border-orange-500/30 text-orange-400 mb-1 shadow-lg shadow-orange-500/10 p-2 overflow-hidden">
+            {resolvedLogo ? (
+              <img 
+                src={resolvedLogo} 
+                alt={agencyName} 
+                className="w-full h-full object-contain filter drop-shadow"
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <ShieldCheck className="w-7 h-7 stroke-[2.2]" />
+            )}
           </div>
           <div className="space-y-0.5">
             <span className="text-[10px] font-mono font-bold tracking-widest uppercase text-orange-400 bg-orange-500/10 px-2.5 py-0.5 rounded-full border border-orange-500/20">
-              Goglite Digital Hub · Suite Privada
+              {agencyName} · Suite Privada
             </span>
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
               Control de Acceso Seguro
