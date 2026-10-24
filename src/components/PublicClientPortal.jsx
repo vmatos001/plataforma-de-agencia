@@ -46,7 +46,8 @@ import {
   getStoredProyectos,
   saveStoredProyectos,
   buildProyectoFromPresupuesto,
-  ensureProyectoForPresupuesto
+  ensureProyectoForPresupuesto,
+  reconcileProyectoWithPresupuesto
 } from '../services/contractGenerator';
 import { evaluateProjectMilestones } from '../services/projectMilestoneSync';
 import { 
@@ -771,7 +772,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   (p.presupuestoCodigo && p.presupuestoCodigo === parsedProp.codigo) ||
                   (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
                 );
-                if (!matchedProj && (storedPortalConfig.fase1Aprobada || parsedProp.estado === 'aceptado')) {
+                if (matchedProj) {
+                  matchedProj = reconcileProyectoWithPresupuesto(matchedProj, parsedProp);
+                } else if (storedPortalConfig.fase1Aprobada || parsedProp.estado === 'aceptado') {
                   matchedProj = buildProyectoFromPresupuesto(parsedProp, projs);
                   saveStoredProyectos([matchedProj, ...projs]);
                 }
@@ -1022,7 +1025,10 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
           (leadEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === leadEmp)
         );
         if (matchedProj) {
-          const evaluatedProj = evaluateProjectMilestones(matchedProj);
+          const synchronizedProj = loadedData.presupuesto
+            ? reconcileProyectoWithPresupuesto(matchedProj, loadedData.presupuesto)
+            : matchedProj;
+          const evaluatedProj = evaluateProjectMilestones(synchronizedProj);
           loadedData.proyecto = evaluatedProj;
           if (evaluatedProj.seguimiento?.porcentajeAvance) {
             loadedData.portalConfig = {
@@ -1827,14 +1833,21 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const clientContacto = presupuesto?.cliente?.nombre || lead.contacto || 'Representante Legal';
   const clientUbicacion = presupuesto?.cliente?.ubicacion || (currentPais === 'DO' ? 'Santo Domingo, República Dominicana' : 'San Salvador, El Salvador');
 
-  // Asegurar que el contrato formal SOW y el proyecto estén siempre resueltos
-  const activeProyecto = data.proyecto || (presupuesto ? buildProyectoFromPresupuesto(presupuesto) : (lead ? buildProyectoFromPresupuesto({
+  // Asegurar que el contrato formal SOW y el proyecto estén siempre resueltos y reconciliados con el presupuesto
+  const rawActiveProyecto = data.proyecto || (presupuesto ? buildProyectoFromPresupuesto(presupuesto) : (lead ? buildProyectoFromPresupuesto({
     id: lead.id,
     codigo: lead.presupuestoCodigo || 'P-2026',
     cliente: { nombre: clientContacto, empresa: clientEmpresa, telefono: lead.telefono, email: lead.email, ubicacion: clientUbicacion },
     pais: currentPais,
     inversion: { precioTotal: totalInversion, anticipo: anticipoMonto, contraEntrega: liquidacionMonto }
   }) : null));
+
+  const activeProyecto = (rawActiveProyecto && (presupuesto || totalInversion))
+    ? reconcileProyectoWithPresupuesto(rawActiveProyecto, presupuesto || {
+        codigo: lead.presupuestoCodigo || 'P-2026',
+        inversion: { precioTotal: totalInversion, anticipo: anticipoMonto, contraEntrega: liquidacionMonto }
+      })
+    : rawActiveProyecto;
 
   const contrato = activeProyecto?.contrato;
 
@@ -2638,7 +2651,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       CLÁUSULA {c.numero}: {c.titulo}
                     </h4>
                     <p className="text-slate-700 leading-relaxed text-justify whitespace-pre-line">
-                      {c.texto}
+                      {(c.texto || '')
+                        .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '')
+                        .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\)/gi, '')}
                     </p>
                   </div>
                 ))}

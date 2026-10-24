@@ -48,7 +48,8 @@ import {
 import {
   getStoredProyectos,
   saveStoredProyectos,
-  buildProyectoFromPresupuesto
+  buildProyectoFromPresupuesto,
+  reconcileProyectoWithPresupuesto
 } from '../services/contractGenerator';
 import {
   evaluateProjectMilestones,
@@ -116,12 +117,15 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
         parsedProps.forEach(prop => {
           if (prop?.estado === 'aceptado') {
             const targetEmp = (prop.cliente?.empresa || '').toLowerCase().trim();
-            const exists = localList.some(p => 
+            const existingIdx = localList.findIndex(p => 
               (p.presupuestoId && p.presupuestoId === prop.id) ||
               (p.presupuestoCodigo && p.presupuestoCodigo === prop.codigo) ||
               (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
             );
-            if (!exists) {
+            if (existingIdx >= 0) {
+              localList[existingIdx] = reconcileProyectoWithPresupuesto(localList[existingIdx], prop);
+              createdAny = true;
+            } else {
               const newProj = buildProyectoFromPresupuesto(prop, localList);
               localList.unshift(newProj);
               createdAny = true;
@@ -1259,8 +1263,10 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                       <h4 className="font-black text-slate-950 uppercase tracking-wide text-[11px]">
                         CLÁUSULA {c.numero}: {c.titulo}
                       </h4>
-                      <p className="text-slate-700 leading-relaxed text-justify">
-                        {c.texto}
+                      <p className="text-slate-700 leading-relaxed text-justify whitespace-pre-line">
+                        {(c.texto || '')
+                          .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '')
+                          .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\)/gi, '')}
                       </p>
                     </div>
                   ))}

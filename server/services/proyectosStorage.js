@@ -37,8 +37,19 @@ export function crearProyectoDesdePresupuesto(presupuesto) {
 
   const modulosTotal = presupuesto.modulos?.reduce((acc, m) => acc + (Number(m.precio) || 0), 0) || 0;
   const total = Number(presupuesto.inversion?.precioTotal) || modulosTotal || 0;
-  const anticipo = Math.round(total * 0.5);
-  const saldo = total - anticipo;
+  const anticipo = Number(presupuesto.inversion?.anticipo) || Math.round(total * 0.5);
+  const saldo = Number(presupuesto.inversion?.contraEntrega) || (total - anticipo);
+
+  const cleanModuleTitle = (t) => (t || '')
+    .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '')
+    .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\)/gi, '')
+    .trim();
+
+  const modulosList = (presupuesto.modulos && presupuesto.modulos.length > 0)
+    ? presupuesto.modulos.map(m => ({ ...m, titulo: cleanModuleTitle(m.titulo) }))
+    : [];
+
+  const modulosResumenTexto = modulosList.map(m => `• ${m.numero || 'Módulo'}: ${cleanModuleTitle(m.titulo)}`).join('\n');
 
   const nuevoProyecto = {
     id: 'proj-' + Date.now(),
@@ -65,11 +76,12 @@ export function crearProyectoDesdePresupuesto(presupuesto) {
       saldo,
       moneda: presupuesto.moneda || 'USD',
       alcanceResumen: presupuesto.portada?.proyecto || 'Desarrollo de plataforma digital de alta conversión.',
+      modulos: modulosList,
       clausulas: [
         {
           numero: 'PRIMERA',
           titulo: 'OBJETO Y ALCANCE DEL SERVICIO',
-          texto: `GOGLITE se compromete a diseñar, desarrollar y desplegar la solución digital para EL CLIENTE (${presupuesto.cliente?.empresa || presupuesto.cliente?.nombre}), ejecutando los módulos acordados en la propuesta formal ${presupuesto.codigo}.`
+          texto: `GOGLITE DIGITAL se compromete formalmente al diseño, desarrollo, configuración y despliegue del sistema web corporativo para EL CLIENTE (${presupuesto.cliente?.empresa || presupuesto.cliente?.nombre}), ejecutando los módulos acordados en la propuesta formal ${presupuesto.codigo}:\n${modulosResumenTexto}`
         },
         {
           numero: 'SEGUNDA',
@@ -79,7 +91,7 @@ export function crearProyectoDesdePresupuesto(presupuesto) {
         {
           numero: 'TERCERA',
           titulo: 'HONORARIOS Y CONDICIONES DE PAGO',
-          texto: `El valor total del proyecto es de $${total.toFixed(2)} USD. Se abonará un 50% ($${anticipo.toFixed(2)} USD) en concepto de anticipo para iniciar los trabajos y el 50% restante ($${saldo.toFixed(2)} USD) contra entrega final y despliegue.`
+          texto: `El valor total del acuerdo comercial es de $${total.toLocaleString()} USD. La forma de pago se estructura en dos fases: un cincuenta por ciento (50% = $${anticipo.toLocaleString()} USD) en concepto de anticipo inicial para dar inicio a los trabajos, y el cincuenta por ciento restante ($${saldo.toLocaleString()} USD) contra entrega final y despliegue en staging, previo a la liberación de credenciales maestras y dominio oficial.`
         },
         {
           numero: 'CUARTA',

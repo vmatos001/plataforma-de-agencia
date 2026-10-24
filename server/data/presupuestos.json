@@ -1,1 +1,105 @@
-[]
+[
+  {
+    "id": "prop-jaybest-evelin-300",
+    "codigo": "P-2026-001",
+    "titulo": "PROPUESTA DE DESARROLLO DIGITAL VIP",
+    "subtitulo": "(SISTEMA TURÍSTICO INTEGRAL: 3 VILLAS, CATÁLOGO TOURS & PAGOS PAYPAL)",
+    "fecha": "Octubre de 2026",
+    "vigenciaDias": 15,
+    "estado": "enviado",
+    "moneda": "USD",
+    "simboloMoneda": "$",
+    "pais": "DO",
+    "emisor": {
+      "empresa": "Goglite",
+      "ubicacion": "Santa Ana, El Salvador · Santo Domingo, RD",
+      "telefono": "(503) 7756-9828",
+      "email": "info@goglite.com",
+      "responsable": "Víctor Matos",
+      "cargo": "Director & Estratega Digital"
+    },
+    "cliente": {
+      "nombre": "Evelin Jasbet",
+      "empresa": "Jaybest Multi Services SRL (Evelin Jasbet Service)",
+      "telefono": "+1 (809) 408-8070",
+      "email": "evelin@jaybestservices.com",
+      "actividad": "Villas Turísticas, Tours & Transporte",
+      "ubicacion": "Punta Cana, República Dominicana",
+      "leadId": "crm-lead-1792877090492-0al5"
+    },
+    "portada": {
+      "proyecto": "Implementación del Sistema Digital Integral para Jaybest Multi Services SRL en Punta Cana: plataforma web turística VIP optimizada para teléfonos móviles con catálogo de sus 3 casas/villas (renta corta tipo Airbnb), catálogo interactivo de tours y excursiones, módulo de transfers para aeropuerto PUJ y hoteles, y pasarela de pago directo con PayPal.",
+      "enfoqueEstrategico": "Arquitectura orientada a la conversión directa de turistas con botón directo de PayPal para reserva inmediata en línea, integración oficial con Airbnb, Booking y TripAdvisor, y botón flotante de WhatsApp Business 24/7 sin intermediarios.",
+      "tecnologiaMobileFirst": "Plataforma ultra-rápida (carga en menos de 1.2 segundos), 100% responsiva para turistas internacionales que reservan y consultan desde sus teléfonos celulares.",
+      "geoSeoLocal": "Optimización y verificación en Google Maps Punta Cana, ecosistema de códigos QR para vehículos y villas para incentivar calificaciones 5 estrellas, y alineación de perfiles en Instagram y Facebook."
+    },
+    "modulos": [
+      {
+        "id": "mod-1",
+        "numero": "MÓDULO 1",
+        "titulo": "Plataforma Web Turística VIP (Mobile-First)",
+        "descripcion": "Desarrollo de sitio web responsivo de alta velocidad con: 1) Fichas individuales para sus 3 Casas/Villas (Renta Corta tipo Airbnb) con galería de fotos, amenidades, capacidad y botón de reserva directa. 2) Catálogo de Tours y Excursiones en Punta Cana con itinerarios y detalles. 3) Módulo de Transporte Turístico para traslados aeropuerto de Punta Cana (PUJ) y hoteles. Incluye hosting de alta velocidad + Certificado SSL seguro.",
+        "tipo": "precio_cerrado",
+        "horas": 12,
+        "precio": 150
+      },
+      {
+        "id": "mod-2",
+        "numero": "MÓDULO 2",
+        "titulo": "Reservas y Pasarela de Pagos en Línea (PayPal & Canales Directos)",
+        "descripcion": "1) Botón directo de PayPal para que los turistas paguen su anticipo o reserva en línea con un solo clic. 2) Conexión y sincronización de perfiles oficiales con Airbnb, Booking y TripAdvisor para reservas con calendario. 3) Botón flotante inteligente de WhatsApp Business para atención y cierre de reservas 24/7 sin intermediarios.",
+        "tipo": "precio_cerrado",
+        "horas": 5,
+        "precio": 50
+      },
+      {
+        "id": "mod-3",
+        "numero": "MÓDULO 3",
+        "titulo": "Posicionamiento Local Google Maps & Ecosistema de Redes",
+        "descripcion": "1) Optimización de ficha comercial de Google Maps en Punta Cana con fotos y categorías para que los turistas ubiquen sus servicios fácilmente. 2) Códigos QR para reseñas 5 estrellas para colocar en vehículos de transporte y en las villas. 3) Alineación de Instagram y Facebook con biografía profesional y botones directos a web y WhatsApp.",
+        "tipo": "precio_cerrado",
+        "horas": 4,
+        "precio": 50
+      },
+      {
+        "id": "mod-4",
+        "numero": "MÓDULO 4",
+        "titulo": "Plan de Publicidad Turística & Soporte Continuo Post-Lanzamiento",
+        "descripcion": "1) Guía y estructura de anuncios (Google Ads y Meta Ads) para atraer turistas buscando villas, tours o traslados en Punta Cana. 2) 1 mes completo de soporte técnico, supervisión y acompañamiento gratuito tras el lanzamiento oficial.",
+        "tipo": "precio_cerrado",
+        "horas": 3,
+        "precio": 50
+      }
+    ],
+    "fases": [
+      {
+        "fase": "Fase 1",
+        "plazo": "Días 1 a 3",
+        "detalle": "Recepción de fotografías de las 3 villas, amenidades, tarifas, catálogo de tours y configuración de la pasarela PayPal y cuentas bancarias locales (Banreservas/Popular/BHD)."
+      },
+      {
+        "fase": "Fase 2",
+        "plazo": "Días 4 a 8",
+        "detalle": "Desarrollo de la plataforma turística Mobile-First, fichas individuales de las 3 propiedades, catálogo de excursiones en Punta Cana y módulo de transfers aeropuerto PUJ."
+      },
+      {
+        "fase": "Fase 3",
+        "plazo": "Días 9 a 10",
+        "detalle": "Integración de Google Maps Punta Cana, códigos QR para vehículos y villas, botón flotante de WhatsApp, pruebas de cobro con PayPal y entrega en producción."
+      }
+    ],
+    "inversion": {
+      "precioMercadoReferencial": 750,
+      "precioTotal": 300,
+      "descuentoEspecial": 450,
+      "anticipo": 150,
+      "contraEntrega": 150,
+      "beneficioExclusivo": "1 mes de soporte técnico, supervisión y acompañamiento gratuito tras el lanzamiento oficial.",
+      "revisiones": "Dos (2) rondas completas de ajustes de diseño y contenido.",
+      "requisitosInicio": "Fotografías de las 3 villas, detalles de los tours, zonas de transporte, número de WhatsApp y cuenta PayPal para vinculación."
+    },
+    "alcance": "Sistema Digital Turístico Completo: Web con 3 Villas, Tours, Transporte PUJ, Botón PayPal, WhatsApp y Google Maps.",
+    "creadoPor": "Agente MCP Goglite",
+    "actualizadoEn": "2026-10-24T22:03:42.452Z"
+  }
+]

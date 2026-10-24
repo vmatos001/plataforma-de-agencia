@@ -9,7 +9,7 @@
     "telefono": "+1 (809) 408-8070",
     "pais": "DO",
     "dominio": "",
-    "etapa": "negociacion",
+    "etapa": "propuesta_enviada",
     "valorEstimado": 300,
     "probabilidad": 85,
     "fuente": "WhatsApp Inbound",
@@ -34,7 +34,7 @@
       "progresoPorcentaje": 25,
       "archivosSubidos": [],
       "notasCliente": "Coordinar y confirmar recepción del anticipo de $150 USD por transferencia local (Banreservas/Popular/BHD) o PayPal para agendar inicio inmediato del proyecto.",
-      "presupuestoId": null,
+      "presupuestoId": "prop-jaybest-evelin-300",
       "proyectoId": null
     },
     "whatsappData": {
