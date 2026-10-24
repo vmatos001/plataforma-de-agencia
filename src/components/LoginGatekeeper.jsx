@@ -320,13 +320,13 @@ export default function LoginGatekeeper({
           </div>
           <div className="space-y-0.5">
             <span className="text-[10px] font-mono font-bold tracking-widest uppercase text-orange-400 bg-orange-500/10 px-2.5 py-0.5 rounded-full border border-orange-500/20">
-              {agencyName} · Suite Privada
+              {agencyName}
             </span>
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
               Control de Acceso Seguro
             </h1>
             <p className="text-xs text-slate-400">
-              Autenticación oficial de dos factores (Google OAuth + Google Authenticator)
+              Autenticación oficial de dos factores
             </p>
           </div>
         </div>
@@ -372,12 +372,6 @@ export default function LoginGatekeeper({
               )}
               <span>{loadingGoogle ? 'Conectando con Google...' : 'Continuar con Google'}</span>
             </button>
-
-            <div className="pt-2 text-center">
-              <span className="text-[10px] text-slate-500 font-mono">
-                Administrador Maestro: sitesgoglite@gmail.com
-              </span>
-            </div>
           </div>
         )}
 
