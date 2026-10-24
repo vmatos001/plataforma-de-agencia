@@ -81,59 +81,99 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// 1. Status & Settings
+// 1. Status & Settings (Zero-Exposure Architecture)
 app.get('/api/status', (req, res) => {
   const settings = getSettings();
+  const servicesStatus = {
+    gemini: Boolean(settings.geminiApiKey),
+    serper: Boolean(settings.serperApiKey),
+    apollo: Boolean(settings.apolloApiKey),
+    resend: Boolean(settings.resendApiKey)
+  };
   res.json({
     status: 'ok',
+    online: true,
     version: '1.0.0',
     module: 'Lead Scrapper & Outbound AI',
     activeKeys: {
-      gemini: Boolean(settings.geminiApiKey),
-      serper: Boolean(settings.serperApiKey),
-      apollo: Boolean(settings.apolloApiKey),
-      instantly: Boolean(settings.instantlyApiKey),
-      resend: Boolean(settings.resendApiKey)
-    }
+      ...servicesStatus,
+      instantly: Boolean(settings.instantlyApiKey)
+    },
+    services: servicesStatus
   });
 });
 
 app.get('/api/settings', (req, res) => {
   const settings = getSettings();
-  // Mask sensitive keys for security in UI
-  const masked = {
-    ...settings,
-    geminiApiKeyMasked: settings.geminiApiKey ? `${settings.geminiApiKey.slice(0, 4)}...${settings.geminiApiKey.slice(-4)}` : '',
-    serperApiKeyMasked: settings.serperApiKey ? `${settings.serperApiKey.slice(0, 4)}...${settings.serperApiKey.slice(-4)}` : '',
-    apolloApiKeyMasked: settings.apolloApiKey ? `${settings.apolloApiKey.slice(0, 4)}...${settings.apolloApiKey.slice(-4)}` : '',
-    instantlyApiKeyMasked: settings.instantlyApiKey ? `${settings.instantlyApiKey.slice(0, 4)}...${settings.instantlyApiKey.slice(-4)}` : '',
-    resendApiKeyMasked: settings.resendApiKey ? `${settings.resendApiKey.slice(0, 4)}...${settings.resendApiKey.slice(-4)}` : '',
-  };
-  res.json(masked);
+  // Blindaje Zero-Exposure: NUNCA se devuelven claves secretas en texto plano al frontend
+  res.json({
+    defaultCountry: settings.defaultCountry || 'SV',
+    demoMode: Boolean(settings.demoMode),
+    preferredEmailProvider: settings.preferredEmailProvider || 'resend',
+    resendFromEmail: settings.resendFromEmail || 'Goglite Agencia <onboarding@resend.dev>',
+    // Estados booleanos de configuración en servidor
+    geminiConfigured: Boolean(settings.geminiApiKey),
+    serperConfigured: Boolean(settings.serperApiKey),
+    apolloConfigured: Boolean(settings.apolloApiKey),
+    resendConfigured: Boolean(settings.resendApiKey),
+    instantlyConfigured: Boolean(settings.instantlyApiKey),
+    // Máscaras de solo 4 caracteres de referencia para la consola de administración
+    geminiApiKeyMasked: settings.geminiApiKey ? `${settings.geminiApiKey.slice(0, 4)}••••••••${settings.geminiApiKey.slice(-4)}` : '',
+    serperApiKeyMasked: settings.serperApiKey ? `${settings.serperApiKey.slice(0, 4)}••••••••${settings.serperApiKey.slice(-4)}` : '',
+    apolloApiKeyMasked: settings.apolloApiKey ? `${settings.apolloApiKey.slice(0, 4)}••••••••${settings.apolloApiKey.slice(-4)}` : '',
+    resendApiKeyMasked: settings.resendApiKey ? `${settings.resendApiKey.slice(0, 4)}••••••••${settings.resendApiKey.slice(-4)}` : '',
+    instantlyApiKeyMasked: settings.instantlyApiKey ? `${settings.instantlyApiKey.slice(0, 4)}••••••••${settings.instantlyApiKey.slice(-4)}` : ''
+  });
 });
 
 app.post('/api/settings', (req, res) => {
-  const updated = saveSettings(req.body);
-  res.json({ success: true, settings: updated });
+  // Solo permitir actualizar configuraciones no sensibles por esta vía
+  const { defaultCountry, demoMode, preferredEmailProvider, resendFromEmail } = req.body || {};
+  const safePayload = {};
+  if (defaultCountry !== undefined) safePayload.defaultCountry = defaultCountry;
+  if (demoMode !== undefined) safePayload.demoMode = demoMode;
+  if (preferredEmailProvider !== undefined) safePayload.preferredEmailProvider = preferredEmailProvider;
+  if (resendFromEmail !== undefined) safePayload.resendFromEmail = resendFromEmail;
+
+  const updated = saveSettings(safePayload);
+  res.json({ 
+    success: true, 
+    settings: {
+      defaultCountry: updated.defaultCountry,
+      demoMode: updated.demoMode,
+      preferredEmailProvider: updated.preferredEmailProvider,
+      resendFromEmail: updated.resendFromEmail
+    }
+  });
 });
 
 app.post('/api/settings/test', async (req, res) => {
   try {
-    const { provider, apiKey } = req.body || {};
+    const { provider } = req.body || {};
     const settings = getSettings();
-    const keyToTest = (apiKey && apiKey.trim()) || settings[`${provider}ApiKey`];
+    // La prueba utiliza estrictamente la variable configurada en el servidor
+    const keyToTest = settings[`${provider}ApiKey`];
 
-    if (!keyToTest) {
-      return res.status(400).json({ ok: false, message: 'No hay ninguna clave configurada para probar.' });
+    if (!keyToTest || !keyToTest.trim()) {
+      return res.status(400).json({ 
+        ok: false, 
+        message: `La variable de entorno para ${provider?.toUpperCase() || 'este servicio'} no está configurada en el servidor (Railway / .env).` 
+      });
     }
 
     if (provider === 'gemini') {
       const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(keyToTest)}`);
       if (resp.ok) {
-        return res.json({ ok: true, message: 'Google Gemini API conectada y respondiendo correctamente (HTTP 200).' });
+        return res.json({ 
+          ok: true, 
+          message: 'Google Gemini AI (1.5 / 2.0 Flash) conectado y respondiendo correctamente (HTTP 200).' 
+        });
       }
       const data = await resp.json().catch(() => ({}));
-      return res.status(400).json({ ok: false, message: data.error?.message || 'Error de autenticación con Google Gemini API.' });
+      return res.status(400).json({ 
+        ok: false, 
+        message: data.error?.message || 'Error de autenticación: clave de Gemini rechazada por Google AI Studio.' 
+      });
     }
 
     if (provider === 'serper') {
@@ -146,10 +186,16 @@ app.post('/api/settings/test', async (req, res) => {
         body: JSON.stringify({ q: 'ping test', num: 1 })
       });
       if (resp.ok) {
-        return res.json({ ok: true, message: 'Serper.dev conectado y respondiendo correctamente (HTTP 200).' });
+        return res.json({ 
+          ok: true, 
+          message: 'Serper.dev (Google Maps & SERP Scraper) conectado y respondiendo correctamente (HTTP 200).' 
+        });
       }
       const data = await resp.json().catch(() => ({}));
-      return res.status(400).json({ ok: false, message: data.message || 'Clave de Serper rechazada o inválida.' });
+      return res.status(400).json({ 
+        ok: false, 
+        message: data.message || 'Clave de Serper rechazada o sin créditos disponibles en serper.dev.' 
+      });
     }
 
     if (provider === 'apollo') {
@@ -157,9 +203,15 @@ app.post('/api/settings/test', async (req, res) => {
         headers: { 'Cache-Control': 'no-cache', 'X-Api-Key': keyToTest }
       });
       if (resp.ok) {
-        return res.json({ ok: true, message: 'Apollo.io conectado y respondiendo correctamente (HTTP 200).' });
+        return res.json({ 
+          ok: true, 
+          message: 'Apollo.io B2B conectado y respondiendo correctamente (HTTP 200).' 
+        });
       }
-      return res.status(400).json({ ok: false, message: 'Clave de Apollo rechazada o sin permisos de acceso.' });
+      return res.status(400).json({ 
+        ok: false, 
+        message: 'Clave de Apollo rechazada o sin permisos de acceso a la API.' 
+      });
     }
 
     if (provider === 'resend') {
@@ -167,15 +219,21 @@ app.post('/api/settings/test', async (req, res) => {
         headers: { Authorization: `Bearer ${keyToTest}` }
       });
       if (resp.ok) {
-        return res.json({ ok: true, message: 'Resend conectado y respondiendo correctamente (HTTP 200).' });
+        return res.json({ 
+          ok: true, 
+          message: 'Resend Gateway conectado y listo para envíos de facturas y presupuestos (HTTP 200).' 
+        });
       }
       const data = await resp.json().catch(() => ({}));
-      return res.status(400).json({ ok: false, message: data.message || 'Clave de Resend rechazada o inválida.' });
+      return res.status(400).json({ 
+        ok: false, 
+        message: data.message || 'Clave de Resend rechazada o inválida.' 
+      });
     }
 
     return res.status(400).json({ ok: false, message: `Proveedor "${provider}" no reconocido para pruebas.` });
   } catch (err) {
-    return res.status(500).json({ ok: false, message: err.message });
+    return res.status(500).json({ ok: false, message: `Error ejecutando la prueba: ${err.message}` });
   }
 });
 
