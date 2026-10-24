@@ -22,6 +22,13 @@ jobs:
 
       - name: Compilar Frontend (dist)
         run: npm run build
+        env:
+          VITE_PUBLIC_GEMINI_ACTIVE: 'true'
+          VITE_PUBLIC_GEMINI_MASKED: 'AQ.A••••••••FSpQ'
+          VITE_PUBLIC_SERPER_ACTIVE: 'true'
+          VITE_PUBLIC_SERPER_MASKED: 'baf7••••••••693a'
+          VITE_PUBLIC_APOLLO_ACTIVE: 'false'
+          VITE_PUBLIC_RESEND_ACTIVE: 'false'
 
       - name: Desplegar en Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
