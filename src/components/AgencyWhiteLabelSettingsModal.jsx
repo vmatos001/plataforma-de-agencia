@@ -64,7 +64,7 @@ export default function AgencyWhiteLabelSettingsModal({
     monedaDefecto: 'USD',
     tasaCambioDop: 58.50,
     tasaCambioEur: 0.92,
-    mcpAgentKey: DEFAULT_AGENCY_BRANDING.mcpAgentKey || 'gog_agent_live_3554881d91556ec76d8734f10fda7366',
+    mcpAgentKey: DEFAULT_AGENCY_BRANDING.mcpAgentKey || 'gog_agent_live_d92cd28fb0ce6cd0139bf8127427bd39',
     apisIntegraciones: {
       googleSiteKitConnected: true,
       googleDriveVault: 'Goglite Agency Drive Vault',

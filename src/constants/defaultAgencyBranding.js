@@ -8,5 +8,5 @@ export const DEFAULT_AGENCY_BRANDING = {
   emailContacto: "contacto@goglite.com",
   telefonoWhatsapp: "+503 7000-1122",
   ubicacionPrincipal: "San Salvador (SV) & Santo Domingo (DO)",
-  mcpAgentKey: "gog_agent_live_3554881d91556ec76d8734f10fda7366"
+  mcpAgentKey: "gog_agent_live_d92cd28fb0ce6cd0139bf8127427bd39"
 };

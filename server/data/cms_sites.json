@@ -39,58 +39,5 @@
       "testimonios": [],
       "faqs": []
     }
-  },
-  {
-    "id": "cms-002",
-    "slug": "inmobiliaria-punta-cana",
-    "nombre": "Villas & Condos Punta Cana",
-    "pais": "DO",
-    "dominio": "villaspuntacana.do",
-    "estado": "borrador",
-    "ultimaActualizacion": "2026-10-10",
-    "contenido": {
-      "branding": {
-        "nombreMarca": "Villas Punta Cana Luxury",
-        "slogan": "Inversiones Inmobiliarias de Alto Rendimiento",
-        "colorPrimario": "#0284C7",
-        "telefonoWhatsApp": "+1 (809) 555-0199",
-        "ciudadPrincipal": "Punta Cana, Bávaro & Cap Cana"
-      },
-      "hero": {
-        "badge": "🌴 Exención fiscal Ley CONFOTUR",
-        "titulo": "Invierte en el Paraíso con Rentabilidades Superiores al 10% Anual",
-        "subtitulo": "Condominios y villas exclusivas a minutos de la playa. Asesoría legal completa y gestión de renta vacacional para inversionistas extranjeros.",
-        "botonTexto": "Descargar Catálogo de Proyectos",
-        "botonSubtexto": "Unidades disponibles desde $135,000 USD"
-      },
-      "servicios": [
-        {
-          "id": "s-1",
-          "titulo": "Condos en Preventa con Ley CONFOTUR",
-          "descripcion": "0% de impuesto de transferencia inmobiliaria y 0% de IPI durante 15 años.",
-          "precio": "Desde $135,000 USD"
-        },
-        {
-          "id": "s-2",
-          "titulo": "Villas con Piscina Privada",
-          "descripcion": "Residencias de 3 y 4 habitaciones con acabados europeos en comunidades cerradas.",
-          "precio": "Desde $260,000 USD"
-        }
-      ],
-      "testimonios": [
-        {
-          "id": "t-1",
-          "cliente": "Michael Johnson (Miami, FL)",
-          "comentario": "El proceso de compra fue transparente de principio a fin. Gran retorno en Airbnb.",
-          "estrellas": 5
-        }
-      ],
-      "faqs": [
-        {
-          "pregunta": "¿Un extranjero puede comprar propiedades en República Dominicana?",
-          "respuesta": "Sí, los extranjeros cuentan con los mismos derechos legales de propiedad que los ciudadanos dominicanos."
-        }
-      ]
-    }
   }
 ]
