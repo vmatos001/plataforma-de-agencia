@@ -1281,37 +1281,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         } catch (e) {}
       }
 
-      // 5. Fallback demo data SOLO si el sistema está completamente vacío
+      // 5. Si no hay datos registrados para este portal, marcar como no disponible
       if (!loadedData || !loadedData.lead) {
-        loadedData = {
-          lead: {
-            id: 'lead-demo-portal',
-            empresa: 'Clínica Dental Escalón',
-            contacto: 'Dr. Roberto Solano',
-            telefono: '+503 7890-1234',
-            email: 'contacto@dentalescalon.com',
-            pais: 'SV',
-            servicio: 'Web Antigravity Ultra-Rápida + SEO Local',
-            presupuestoMonto: 650,
-            etapa: 'negociacion',
-            portalToken: token || 'portal-demo'
-          },
-          portalConfig: {
-            faseActual: 1,
-            progresoPorcentaje: 20,
-            fase1Aprobada: false,
-            fase2Firmada: false,
-            fase3InsumosCompletos: false,
-            fase4Liquidada: false,
-            fase5CareActivo: false,
-            archivosSubidos: [
-              { id: 'f-1', nombre: 'Logo_Dental_Escalon.svg', categoria: 'Logotipo Vectorial', fecha: '2026-10-12', estado: 'Aprobado' },
-              { id: 'f-2', nombre: 'Fotos_Consultorio_HD.zip', categoria: 'Fotografías & Gráficos', fecha: '2026-10-13', estado: 'Aprobado' }
-            ]
-          },
-          presupuesto: null,
-          proyecto: null
-        };
+        setData(null);
+        setLoading(false);
+        return;
       }
 
       // Default country tab for banking
@@ -2276,6 +2250,25 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
         <p className="text-sm font-semibold text-white tracking-wide">Cargando tu Portal de Cliente Seguro...</p>
         <span className="text-xs text-slate-500 mt-1">Conexión encriptada SSL 256-bit</span>
+      </div>
+    );
+  }
+
+  if (!data || !data.lead) {
+    return (
+      <div className="min-h-screen bg-[#080b11] text-slate-200 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-4 text-orange-500">
+          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-bold text-white mb-2">Portal no disponible o enlace no registrado</h2>
+        <p className="text-sm text-slate-400 max-w-md mb-6">
+          El portal que intentas consultar no existe o aún no ha sido activado por el equipo comercial de Goglite.
+        </p>
+        <a href="/" className="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-medium text-sm transition-all shadow-lg shadow-orange-500/20">
+          Volver a Goglite
+        </a>
       </div>
     );
   }

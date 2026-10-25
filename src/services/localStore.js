@@ -157,18 +157,14 @@ export function getStoredCrmLeads() {
         return syncCrmLeadsWithPresupuestos(parsed);
       }
     }
-
-    // Inicialización limpia de producción: Cargar el lead real de Evelin Jasbet
-    const initialLeads = Array.isArray(INITIAL_PROD_PROD_LEADS_SAFE) ? INITIAL_PROD_PROD_LEADS_SAFE : INITIAL_PROD_CRM_LEADS;
-    saveStoredCrmLeads(initialLeads);
-    return syncCrmLeadsWithPresupuestos(initialLeads);
+    return [];
   } catch (e) {
     console.warn('[LocalStore] Error leyendo leads de CRM:', e);
   }
-  return INITIAL_PROD_CRM_LEADS || [];
+  return [];
 }
 
-const INITIAL_PROD_PROD_LEADS_SAFE = INITIAL_PROD_CRM_LEADS;
+const INITIAL_PROD_PROD_LEADS_SAFE = [];
 
 /**
  * Guarda los leads de CRM en la clave estandarizada v3 normalizando etapas legacy
@@ -216,6 +212,18 @@ export function clearAllPlatformData() {
       localStorage.removeItem(k);
     } catch {}
   }
+
+  // Limpiar cualquier clave dinámica generada (portales individuales, facturas, comprobantes)
+  try {
+    const dynamicKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('goglite_portal_') || key.startsWith('goglite_invoice_') || key.startsWith('goglite_comprobante_') || key.startsWith('goglite_lead_'))) {
+        dynamicKeys.push(key);
+      }
+    }
+    dynamicKeys.forEach(k => localStorage.removeItem(k));
+  } catch {}
 
   // Devolver el módulo activo a la Fase 1
   try {

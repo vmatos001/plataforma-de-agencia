@@ -39,9 +39,10 @@ jobs:
           projectId: goglite-agency
           firebaseToolsVersion: 15.34.0
 
-      - name: Desplegar Reglas de Firestore
+      - name: Desplegar Reglas de Firestore y Limpieza Cloud
         continue-on-error: true
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GOGLITE_AGENCY }}' > /tmp/sa.json
-          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json npx --yes firebase-tools@15.34.0 deploy --only firestore --project goglite-agency
+          node scripts/deploy_rules_and_clean_cloud.mjs /tmp/sa.json
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json npx --yes firebase-tools@15.34.0 deploy --only firestore:rules --project goglite-agency || true
           rm -f /tmp/sa.json
