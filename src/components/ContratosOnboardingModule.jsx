@@ -1235,15 +1235,20 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     if (!invoiceAuditModal?.invoice || !invoiceEditForm) return;
 
     const currentInv = invoiceAuditModal.invoice;
+    const tot = Number(invoiceEditForm.total) || currentInv.total;
+    const cob = Math.max(0, Number(invoiceEditForm.montoCobrado) || 0);
+    const sal = Math.max(0, tot - cob);
+    const est = cob >= tot && tot > 0 ? 'cobrada' : cob > 0 ? 'parcial' : 'pendiente';
+
     const updatedInv = {
       ...currentInv,
       numeroFactura: invoiceEditForm.numeroFactura,
       concepto: invoiceEditForm.concepto,
-      subtotal: Number(invoiceEditForm.total) || currentInv.subtotal,
-      total: Number(invoiceEditForm.total) || currentInv.total,
-      montoCobrado: Number(invoiceEditForm.montoCobrado),
-      saldoPendiente: Number(invoiceEditForm.saldoPendiente),
-      estado: invoiceEditForm.estado,
+      subtotal: tot,
+      total: tot,
+      montoCobrado: cob,
+      saldoPendiente: sal,
+      estado: est,
       cliente: {
         ...(currentInv.cliente || {}),
         empresa: invoiceEditForm.empresa,
@@ -3403,6 +3408,30 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                       value={invoiceEditForm.numeroFactura}
                       onChange={(e) => setInvoiceEditForm(prev => ({ ...prev, numeroFactura: e.target.value }))}
                       className="w-full bg-[#0a0d16] border border-slate-700 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-orange-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-emerald-400 uppercase mb-1">Monto Cobrado (USD) · Abono Parcial</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={invoiceEditForm.montoCobrado ?? ''}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const val = raw === '' ? '' : Math.max(0, Number(raw) || 0);
+                        const tot = Number(invoiceEditForm.total) || 0;
+                        const eff = typeof val === 'number' ? val : 0;
+                        const saldo = Math.max(0, tot - eff);
+                        const est = eff >= tot && tot > 0 ? 'cobrada' : eff > 0 ? 'parcial' : 'pendiente';
+                        setInvoiceEditForm(prev => ({
+                          ...prev,
+                          montoCobrado: val,
+                          saldoPendiente: saldo,
+                          estado: est
+                        }));
+                      }}
+                      className="w-full bg-[#0a0d16] border border-slate-700 focus:border-emerald-500 rounded-lg p-2 text-emerald-400 font-mono font-bold text-xs focus:outline-none"
                     />
                   </div>
                   <div className="sm:col-span-2">

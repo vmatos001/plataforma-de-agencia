@@ -1198,7 +1198,9 @@ export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFI
   const estadoLabel = invoice.estado === 'cobrada'
     ? 'PAGADA 100%'
     : invoice.estado === 'parcial'
-    ? 'ANTICIPO COBRADO (PARCIAL)'
+    ? (Number(invoice.montoCobrado) === Math.round(Number(invoice.total) * 0.5)
+        ? 'ANTICIPO COBRADO (50%)'
+        : `ABONO PARCIAL ($${Number(invoice.montoCobrado || 0).toLocaleString()} USD)`)
     : 'PENDIENTE DE PAGO';
 
   const badgeBg = invoice.estado === 'cobrada' ? '#DCFCE7' : '#FFF0E6';
@@ -1448,7 +1450,9 @@ export function CorporateInvoiceDocument({ invoice, configuracion = DEFAULT_CONF
             {invoice.estado === 'cobrada'
               ? 'PAGADA 100%'
               : invoice.estado === 'parcial'
-              ? 'ANTICIPO COBRADO (50%)'
+              ? (Number(invoice.montoCobrado) === Math.round(Number(invoice.total) * 0.5)
+                  ? 'ANTICIPO COBRADO (50%)'
+                  : `ABONO PARCIAL ($${Number(invoice.montoCobrado || 0).toLocaleString()} USD)`)
               : 'PENDIENTE DE PAGO'}
           </span>
         </div>
@@ -2389,17 +2393,70 @@ export default function GestionRentabilidadModule({
     });
   };
 
+  // Modificar monto cobrado manualmente (para abonos o pagos parciales en vivo)
+  const handleUpdateMontoCobrado = (rawVal) => {
+    setSelectedInvoice(prev => {
+      if (!prev) return prev;
+      const total = Number(prev.total) || 0;
+      let numVal = rawVal;
+      if (rawVal !== '') {
+        const parsed = Number(rawVal);
+        numVal = isNaN(parsed) ? 0 : parsed;
+      }
+      const effectiveNum = typeof numVal === 'number' ? numVal : 0;
+      const saldo = Math.max(0, total - effectiveNum);
+      const estado = effectiveNum >= total && total > 0 ? 'cobrada' : effectiveNum > 0 ? 'parcial' : 'pendiente';
+
+      const updated = {
+        ...prev,
+        montoCobrado: numVal,
+        saldoPendiente: saldo,
+        estado
+      };
+
+      setFinanzasState(fPrev => {
+        const nextFacturas = (fPrev.facturas || []).map(f => f.id === updated.id ? { ...updated, montoCobrado: effectiveNum } : f);
+        return { ...fPrev, facturas: nextFacturas };
+      });
+
+      return updated;
+    });
+  };
+
   // Guardar factura activa y sincronizar con proyecto y portal
   const handleSaveActiveInvoice = async () => {
     if (!selectedInvoice) return;
-    const toSave = { ...selectedInvoice };
+    const effectiveMonto = Math.max(0, Number(selectedInvoice.montoCobrado) || 0);
+    const total = Number(selectedInvoice.total) || 0;
+    const saldo = Math.max(0, total - effectiveMonto);
+    const estado = effectiveMonto >= total && total > 0 ? 'cobrada' : effectiveMonto > 0 ? 'parcial' : 'pendiente';
+
+    const toSave = {
+      ...selectedInvoice,
+      montoCobrado: effectiveMonto,
+      saldoPendiente: saldo,
+      estado
+    };
+
+    setSelectedInvoice(toSave);
+
     setFinanzasState(prev => {
       const nextFacturas = (prev.facturas || []).map(f => f.id === toSave.id ? toSave : f);
       return { ...prev, facturas: nextFacturas };
     });
 
+    try {
+      let stored = [];
+      const raw = localStorage.getItem('goglite_facturas');
+      if (raw) stored = JSON.parse(raw);
+      const idx = stored.findIndex(f => f.id === toSave.id || f.numeroFactura === toSave.numeroFactura);
+      if (idx >= 0) stored[idx] = toSave;
+      else stored.push(toSave);
+      localStorage.setItem('goglite_facturas', JSON.stringify(stored));
+    } catch (e) {}
+
     syncInvoiceWithClientProject(toSave);
-    showToast(`✓ Factura ${toSave.numeroFactura} guardada y sincronizada.`);
+    showToast(`✓ Factura ${toSave.numeroFactura} guardada con cobrado de $${effectiveMonto.toLocaleString()} USD.`);
 
     try {
       await fetch(getBackendEndpoint(`/api/finanzas/facturas/${toSave.id}`), {
@@ -3835,7 +3892,7 @@ export default function GestionRentabilidadModule({
                   </div>
 
                   {/* Aprobación rápida de depósito (Habilita factura en el portal del cliente) */}
-                  <div className="p-3 rounded-lg bg-[#111728] border border-slate-800 space-y-2">
+                  <div className="p-3 rounded-lg bg-[#111728] border border-slate-800 space-y-2.5">
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-slate-300 font-semibold">Aprobación de Depósito / Cobro:</span>
                       <span className={`font-mono text-[10px] px-2 py-0.5 rounded-full font-bold ${
@@ -3843,7 +3900,7 @@ export default function GestionRentabilidadModule({
                         selectedInvoice.estado === 'parcial' ? 'bg-sky-500/20 text-sky-400' :
                         'bg-amber-500/20 text-amber-400'
                       }`}>
-                        {selectedInvoice.estado === 'cobrada' ? 'Cobrada 100%' : selectedInvoice.estado === 'parcial' ? 'Anticipo 50%' : 'Pendiente'}
+                        {selectedInvoice.estado === 'cobrada' ? 'Cobrada 100%' : selectedInvoice.estado === 'parcial' ? 'Abono Parcial' : 'Pendiente'}
                       </span>
                     </div>
 
@@ -3852,13 +3909,13 @@ export default function GestionRentabilidadModule({
                         type="button"
                         onClick={() => handleQuickApprovePayment('anticipo')}
                         className={`py-1.5 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                          selectedInvoice.estado === 'parcial'
+                          selectedInvoice.estado === 'parcial' && Number(selectedInvoice.montoCobrado) === Math.round(Number(selectedInvoice.total) * 0.5)
                             ? 'bg-sky-600 text-white shadow'
                             : 'bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30'
                         }`}
                       >
                         <Check className="w-3.5 h-3.5" />
-                        <span>Aprobar Anticipo (50%)</span>
+                        <span>Aprobar 50%</span>
                       </button>
                       <button
                         type="button"
@@ -3870,8 +3927,37 @@ export default function GestionRentabilidadModule({
                         }`}
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Aprobar Cobro 100%</span>
+                        <span>Aprobar 100%</span>
                       </button>
+                    </div>
+
+                    {/* Campo Editable: Monto Cobrado / Abono Parcial */}
+                    <div className="pt-2 border-t border-slate-800/80 space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <label className="text-slate-300 font-semibold flex items-center gap-1">
+                          <span>Monto Cobrado (USD):</span>
+                          <span className="text-[10px] text-slate-500 font-normal">(Editable para abonos parciales)</span>
+                        </label>
+                        <span className="font-mono text-[10px] text-amber-400 font-semibold">
+                          Saldo: ${Math.max(0, Number(selectedInvoice.total || 0) - (Number(selectedInvoice.montoCobrado) || 0)).toLocaleString()} USD
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs font-bold">$</span>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          max={Number(selectedInvoice.total) || 999999}
+                          value={selectedInvoice.montoCobrado ?? ''}
+                          onChange={(e) => handleUpdateMontoCobrado(e.target.value)}
+                          placeholder="Ingresa monto cobrado..."
+                          className="w-full bg-[#161e31] border border-slate-700 hover:border-slate-600 focus:border-emerald-500 rounded-lg pl-7 pr-3 py-1.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none transition-colors"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        Si el cliente realizó un pago parcial, modifica aquí el importe exacto. El saldo y el documento se recalculan en tiempo real.
+                      </p>
                     </div>
                   </div>
 
@@ -4024,9 +4110,19 @@ export default function GestionRentabilidadModule({
                       <span>Total Facturado:</span>
                       <span className="font-mono font-bold text-orange-400 text-sm">${Number(selectedInvoice.total || 0).toLocaleString()} USD</span>
                     </div>
-                    <div className="flex justify-between text-emerald-400">
-                      <span>Monto Cobrado / Anticipo:</span>
-                      <span className="font-mono font-bold">${Number(selectedInvoice.montoCobrado || 0).toLocaleString()} USD</span>
+                    <div className="flex items-center justify-between text-emerald-400">
+                      <span>Monto Cobrado (USD):</span>
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono text-xs text-emerald-400 font-bold">$</span>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={selectedInvoice.montoCobrado ?? ''}
+                          onChange={(e) => handleUpdateMontoCobrado(e.target.value)}
+                          className="w-24 bg-[#161e31] border border-slate-700 focus:border-emerald-500 rounded px-2 py-0.5 text-right font-mono font-bold text-xs text-emerald-400 focus:outline-none"
+                        />
+                      </div>
                     </div>
                     <div className="flex justify-between text-amber-400 border-t border-slate-800 pt-1">
                       <span>Saldo Pendiente:</span>
