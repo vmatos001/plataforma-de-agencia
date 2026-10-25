@@ -1056,20 +1056,25 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     // Sincronizar todas las llaves de portal existentes en localStorage
     if (tipoPago === 'saldo') {
       syncPortalStorageForProyecto(updatedProj, {
+        saldoConfirmadoAgencia: true,
+        facturaSaldoHabilitada: true,
         fase4Liquidada: true,
         liquidacionPagada: true,
         fechaLiquidacion: nowStr,
         faseActual: 5,
         progresoPorcentaje: 100
       });
-      alert('✓ ¡Liquidación confirmada con éxito! El candado de accesos ha sido liberado y la Fase 5 (Garantía de 30 Días & CMS) está desbloqueada en el portal del cliente.');
+      alert('✓ ¡Liquidación confirmada con éxito! El candado de accesos ha sido liberado, la factura final emitida y la Fase 5 (Garantía de 30 Días & CMS) está desbloqueada en el portal del cliente.');
     } else {
       syncPortalStorageForProyecto(updatedProj, {
         anticipoPagado: true,
+        anticipoConfirmadoAgencia: true,
+        facturaAnticipoHabilitada: true,
+        facturaHabilitadaCliente: true,
         faseActual: Math.max(3, updatedProj.portalConfig?.faseActual || 3),
         progresoPorcentaje: Math.max(60, updatedProj.portalConfig?.progresoPorcentaje || 60)
       });
-      alert('✓ ¡Anticipo del 50% confirmado! El proyecto avanza formalmente a desarrollo y configuración de insumos.');
+      alert('✓ ¡Anticipo del 50% confirmado! La factura oficial ha sido emitida y habilitada al cliente. El proyecto avanza formalmente a desarrollo y configuración de insumos.');
     }
 
     try {
@@ -2918,7 +2923,12 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                                 saveStoredProyectos(next);
                                 return next;
                               });
-                              syncPortalStorageForProyecto(modProj, { anticipoPagado: false });
+                              syncPortalStorageForProyecto(modProj, { 
+                                anticipoPagado: false, 
+                                anticipoConfirmadoAgencia: false, 
+                                facturaAnticipoHabilitada: false, 
+                                facturaHabilitadaCliente: false 
+                              });
                             }}
                             className="text-[10px] text-slate-500 hover:text-amber-400 underline transition-colors"
                             title="Revertir estado de anticipo a pendiente"
@@ -3058,7 +3068,12 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                                   saveStoredProyectos(next);
                                   return next;
                                 });
-                                syncPortalStorageForProyecto(modProj, { fase4Liquidada: false, liquidacionPagada: false });
+                                syncPortalStorageForProyecto(modProj, { 
+                                  fase4Liquidada: false, 
+                                  liquidacionPagada: false, 
+                                  saldoConfirmadoAgencia: false, 
+                                  facturaSaldoHabilitada: false 
+                                });
                               }}
                               className="text-[10px] text-slate-500 hover:text-amber-400 underline transition-colors"
                               title="Revertir estado a pendiente"

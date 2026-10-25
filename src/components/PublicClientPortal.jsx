@@ -323,57 +323,106 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     };
   }, []);
 
-  const matchingFactura = React.useMemo(() => {
+  // Compuertas de Verificación Administrativa de Facturas y Pagos
+  const isAnticipoConfirmed = Boolean(
+    data?.proyecto?.pagos?.anticipoEstado === 'confirmado' || 
+    data?.portalConfig?.anticipoConfirmadoAgencia === true ||
+    data?.portalConfig?.facturaAnticipoHabilitada === true
+  );
+
+  const isSaldoConfirmed = Boolean(
+    data?.proyecto?.pagos?.saldoEstado === 'confirmado' || 
+    data?.portalConfig?.fase4Liquidada === true ||
+    data?.portalConfig?.saldoConfirmadoAgencia === true
+  );
+
+  const hasAdvanceReceiptSubmitted = Boolean(
+    advanceReceiptImage || 
+    advanceReceiptRef || 
+    data?.portalConfig?.comprobanteAnticipo || 
+    data?.portalConfig?.comprobanteAnticipoImagen || 
+    data?.proyecto?.pagos?.anticipoComprobante || 
+    data?.proyecto?.pagos?.anticipoComprobanteImagen ||
+    data?.portalConfig?.fase2Firmada
+  );
+
+  const hasSettlementReceiptSubmitted = Boolean(
+    settlementReceiptImage || 
+    settlementReceiptRef || 
+    data?.portalConfig?.comprobanteLiquidacion || 
+    data?.portalConfig?.comprobanteLiquidacionImagen || 
+    data?.proyecto?.pagos?.saldoComprobante || 
+    data?.proyecto?.pagos?.saldoComprobanteImagen
+  );
+
+  // Lista de facturas oficiales formalmente confirmadas por administración
+  const clientFacturasDisponibles = React.useMemo(() => {
+    if (!isAnticipoConfirmed && !isSaldoConfirmed) {
+      return [];
+    }
+
     const targetEmpresa = (data?.presupuesto?.cliente?.empresa || data?.lead?.empresa || '').toLowerCase().trim();
     const targetPresupuestoId = data?.presupuesto?.id;
     const targetPresupuestoCodigo = data?.presupuesto?.codigo || data?.lead?.presupuestoCodigo;
 
-    let found = null;
+    let matched = [];
     if (Array.isArray(clientFacturaList) && clientFacturaList.length > 0) {
-      found = clientFacturaList.find(f => 
+      matched = clientFacturaList.filter(f => 
         (targetPresupuestoId && (f.presupuestoId === targetPresupuestoId || f.id === targetPresupuestoId)) ||
         (targetPresupuestoCodigo && (f.codigoPresupuesto === targetPresupuestoCodigo || f.numeroFactura?.includes(targetPresupuestoCodigo))) ||
         (targetEmpresa && f.cliente?.empresa && f.cliente.empresa.toLowerCase().trim() === targetEmpresa)
       );
     }
 
-    if (!found && data?.presupuesto) {
-      found = buildInvoiceFromPresupuesto(data.presupuesto);
-    } else if (!found && data?.lead) {
-      found = buildInvoiceFromPresupuesto({
-        id: data.lead.id,
-        codigo: data.lead.presupuestoCodigo || 'P-2026-001',
-        titulo: 'Propuesta de Desarrollo Digital VIP',
-        cliente: {
-          empresa: data.lead.empresa,
-          nombre: data.lead.contacto,
-          telefono: data.lead.telefono,
-          email: data.lead.email,
-          ubicacion: data.lead.ubicacion
-        },
-        pais: data.lead.pais || 'DO',
-        inversion: {
-          precioTotal: Number(data.lead.valorEstimado) || 300,
-          anticipo: Math.round((Number(data.lead.valorEstimado) || 300) * 0.5)
-        }
-      });
-    }
-
-    // Sincronizar y reconciliar siempre con la propuesta actual para reflejar $300 / $150 y sin costo por módulo
-    if (found && data?.presupuesto) {
-      found = reconcileInvoiceWithPresupuesto(found, data.presupuesto);
-    }
-
-    if (found) {
-      if (data?.portalConfig?.fase2Firmada || data?.presupuesto?.anticipoPagado) {
-        found.estado = 'parcial';
-        found.montoCobrado = data?.presupuesto?.inversion?.anticipo || Math.round(Number(found.total) * 0.5);
-        found.saldoPendiente = Math.max(0, Number(found.total) - Number(found.montoCobrado));
+    // Filtrar estrictamente por el estado confirmado de cada hito
+    const valid = matched.filter(f => {
+      if (f.tipoHito === 'anticipo' || f.id?.endsWith('-anticipo')) return isAnticipoConfirmed;
+      if (f.tipoHito === 'saldo' || f.id?.endsWith('-saldo')) return isSaldoConfirmed;
+      return isAnticipoConfirmed || isSaldoConfirmed;
+    }).map(f => {
+      let inv = normalizeFacturaItems(f);
+      if (data?.presupuesto) {
+        inv = reconcileInvoiceWithPresupuesto(inv, data.presupuesto);
       }
+      return inv;
+    });
+
+    // Si la administración confirmó en el panel pero la factura aún no sincronizó en clientFacturaList
+    if (valid.length === 0 && (isAnticipoConfirmed || isSaldoConfirmed) && data?.presupuesto) {
+      let built = buildInvoiceFromPresupuesto(data.presupuesto);
+      built = reconcileInvoiceWithPresupuesto(built, data.presupuesto);
+      if (isSaldoConfirmed) {
+        built.estado = 'cobrada';
+        built.montoCobrado = built.total;
+        built.saldoPendiente = 0;
+      } else if (isAnticipoConfirmed) {
+        built.estado = 'cobrada';
+        built.montoCobrado = data?.presupuesto?.inversion?.anticipo || Math.round(Number(built.total) * 0.5);
+        built.saldoPendiente = Math.max(0, Number(built.total) - Number(built.montoCobrado));
+      }
+      valid.push(normalizeFacturaItems(built));
     }
 
-    return found ? normalizeFacturaItems(found) : null;
-  }, [clientFacturaList, data]);
+    return valid;
+  }, [clientFacturaList, data, isAnticipoConfirmed, isSaldoConfirmed]);
+
+  const matchingFactura = React.useMemo(() => {
+    // Si la agencia no ha confirmado ningún pago, NUNCA mostrar factura en el portal
+    if (!isAnticipoConfirmed && !isSaldoConfirmed) {
+      return null;
+    }
+
+    if (clientFacturasDisponibles.length > 0) {
+      if (isSaldoConfirmed) {
+        // En liquidación o saldo confirmado, preferir la de saldo si existe
+        const saldoInv = clientFacturasDisponibles.find(f => f.tipoHito === 'saldo' || f.id?.endsWith('-saldo'));
+        return saldoInv || clientFacturasDisponibles[clientFacturasDisponibles.length - 1];
+      }
+      return clientFacturasDisponibles[0];
+    }
+
+    return null;
+  }, [clientFacturasDisponibles, isAnticipoConfirmed, isSaldoConfirmed]);
 
   const handlePrintClientInvoicePdf = (fac) => {
     if (!fac) return;
@@ -542,6 +591,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const [settlementReceiptFileName, setSettlementReceiptFileName] = useState('');
   const settlementReceiptInputRef = useRef(null);
   const [unlockAnimating, setUnlockAnimating] = useState(false);
+  const [showResubmitSettlementForm, setShowResubmitSettlementForm] = useState(false);
 
   // Fase 5 - Maintenance state
   const [carePlanActive, setCarePlanActive] = useState(false);
@@ -2180,10 +2230,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         if (idx !== -1) {
           storedProjs[idx] = evaluateProjectMilestones({
             ...storedProjs[idx],
-            estado: 'entregado',
             pagos: {
               ...(storedProjs[idx].pagos || {}),
-              saldoEstado: 'confirmado',
+              saldoEstado: 'verificacion',
               saldoComprobante: textoLiquidacion,
               saldoComprobanteImagen: finalSettlementImg || storedProjs[idx].pagos?.saldoComprobanteImagen || null,
               saldoComprobanteNombre: finalSettlementName || storedProjs[idx].pagos?.saldoComprobanteNombre || null,
@@ -2198,17 +2247,15 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       }
 
       await savePortalUpdates({
-        fase4Liquidada: true,
-        fechaLiquidacion: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
         comprobanteLiquidacion: textoLiquidacion,
         comprobanteLiquidacionImagen: finalSettlementImg || null,
         comprobanteLiquidacionNombre: finalSettlementName || null,
-        liquidacionPagada: true,
-        progresoPorcentaje: 95,
-        faseActual: 5
+        liquidacionReportada: true,
+        fechaReporteLiquidacion: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
       });
+      setShowResubmitSettlementForm(false);
       setUnlockAnimating(false);
-      showNotification('🔓 ¡Candado liberado! Tus credenciales oficiales y código fuente están disponibles.');
+      showNotification('✓ Comprobante enviado. En proceso de verificación administrativa por Goglite Studio.');
     }, 1200);
   };
 
@@ -3064,8 +3111,8 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               </div>
             </div>
 
-            {/* Factura Oficial de Servicios Habilitada para el Cliente */}
-            {matchingFactura && (
+            {/* Factura Oficial de Servicios Habilitada para el Cliente tras Confirmación */}
+            {matchingFactura ? (
               <div className="no-print p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#0c1424] via-[#0f172a] to-[#141d33] border border-orange-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
                 <div className="flex items-center gap-3.5">
                   <div className="w-12 h-12 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-400 flex items-center justify-center shrink-0 shadow-inner">
@@ -3079,7 +3126,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                         matchingFactura.estado === 'parcial' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' :
                         'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                       }`}>
-                        {matchingFactura.estado === 'cobrada' ? '✓ Pagada 100%' : '✓ Anticipo Acreditado (50%)'}
+                        {matchingFactura.estado === 'cobrada' ? '✓ Anticipo Acreditado (100% Cobrado)' : '✓ Anticipo Acreditado (50%)'}
                       </span>
                     </div>
                     <p className="text-xs text-slate-300 mt-0.5">
@@ -3098,7 +3145,31 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   </button>
                 </div>
               </div>
-            )}
+            ) : hasAdvanceReceiptSubmitted ? (
+              <div className="no-print p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#14120e] via-[#1c1813] to-[#17130f] border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 shadow-inner">
+                    <Clock className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-bold text-white">Comprobante de Anticipo en Verificación Administrativa</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                        Validación Interna Pendiente
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Tu comprobante de anticipo fue registrado correctamente. El equipo administrativo está validando la acreditación en cuenta; una vez confirmado el depósito en nuestro panel interno, tu <strong>Factura Comercial Oficial</strong> quedará disponible aquí para consulta y descarga.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[11px] font-mono text-amber-300/80 bg-amber-950/40 px-3 py-1.5 rounded-xl border border-amber-500/20">
+                    Factura en emisión pendiente
+                  </span>
+                </div>
+              </div>
+            ) : null}
 
             {/* FULL PRINTABLE SOW CONTRACT SHEET (2 HOJAS CARTA 8.5 x 11 in) */}
             <div 
@@ -4363,6 +4434,40 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     </div>
                   </div>
 
+                  {/* Factura Oficial de Liquidación Final si está confirmada */}
+                  {(() => {
+                    const facSaldo = clientFacturasDisponibles.find(f => f.tipoHito === 'saldo' || f.id?.endsWith('-saldo')) || (isSaldoConfirmed ? matchingFactura : null);
+                    if (!facSaldo) return null;
+                    return (
+                      <div className="p-4 rounded-xl bg-gradient-to-r from-[#0c1424] via-[#0f172a] to-[#141d33] border border-orange-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-white">Factura de Liquidación Final · {facSaldo.numeroFactura}</span>
+                              <span className="text-[9px] font-mono px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                ✓ Liquidado 100%
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-300">
+                              Comprobante fiscal y finiquito final por <strong className="text-white">${Number(facSaldo.total).toLocaleString()} USD</strong> disponible para descarga.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedClientInvoiceModal(facSaldo)}
+                          className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shadow transition-all shrink-0"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Ver Factura</span>
+                        </button>
+                      </div>
+                    );
+                  })()}
+
                   <div className="pt-2">
                     <button
                       type="button"
@@ -4377,8 +4482,59 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     </button>
                   </div>
                 </div>
+              ) : hasSettlementReceiptSubmitted && !showResubmitSettlementForm ? (
+                /* ESTADO: COMPROBANTE EN VERIFICACIÓN ADMINISTRATIVA */
+                <div className="p-6 rounded-2xl bg-gradient-to-br from-[#16131c] via-[#1a1724] to-[#0f111a] border-2 border-amber-500/40 space-y-4 shadow-xl">
+                  <div className="flex items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                        <Clock className="w-6 h-6 animate-pulse" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold text-white">Comprobante de Liquidación en Verificación Administrativa</h3>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                            Validación en Curso
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300 mt-1">
+                          Tu comprobante bancario del 50% de saldo final (${liquidacionMonto} USD) ha sido registrado y se encuentra en revisión.
+                        </p>
+                        <p className="text-xs text-amber-300 font-semibold mt-1">
+                          Nuestro departamento administrativo está validando la acreditación bancaria en el panel interno. Tan pronto se confirme el depósito, el candado de accesos se liberará automáticamente y tu factura comercial final estará disponible para su descarga.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800/80">
+                    <div className="flex items-center gap-2">
+                      {(settlementReceiptImage || data?.portalConfig?.comprobanteLiquidacionImagen || data?.proyecto?.pagos?.saldoComprobanteImagen) && (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewReceiptModalUrl(settlementReceiptImage || data?.portalConfig?.comprobanteLiquidacionImagen || data?.proyecto?.pagos?.saldoComprobanteImagen)}
+                          className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-bold flex items-center gap-1.5 border border-slate-700 transition-colors"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-orange-400" />
+                          <span>Ver Comprobante Adjunto</span>
+                        </button>
+                      )}
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        Estado: Esperando validación interna de administración
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowResubmitSettlementForm(true)}
+                      className="text-[11px] text-orange-400 hover:text-orange-300 underline font-semibold transition-colors"
+                    >
+                      Resubir o corregir comprobante
+                    </button>
+                  </div>
+                </div>
               ) : (
-                /* LOCKED CARD WITH SETTLEMENT REQUIREMENT */
+                /* LOCKED CARD WITH SETTLEMENT REQUIREMENT FORM */
                 <div className="p-6 rounded-2xl bg-gradient-to-br from-amber-500/10 via-[#18151f] to-[#0f111a] border-2 border-amber-500/40 space-y-4">
                   <div className="flex items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -4450,23 +4606,35 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       </div>
                     </div>
 
-                    <button
-                      type="submit"
-                      disabled={unlockAnimating}
-                      className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-orange-950 transition-all"
-                    >
-                      {unlockAnimating ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>Liberando Credenciales y Repositorio...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Unlock className="w-4 h-4" />
-                          <span>Confirmar Liquidación y Desbloquear Accesos</span>
-                        </>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="submit"
+                        disabled={unlockAnimating}
+                        className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-orange-950 transition-all"
+                      >
+                        {unlockAnimating ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>Enviando Comprobante a Administración...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            <span>Reportar Comprobante de Liquidación</span>
+                          </>
+                        )}
+                      </button>
+
+                      {hasSettlementReceiptSubmitted && showResubmitSettlementForm && (
+                        <button
+                          type="button"
+                          onClick={() => setShowResubmitSettlementForm(false)}
+                          className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors"
+                        >
+                          Cancelar
+                        </button>
                       )}
-                    </button>
+                    </div>
                   </form>
                 </div>
               )}
@@ -4716,6 +4884,51 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               </div>
 
             </div>
+
+            {/* Facturas Comerciales Oficiales del Proyecto en Fase 5 */}
+            {clientFacturasDisponibles.length > 0 && (
+              <div className="no-print rounded-2xl bg-[#0e1320] border border-slate-800 p-5 space-y-4 shadow-xl">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <FileText className="w-5 h-5 text-orange-400" />
+                    <div>
+                      <h3 className="text-sm font-bold text-white">Facturas Comerciales Oficiales del Proyecto</h3>
+                      <p className="text-[11px] text-slate-400">Comprobantes y recibos fiscales emitidos y confirmados por administración</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                    {clientFacturasDisponibles.length} {clientFacturasDisponibles.length === 1 ? 'Factura Validada' : 'Facturas Validadas'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {clientFacturasDisponibles.map(fac => (
+                    <div key={fac.id} className="p-4 rounded-xl bg-[#131929] border border-slate-700/70 flex items-center justify-between gap-3 shadow-sm hover:border-orange-500/40 transition-all">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono font-bold text-orange-400">{fac.numeroFactura}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono font-bold">
+                            ${Number(fac.total).toLocaleString()} USD
+                          </span>
+                        </div>
+                        <div className="text-xs text-white font-medium line-clamp-1">{fac.concepto}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          {fac.tipoHito === 'saldo' ? 'Liquidación y Saldo Final (50%)' : 'Anticipo Inicial (50%)'} · {fac.fechaEmision}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedClientInvoiceModal(fac)}
+                        className="px-3 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 shadow transition-all"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Ver Factura</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -4789,6 +5002,29 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 </button>
               </div>
             </div>
+            {clientFacturasDisponibles.length > 1 && (
+              <div className="px-4 py-2.5 bg-[#090d16] border-b border-slate-800 flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-mono text-slate-400">Facturas confirmadas:</span>
+                {clientFacturasDisponibles.map((fac, idx) => {
+                  const isSelected = selectedClientInvoiceModal?.id === fac.id || selectedClientInvoiceModal?.numeroFactura === fac.numeroFactura;
+                  return (
+                    <button
+                      key={fac.id || idx}
+                      type="button"
+                      onClick={() => setSelectedClientInvoiceModal(fac)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        isSelected 
+                          ? 'bg-orange-600 text-white shadow-md' 
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60'
+                      }`}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>{fac.tipoHito === 'saldo' ? 'Saldo Final (50%)' : 'Anticipo Inicial (50%)'} · {fac.numeroFactura}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div className="p-6 overflow-y-auto bg-[#FAFAFA]">
               <CorporateInvoiceDocument 
                 invoice={selectedClientInvoiceModal} 

@@ -824,6 +824,7 @@ export function buildMilestoneInvoices(propOrProj, existingFacturasCount = 0, co
     montoCobrado: isAnticipoPaid ? anticipoMonto : 0,
     saldoPendiente: isAnticipoPaid ? 0 : anticipoMonto,
     estado: isAnticipoPaid ? 'cobrada' : 'pendiente',
+    habilitadaCliente: isAnticipoPaid,
     metodoPago,
     cuentaBancariaId,
     horasInvertidasEstimadas: Math.round(horasEstimadas / 2),
@@ -859,6 +860,7 @@ export function buildMilestoneInvoices(propOrProj, existingFacturasCount = 0, co
     montoCobrado: isSaldoPaid ? saldoMonto : 0,
     saldoPendiente: isSaldoPaid ? 0 : saldoMonto,
     estado: isSaldoPaid ? 'cobrada' : 'pendiente',
+    habilitadaCliente: isSaldoPaid,
     metodoPago,
     cuentaBancariaId,
     horasInvertidasEstimadas: Math.round(horasEstimadas / 2),
@@ -951,6 +953,7 @@ export function reconcileMilestoneInvoices(currentFacturas = [], configuracion =
           montoCobrado: isAnticipoPaid ? anticipoMonto : Math.min(anticipoMonto, Number(f1.montoCobrado) || 0),
           saldoPendiente: isAnticipoPaid ? 0 : Math.max(0, anticipoMonto - (Number(f1.montoCobrado) || 0)),
           estado: (isAnticipoPaid || Number(f1.montoCobrado) >= anticipoMonto) ? 'cobrada' : 'pendiente',
+          habilitadaCliente: Boolean(isAnticipoPaid || Number(f1.montoCobrado) >= anticipoMonto),
           concepto: f1.concepto?.includes('Anticipo') ? f1.concepto : `Anticipo Inicial (50%) · ${cleanTitle || f1.concepto || 'Desarrollo Web VIP'}`,
           origenModulo: `Módulo 4 · Contrato ${projCode || ''} (Anticipo 50%)`,
           items: [
@@ -987,6 +990,7 @@ export function reconcileMilestoneInvoices(currentFacturas = [], configuracion =
           montoCobrado: (isSaldoPaid || Number(f1.montoCobrado) >= totalInversion) ? saldoMonto : 0,
           saldoPendiente: (isSaldoPaid || Number(f1.montoCobrado) >= totalInversion) ? 0 : saldoMonto,
           estado: (isSaldoPaid || Number(f1.montoCobrado) >= totalInversion) ? 'cobrada' : 'pendiente',
+          habilitadaCliente: Boolean(isSaldoPaid || Number(f1.montoCobrado) >= totalInversion),
           metodoPago: f1.metodoPago || 'Transferencia Bancaria',
           cuentaBancariaId: f1.cuentaBancariaId,
           horasInvertidasEstimadas: f1.horasInvertidasEstimadas || 10,
@@ -1016,7 +1020,8 @@ export function reconcileMilestoneInvoices(currentFacturas = [], configuracion =
               tipoHito: 'saldo',
               montoCobrado: Number(fac.total) || saldoMonto,
               saldoPendiente: 0,
-              estado: 'cobrada'
+              estado: 'cobrada',
+              habilitadaCliente: true
             };
             modified = true;
           } else if (isAnticipo && isAnticipoPaid && fac.estado !== 'cobrada') {
@@ -1025,7 +1030,8 @@ export function reconcileMilestoneInvoices(currentFacturas = [], configuracion =
               tipoHito: 'anticipo',
               montoCobrado: Number(fac.total) || anticipoMonto,
               saldoPendiente: 0,
-              estado: 'cobrada'
+              estado: 'cobrada',
+              habilitadaCliente: true
             };
             modified = true;
           }
