@@ -817,24 +817,6 @@ export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFI
     ubicacion: emisorRaw?.ubicacion || configuracion?.ubicacionPrincipal || DEFAULT_CONFIGURACION.emisor.ubicacion
   };
   const pais = invoice.cliente?.pais || 'SV';
-  const cuentas = normalizeCuentasBancarias(configuracion?.cuentasBancarias);
-
-  let cuenta = null;
-  if (invoice.cuentaBancariaId) {
-    cuenta = cuentas.find(c => c.id === invoice.cuentaBancariaId);
-  }
-  if (!cuenta && invoice.metodoPago) {
-    cuenta = cuentas.find(c => c.banco?.toLowerCase().includes(invoice.metodoPago.toLowerCase()) || invoice.metodoPago.toLowerCase().includes(c.banco?.toLowerCase()));
-  }
-  if (!cuenta) {
-    cuenta = cuentas.find(c => c.pais === pais && c.activa && c.predeterminada)
-      || cuentas.find(c => c.pais === pais && c.activa)
-      || cuentas.find(c => c.activa)
-      || cuentas[0];
-  }
-
-  const uglyCashCuenta = cuentas.find(c => (c.pais === 'US' || c.banco?.toLowerCase().includes('uglycash')) && c.activa);
-  const cuentasAlternativas = cuentas.filter(c => c.pais === pais && c.activa && c.id !== cuenta?.id);
 
   const estadoLabel = invoice.estado === 'cobrada'
     ? 'PAGADA 100%'
@@ -847,16 +829,16 @@ export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFI
 
   const rowsHtml = (invoice.items || []).map((item, idx) => `
     <tr style="background: ${idx % 2 === 1 ? '#FAFAFA' : '#FFFFFF'};">
-      <td style="padding: 14px 16px; font-size: 13px; border-bottom: 1px solid #EEEEEE; color: #1A1A1A; font-weight: 500;">
+      <td style="padding: 12px 14px; font-size: 13px; border-bottom: 1px solid #EEEEEE; color: #1A1A1A; font-weight: 500;">
         ${item.descripcion || 'Servicio Digital'}
       </td>
-      <td style="padding: 14px 16px; font-size: 13px; border-bottom: 1px solid #EEEEEE; text-align: center; font-family: monospace;">
+      <td style="padding: 12px 14px; font-size: 13px; border-bottom: 1px solid #EEEEEE; text-align: center; font-family: monospace;">
         ${item.cantidad || 1}
       </td>
-      <td style="padding: 14px 16px; font-size: 13px; border-bottom: 1px solid #EEEEEE; text-align: right; font-family: monospace;">
+      <td style="padding: 12px 14px; font-size: 13px; border-bottom: 1px solid #EEEEEE; text-align: right; font-family: monospace;">
         $${Number(item.precioUnitario || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
       </td>
-      <td style="padding: 14px 16px; font-size: 13px; border-bottom: 1px solid #EEEEEE; text-align: right; font-family: monospace; font-weight: 700; color: #1A1A1A;">
+      <td style="padding: 12px 14px; font-size: 13px; border-bottom: 1px solid #EEEEEE; text-align: right; font-family: monospace; font-weight: 700; color: #1A1A1A;">
         $${Number(item.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
       </td>
     </tr>
@@ -869,31 +851,30 @@ export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFI
   <title>Factura ${invoice.numeroFactura} - ${invoice.cliente?.empresa || 'Goglite'}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; }
-    body { background-color: #FAFAFA; color: #1A1A1A; padding: 36px 20px; display: flex; justify-content: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .invoice-card { background: #FFFFFF; width: 100%; max-width: 820px; padding: 48px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #EBEBEB; }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; padding-bottom: 24px; border-bottom: 2px solid #1A1A1A; }
+    body { background-color: #FAFAFA; color: #1A1A1A; padding: 24px 20px; display: flex; justify-content: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .invoice-card { background: #FFFFFF; width: 100%; max-width: 820px; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #EBEBEB; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 2px solid #1A1A1A; }
     .brand-box { display: flex; align-items: center; gap: 14px; }
-    .brand-badge { width: 46px; height: 46px; border-radius: 10px; background: #FF6B00; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; }
-    .logo { font-size: 24px; font-weight: 900; color: #1A1A1A; text-transform: uppercase; letter-spacing: -0.5px; }
+    .brand-badge { width: 44px; height: 44px; border-radius: 10px; background: #FF6B00; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; }
+    .logo { font-size: 22px; font-weight: 900; color: #1A1A1A; text-transform: uppercase; letter-spacing: -0.5px; }
     .logo span { color: #FF6B00; }
     .brand-sub { font-size: 12px; color: #555555; margin-top: 2px; }
     .invoice-meta { text-align: right; }
     .invoice-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: #888888; font-weight: 700; }
-    .invoice-title { font-size: 26px; font-weight: 900; color: #FF6B00; font-family: monospace; margin-top: 2px; }
-    .status-badge { display: inline-block; padding: 6px 14px; background: ${badgeBg}; color: ${badgeColor}; font-size: 11px; font-weight: 800; border-radius: 20px; margin-top: 8px; letter-spacing: 0.5px; }
-    .parties { display: flex; justify-content: space-between; gap: 32px; margin-bottom: 32px; }
-    .party-col { flex: 1; background: #FAFAFA; padding: 18px 20px; border-radius: 10px; border: 1px solid #EEEEEE; }
-    .party-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #FF6B00; font-weight: 800; margin-bottom: 8px; }
-    .party-name { font-size: 15px; font-weight: 800; color: #1A1A1A; margin-bottom: 4px; }
-    .party-detail { font-size: 12.5px; color: #555555; line-height: 1.55; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 28px; page-break-inside: avoid; }
-    th { background: #1A1A1A; color: #FFFFFF; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 12px 16px; text-align: left; }
-    .totals-wrapper { display: flex; justify-content: flex-end; margin-bottom: 32px; page-break-inside: avoid; }
-    .totals-box { width: 320px; background: #FAFAFA; padding: 18px 20px; border-radius: 10px; border: 1px solid #EEEEEE; }
-    .totals-row { display: flex; justify-content: space-between; padding: 7px 0; font-size: 13px; color: #555555; }
-    .totals-row.final { border-top: 2px solid #1A1A1A; color: #1A1A1A; font-size: 17px; font-weight: 900; padding-top: 12px; margin-top: 6px; }
+    .invoice-title { font-size: 24px; font-weight: 900; color: #FF6B00; font-family: monospace; margin-top: 2px; }
+    .status-badge { display: inline-block; padding: 5px 12px; background: ${badgeBg}; color: ${badgeColor}; font-size: 11px; font-weight: 800; border-radius: 20px; margin-top: 6px; letter-spacing: 0.5px; }
+    .parties { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+    .party-col { flex: 1; background: #FAFAFA; padding: 16px 18px; border-radius: 10px; border: 1px solid #EEEEEE; }
+    .party-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #FF6B00; font-weight: 800; margin-bottom: 6px; }
+    .party-name { font-size: 14.5px; font-weight: 800; color: #1A1A1A; margin-bottom: 3px; }
+    .party-detail { font-size: 12px; color: #555555; line-height: 1.5; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; page-break-inside: avoid; }
+    th { background: #1A1A1A; color: #FFFFFF; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 11px 14px; text-align: left; }
+    .totals-wrapper { display: flex; justify-content: flex-end; margin-bottom: 20px; page-break-inside: avoid; }
+    .totals-box { width: 320px; background: #FAFAFA; padding: 16px 18px; border-radius: 10px; border: 1px solid #EEEEEE; }
+    .totals-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; color: #555555; }
+    .totals-row.final { border-top: 2px solid #1A1A1A; color: #1A1A1A; font-size: 16px; font-weight: 900; padding-top: 10px; margin-top: 4px; }
     .totals-row.final span.highlight { color: #FF6B00; font-family: monospace; }
-    .confirmation-box { background: #FAFAFA; border-left: 4px solid #FF6B00; padding: 16px 20px; border-radius: 6px; font-size: 12.5px; color: #444444; line-height: 1.6; page-break-inside: avoid; }
     @media print {
       @page {
         size: letter portrait;
@@ -904,22 +885,23 @@ export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFI
         padding: 0 !important;
         margin: 0 !important;
         width: 100% !important;
+        height: 100% !important;
+        overflow: hidden !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
       .invoice-card {
         box-shadow: none !important;
         border: none !important;
-        padding: 0.6in 0.65in !important;
+        padding: 0.45in 0.55in !important;
         width: 8.5in !important;
         max-width: 8.5in !important;
-        min-height: 11in !important;
         box-sizing: border-box !important;
         margin: 0 auto !important;
         page-break-inside: avoid !important;
         break-inside: avoid !important;
       }
-      table, .totals-wrapper, .confirmation-box {
+      table, .totals-wrapper {
         page-break-inside: avoid !important;
         break-inside: avoid !important;
       }
@@ -1000,33 +982,20 @@ export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFI
           <span>Total Factura:</span>
           <span class="highlight">$${Number(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
         </div>
-        <div class="totals-row" style="color: #15803D; font-weight: 700; padding-top: 10px;">
+        <div class="totals-row" style="color: #15803D; font-weight: 700; padding-top: 8px;">
           <span>Monto Cobrado / Anticipo:</span>
           <span style="font-family: monospace;">$${Number(invoice.montoCobrado || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
         </div>
-        <div class="totals-row" style="color: #D97706; font-weight: 800; border-top: 1px solid #E5E7EB; padding-top: 8px;">
+        <div class="totals-row" style="color: #D97706; font-weight: 800; border-top: 1px solid #E5E7EB; padding-top: 6px;">
           <span>Saldo Pendiente:</span>
           <span style="font-family: monospace;">$${Number(invoice.saldoPendiente ?? Math.max(0, (invoice.total || 0) - (invoice.montoCobrado || 0))).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
         </div>
       </div>
     </div>
 
-    <div class="confirmation-box">
-      <strong style="color: #1A1A1A; display: block; margin-bottom: 6px;">CONFIRMACIÓN DEL SISTEMA & DATOS BANCARIOS DE PAGO:</strong>
-      • <strong>Método de Cobro Principal:</strong> ${cuenta?.banco || 'Transferencia Bancaria'} (${cuenta?.tipo || 'Cuenta Oficial'})<br/>
-      • <strong>Número de Cuenta / Tag:</strong> <span style="font-family: monospace; font-weight: 700; color: #1A1A1A;">${cuenta?.numero || 'N/A'}</span> · <strong>Moneda:</strong> ${cuenta?.moneda || 'USD'} · <strong>Titular:</strong> ${cuenta?.titular || 'Víctor Matos'}<br/>
-      ${cuenta?.instrucciones ? `• <strong>Instrucciones:</strong> ${cuenta.instrucciones}<br/>` : ''}
-      ${(pais === 'US' || uglyCashCuenta) && uglyCashCuenta?.id !== cuenta?.id ? `
-      <div style="margin-top: 6px; padding: 6px 10px; background: #FFF7ED; border-left: 3px solid #FF6B00; border-radius: 4px; font-size: 12px; color: #9A3412;">
-        ⚡ <strong>Clientes en Estados Unidos (Remesa Instantánea):</strong> Puede transferir de forma inmediata y sin comisiones desde EE.UU. mediante la app <strong>uglyCash</strong> al tag <span style="font-family: monospace; font-weight: 800; color: #FF6B00;">${uglyCashCuenta.numero}</span> (${uglyCashCuenta.titular}).
-      </div>` : ''}
-      ${cuentasAlternativas.length > 0 ? `
-      <div style="margin-top: 5px; color: #555555; font-size: 11.5px;">
-        • <strong>Otras Cuentas en ${pais === 'DO' ? 'Rep. Dominicana' : pais}:</strong> ${cuentasAlternativas.map(ca => `${ca.banco} (${ca.tipo}): Nº ${ca.numero} [${ca.moneda}]`).join(' · ')}
-      </div>` : ''}
-      <div style="margin-top: 5px;">
-        • <strong>Condiciones Comerciales:</strong> Anticipo del 50% al inicio y 50% contra entrega final verificada. Referencia de sistema: <span style="font-family: monospace;">${invoice.id}</span> (${invoice.origenModulo || 'Goglite ERP'}).
-      </div>
+    <div style="margin-top: 24px; padding-top: 14px; border-top: 1px solid #E5E7EB; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #888888;">
+      <span>Documento comercial generado electrónicamente · Goglite Agency Suite</span>
+      <span style="font-family: monospace; font-weight: 700; color: #555555;">Página 1 de 1 · ${invoice.numeroFactura || ''}</span>
     </div>
   </div>
 </body>
@@ -1062,23 +1031,6 @@ export function CorporateInvoiceDocument({ invoice, configuracion = DEFAULT_CONF
     telefono: emisorRaw?.telefono || configuracion?.telefonoWhatsapp || DEFAULT_CONFIGURACION.emisor.telefono,
     ubicacion: emisorRaw?.ubicacion || configuracion?.ubicacionPrincipal || DEFAULT_CONFIGURACION.emisor.ubicacion
   };
-  const cuentas = normalizeCuentasBancarias(configuracion?.cuentasBancarias);
-  const p = invoice.cliente?.pais || 'SV';
-  let activeAcc = null;
-  if (invoice.cuentaBancariaId) {
-    activeAcc = cuentas.find(c => c.id === invoice.cuentaBancariaId);
-  }
-  if (!activeAcc && invoice.metodoPago) {
-    activeAcc = cuentas.find(c => c.banco?.toLowerCase().includes(invoice.metodoPago.toLowerCase()) || invoice.metodoPago.toLowerCase().includes(c.banco?.toLowerCase()));
-  }
-  if (!activeAcc) {
-    activeAcc = cuentas.find(c => c.pais === p && c.activa && c.predeterminada)
-      || cuentas.find(c => c.pais === p && c.activa)
-      || cuentas.find(c => c.activa)
-      || cuentas[0];
-  }
-  const uglyCashAcc = cuentas.find(c => (c.pais === 'US' || c.banco?.toLowerCase().includes('uglycash')) && c.activa);
-  const extraAccounts = cuentas.filter(c => c.pais === p && c.activa && c.id !== activeAcc?.id);
 
   return (
     <div className="printable-invoice-document bg-white p-6 sm:p-8 rounded-xl border border-[#EBEBEB] shadow-sm space-y-6 text-[#1A1A1A] font-sans print:border-none print:shadow-none print:p-0 print:m-0 print:w-full">
@@ -1202,28 +1154,10 @@ export function CorporateInvoiceDocument({ invoice, configuracion = DEFAULT_CONF
         </div>
       </div>
 
-      {/* 5. Caja de Confirmación del Sistema & Datos Bancarios */}
-      <div className="bg-[#FAFAFA] border-l-4 border-[#FF6B00] p-3.5 rounded-r-lg text-xs text-[#444444] space-y-1.5">
-        <div className="font-extrabold text-[#1A1A1A] flex items-center justify-between">
-          <span className="text-[11px]">CONFIRMACIÓN DEL SISTEMA & INSTRUCCIONES BANCARIAS:</span>
-          <span className="text-[10px] px-2 py-0.5 rounded bg-orange-100 text-[#FF6B00] font-mono font-bold">
-            {activeAcc?.moneda || 'USD'}
-          </span>
-        </div>
-        <div className="text-[11px]">
-          • <strong>Método Principal:</strong> {activeAcc?.banco} ({activeAcc?.tipo}) — <span className="font-mono font-bold text-[#1A1A1A]">{activeAcc?.numero}</span> ({activeAcc?.titular})
-          {activeAcc?.instrucciones && <span className="block text-[#666666] text-[10px] mt-0.5">• Instrucciones: {activeAcc.instrucciones}</span>}
-        </div>
-        {(p === 'US' || uglyCashAcc) && uglyCashAcc?.id !== activeAcc?.id && (
-          <div className="mt-1 p-2 rounded bg-orange-50 border-l-2 border-[#FF6B00] text-[11px] text-orange-950">
-            ⚡ <strong>Clientes en Estados Unidos (Remesa Instantánea):</strong> Transfiere sin comisiones mediante la app <strong>uglyCash</strong> al tag <span className="font-mono font-bold text-[#FF6B00]">{uglyCashAcc.numero}</span> ({uglyCashAcc.titular}).
-          </div>
-        )}
-        {extraAccounts.length > 0 && (
-          <div className="text-[10.5px] text-[#666666]">
-            • <strong>Cuentas Adicionales:</strong> {extraAccounts.map(ca => `${ca.banco}: ${ca.numero}`).join(' · ')}
-          </div>
-        )}
+      {/* 5. Pie de Factura Oficial de 1 Sola Página */}
+      <div className="pt-3 border-t border-[#E5E7EB] flex items-center justify-between text-[11px] text-[#888888] font-mono">
+        <span>Documento comercial generado electrónicamente · Goglite Agency Suite</span>
+        <span className="font-bold text-[#555555]">Página 1 de 1 · {invoice.numeroFactura}</span>
       </div>
     </div>
   );
@@ -1277,6 +1211,7 @@ export default function GestionRentabilidadModule({
   const [facturaSearch, setFacturaSearch] = useState('');
   const [facturaStatus, setFacturaStatus] = useState('ALL'); // 'ALL' | 'cobrada' | 'parcial' | 'pendiente'
   const [facturaCountry, setFacturaCountry] = useState('ALL'); // 'ALL' | 'SV' | 'DO' | 'US'
+  const [facturaClientFilter, setFacturaClientFilter] = useState(null); // { nombre: string, facturaId?: string, proyectoId?: string, presupuestoId?: string } | null
 
   // Pestaña 'gastos' (Gastos Operativos)
   const [gastoSearch, setGastoSearch] = useState('');
@@ -2710,13 +2645,28 @@ export default function GestionRentabilidadModule({
   const filteredFacturas = facturas.filter(f => {
     const matchCountry = facturaCountry === 'ALL' || f.cliente?.pais === facturaCountry || (facturaCountry === 'US' && (f.cuentaBancariaId?.includes('uglycash') || f.metodoPago?.toLowerCase().includes('uglycash') || f.cliente?.pais === 'US'));
     const matchStatus = facturaStatus === 'ALL' || f.estado === facturaStatus;
+
+    // Filtro contextual por cliente (cuando se pulsa 'Ver Factura' en Rentabilidad Unitaria)
+    const matchClient = !facturaClientFilter || (() => {
+      if (typeof facturaClientFilter === 'object' && facturaClientFilter !== null) {
+        if (facturaClientFilter.facturaId && f.id === facturaClientFilter.facturaId) return true;
+        if (facturaClientFilter.proyectoId && f.proyectoId && f.proyectoId === facturaClientFilter.proyectoId) return true;
+        if (facturaClientFilter.presupuestoId && f.presupuestoId && f.presupuestoId === facturaClientFilter.presupuestoId) return true;
+      }
+      const targetName = (typeof facturaClientFilter === 'string' ? facturaClientFilter : facturaClientFilter?.nombre || '').toLowerCase().trim();
+      if (!targetName) return true;
+      const fEmp = (f.cliente?.empresa || '').toLowerCase().trim();
+      const fCont = (f.cliente?.contacto || '').toLowerCase().trim();
+      return fEmp === targetName || fEmp.includes(targetName) || targetName.includes(fEmp) || fCont === targetName;
+    })();
+
     const term = facturaSearch.toLowerCase().trim();
     const matchSearch = !term ||
       f.cliente?.empresa?.toLowerCase().includes(term) ||
       f.numeroFactura?.toLowerCase().includes(term) ||
       f.concepto?.toLowerCase().includes(term) ||
       f.origenModulo?.toLowerCase().includes(term);
-    return matchCountry && matchStatus && matchSearch;
+    return matchCountry && matchStatus && matchClient && matchSearch;
   });
 
   // Auto-seleccionar la primera factura al entrar a la pestaña Facturas si ninguna está seleccionada
@@ -3197,12 +3147,22 @@ export default function GestionRentabilidadModule({
                         <button
                           onClick={() => {
                             const found = facturas.find(f => f.id === p.facturaId);
+                            setFacturaClientFilter({
+                              nombre: p.cliente,
+                              facturaId: p.facturaId,
+                              proyectoId: p.proyectoId,
+                              presupuestoId: p.presupuestoId
+                            });
+                            setFacturaSearch('');
+                            setFacturaStatus('ALL');
+                            setFacturaCountry('ALL');
                             if (found) {
                               handleSelectInvoice(found);
-                              setActiveTab('facturas');
                             }
+                            setActiveTab('facturas');
                           }}
                           className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
+                          title={`Ver historial de facturas de ${p.cliente}`}
                         >
                           Ver Factura
                         </button>
@@ -3234,6 +3194,21 @@ export default function GestionRentabilidadModule({
           {/* Tab 2 Dedicated Controls Toolbar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-[#0e131f] border border-slate-800 rounded-xl">
             <div className="flex flex-wrap items-center gap-2">
+              {/* Pill de Filtro Activo por Cliente con opción para ver todo el mes */}
+              {facturaClientFilter && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/15 border border-orange-500/40 text-xs text-orange-300 font-medium shadow-sm">
+                  <span>Cliente: <strong className="text-white">{typeof facturaClientFilter === 'string' ? facturaClientFilter : facturaClientFilter?.nombre}</strong></span>
+                  <button
+                    onClick={() => setFacturaClientFilter(null)}
+                    className="ml-1 px-1.5 py-0.5 rounded bg-orange-500/20 hover:bg-orange-500/40 text-orange-200 text-[10px] font-bold flex items-center gap-1 transition-colors"
+                    title="Mostrar todas las facturas del mes de todos los clientes"
+                  >
+                    <X className="w-3 h-3" />
+                    <span>Ver todas del mes</span>
+                  </button>
+                </div>
+              )}
+
               {/* Search */}
               <div className="relative">
                 <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -3335,11 +3310,28 @@ export default function GestionRentabilidadModule({
               {/* 1. Historial de Facturas por Cuenta */}
               <div className="bg-[#0c1017] border border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
                 <div className="p-3 bg-[#101522] border-b border-slate-800 flex items-center justify-between text-xs font-bold text-slate-200">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5 text-orange-400" />
-                    <span>Historial de Facturas por Cuenta</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                    <span className="truncate">
+                      {facturaClientFilter 
+                        ? `Historial: ${typeof facturaClientFilter === 'string' ? facturaClientFilter : facturaClientFilter?.nombre}`
+                        : 'Historial de Facturas del Mes'}
+                    </span>
                   </div>
-                  <span className="text-[11px] font-mono text-slate-400">{filteredFacturas.length} registradas</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] font-mono text-slate-400">
+                      {filteredFacturas.length} {filteredFacturas.length === 1 ? 'registrada' : 'registradas'}
+                    </span>
+                    {facturaClientFilter && (
+                      <button
+                        onClick={() => setFacturaClientFilter(null)}
+                        className="text-[10px] text-orange-400 hover:text-orange-300 underline font-normal transition-colors"
+                        title="Ver el historial de todas las facturas del mes"
+                      >
+                        (Ver todas)
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="max-h-72 overflow-y-auto divide-y divide-slate-800/60 font-sans p-2 space-y-1.5">
@@ -3393,9 +3385,21 @@ export default function GestionRentabilidadModule({
                   })}
 
                   {filteredFacturas.length === 0 && (
-                    <div className="p-6 text-center text-slate-500">
+                    <div className="p-6 text-center text-slate-500 space-y-2">
                       <FileText className="w-6 h-6 mx-auto mb-1.5 opacity-30 text-slate-400" />
-                      <p className="font-semibold text-xs text-slate-300">No hay facturas registradas</p>
+                      <p className="font-semibold text-xs text-slate-300">
+                        {facturaClientFilter
+                          ? `No hay facturas registradas para "${typeof facturaClientFilter === 'string' ? facturaClientFilter : facturaClientFilter?.nombre}"`
+                          : 'No hay facturas registradas'}
+                      </p>
+                      {facturaClientFilter && (
+                        <button
+                          onClick={() => setFacturaClientFilter(null)}
+                          className="text-xs text-orange-400 hover:text-orange-300 underline font-medium block mx-auto"
+                        >
+                          Ver historial de todas las facturas del mes
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
