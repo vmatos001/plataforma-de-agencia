@@ -1438,20 +1438,26 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     }
   };
 
-  // Canvas signature helpers
+  // Canvas signature helpers optimizados para pantallas táctiles (Mobile-First)
   const getCoordinates = (e) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const touch = e.touches && e.touches.length > 0 ? e.touches[0] : (e.changedTouches && e.changedTouches.length > 0 ? e.changedTouches[0] : null);
+    const clientX = touch ? touch.clientX : e.clientX;
+    const clientY = touch ? touch.clientY : e.clientY;
+    const scaleX = canvas.width / (rect.width || 1);
+    const scaleY = canvas.height / (rect.height || 1);
     return {
-      x: clientX - rect.left,
-      y: clientY - rect.top
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
     };
   };
 
   const startDrawing = (e) => {
+    if (e.cancelable && e.type.startsWith('touch')) {
+      e.preventDefault();
+    }
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -1464,6 +1470,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   const draw = (e) => {
     if (!isDrawing) return;
+    if (e.cancelable && e.type.startsWith('touch')) {
+      e.preventDefault();
+    }
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -2242,8 +2251,8 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         </div>
       </header>
 
-      {/* Main Content Container */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 flex-1 w-full">
+      {/* Main Content Container (Mobile-First Spacing & Bottom Padding) */}
+      <main className="max-w-6xl mx-auto px-3.5 sm:px-6 py-4 sm:py-8 space-y-5 sm:space-y-6 flex-1 w-full pb-28 sm:pb-8">
         
         {/* Welcome Client Hero Box */}
         <div className="rounded-2xl bg-gradient-to-br from-[#101626] to-[#0b0e17] border border-slate-800 p-5 sm:p-7 relative overflow-hidden shadow-2xl">
@@ -2371,8 +2380,8 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
           </div>
         )}
 
-        {/* 5-Phase Interactive Stepper Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+        {/* 5-Phase Interactive Stepper Bar (Mobile-First Horizontal Swipe Snap + Desktop Grid) */}
+        <div className="flex overflow-x-auto no-scrollbar snap-x touch-pan-x gap-2 pb-2 -mx-3.5 px-3.5 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-5 sm:gap-2.5">
           {steps.map((st) => {
             const isCurrent = activeTab === st.num;
             const isCompleted = st.done;
@@ -2385,7 +2394,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 key={st.num}
                 type="button"
                 onClick={() => handleSelectTab(st)}
-                className={`p-3.5 rounded-xl border text-left transition-all relative overflow-hidden ${
+                className={`shrink-0 snap-start min-w-[145px] sm:min-w-0 sm:w-auto p-3 sm:p-3.5 rounded-xl border text-left transition-all relative overflow-hidden select-none active:scale-[0.98] ${
                   isCurrent
                     ? isGoogleProtected
                       ? 'bg-amber-500/15 border-amber-500 text-white shadow-lg shadow-amber-950/40'
@@ -2765,6 +2774,32 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 )}
               </div>
             </div>
+
+            {/* Barra Móvil Flotante Fija (Mobile-First Thumb-Zone) */}
+            <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 bg-[#080b12]/95 backdrop-blur-lg border-t border-orange-500/30 z-40 shadow-2xl flex items-center gap-2">
+              {portalConfig?.fase1Aprobada ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(2);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/60"
+                >
+                  <CheckCheck className="w-4 h-4" />
+                  <span>Propuesta Aprobada · Ir a Contrato SOW →</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleAprobarPropuesta}
+                  className="w-full py-3.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-orange-950/60 transition-all active:scale-[0.99]"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Aprobar Propuesta VIP (1-Clic)</span>
+                </button>
+              )}
+            </div>
           </div>
           )
         )}
@@ -3138,7 +3173,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       <button
                         type="button"
                         onClick={() => setSelectedBankTab('SV')}
-                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                        className={`flex-1 py-2 sm:py-1.5 text-xs font-bold rounded-lg transition-all ${
                           activeBankTab === 'SV' ? 'bg-orange-600 text-white shadow' : 'text-slate-400 hover:text-white'
                         }`}
                       >
@@ -3148,7 +3183,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       <button
                         type="button"
                         onClick={() => setSelectedBankTab('DO')}
-                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                        className={`flex-1 py-2 sm:py-1.5 text-xs font-bold rounded-lg transition-all ${
                           activeBankTab === 'DO' ? 'bg-orange-600 text-white shadow' : 'text-slate-400 hover:text-white'
                         }`}
                       >
@@ -3158,7 +3193,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     <button
                       type="button"
                       onClick={() => setSelectedBankTab('US')}
-                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                      className={`flex-1 py-2 sm:py-1.5 text-xs font-bold rounded-lg transition-all ${
                         activeBankTab === 'US' ? 'bg-orange-600 text-white shadow' : 'text-slate-400 hover:text-white'
                       }`}
                     >
@@ -3180,9 +3215,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                         <button
                           type="button"
                           onClick={() => handleCopyBank('0054-019283-01', 'SV')}
-                          className="w-full mt-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5"
+                          className="w-full mt-2.5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-100 text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 active:scale-[0.99] transition-all min-h-[46px]"
                         >
-                          {copiedBank === 'SV' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copiedBank === 'SV' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-orange-400" />}
                           <span>{copiedBank === 'SV' ? '¡Número de Cuenta Copiado!' : 'Copiar Cuenta Banco Agrícola'}</span>
                         </button>
                       </div>
@@ -3200,9 +3235,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                         <button
                           type="button"
                           onClick={() => handleCopyBank('960-239481-2', 'DO')}
-                          className="w-full mt-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5"
+                          className="w-full mt-2.5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-100 text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 active:scale-[0.99] transition-all min-h-[46px]"
                         >
-                          {copiedBank === 'DO' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copiedBank === 'DO' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-orange-400" />}
                           <span>{copiedBank === 'DO' ? '¡Número de Cuenta Copiado!' : 'Copiar Cuenta Banreservas'}</span>
                         </button>
                       </div>
@@ -3220,9 +3255,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                         <button
                           type="button"
                           onClick={() => handleCopyBank('$goglite', 'US')}
-                          className="w-full mt-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5"
+                          className="w-full mt-2.5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-100 text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 active:scale-[0.99] transition-all min-h-[46px]"
                         >
-                          {copiedBank === 'US' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copiedBank === 'US' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-orange-400" />}
                           <span>{copiedBank === 'US' ? '¡uglyTag Copiado!' : 'Copiar Tag uglyCash ($goglite)'}</span>
                         </button>
                       </div>
@@ -3330,16 +3365,22 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
                     {portalConfig?.fase2Firmada ? (
                       <button
-                        onClick={() => setActiveTab(3)}
-                        className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 border border-slate-700"
+                        type="button"
+                        onClick={() => {
+                          setActiveTab(3);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="w-full py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 border border-slate-700 min-h-[46px]"
                       >
                         <span>Ir a la Fase 3: Intake de Insumos</span>
                         <ChevronRight className="w-4 h-4" />
                       </button>
                     ) : (
                       <button
+                        id="btn-submit-contract-sow"
+                        type="button"
                         onClick={handleFirmarContrato}
-                        className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-orange-950 transition-all"
+                        className="w-full py-3.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl shadow-orange-950 transition-all min-h-[48px] active:scale-[0.99]"
                       >
                         <CheckCheck className="w-4 h-4" />
                         <span>Confirmar Firma y Enviar Captura de Comprobante (50%)</span>
@@ -3348,6 +3389,32 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Barra Móvil Flotante Fija para Fase 2 (Mobile-First Thumb-Zone) */}
+            <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 bg-[#080b12]/95 backdrop-blur-lg border-t border-orange-500/30 z-40 shadow-2xl flex items-center gap-2">
+              {portalConfig?.fase2Firmada ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(3);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/60"
+                >
+                  <CheckCheck className="w-4 h-4" />
+                  <span>Contrato Firmado · Ir a Intake de Insumos →</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleFirmarContrato}
+                  className="w-full py-3.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-orange-950/60 transition-all active:scale-[0.99]"
+                >
+                  <PenTool className="w-4 h-4" />
+                  <span>Confirmar Firma y Reportar Anticipo</span>
+                </button>
+              )}
             </div>
           </div>
           )
