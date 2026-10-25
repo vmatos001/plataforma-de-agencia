@@ -61,7 +61,7 @@ import {
   reconcileInvoiceWithPresupuesto,
   normalizeFacturaItems 
 } from './GestionRentabilidadModule';
-import { auth } from '../services/firebase';
+import { auth, getPortalFromFirestore, savePortalToFirestore } from '../services/firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 function GoogleProtectedCard({
@@ -713,10 +713,10 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       // Set initial active tab based on progress ONCE
       if (!tabInitializedRef.current) {
         tabInitializedRef.current = true;
-        if (cfg.fase4Liquidada) setActiveTab(5);
-        else if (cfg.fase3InsumosCompletos) setActiveTab(4);
-        else if (cfg.fase2Firmada) setActiveTab(3);
-        else if (cfg.fase1Aprobada) setActiveTab(2);
+        if (cfg.fase4Liquidada || (cfg.faseActual && cfg.faseActual >= 5)) setActiveTab(5);
+        else if (cfg.fase3InsumosCompletos || (cfg.faseActual && cfg.faseActual >= 4)) setActiveTab(4);
+        else if (cfg.fase2Firmada || (cfg.faseActual && cfg.faseActual >= 3)) setActiveTab(3);
+        else if (cfg.fase1Aprobada || (cfg.faseActual && cfg.faseActual >= 2)) setActiveTab(2);
         else setActiveTab(1);
       }
     }
@@ -943,6 +943,30 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 );
                 if (matchedProj) {
                   matchedProj = reconcileProyectoWithPresupuesto(matchedProj, parsedProp);
+                  if (parsedProp.proyecto) {
+                    matchedProj = {
+                      ...matchedProj,
+                      ...parsedProp.proyecto,
+                      portalConfig: {
+                        ...(matchedProj.portalConfig || {}),
+                        ...(parsedProp.proyecto.portalConfig || {})
+                      },
+                      pagos: {
+                        ...(matchedProj.pagos || {}),
+                        ...(parsedProp.proyecto.pagos || {})
+                      },
+                      onboarding: {
+                        ...(matchedProj.onboarding || {}),
+                        ...(parsedProp.proyecto.onboarding || {})
+                      }
+                    };
+                  }
+                } else if (parsedProp.proyecto) {
+                  matchedProj = {
+                    ...buildProyectoFromPresupuesto(parsedProp, projs),
+                    ...parsedProp.proyecto
+                  };
+                  saveStoredProyectos([matchedProj, ...projs]);
                 } else if (storedPortalConfig.fase1Aprobada || parsedProp.estado === 'aceptado') {
                   matchedProj = buildProyectoFromPresupuesto(parsedProp, projs);
                   saveStoredProyectos([matchedProj, ...projs]);
@@ -951,9 +975,13 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
               loadedData = {
                 lead: resolvedLead,
-                portalConfig: { ...(parsedProp.portalConfig || {}), ...storedPortalConfig },
+                portalConfig: { 
+                  ...(parsedProp.portalConfig || {}), 
+                  ...(parsedProp.proyecto?.portalConfig || {}), 
+                  ...storedPortalConfig 
+                },
                 presupuesto: parsedProp,
-                proyecto: matchedProj
+                proyecto: matchedProj || parsedProp.proyecto
               };
 
               // Actualizar únicamente la propuesta existente sin duplicar registros
@@ -993,7 +1021,28 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         }
       }
 
-      // 1. Consultar en tiempo real la Base de Datos de la Aplicación (Fases 1 a 7) vía API y fusionar con payload URL si existe
+      // 1. Consultar Firestore en tiempo real para sincronización multidispositivo (PC <-> Móvil)
+      try {
+        const firestoreData = await getPortalFromFirestore(token);
+        if (firestoreData && (firestoreData.lead || firestoreData.presupuesto || firestoreData.proyecto)) {
+          if (loadedData) {
+            loadedData = {
+              ...loadedData,
+              ...firestoreData,
+              lead: { ...(loadedData.lead || {}), ...(firestoreData.lead || {}) },
+              presupuesto: firestoreData.presupuesto || loadedData.presupuesto,
+              proyecto: firestoreData.proyecto || loadedData.proyecto,
+              portalConfig: { ...(loadedData.portalConfig || {}), ...(firestoreData.portalConfig || {}) }
+            };
+          } else {
+            loadedData = firestoreData;
+          }
+        }
+      } catch (fErr) {
+        console.warn('[Portal] Error leyendo de Firestore:', fErr);
+      }
+
+      // 1.1 Consultar en tiempo real la Base de Datos de la Aplicación (Fases 1 a 7) vía API si está disponible
       try {
         const res = await fetch(`/api/portal/${token}`);
         const ctype = res.headers.get('content-type') || '';
@@ -2515,7 +2564,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 {portalConfig?.fase1Aprobada ? (
                   <button
                     onClick={() => setActiveTab(2)}
-                    className="px-4 py-2.5 rounded-xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center gap-2 shadow-sm"
+                    className="hidden sm:flex px-4 py-2.5 rounded-xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 font-bold text-xs items-center gap-2 shadow-sm"
                   >
                     <CheckCheck className="w-4 h-4" />
                     <span>Propuesta Aprobada · Ir a Contrato SOW →</span>
@@ -2524,7 +2573,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   <button
                     type="button"
                     onClick={handleAprobarPropuesta}
-                    className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-2 shadow-xl shadow-orange-950 transition-all transform hover:scale-[1.02]"
+                    className="hidden sm:flex px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs items-center gap-2 shadow-xl shadow-orange-950 transition-all transform hover:scale-[1.02]"
                   >
                     <Check className="w-4 h-4" />
                     <span>Aprobar Propuesta (1-Clic)</span>
@@ -2536,40 +2585,40 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             {/* FULL EXECUTIVE PROPOSAL DOCUMENT (ESTILO GOOGLE DOCS / GOGLITE OFICIAL) */}
             <div 
               id="printable-client-proposal"
-              className="bg-slate-900/60 p-2 sm:p-6 text-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl print:border-none print:p-0 print:shadow-none print:bg-transparent print:m-0 space-y-6 print:space-y-0"
+              className="bg-slate-900/40 p-0 sm:p-6 text-slate-900 rounded-2xl border border-slate-800/80 overflow-hidden shadow-2xl print:border-none print:p-0 print:shadow-none print:bg-transparent print:m-0 space-y-4 sm:space-y-6 print:space-y-0"
             >
               {/* PÁGINA 1: PORTADA OFICIAL GOGLITE */}
-              <div className="pdf-page-cover relative w-full aspect-[210/297] max-w-4xl mx-auto overflow-hidden bg-white shadow-2xl rounded-xl print:rounded-none print:shadow-none">
+              <div className="pdf-page-cover relative w-full max-h-[220px] sm:max-h-none sm:aspect-[210/297] max-w-4xl mx-auto overflow-hidden bg-white shadow-2xl rounded-xl print:rounded-none print:shadow-none">
                 <img 
                   src="/assets/portada_oficial_fija.png" 
                   alt="Propuesta de Desarrollo Digital VIP" 
-                  className="w-full h-full object-cover block"
+                  className="w-full h-full object-cover object-top block"
                 />
               </div>
 
               {/* PÁGINA 2: RESUMEN EJECUTIVO, ESTRATEGIA, ALCANCE Y CONDICIONES */}
-              <div className="pdf-page-content max-w-4xl mx-auto p-6 sm:p-12 bg-white shadow-2xl rounded-xl print:rounded-none print:shadow-none text-slate-900 font-sans leading-relaxed text-xs">
+              <div className="pdf-page-content max-w-4xl mx-auto p-4 sm:p-12 bg-white shadow-2xl rounded-xl print:rounded-none print:shadow-none text-slate-900 font-sans leading-relaxed text-xs">
                 {/* Sub-Header con Marca Goglite y Metadatos */}
                 <div className="border-b-2 border-slate-900 pb-4 mb-6 avoid-break">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <img 
                         src="/assets/goglite_logo.png" 
                         alt={presupuesto?.emisor?.empresa || 'Goglite'} 
-                        className="h-10 w-auto object-contain"
+                        className="h-9 sm:h-10 w-auto object-contain shrink-0"
                       />
-                      <div className="text-[10px] text-slate-600 font-medium space-y-0.5 border-l border-slate-300 pl-3">
+                      <div className="text-[10px] text-slate-600 font-medium space-y-0.5 border-l border-slate-300 pl-2.5 sm:pl-3">
                         <div><strong>Ubicación:</strong> {presupuesto?.emisor?.ubicacion || 'Santa Ana, El Salvador · Santo Domingo, RD'}</div>
                         <div><strong>Contacto:</strong> {presupuesto?.emisor?.telefono || '(503) 7756-9828'} | {presupuesto?.emisor?.email || 'info@goglite.com'}</div>
                         <div><strong>Director:</strong> {presupuesto?.emisor?.responsable || 'Víctor Matos'}</div>
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <div className="text-[11px] font-mono font-bold text-slate-900 uppercase">
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200">
+                      <div className="text-[10px] sm:text-[11px] font-mono font-bold text-slate-900 uppercase">
                         Fecha: {presupuesto?.fecha || new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
                       </div>
-                      <div className="text-[11px] font-mono text-orange-600 font-bold mt-0.5">
+                      <div className="text-[11px] font-mono text-orange-600 font-bold sm:mt-0.5">
                         {presupuesto?.codigo || 'P-2026-001'}
                       </div>
                     </div>
@@ -2682,7 +2731,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 </div>
 
                 {/* 3. INVERSIÓN ESTRATÉGICA Y CONDICIONES */}
-                <div className="mb-6 p-5 sm:p-6 rounded-xl bg-slate-900 text-white avoid-break shadow-md">
+                <div className="mb-6 p-4 sm:p-6 rounded-xl bg-slate-900 text-white avoid-break shadow-md">
                   <h2 className="text-xs font-black uppercase tracking-wider text-orange-400 mb-2">
                     3. Inversión Estratégica y Condiciones Comerciales
                   </h2>
@@ -2691,10 +2740,10 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     La inversión en un sistema digital integral de esta envergadura suele oscilar entre los <strong>${presupuesto?.inversion?.precioMercadoReferencial || Math.max(1500, totalInversion * 2)} USD</strong> en el mercado profesional. Para <strong>{clientEmpresa}</strong> hemos estructurado un paquete preferencial:
                   </p>
 
-                  <div className="bg-white/10 p-3.5 rounded-lg border border-white/15 space-y-1.5 font-mono mb-4">
+                  <div className="bg-white/10 p-3 sm:p-3.5 rounded-lg border border-white/15 space-y-1.5 font-mono mb-4">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-slate-300">Inversión Total del Sistema Completo:</span>
-                      <span className="text-base font-extrabold text-orange-400">
+                      <span className="text-sm sm:text-base font-extrabold text-orange-400">
                         ${totalInversion} USD
                       </span>
                     </div>
@@ -2766,7 +2815,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   <button
                     type="button"
                     onClick={handleAprobarPropuesta}
-                    className="w-full sm:w-auto px-7 py-3 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-2xl shadow-orange-950 transition-all transform hover:scale-[1.02]"
+                    className="hidden sm:flex w-full sm:w-auto px-7 py-3 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs items-center justify-center gap-2 shadow-2xl shadow-orange-950 transition-all transform hover:scale-[1.02]"
                   >
                     <Check className="w-4 h-4" />
                     <span>Aprobar Propuesta (1-Clic) & Continuar</span>
@@ -2776,7 +2825,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             </div>
 
             {/* Barra Móvil Flotante Fija (Mobile-First Thumb-Zone) */}
-            <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 bg-[#080b12]/95 backdrop-blur-lg border-t border-orange-500/30 z-40 shadow-2xl flex items-center gap-2">
+            <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-[#080b12]/95 backdrop-blur-lg border-t border-orange-500/30 z-40 shadow-2xl flex items-center gap-2">
               {portalConfig?.fase1Aprobada ? (
                 <button
                   type="button"
@@ -3392,7 +3441,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             </div>
 
             {/* Barra Móvil Flotante Fija para Fase 2 (Mobile-First Thumb-Zone) */}
-            <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 bg-[#080b12]/95 backdrop-blur-lg border-t border-orange-500/30 z-40 shadow-2xl flex items-center gap-2">
+            <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-[#080b12]/95 backdrop-blur-lg border-t border-orange-500/30 z-40 shadow-2xl flex items-center gap-2">
               {portalConfig?.fase2Firmada ? (
                 <button
                   type="button"

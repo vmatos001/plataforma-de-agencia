@@ -56,6 +56,7 @@ import {
   syncAllProyectosWithEvents,
   getStoredSprintTasks
 } from '../services/projectMilestoneSync';
+import { savePortalToFirestore } from '../services/firebase';
 
 export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNavigateToPresupuestos }) {
   const [proyectos, setProyectos] = useState([]);
@@ -529,6 +530,31 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
           ultimaModificacion: new Date().toISOString()
         }));
       });
+
+      // Sincronizar en Firestore para acceso inmediato desde celulares y otros dispositivos
+      const syncToken = proj.portalToken || (proj.leadId ? 'portal-' + proj.leadId : 'portal-' + proj.id);
+      savePortalToFirestore(syncToken, {
+        token: syncToken,
+        lead: {
+          id: proj.leadId || proj.id,
+          empresa: proj.cliente?.empresa || '',
+          contacto: proj.cliente?.nombre || '',
+          telefono: proj.cliente?.telefono || '',
+          email: proj.cliente?.email || '',
+          pais: proj.cliente?.pais || 'SV',
+          portalToken: syncToken
+        },
+        proyecto: {
+          id: proj.id,
+          faseActual: updates.faseActual || proj.faseActual || 1,
+          portalConfig: { ...(proj.portalConfig || {}), ...updates },
+          pagos: proj.pagos || {},
+          onboarding: proj.onboarding || {},
+          contrato: proj.contrato || {},
+          estado: proj.estado || 'activo'
+        },
+        portalConfig: { ...(proj.portalConfig || {}), ...updates }
+      }).catch(() => {});
     } catch (e) {
       console.warn('[SyncPortalStorage] Error sincronizando claves:', e);
     }
@@ -994,14 +1020,24 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
         const compactPayload = {
           id: prop.id,
           codigo: prop.codigo,
-          cliente: prop.cliente,
-          titulo: prop.titulo,
-          pais: prop.pais,
+          cliente: prop.cliente || target.cliente,
+          titulo: prop.titulo || target.titulo,
+          pais: prop.pais || target.pais,
           inversion: prop.inversion,
           modulos: prop.modulos || [],
           fases: prop.fases || [],
           vigenciaDias: prop.vigenciaDias || 15,
-          estado: prop.estado || 'aceptado'
+          estado: prop.estado || 'aceptado',
+          // Incluir el estado completo y verificado del proyecto para sincronizar cualquier dispositivo externo
+          proyecto: {
+            id: target.id,
+            faseActual: target.faseActual || (target.pagos?.saldoEstado === 'confirmado' ? 5 : (target.onboarding?.insumosValidados100 ? 4 : 1)),
+            portalConfig: target.portalConfig || {},
+            pagos: target.pagos || {},
+            onboarding: target.onboarding || {},
+            contrato: target.contrato || {},
+            estado: target.estado || 'activo'
+          }
         };
         const jsonStr = JSON.stringify(compactPayload);
         const encoded = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (m, p) => String.fromCharCode('0x' + p)));

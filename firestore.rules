@@ -35,6 +35,21 @@ rules_version = '2';
 //   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación)
 //   - updatedBy: string (opcional, máx 128 caracteres)
 //
+// Collection: portales
+// Document ID: {token} (ej: 'tok-f89a2b', UUID o token alfanumérico)
+// Fields:
+//   - token: string (obligatorio, 1-128 caracteres, inmutable, coincide con {token})
+//   - lead: map (opcional) - Objeto de datos comerciales, perfil y contacto del lead/cliente
+//   - presupuesto: map (opcional) - Propuesta económica, ítems, cronograma e inversión
+//   - proyecto: map (opcional) - Plan de desarrollo, contrato, pagos e insumos
+//   - portalConfig: map (opcional) - Estado del flujo del portal, flags de acceso y fases
+//   - workflowData: map (opcional) - Metadatos consolidados del flujo de trabajo (auditoría, SEO, finanzas)
+//   - id: string (opcional, máx 128 caracteres, inmutable si existe)
+//   - updatedAt: string | timestamp (opcional, máx 50 caracteres si string) - Última actualización
+//   - createdAt: string | timestamp (opcional, máx 50 caracteres si string, inmutable tras creación)
+//   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación) - ID o correo del creador
+//   - updatedBy: string (opcional, máx 128 caracteres) - ID o correo del último editor
+//
 // ===============================================================
 
 service cloud.firestore {
@@ -66,7 +81,7 @@ service cloud.firestore {
     }
 
     // ===============================================================
-    // Domain Validators
+    // Domain Validators: CMS Sites
     // ===============================================================
 
     // Validación de sub-estructura de branding
@@ -135,10 +150,46 @@ service cloud.firestore {
     }
 
     // ===============================================================
+    // Domain Validators: Portales Confidenciales
+    // ===============================================================
+
+    // Validador principal del documento de portal confidencial (Validator Function Pattern)
+    function isValidPortal(data, portalToken) {
+      return hasRequiredFields(['token']) &&
+        hasOnlyAllowedFields([
+          'id', 'token', 'lead', 'presupuesto', 'proyecto',
+          'portalConfig', 'workflowData', 'updatedAt', 'createdAt',
+          'createdBy', 'updatedBy'
+        ]) &&
+        data.token is string &&
+        data.token.size() >= 1 &&
+        data.token.size() <= 128 &&
+        data.token == portalToken &&
+        (!('lead' in data) || data.lead is map) &&
+        (!('presupuesto' in data) || data.presupuesto is map) &&
+        (!('proyecto' in data) || data.proyecto is map) &&
+        (!('portalConfig' in data) || data.portalConfig is map) &&
+        (!('workflowData' in data) || data.workflowData is map) &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+        (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50) || data.updatedAt is timestamp) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50) || data.createdAt is timestamp) &&
+        (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 128)) &&
+        (!('updatedBy' in data) || (data.updatedBy is string && data.updatedBy.size() <= 128));
+    }
+
+    // Garantiza que los campos inmutables del portal (token, id, fecha y autor de origen) no sean alterados en update
+    function isImmutablePortalDataPreserved() {
+      return request.resource.data.token == resource.data.token &&
+        (!('id' in resource.data) || request.resource.data.id == resource.data.id) &&
+        (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt) &&
+        (!('createdBy' in resource.data) || request.resource.data.createdBy == resource.data.createdBy);
+    }
+
+    // ===============================================================
     // Collection Rules
     // ===============================================================
 
-    // Colección principal: Sitios web administrados por el Headless CMS de la agencia
+    // Colección: Sitios web administrados por el Headless CMS de la agencia
     match /cms_sites/{siteSlug} {
       // 1. Lectura pública:
       // Los sitios web de clientes finales ejecutan el script universal 'cms.js'
@@ -158,6 +209,28 @@ service cloud.firestore {
 
       // 4. Eliminación:
       // Restringido estrictamente a administradores autenticados.
+      allow delete: if isAdmin();
+    }
+
+    // Colección: Portales confidenciales de clientes de la agencia
+    match /portales/{token} {
+      // 1. Lectura pública:
+      // Permite a los clientes acceder y consultar su portal confidencial mediante su token único.
+      allow read: if true;
+
+      // 2. Creación:
+      // Permitido a usuarios autenticados con validación estricta de esquema y concordancia de token.
+      allow create: if isAuthenticated() &&
+                    isValidPortal(request.resource.data, token);
+
+      // 3. Actualización:
+      // Permitido a usuarios autenticados con validación estricta y preservación de inmutabilidad del token.
+      allow update: if isAuthenticated() &&
+                    isValidPortal(request.resource.data, token) &&
+                    isImmutablePortalDataPreserved();
+
+      // 4. Eliminación:
+      // Restringido exclusivamente a administradores con privilegios elevados.
       allow delete: if isAdmin();
     }
 

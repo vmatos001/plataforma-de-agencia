@@ -666,6 +666,31 @@ export default function PresupuestosModule({
         vigenciaDias: target.vigenciaDias || 15,
         estado: (!target.estado || target.estado === 'borrador') ? 'sin_abrir' : target.estado
       };
+
+      // Si existe un proyecto formal asociado, adjuntar su estado sincronizado
+      try {
+        const rawProjs = localStorage.getItem('goglite_proyectos');
+        if (rawProjs) {
+          const projs = JSON.parse(rawProjs);
+          const matchedProj = projs.find(p => 
+            p.presupuestoId === target.id || 
+            p.presupuestoCodigo === target.codigo ||
+            (target.cliente?.empresa && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === target.cliente.empresa.toLowerCase().trim())
+          );
+          if (matchedProj) {
+            compactPayload.proyecto = {
+              id: matchedProj.id,
+              faseActual: matchedProj.faseActual || (matchedProj.pagos?.saldoEstado === 'confirmado' ? 5 : (matchedProj.onboarding?.insumosValidados100 ? 4 : 1)),
+              portalConfig: matchedProj.portalConfig || {},
+              pagos: matchedProj.pagos || {},
+              onboarding: matchedProj.onboarding || {},
+              contrato: matchedProj.contrato || {},
+              estado: matchedProj.estado || 'activo'
+            };
+          }
+        }
+      } catch (e) {}
+
       const jsonStr = JSON.stringify(compactPayload);
       const encoded = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (m, p) => String.fromCharCode('0x' + p)));
       payloadQuery = `?d=${encodeURIComponent(encoded)}`;

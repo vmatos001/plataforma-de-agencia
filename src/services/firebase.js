@@ -72,6 +72,49 @@ export async function getCmsSiteFromFirestore(slug) {
 }
 
 /**
+ * Guarda o actualiza el estado completo de un portal de cliente en Firestore
+ */
+export async function savePortalToFirestore(token, portalData) {
+  try {
+    if (!token) return null;
+    await ensureAuth();
+    const cleanToken = String(token).trim();
+    const portalRef = doc(db, 'portales', cleanToken);
+    const payload = {
+      token: cleanToken,
+      lead: portalData.lead || null,
+      presupuesto: portalData.presupuesto || null,
+      proyecto: portalData.proyecto || null,
+      portalConfig: portalData.portalConfig || {},
+      updatedAt: new Date().toISOString()
+    };
+    await setDoc(portalRef, payload, { merge: true });
+    return payload;
+  } catch (err) {
+    console.warn('[Firestore] Error guardando portal:', token, err);
+    return null;
+  }
+}
+
+/**
+ * Obtiene el estado de un portal desde Firestore para sincronización multidispositivo
+ */
+export async function getPortalFromFirestore(token) {
+  try {
+    if (!token) return null;
+    const cleanToken = String(token).trim();
+    const portalRef = doc(db, 'portales', cleanToken);
+    const snap = await getDoc(portalRef);
+    if (snap.exists()) {
+      return snap.data();
+    }
+  } catch (err) {
+    console.warn('[Firestore] Error leyendo portal:', token, err);
+  }
+  return null;
+}
+
+/**
  * Conecta la cuenta de Google mediante OAuth 2.0 con permisos de Google Business Profile
  */
 export async function connectGoogleBusinessAccount() {

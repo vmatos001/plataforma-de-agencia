@@ -1182,9 +1182,58 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     }
   };
 
-  // Copy portal link
-  const handleCopyPortalLink = (token) => {
-    const url = `${window.location.origin}/portal/${token}`;
+  // Copy portal link with complete project & proposal payload
+  const handleCopyPortalLink = (token, leadObj = null) => {
+    let payloadQuery = '';
+    try {
+      const targetLead = leadObj || activeLeadModal;
+      const rawP = typeof window !== 'undefined' ? localStorage.getItem('goglite_presupuestos') : null;
+      const rawProjs = typeof window !== 'undefined' ? localStorage.getItem('goglite_proyectos') : null;
+      let matchedProp = null;
+      let matchedProj = null;
+
+      if (rawP && targetLead) {
+        const ps = JSON.parse(rawP);
+        const lEmp = (targetLead.empresa || '').toLowerCase().trim();
+        matchedProp = ps.find(p => p.leadId === targetLead.id || p.portalToken === token || (lEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === lEmp));
+      }
+      if (rawProjs && targetLead) {
+        const projs = JSON.parse(rawProjs);
+        const lEmp = (targetLead.empresa || '').toLowerCase().trim();
+        matchedProj = projs.find(p => (matchedProp && p.presupuestoId === matchedProp.id) || (lEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === lEmp));
+      }
+
+      if (matchedProp) {
+        const compactPayload = {
+          id: matchedProp.id,
+          codigo: matchedProp.codigo,
+          cliente: matchedProp.cliente || { empresa: targetLead.empresa, nombre: targetLead.contacto, telefono: targetLead.telefono, email: targetLead.email },
+          titulo: matchedProp.titulo,
+          pais: matchedProp.pais || targetLead.pais,
+          inversion: matchedProp.inversion,
+          modulos: matchedProp.modulos || [],
+          fases: matchedProp.fases || [],
+          vigenciaDias: matchedProp.vigenciaDias || 15,
+          estado: matchedProp.estado || 'aceptado'
+        };
+        if (matchedProj) {
+          compactPayload.proyecto = {
+            id: matchedProj.id,
+            faseActual: matchedProj.faseActual || (matchedProj.pagos?.saldoEstado === 'confirmado' ? 5 : (matchedProj.onboarding?.insumosValidados100 ? 4 : 1)),
+            portalConfig: matchedProj.portalConfig || {},
+            pagos: matchedProj.pagos || {},
+            onboarding: matchedProj.onboarding || {},
+            contrato: matchedProj.contrato || {},
+            estado: matchedProj.estado || 'activo'
+          };
+        }
+        const jsonStr = JSON.stringify(compactPayload);
+        const encoded = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (m, p) => String.fromCharCode('0x' + p)));
+        payloadQuery = `?d=${encodeURIComponent(encoded)}`;
+      }
+    } catch (e) {}
+
+    const url = `${window.location.origin}/portal/${token}${payloadQuery}`;
     navigator.clipboard.writeText(url);
     setPortalCopied(true);
     setTimeout(() => setPortalCopied(false), 2000);
@@ -2702,7 +2751,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                       {`${window.location.origin}/portal/${activeLeadModal.portalToken || 'portal-' + activeLeadModal.id}`}
                     </span>
                     <button
-                      onClick={() => handleCopyPortalLink(activeLeadModal.portalToken || 'portal-' + activeLeadModal.id)}
+                      onClick={() => handleCopyPortalLink(activeLeadModal.portalToken || 'portal-' + activeLeadModal.id, activeLeadModal)}
                       className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1 shrink-0 transition-colors"
                     >
                       {portalCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
