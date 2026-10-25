@@ -805,9 +805,32 @@ export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFI
     .totals-row.final span.highlight { color: #FF6B00; font-family: monospace; }
     .confirmation-box { background: #FAFAFA; border-left: 4px solid #FF6B00; padding: 16px 20px; border-radius: 6px; font-size: 12.5px; color: #444444; line-height: 1.6; page-break-inside: avoid; }
     @media print {
-      @page { size: A4 portrait; margin: 12mm; }
-      body { background: #FFFFFF; padding: 0; }
-      .invoice-card { box-shadow: none; border: none; padding: 0; width: 100%; max-width: 100%; }
+      @page {
+        size: letter portrait;
+        margin: 0.5in;
+      }
+      html, body {
+        background: #FFFFFF !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .invoice-card {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: 7.5in !important;
+        margin: 0 auto !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      table, .totals-wrapper, .confirmation-box {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
     }
   </style>
 </head>
@@ -940,7 +963,7 @@ export function CorporateInvoiceDocument({ invoice, configuracion = DEFAULT_CONF
   const extraAccounts = cuentas.filter(c => c.pais === p && c.activa && c.id !== activeAcc?.id);
 
   return (
-    <div className="bg-white p-6 sm:p-8 rounded-xl border border-[#EBEBEB] shadow-sm space-y-6 text-[#1A1A1A] font-sans">
+    <div className="printable-invoice-document bg-white p-6 sm:p-8 rounded-xl border border-[#EBEBEB] shadow-sm space-y-6 text-[#1A1A1A] font-sans print:border-none print:shadow-none print:p-0 print:m-0 print:w-full">
       {/* 1. Header de Factura */}
       <div className="flex flex-col sm:flex-row items-start justify-between gap-4 pb-5 border-b-2 border-[#1A1A1A]">
         <div className="flex items-center gap-3.5">

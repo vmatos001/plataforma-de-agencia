@@ -2673,13 +2673,13 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               className="bg-transparent p-0 text-slate-900 overflow-visible print:border-none print:p-0 print:shadow-none print:bg-transparent print:m-0 space-y-6 sm:space-y-8 print:space-y-0"
             >
               {/* =========================================================================
-                  HOJA 1: PORTADA OFICIAL GOGLITE (TAMAÑO CARTA 8.5 x 11 in / FULL BLEED)
+                  HOJA 1: PORTADA OFICIAL GOGLITE (TAMAÑO CARTA 8.5 x 11 in / AJUSTE EXACTO)
                   ========================================================================= */}
-              <div className="print-letter-page print-cover-sheet relative w-full max-w-4xl mx-auto overflow-hidden bg-white shadow-2xl rounded-2xl print:rounded-none print:shadow-none print:m-0 aspect-[8.5/11]">
+              <div className="print-letter-page print-cover-sheet relative w-full max-w-4xl mx-auto overflow-hidden bg-[#090808] shadow-2xl rounded-2xl print:rounded-none print:shadow-none print:m-0 flex items-center justify-center">
                 <img 
                   src="/assets/portada_oficial_fija.png" 
                   alt="Propuesta de Desarrollo Digital VIP" 
-                  className="w-full h-full object-cover block"
+                  className="w-full h-auto object-contain block mx-auto print:w-full print:h-full print:object-contain"
                 />
               </div>
 
@@ -3089,142 +3089,200 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               </div>
             )}
 
-            {/* FULL PRINTABLE SOW CONTRACT SHEET (A4 Presentation idéntica al panel interno) */}
+            {/* FULL PRINTABLE SOW CONTRACT SHEET (2 HOJAS CARTA 8.5 x 11 in) */}
             <div 
               id="printable-client-contract"
-              className="bg-white text-slate-900 rounded-2xl shadow-2xl p-6 sm:p-12 border border-slate-200 print:border-none print:p-0 print:shadow-none print:rounded-none max-w-4xl mx-auto"
+              className="bg-transparent p-0 text-slate-900 overflow-visible print:border-none print:p-0 print:shadow-none print:bg-transparent print:m-0 space-y-6 sm:space-y-8 print:space-y-0"
             >
-              {/* Header Document */}
-              <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
-                <div className="flex items-center gap-3">
-                  <img 
-                    src="/assets/goglite_logo.png" 
-                    alt="Goglite Digital" 
-                    className="h-8 w-auto object-contain"
-                    onError={(e) => { e.target.style.display = 'none'; }}
-                  />
-                  <div>
-                    <div className="font-black text-sm uppercase tracking-wider text-slate-900">Goglite Digital</div>
-                    <div className="text-[10px] text-slate-500 font-mono">Agencia de Desarrollo Web Nativo & IA</div>
+              {/* =========================================================================
+                  HOJA 1 DE CONTRATO SOW: ENCABEZADO, PARTES Y CLÁUSULAS 1 A 4 (8.5 x 11 in)
+                  ========================================================================= */}
+              <div className="print-letter-page print-content-sheet max-w-4xl mx-auto p-6 sm:p-10 bg-white shadow-2xl rounded-2xl print:rounded-none print:shadow-none print:m-0 text-slate-900 font-sans leading-relaxed text-xs aspect-auto sm:min-h-[11in] flex flex-col justify-between">
+                <div>
+                  {/* Header Document */}
+                  <div className="flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-4 avoid-break">
+                    <div className="flex items-center gap-3">
+                      <img 
+                        src="/assets/goglite_logo.png" 
+                        alt="Goglite Digital" 
+                        className="h-8 w-auto object-contain"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                      <div>
+                        <div className="font-black text-sm uppercase tracking-wider text-slate-900">Goglite Digital</div>
+                        <div className="text-[10px] text-slate-500 font-mono">Agencia de Desarrollo Web Nativo & IA</div>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="font-mono text-xs font-bold text-orange-600">{activeProyecto?.codigo || 'CON-2026-001'}</div>
+                      <div className="text-[10px] text-slate-500">{contrato?.fechaEmision || new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                    </div>
                   </div>
-                </div>
 
-                <div className="text-right">
-                  <div className="font-mono text-xs font-bold text-orange-600">{activeProyecto?.codigo || 'CON-2026-001'}</div>
-                  <div className="text-[10px] text-slate-500">{contrato?.fechaEmision || new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-                </div>
-              </div>
-
-              {/* Title */}
-              <div className="text-center my-6">
-                <h1 className="text-base sm:text-lg font-black uppercase tracking-tight text-slate-950">
-                  {contrato?.titulo || 'CONTRATO OFICIAL DE PRESTACIÓN DE SERVICIOS DIGITALES Y DESARROLLO WEB'}
-                </h1>
-                <p className="text-xs text-slate-600 mt-1">
-                  Entre Goglite Digital y {clientEmpresa}
-                </p>
-              </div>
-
-              {/* Parties Section */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs mb-6 space-y-2">
-                <p className="leading-relaxed">
-                  <strong>DE UNA PARTE:</strong> <strong>GOGLITE DIGITAL</strong>, representada por su Director General <strong>Víctor Matos</strong>, con facultades suficientes para celebrar este acto en calidad de <strong>EL PRESTADOR</strong>.
-                </p>
-                <p className="leading-relaxed">
-                  <strong>DE OTRA PARTE:</strong> <strong>{clientContacto}</strong>, en representación legal de <strong>{clientEmpresa}</strong>, con domicilio en {clientUbicacion}, en adelante <strong>EL CLIENTE</strong>.
-                </p>
-                <p className="text-slate-600 text-[11px] pt-1 border-t border-slate-200">
-                  Ambas partes se reconocen recíprocamente la capacidad legal necesaria para otorgar el presente contrato de servicios con base en las siguientes cláusulas:
-                </p>
-              </div>
-
-              {/* Clauses */}
-              <div className="space-y-4 text-xs text-slate-800">
-                {(contrato?.clausulas || []).map((c, i) => (
-                  <div key={i} className="space-y-1">
-                    <h4 className="font-black text-slate-950 uppercase tracking-wide text-[11px]">
-                      CLÁUSULA {c.numero}: {c.titulo}
-                    </h4>
-                    <p className="text-slate-700 leading-relaxed text-justify whitespace-pre-line">
-                      {(c.texto || '')
-                        .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '')
-                        .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\)/gi, '')}
+                  {/* Title */}
+                  <div className="text-center my-4 avoid-break">
+                    <h1 className="text-base sm:text-lg font-black uppercase tracking-tight text-slate-950">
+                      {contrato?.titulo || 'CONTRATO OFICIAL DE PRESTACIÓN DE SERVICIOS DIGITALES Y DESARROLLO WEB'}
+                    </h1>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Entre Goglite Digital y {clientEmpresa}
                     </p>
                   </div>
-                ))}
+
+                  {/* Parties Section */}
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs mb-4 space-y-1.5 avoid-break">
+                    <p className="leading-relaxed">
+                      <strong>DE UNA PARTE:</strong> <strong>GOGLITE DIGITAL</strong>, representada por su Director General <strong>Víctor Matos</strong>, con facultades suficientes para celebrar este acto en calidad de <strong>EL PRESTADOR</strong>.
+                    </p>
+                    <p className="leading-relaxed">
+                      <strong>DE OTRA PARTE:</strong> <strong>{clientContacto}</strong>, en representación legal de <strong>{clientEmpresa}</strong>, con domicilio en {clientUbicacion}, en adelante <strong>EL CLIENTE</strong>.
+                    </p>
+                    <p className="text-slate-600 text-[10.5px] pt-1 border-t border-slate-200">
+                      Ambas partes se reconocen recíprocamente la capacidad legal necesaria para otorgar el presente contrato de servicios con base en las siguientes cláusulas:
+                    </p>
+                  </div>
+
+                  {/* Clauses 1 to 4 */}
+                  <div className="space-y-3 text-xs text-slate-800">
+                    {(contrato?.clausulas || []).slice(0, 4).map((c, i) => (
+                      <div key={i} className="space-y-0.5 avoid-break">
+                        <h4 className="font-black text-slate-950 uppercase tracking-wide text-[11px]">
+                          CLÁUSULA {c.numero}: {c.titulo}
+                        </h4>
+                        <p className="text-slate-700 leading-relaxed text-justify whitespace-pre-line text-[10.5px]">
+                          {(c.texto || '')
+                            .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '')
+                            .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\)/gi, '')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Footer Hoja 1 */}
+                <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 font-mono avoid-break">
+                  <span>Goglite Digital · Contrato SOW</span>
+                  <span>Página 1 de 2 · Términos & Alcance</span>
+                </div>
               </div>
 
-              {/* Summary Table: Investment */}
-              <div className="my-6 p-4 rounded-xl bg-slate-900 text-white text-xs">
-                <div className="font-bold text-orange-400 uppercase text-[10px] tracking-wider mb-2">
-                  Resumen Financiero del Acuerdo
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <div className="text-slate-400 text-[10px]">Inversión Total:</div>
-                    <div className="text-sm font-bold text-white font-mono">${totalInversion} USD</div>
+              {/* =========================================================================
+                  HOJA 2 DE CONTRATO SOW: CLÁUSULAS 5+, INVERSIÓN Y FIRMAS (8.5 x 11 in)
+                  ========================================================================= */}
+              <div className="print-letter-page print-content-sheet max-w-4xl mx-auto p-6 sm:p-10 bg-white shadow-2xl rounded-2xl print:rounded-none print:shadow-none print:m-0 text-slate-900 font-sans leading-relaxed text-xs aspect-auto sm:min-h-[11in] flex flex-col justify-between">
+                <div>
+                  {/* Mini-Header Hoja 2 */}
+                  <div className="border-b border-slate-200 pb-2.5 mb-4 flex items-center justify-between avoid-break">
+                    <div className="flex items-center gap-2">
+                      <img 
+                        src="/assets/goglite_logo.png" 
+                        alt="Goglite Digital" 
+                        className="h-6 w-auto object-contain"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                      <span className="font-bold text-slate-900 text-xs">Goglite Digital · Contrato Oficial</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-500">
+                      {activeProyecto?.codigo || 'CON-2026-001'} · {clientEmpresa}
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-slate-400 text-[10px]">Anticipo (50%):</div>
-                    <div className="text-sm font-bold text-emerald-400 font-mono">${anticipoMonto} USD</div>
-                  </div>
-                  <div>
-                    <div className="text-slate-400 text-[10px]">Saldo Final (50%):</div>
-                    <div className="text-sm font-bold text-amber-300 font-mono">${liquidacionMonto} USD</div>
-                  </div>
-                </div>
-              </div>
 
-              {/* Signature Section Inside Document */}
-              <div className="mt-8 pt-6 border-t-2 border-slate-300 grid grid-cols-1 sm:grid-cols-2 gap-8">
-                {/* Agency Signature */}
-                <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col justify-between">
-                  <div>
-                    <div className="text-[10px] uppercase font-bold text-slate-500 mb-2">Por Goglite Digital:</div>
-                    <div className="h-16 flex items-center justify-center border-b border-slate-300 pb-2">
-                      <span className="font-serif italic text-lg text-slate-800">Victor Matos</span>
+                  {/* Clauses 5 to end */}
+                  <div className="space-y-3 text-xs text-slate-800 mb-4">
+                    {(contrato?.clausulas || []).slice(4).map((c, i) => (
+                      <div key={i} className="space-y-0.5 avoid-break">
+                        <h4 className="font-black text-slate-950 uppercase tracking-wide text-[11px]">
+                          CLÁUSULA {c.numero}: {c.titulo}
+                        </h4>
+                        <p className="text-slate-700 leading-relaxed text-justify whitespace-pre-line text-[10.5px]">
+                          {(c.texto || '')
+                            .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '')
+                            .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\)/gi, '')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Summary Table: Investment */}
+                  <div className="mb-4 p-4 rounded-xl bg-slate-900 text-white text-xs avoid-break shadow-md">
+                    <div className="font-bold text-orange-400 uppercase text-[10px] tracking-wider mb-2">
+                      Resumen Financiero del Acuerdo
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <div className="text-slate-400 text-[10px]">Inversión Total:</div>
+                        <div className="text-sm font-bold text-white font-mono">${totalInversion} USD</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400 text-[10px]">Anticipo (50%):</div>
+                        <div className="text-sm font-bold text-emerald-400 font-mono">${anticipoMonto} USD</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400 text-[10px]">Saldo Final (50%):</div>
+                        <div className="text-sm font-bold text-amber-300 font-mono">${liquidacionMonto} USD</div>
+                      </div>
                     </div>
                   </div>
-                  <div className="mt-2 text-center text-[10px] text-slate-600">
-                    <div className="font-bold text-slate-900">Víctor Matos</div>
-                    <div>Director General · Goglite Digital</div>
-                    <div className="text-emerald-700 font-mono font-bold mt-0.5">Certificado por Goglite Digital</div>
+
+                  {/* Signature Section Inside Document */}
+                  <div className="pt-3 border-t-2 border-slate-300 grid grid-cols-1 sm:grid-cols-2 gap-6 avoid-break">
+                    {/* Agency Signature */}
+                    <div className="border border-slate-200 rounded-xl p-3.5 bg-slate-50 flex flex-col justify-between">
+                      <div>
+                        <div className="text-[9.5px] uppercase font-bold text-slate-500 mb-1.5">Por Goglite Digital:</div>
+                        <div className="h-14 flex items-center justify-center border-b border-slate-300 pb-1.5">
+                          <span className="font-serif italic text-base text-slate-800">Victor Matos</span>
+                        </div>
+                      </div>
+                      <div className="mt-1.5 text-center text-[10px] text-slate-600">
+                        <div className="font-bold text-slate-900 text-[11px]">Víctor Matos</div>
+                        <div>Director General · Goglite Digital</div>
+                        <div className="text-emerald-700 font-mono font-bold text-[9.5px] mt-0.5">Certificado por Goglite Digital</div>
+                      </div>
+                    </div>
+
+                    {/* Client Signature Preview Inside Document */}
+                    <div className="border border-slate-200 rounded-xl p-3.5 bg-slate-50 flex flex-col justify-between">
+                      <div>
+                        <div className="text-[9.5px] uppercase font-bold text-slate-500 mb-1.5">Por El Cliente ({clientEmpresa}):</div>
+                        
+                        {portalConfig?.fase2Firmada && portalConfig?.firmaDigital ? (
+                          <div className="h-14 flex items-center justify-center border-b border-slate-300 pb-1.5">
+                            <img 
+                              src={portalConfig.firmaDigital} 
+                              alt="Firma Digital Cliente" 
+                              className="max-h-12 max-w-full object-contain filter brightness-0"
+                              style={{ filter: 'brightness(0)' }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="h-14 flex items-center justify-center border-b border-dashed border-slate-300 text-slate-400 text-[10.5px] italic pb-1.5 text-center">
+                            ✍ Firma digital registrada en el portal
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-1.5 text-center text-[10px] text-slate-600">
+                        <div className="font-bold text-slate-900 text-[11px]">
+                          {portalConfig?.nombreFirmante || clientContacto}
+                        </div>
+                        <div>
+                          {portalConfig?.documentoFirmante ? `ID: ${portalConfig.documentoFirmante}` : 'Representante Legal'}
+                        </div>
+                        {portalConfig?.fase2Firmada && (
+                          <div className="text-emerald-700 font-mono font-bold text-[9.5px] mt-0.5">
+                            ✓ Firmado Electrónicamente ({portalConfig.fechaFirmaContrato || '16 Oct 2026'})
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Client Signature Preview Inside Document */}
-                <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col justify-between">
-                  <div>
-                    <div className="text-[10px] uppercase font-bold text-slate-500 mb-2">Por El Cliente ({clientEmpresa}):</div>
-                    
-                    {portalConfig?.fase2Firmada && portalConfig?.firmaDigital ? (
-                      <div className="h-16 flex items-center justify-center border-b border-slate-300 pb-2">
-                        <img 
-                          src={portalConfig.firmaDigital} 
-                          alt="Firma Digital Cliente" 
-                          className="max-h-14 max-w-full object-contain filter brightness-0"
-                          style={{ filter: 'brightness(0)' }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="h-16 flex items-center justify-center border-b border-dashed border-slate-300 text-slate-400 text-[11px] italic pb-2 text-center">
-                        ✍ Firma digital pendiente en el formulario interactivo
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-2 text-center text-[10px] text-slate-600">
-                    <div className="font-bold text-slate-900">
-                      {portalConfig?.nombreFirmante || clientContacto}
-                    </div>
-                    <div>
-                      {portalConfig?.documentoFirmante ? `ID: ${portalConfig.documentoFirmante}` : 'Representante Legal'}
-                    </div>
-                    {portalConfig?.fase2Firmada && (
-                      <div className="text-emerald-700 font-mono font-bold mt-0.5">
-                        ✓ Firmado Electrónicamente ({portalConfig.fechaFirmaContrato || '16 Oct 2026'})
-                      </div>
-                    )}
-                  </div>
+                {/* Footer Hoja 2 */}
+                <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 font-mono avoid-break">
+                  <span>Goglite Digital · Contrato SOW</span>
+                  <span>Página 2 de 2 · Cierre Legal & Firmas</span>
                 </div>
               </div>
             </div>

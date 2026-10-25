@@ -87,10 +87,13 @@
     border: none !important;
   }
 
-  /* Printable proposal sheet takes the whole printed document without dark backgrounds or outer borders */
+  /* Printable document sheets take the whole printed canvas without dark backgrounds or outer borders */
   #printable-proposal,
   #printable-client-proposal,
-  #printable-client-contract {
+  #printable-contract,
+  #printable-client-contract,
+  #printable-invoice,
+  .printable-invoice-document {
     display: block !important;
     position: static !important;
     width: 8.5in !important;
@@ -132,7 +135,7 @@
     break-after: auto !important;
   }
 
-  /* Front cover: EXACT Letter full bleed from PDF */
+  /* Front cover: EXACT Letter fit without cropping logo or titles */
   .print-letter-page.print-cover-sheet,
   .pdf-page-cover {
     width: 8.5in !important;
@@ -148,21 +151,25 @@
     break-inside: avoid !important;
     box-sizing: border-box !important;
     position: relative !important;
-    background: #ffffff !important;
+    background: #090808 !important;
     overflow: hidden !important;
     border-radius: 0 !important;
     box-shadow: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 
   .print-letter-page.print-cover-sheet img,
   .pdf-page-cover img {
-    width: 8.5in !important;
-    height: 11in !important;
+    width: 100% !important;
+    height: 100% !important;
     max-width: 8.5in !important;
     max-height: 11in !important;
-    object-fit: cover !important;
+    object-fit: contain !important;
+    object-position: center !important;
     display: block !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     padding: 0 !important;
   }
 

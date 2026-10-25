@@ -1434,13 +1434,13 @@ export default function PresupuestosModule({
                 className="bg-transparent p-0 text-slate-900 rounded-xl text-xs leading-relaxed max-h-[85vh] overflow-y-auto print:max-h-none print:shadow-none print:p-0 print:text-black font-sans space-y-4 print:space-y-0"
               >
                 {/* =========================================================================
-                    HOJA 1: PORTADA OFICIAL GOGLITE (TAMAÑO CARTA 8.5 x 11 in / FULL BLEED)
+                    HOJA 1: PORTADA OFICIAL GOGLITE (TAMAÑO CARTA 8.5 x 11 in / AJUSTE EXACTO)
                     ========================================================================= */}
-                <div className="print-letter-page print-cover-sheet relative w-full aspect-[8.5/11] sm:h-auto overflow-hidden bg-white shadow-xl rounded-lg print:rounded-none print:shadow-none">
+                <div className="print-letter-page print-cover-sheet relative w-full aspect-auto overflow-hidden bg-[#090808] shadow-xl rounded-lg print:rounded-none print:shadow-none flex items-center justify-center">
                   <img 
                     src="/assets/portada_oficial_fija.png" 
                     alt="Propuesta de Desarrollo Digital VIP" 
-                    className="w-full h-full object-cover block"
+                    className="w-full h-auto object-contain block mx-auto print:w-full print:h-full print:object-contain"
                   />
                 </div>
 
