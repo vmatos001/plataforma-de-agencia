@@ -1196,12 +1196,25 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             : matchedProj;
           const evaluatedProj = evaluateProjectMilestones(synchronizedProj);
           loadedData.proyecto = evaluatedProj;
-          if (evaluatedProj.seguimiento?.porcentajeAvance) {
-            loadedData.portalConfig = {
-              ...(loadedData.portalConfig || {}),
-              progresoPorcentaje: evaluatedProj.seguimiento.porcentajeAvance
-            };
-          }
+
+          const isValidadosEnProj = Boolean(
+            evaluatedProj.onboarding?.insumosValidados100 || 
+            evaluatedProj.portalConfig?.fase3InsumosCompletos ||
+            evaluatedProj.faseActual >= 4
+          );
+
+          const isClienteConfirmoEnProj = Boolean(
+            evaluatedProj.onboarding?.clienteConfirmoInsumos ||
+            evaluatedProj.portalConfig?.clienteConfirmoInsumos
+          );
+
+          loadedData.portalConfig = {
+            ...(loadedData.portalConfig || {}),
+            progresoPorcentaje: evaluatedProj.seguimiento?.porcentajeAvance || loadedData.portalConfig?.progresoPorcentaje || 20,
+            fase3InsumosCompletos: isValidadosEnProj || Boolean(loadedData.portalConfig?.fase3InsumosCompletos),
+            clienteConfirmoInsumos: isClienteConfirmoEnProj || Boolean(loadedData.portalConfig?.clienteConfirmoInsumos),
+            faseActual: isValidadosEnProj ? Math.max(4, loadedData.portalConfig?.faseActual || 4) : (loadedData.portalConfig?.faseActual || 1)
+          };
         }
       } catch (projSyncErr) {
         console.warn('[Portal] Error sincronizando con proyectos:', projSyncErr);
@@ -1292,9 +1305,15 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             (loadedData.lead?.id ? localStorage.getItem('goglite_portal_' + loadedData.lead.id) : null);
           if (rawLocalPortal) {
             const parsedLocalPortal = JSON.parse(rawLocalPortal);
+            const isValidadosEnProj = Boolean(
+              loadedData.proyecto?.onboarding?.insumosValidados100 ||
+              loadedData.proyecto?.portalConfig?.fase3InsumosCompletos ||
+              loadedData.proyecto?.faseActual >= 4
+            );
             loadedData.portalConfig = {
               ...(loadedData.portalConfig || {}),
-              ...parsedLocalPortal
+              ...parsedLocalPortal,
+              fase3InsumosCompletos: isValidadosEnProj || Boolean(parsedLocalPortal.fase3InsumosCompletos) || Boolean(loadedData.portalConfig?.fase3InsumosCompletos)
             };
           }
         }
@@ -2064,7 +2083,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   const isFase1Done = Boolean(portalConfig?.fase1Aprobada);
   const isFase2Done = Boolean(portalConfig?.fase2Firmada);
-  const isFase3Done = Boolean(portalConfig?.fase3InsumosCompletos);
+  const isFase3Done = Boolean(
+    portalConfig?.fase3InsumosCompletos ||
+    activeProyecto?.onboarding?.insumosValidados100 ||
+    activeProyecto?.portalConfig?.fase3InsumosCompletos ||
+    activeProyecto?.faseActual >= 4
+  );
   const isFase4Done = Boolean(portalConfig?.fase4Liquidada);
   const isFase5Done = Boolean(portalConfig?.fase5CareActivo);
 
@@ -3738,7 +3762,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
               {/* SECCIÓN DE ESTADO & CONFIRMACIÓN DE ENTREGA */}
               <div className="pt-3 border-t border-slate-800/80">
-                {portalConfig?.fase3InsumosCompletos ? (
+                {(portalConfig?.fase3InsumosCompletos || isFase3Done) ? (
                   /* ESTADO 1: INSUMOS VALIDADOS POR LA AGENCIA (RELOJ ACTIVO) */
                   <div className="p-5 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/40 space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -3822,23 +3846,21 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       </button>
                     </div>
 
-                    {/* Botón de validación rápida si la sesión pertenece a la agencia */}
-                    {portalConfig?.clienteAuthRol === 'agency' && (
-                      <div className="p-3.5 rounded-xl bg-orange-950/40 border border-orange-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-3">
-                        <div className="flex items-center gap-2 text-orange-300 text-xs font-mono font-bold">
-                          <ShieldCheck className="w-4 h-4 text-orange-400" />
-                          <span>[Vista de Agencia] ¿Revisaste los archivos en Google Drive?</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleCompletarInsumos}
-                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all shrink-0"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Validar Insumos en Drive y Activar Reloj de 10 Días</span>
-                        </button>
+                    {/* Botón de validación de insumos en Google Drive */}
+                    <div className="p-3.5 rounded-xl bg-orange-950/40 border border-orange-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-3">
+                      <div className="flex items-center gap-2 text-orange-300 text-xs font-mono font-bold">
+                        <ShieldCheck className="w-4 h-4 text-orange-400 shrink-0" />
+                        <span>¿Archivos verificados en Google Drive? Validar para desbloquear la Fase 4:</span>
                       </div>
-                    )}
+                      <button
+                        type="button"
+                        onClick={handleCompletarInsumos}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all shrink-0"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Validar Insumos en Drive & Activar Reloj 10 Días</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   /* ESTADO 3: EL CLIENTE AÚN NO HA CONFIRMADO LA SUBIDA */

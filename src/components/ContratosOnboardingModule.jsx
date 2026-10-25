@@ -481,15 +481,102 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     }));
   };
 
+  // Helper para sincronizar todas las llaves goglite_portal_* asociadas a un proyecto
+  const syncPortalStorageForProyecto = (proj, updates = {}) => {
+    if (!proj || typeof window === 'undefined') return;
+    try {
+      const targetEmp = (proj.cliente?.empresa || '').toLowerCase().trim();
+      const targetPresId = proj.presupuestoId;
+      const targetProjId = proj.id;
+      const targetToken = proj.portalToken;
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('goglite_portal_')) {
+          try {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const cfg = JSON.parse(raw);
+              const matches = 
+                (targetToken && key === 'goglite_portal_' + targetToken) ||
+                (targetProjId && key === 'goglite_portal_' + targetProjId) ||
+                (targetPresId && key === 'goglite_portal_' + targetPresId) ||
+                (cfg.proyectoId && cfg.proyectoId === targetProjId) ||
+                (cfg.presupuestoId && cfg.presupuestoId === targetPresId) ||
+                (cfg.leadId && proj.leadId && cfg.leadId === proj.leadId) ||
+                (targetEmp && cfg.empresa && cfg.empresa.toLowerCase().trim() === targetEmp);
+
+              if (matches) {
+                localStorage.setItem(key, JSON.stringify({
+                  ...cfg,
+                  ...updates,
+                  ultimaModificacion: new Date().toISOString()
+                }));
+              }
+            }
+          } catch (e) {}
+        }
+      }
+
+      const directTokens = [proj.portalToken, proj.presupuestoId, proj.id, proj.codigo].filter(Boolean);
+      directTokens.forEach(tk => {
+        const key = 'goglite_portal_' + tk;
+        const raw = localStorage.getItem(key);
+        const prevCfg = raw ? JSON.parse(raw) : {};
+        localStorage.setItem(key, JSON.stringify({
+          ...prevCfg,
+          ...updates,
+          ultimaModificacion: new Date().toISOString()
+        }));
+      });
+    } catch (e) {
+      console.warn('[SyncPortalStorage] Error sincronizando claves:', e);
+    }
+  };
+
   // Save onboarding
   const handleSaveOnboarding = async () => {
+    if (!activeProyecto) return;
+    const nowStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+    const currentInsumos = getInsumosList(activeProyecto);
+
+    // Comprobar si el cliente ya notificó que subió los documentos o si ya estaban validados
+    const isClienteAlreadyConfirmed = Boolean(
+      activeProyecto.onboarding?.clienteConfirmoInsumos ||
+      activeProyecto.portalConfig?.clienteConfirmoInsumos
+    );
+    const shouldValidate100 = Boolean(
+      isClienteAlreadyConfirmed ||
+      activeProyecto.onboarding?.insumosValidados100
+    );
+
+    const updatedOnboarding = {
+      ...(activeProyecto.onboarding || {}),
+      completado: true,
+      insumosValidados100: shouldValidate100,
+      clienteConfirmoInsumos: isClienteAlreadyConfirmed || Boolean(activeProyecto.onboarding?.clienteConfirmoInsumos),
+      fecha: activeProyecto.onboarding?.fecha || nowStr,
+      fechaValidacionAgencia: shouldValidate100 ? (activeProyecto.onboarding?.fechaValidacionAgencia || nowStr) : activeProyecto.onboarding?.fechaValidacionAgencia,
+      datos: activeProyecto.onboarding?.datos || {},
+      archivosSubidos: currentInsumos,
+      archivosRecibidos: currentInsumos,
+      estadoInsumos: shouldValidate100 ? 'validados_agencia' : (activeProyecto.onboarding?.estadoInsumos || 'en_revision')
+    };
+
+    const updatedPortalConfig = {
+      ...(activeProyecto.portalConfig || {}),
+      clienteConfirmoInsumos: isClienteAlreadyConfirmed,
+      fase3InsumosCompletos: shouldValidate100,
+      fechaInsumosCompletos: shouldValidate100 ? nowStr : activeProyecto.portalConfig?.fechaInsumosCompletos,
+      faseActual: shouldValidate100 ? 4 : (activeProyecto.portalConfig?.faseActual || 3),
+      progresoPorcentaje: shouldValidate100 ? 80 : (activeProyecto.portalConfig?.progresoPorcentaje || 60)
+    };
+
     const baseProj = {
       ...activeProyecto,
-      onboarding: {
-        completado: true,
-        fecha: new Date().toISOString().split('T')[0],
-        datos: activeProyecto.onboarding?.datos || {}
-      }
+      faseActual: shouldValidate100 ? 4 : (activeProyecto.faseActual || 3),
+      onboarding: updatedOnboarding,
+      portalConfig: updatedPortalConfig
     };
 
     const updatedProj = evaluateProjectMilestones(baseProj);
@@ -499,6 +586,15 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       const next = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
       saveStoredProyectos(next);
       return next;
+    });
+
+    // Sincronizar todas las llaves de portal en localStorage
+    syncPortalStorageForProyecto(updatedProj, {
+      clienteConfirmoInsumos: true,
+      fase3InsumosCompletos: shouldValidate100,
+      fechaInsumosCompletos: nowStr,
+      faseActual: shouldValidate100 ? 4 : 3,
+      progresoPorcentaje: shouldValidate100 ? 80 : 60
     });
 
     try {
@@ -511,6 +607,8 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       console.warn('API onboarding warn:', err);
     }
 
+    window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: [updatedProj] } }));
+    window.dispatchEvent(new Event('storage'));
     showNotification();
   };
 
@@ -718,10 +816,20 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
         ...(activeProyecto.onboarding || {}),
         completado: true,
         insumosValidados100: true,
+        clienteConfirmoInsumos: true,
         fecha: nowStr,
         fechaValidacionAgencia: nowStr,
         archivosSubidos: currentInsumos,
-        archivosRecibidos: currentInsumos
+        archivosRecibidos: currentInsumos,
+        estadoInsumos: 'validados_agencia'
+      },
+      portalConfig: {
+        ...(activeProyecto.portalConfig || {}),
+        clienteConfirmoInsumos: true,
+        fase3InsumosCompletos: true,
+        fechaInsumosCompletos: nowStr,
+        faseActual: 4,
+        progresoPorcentaje: 80
       }
     });
 
@@ -732,28 +840,19 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       return next;
     });
 
-    try {
-      const tokensToCheck = [activeProyecto.portalToken, activeProyecto.presupuestoId, activeProyecto.id].filter(Boolean);
-      tokensToCheck.forEach(tk => {
-        const raw = localStorage.getItem('goglite_portal_' + tk);
-        if (raw) {
-          const cfg = JSON.parse(raw);
-          localStorage.setItem('goglite_portal_' + tk, JSON.stringify({
-            ...cfg,
-            clienteConfirmoInsumos: true,
-            fase3InsumosCompletos: true,
-            fechaInsumosCompletos: nowStr,
-            faseActual: 4,
-            progresoPorcentaje: 80
-          }));
-        }
-      });
-    } catch (e) {}
+    // Sincronizar todas las llaves de portal existentes en localStorage
+    syncPortalStorageForProyecto(updatedProj, {
+      clienteConfirmoInsumos: true,
+      fase3InsumosCompletos: true,
+      fechaInsumosCompletos: nowStr,
+      faseActual: 4,
+      progresoPorcentaje: 80
+    });
 
     window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: [updatedProj] } }));
     window.dispatchEvent(new Event('storage'));
     showNotification();
-    alert('✓ ¡Insumos validados al 100%! El cronómetro oficial de 10 días hábiles de desarrollo ha comenzado formalmente.');
+    alert('✓ ¡Insumos validados al 100% en Google Drive! El cronómetro oficial de 10 días hábiles de desarrollo ha comenzado formalmente y la Fase 4 está desbloqueada.');
   };
 
   // Confirm payment
@@ -1455,6 +1554,72 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                   <span>Guardar Activos</span>
                 </button>
               </div>
+
+              {/* Banner de Validación de Insumos Drive / Fase 3 a Fase 4 */}
+              {(() => {
+                const is100Validados = Boolean(
+                  activeProyecto.onboarding?.insumosValidados100 ||
+                  activeProyecto.portalConfig?.fase3InsumosCompletos ||
+                  activeProyecto.faseActual >= 4
+                );
+                const isClienteNotifico = Boolean(
+                  activeProyecto.onboarding?.clienteConfirmoInsumos ||
+                  activeProyecto.portalConfig?.clienteConfirmoInsumos
+                );
+
+                if (isClienteNotifico && !is100Validados) {
+                  return (
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-[#0b101c] border-2 border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-amber-500/25 text-amber-300 flex items-center justify-center shrink-0 border border-amber-500/40 mt-0.5">
+                          <Clock className="w-5 h-5 animate-pulse" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-black uppercase text-amber-300">
+                              🔔 El Cliente Notificó Subida de Insumos al Google Drive
+                            </span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 border border-amber-500/30 font-bold">
+                              En Revisión
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-200 mt-1 leading-relaxed">
+                            El cliente confirmó que subió sus documentos a Google Drive ({activeProyecto.onboarding?.fechaConfirmacionCliente || 'reciente'}). 
+                            Presiona el botón a continuación para validar que los archivos están en Drive y desbloquear la Fase 4 en el portal del cliente:
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleValidateInsumosAgency}
+                        className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950 transition-all shrink-0 border border-emerald-400/40 transform hover:scale-[1.02]"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Aprobar Insumos en Drive & Desbloquear Fase 4</span>
+                      </button>
+                    </div>
+                  );
+                }
+
+                if (is100Validados) {
+                  return (
+                    <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2 text-emerald-300">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>
+                          <strong>✓ Insumos Validados al 100% en Google Drive:</strong> El cronómetro oficial de 10 días hábiles está activo y la Fase 4 está desbloqueada en el portal del cliente.
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold shrink-0">
+                        Fase 4 Desbloqueada
+                      </span>
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
 
               {/* Wizard Sections */}
               <div className="space-y-5">

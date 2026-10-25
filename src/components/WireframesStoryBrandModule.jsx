@@ -575,41 +575,49 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown ni texto antes o después)
 
       {/* Top Banner / Hero */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-[#0d121f] via-[#101726] to-[#141b2d] border border-orange-500/20 shadow-xl relative overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+        {/* Tier 1: Title & Badge */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800/60">
           <div>
             <div className="flex items-center gap-2 text-xs font-bold text-orange-400 uppercase tracking-wider mb-1">
               <Sparkles className="w-4 h-4 text-orange-400" />
               <span>Módulo 4 · Fase 4 · StoryBrand Framework (Donald Miller)</span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-white">
+            <h1 className="text-xl sm:text-2xl font-black text-white">
               Brand Story de 7 Partes (Base de Partida Estratégica)
             </h1>
-            <p className="text-xs text-slate-400 max-w-2xl mt-1 leading-relaxed">
-              Construye la narrativa persuasiva de 7 partes que posiciona al cliente como el héroe y a la empresa como la guía. 
-              Este guion es la base de partida fundamental para alimentar el constructor de IA y redactar copy de alta conversión.
-            </p>
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              {activeStoryBrand?.aiGenerated ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                  Redactado con Google AI ({activeStoryBrand.aiModel || 'Gemini Flash'})
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-blue-500/15 border border-blue-500/30 text-blue-300">
-                  <FileCheck className="w-3.5 h-3.5 text-blue-400" />
-                  {activeStoryBrand?.generatorType || 'Motor Estratégico Goglite'}
-                </span>
-              )}
-            </div>
           </div>
+          <div className="shrink-0 self-start sm:self-center">
+            {activeStoryBrand?.aiGenerated ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 shadow-sm whitespace-nowrap">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                Redactado con Google AI ({activeStoryBrand.aiModel || 'Gemini Flash'})
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/15 border border-blue-500/30 text-blue-300 shadow-sm whitespace-nowrap">
+                <FileCheck className="w-3.5 h-3.5 text-blue-400" />
+                {activeStoryBrand?.generatorType || 'Motor Estratégico Goglite'}
+              </span>
+            )}
+          </div>
+        </div>
 
-          {/* Action Buttons & Project Switcher */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {/* Project Dropdown */}
+        {/* Tier 2: Full-width descriptive text */}
+        <p className="text-xs text-slate-300 leading-relaxed max-w-4xl mt-3">
+          Construye la narrativa persuasiva de 7 partes que posiciona al cliente como el héroe y a la empresa como la guía. 
+          Este guion es la base de partida fundamental para alimentar el constructor de IA y redactar copy de alta conversión sin plantillas rígidas.
+        </p>
+
+        {/* Tier 3: Dedicated Control & Action Toolbar */}
+        <div className="mt-4 p-3 rounded-xl bg-[#080c16]/90 border border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3 shadow-inner">
+          {/* Left: Project Selector */}
+          <div className="flex items-center gap-2.5 flex-1 min-w-[280px]">
+            <span className="text-xs font-bold text-slate-400 uppercase font-mono tracking-wider shrink-0">
+              Proyecto:
+            </span>
             <select
               value={selectedProyectoId}
               onChange={(e) => handleSelectProject(e.target.value)}
-              className="px-3 py-2 rounded-xl bg-[#080b11] border border-slate-800 text-xs font-bold text-slate-200 focus:outline-none focus:border-orange-500"
+              className="w-full sm:w-auto px-3 py-2 rounded-lg bg-[#0e1424] border border-slate-700 text-xs font-bold text-slate-200 focus:outline-none focus:border-orange-500 shadow-sm"
             >
               {proyectos.map(p => (
                 <option key={p.id} value={p.id}>
@@ -617,11 +625,14 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown ni texto antes o después)
                 </option>
               ))}
             </select>
+          </div>
 
+          {/* Right: Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               onClick={handleRegenerateStoryBrand}
               disabled={isGenerating}
-              className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 shadow-glow-sm transition-all"
+              className="px-3.5 py-2 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all"
               title="Regenerar Brand Story con IA para el proyecto activo"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
@@ -630,7 +641,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown ni texto antes o después)
 
             <button
               onClick={handleCopyScript}
-              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-colors"
+              className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-colors border border-slate-700"
               title="Copiar guion StoryBrand completo en Markdown"
             >
               {copiedScript ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -639,7 +650,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown ni texto antes o después)
 
             <button
               onClick={handleDownloadScript}
-              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-colors"
+              className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-colors border border-slate-700"
               title="Descargar archivo Markdown del Brand Story"
             >
               <Download className="w-3.5 h-3.5" />
@@ -648,7 +659,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown ni texto antes o después)
 
             <button
               onClick={handleSave}
-              className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all"
+              className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all"
             >
               <Save className="w-3.5 h-3.5" />
               <span>Guardar</span>
@@ -656,27 +667,25 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown ni texto antes o después)
           </div>
         </div>
 
-        {/* Client Subhead Context */}
+        {/* Tier 4: Client Metadata Grid */}
         {selectedProj && (
-          <div className="mt-4 pt-4 border-t border-slate-800/80 flex flex-wrap items-center gap-4 text-xs">
-            <div className="text-slate-400">
-              <span className="text-slate-500">Cliente Activo:</span>{' '}
-              <strong className="text-slate-200">{selectedProj.cliente?.nombre}</strong> ({selectedProj.cliente?.empresa})
+          <div className="mt-3 pt-3 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+            <div className="p-2.5 rounded-lg bg-[#0e1424]/60 border border-slate-800/60">
+              <span className="text-slate-500 block text-[10px] uppercase font-mono mb-0.5">Cliente Activo</span>
+              <strong className="text-slate-200 truncate block">{selectedProj.cliente?.nombre} ({selectedProj.cliente?.empresa})</strong>
             </div>
-            <div className="text-slate-400">
-              <span className="text-slate-500">Nicho / Especialidad:</span>{' '}
-              <strong className="text-orange-400">{selectedProj.cliente?.actividad}</strong>
+            <div className="p-2.5 rounded-lg bg-[#0e1424]/60 border border-slate-800/60">
+              <span className="text-slate-500 block text-[10px] uppercase font-mono mb-0.5">Nicho / Especialidad</span>
+              <strong className="text-orange-400 truncate block">{selectedProj.cliente?.actividad}</strong>
             </div>
-            <div className="text-slate-400">
-              <span className="text-slate-500">Ubicación:</span>{' '}
-              <strong className="text-slate-200">{selectedProj.cliente?.ubicacion || (selectedProj.pais === 'DO' ? 'Punta Cana, RD' : 'El Salvador')}</strong>
+            <div className="p-2.5 rounded-lg bg-[#0e1424]/60 border border-slate-800/60">
+              <span className="text-slate-500 block text-[10px] uppercase font-mono mb-0.5">Ubicación</span>
+              <strong className="text-slate-200 truncate block">{selectedProj.cliente?.ubicacion || (selectedProj.pais === 'DO' ? 'Punta Cana, RD' : 'El Salvador')}</strong>
             </div>
-            {selectedProj.cliente?.telefono && (
-              <div className="text-slate-400">
-                <span className="text-slate-500">Contacto / WhatsApp:</span>{' '}
-                <strong className="text-emerald-400">{selectedProj.cliente?.telefono}</strong>
-              </div>
-            )}
+            <div className="p-2.5 rounded-lg bg-[#0e1424]/60 border border-slate-800/60">
+              <span className="text-slate-500 block text-[10px] uppercase font-mono mb-0.5">Contacto / WhatsApp</span>
+              <strong className="text-emerald-400 truncate block">{selectedProj.cliente?.telefono || 'No especificado'}</strong>
+            </div>
           </div>
         )}
       </div>
