@@ -37,7 +37,9 @@ import {
   LogOut,
   FolderOpen,
   FileUp,
-  Trash2
+  Trash2,
+  Sliders,
+  Smartphone
 } from 'lucide-react';
 import {
   getStoredCrmLeads,
@@ -3949,27 +3951,35 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 </div>
               </div>
 
-              {/* Quality Audit Badges */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3 rounded-xl bg-[#141b2b] border border-slate-800 text-center">
-                  <div className="text-[10px] font-mono text-slate-400 uppercase">Velocidad Móvil</div>
-                  <div className="text-lg font-black text-emerald-400 font-mono mt-0.5">99 / 100</div>
-                  <div className="text-[9px] text-slate-500">Google PageSpeed</div>
+              {/* Pre-visualización y Verificación de Staging */}
+              <div className="p-4 rounded-xl bg-[#111726] border border-slate-800 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 mt-0.5 border border-orange-500/30">
+                    <Smartphone className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+                      Pre-Visualización Privada & Verificación de Staging
+                    </h4>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Tu plataforma web se encuentra alojada en nuestro servidor privado de pruebas con tus insumos de marca, estructura visual y canales de WhatsApp. Puedes navegar el sitio y comprobar la experiencia móvil antes de la conexión a tu dominio definitivo.
+                    </p>
+                  </div>
                 </div>
-                <div className="p-3 rounded-xl bg-[#141b2b] border border-slate-800 text-center">
-                  <div className="text-[10px] font-mono text-slate-400 uppercase">Tiempo de Carga</div>
-                  <div className="text-lg font-black text-emerald-400 font-mono mt-0.5">0.65s</div>
-                  <div className="text-[9px] text-slate-500">Core Web Vitals LCP</div>
-                </div>
-                <div className="p-3 rounded-xl bg-[#141b2b] border border-slate-800 text-center">
-                  <div className="text-[10px] font-mono text-slate-400 uppercase">Diseño Responsive</div>
-                  <div className="text-lg font-black text-sky-400 font-mono mt-0.5">100% OK</div>
-                  <div className="text-[9px] text-slate-500">Móvil, Tablet & Desktop</div>
-                </div>
-                <div className="p-3 rounded-xl bg-[#141b2b] border border-slate-800 text-center">
-                  <div className="text-[10px] font-mono text-slate-400 uppercase">WhatsApp & SEO</div>
-                  <div className="text-lg font-black text-purple-400 font-mono mt-0.5">Activo</div>
-                  <div className="text-[9px] text-slate-500">Eventos de conversión</div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] text-slate-300">
+                  <div className="flex items-center gap-1.5 p-2 rounded-lg bg-[#0a0d16] border border-slate-800/80">
+                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>Diseño Mobile-First adaptado</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 p-2 rounded-lg bg-[#0a0d16] border border-slate-800/80">
+                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>Canales de WhatsApp configurados</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 p-2 rounded-lg bg-[#0a0d16] border border-slate-800/80">
+                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>Listo para despliegue en producción</span>
+                  </div>
                 </div>
               </div>
 
@@ -4124,6 +4134,89 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         {/* ========================================================================= */}
         {activeTab === 5 && portalConfig?.clienteAutenticado && (
           <div className="space-y-6">
+
+            {/* Banner Superior de Producción en Vivo & Conexión al CMS */}
+            <div className="p-6 rounded-2xl bg-gradient-to-r from-[#0d1526] via-[#101b30] to-[#0a101f] border-2 border-emerald-500/40 shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                    <Globe className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-mono font-bold uppercase bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        Sitio Oficial en Producción · Conectado al CMS
+                      </span>
+                      <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                        SSL 256-bit Activo
+                      </span>
+                    </div>
+                    <h3 className="text-base sm:text-lg font-extrabold text-white mt-0.5">
+                      https://{(lead.empresa || 'empresa').toLowerCase().replace(/\s+/g, '')}.com
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <a
+                    href={`https://${(lead.empresa || 'empresa').toLowerCase().replace(/\s+/g, '')}.com`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Visitar Sitio Oficial</span>
+                  </a>
+                  <a
+                    href="https://goglite-studio-demo.web.app"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 border border-slate-700 transition-colors"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Panel CMS / Admin</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Quality Audit Badges (Auditadas en Producción / CMS) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-300 font-mono uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Métricas de Rendimiento & Salud Web en Producción</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Conectado con Goglite Headless CMS
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-xl bg-[#141b2b] border border-slate-800 text-center shadow-inner">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase">Velocidad Móvil</div>
+                    <div className="text-xl font-black text-emerald-400 font-mono mt-0.5">99 / 100</div>
+                    <div className="text-[9px] text-slate-500">Google PageSpeed Producción</div>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-[#141b2b] border border-slate-800 text-center shadow-inner">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase">Tiempo de Carga</div>
+                    <div className="text-xl font-black text-emerald-400 font-mono mt-0.5">0.65s</div>
+                    <div className="text-[9px] text-slate-500">Core Web Vitals LCP</div>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-[#141b2b] border border-slate-800 text-center shadow-inner">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase">Diseño Responsive</div>
+                    <div className="text-xl font-black text-sky-400 font-mono mt-0.5">100% OK</div>
+                    <div className="text-[9px] text-slate-500">Móvil, Tablet & Desktop</div>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-[#141b2b] border border-slate-800 text-center shadow-inner">
+                    <div className="text-[10px] font-mono text-slate-400 uppercase">WhatsApp & SEO</div>
+                    <div className="text-xl font-black text-purple-400 font-mono mt-0.5">Activo</div>
+                    <div className="text-[9px] text-slate-500">Canales & Eventos de Cierre</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               
               {/* Left Column: 30-Day Free Post-Launch Guarantee */}
