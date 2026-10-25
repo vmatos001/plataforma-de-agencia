@@ -96,10 +96,14 @@ function GoogleProtectedCard({
         <div className="text-xs font-mono text-emerald-400">
           {subtitle} · {clientEmpresa}
         </div>
-        {displayedAuthorized && (
+        {boundClientEmail ? (
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-900/80 border border-slate-700/80 text-[11px] font-mono text-slate-300">
-            <span className="text-slate-500">Cuenta de Google autorizada:</span>
-            <span className="text-amber-400 font-bold">{displayedAuthorized}</span>
+            <span className="text-slate-500">Acceso exclusivo cliente:</span>
+            <span className="text-amber-400 font-bold">{boundClientEmail}</span>
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-[11px] font-mono text-emerald-300">
+            <span>✨ Inicia sesión con tu cuenta de Google (Gmail o Workspace) para registrar tu acceso oficial</span>
           </div>
         )}
         <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
@@ -122,7 +126,7 @@ function GoogleProtectedCard({
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
           </svg>
-          <span>{loading ? 'Verificando con Google...' : 'Acceso Rápido con Google Workspace / Gmail'}</span>
+          <span>{loading ? 'Verificando con Google...' : (boundClientEmail ? `Acceder con Google (${boundClientEmail})` : 'Registrar y Acceder con tu Cuenta de Google')}</span>
         </button>
 
         <div className="flex items-center gap-3">
@@ -481,6 +485,30 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     showNotification('Sesión cerrada. Aprobación y Contrato SOW ahora están protegidos con Google.');
   };
 
+  const handleUnlinkClientAccount = async () => {
+    if (!window.confirm('¿Deseas desvincular la cuenta registrada de este cliente? Esto permitirá que el cliente registre una nueva cuenta de Google al volver a ingresar.')) return;
+    try {
+      await auth.signOut();
+    } catch (e) {}
+    await savePortalUpdates({
+      cuentaClienteRegistrada: '',
+      clienteAuthEmail: '',
+      clienteAutenticado: false,
+      sesionCerradaProtegida: true
+    });
+    setData(prev => ({
+      ...prev,
+      portalConfig: {
+        ...(prev?.portalConfig || {}),
+        cuentaClienteRegistrada: '',
+        clienteAuthEmail: '',
+        clienteAutenticado: false,
+        sesionCerradaProtegida: true
+      }
+    }));
+    showNotification('Cuenta de cliente desvinculada. El portal está listo para registrar una nueva cuenta de Google.');
+  };
+
   // Fase 4 - Settlement states
   const [settlementReceiptRef, setSettlementReceiptRef] = useState('');
   const [settlementReceiptImage, setSettlementReceiptImage] = useState('');
@@ -752,14 +780,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                        cleanAttemptEmail === 'victor@goglite.com' ||
                        cleanAttemptEmail === agencyEmail;
 
-      const leadEmail = (data?.lead?.email || '').toLowerCase().trim();
-      const propEmail = (data?.presupuesto?.cliente?.email || '').toLowerCase().trim();
-      const projEmail = (data?.proyecto?.cliente?.email || '').toLowerCase().trim();
-
       const boundClientEmail = (
         data?.portalConfig?.cuentaClienteRegistrada ||
         data?.lead?.cuentaClienteRegistrada ||
-        data?.portalConfig?.clienteAuthEmail ||
         ''
       ).toLowerCase().trim();
 
@@ -771,11 +794,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       let authRole = 'client';
 
       if (isAgency) {
+        // Acceso administrativo de agencia: siempre autorizado, sin sobrescribir la cuenta del cliente
         isAuthorized = true;
         authRole = 'agency';
       } else if (boundClientEmail) {
-        // El expediente ya tiene una cuenta de cliente vinculada formalmente:
-        // Solo se permite esa cuenta oficial de cliente (o cuentas adicionales autorizadas)
+        // El cliente ya registró previamente su cuenta oficial de Google:
+        // Solo se permite esa cuenta oficial registrada (o cuentas adicionales autorizadas)
         if (cleanAttemptEmail === boundClientEmail || additionalAuth.includes(cleanAttemptEmail)) {
           isAuthorized = true;
           authRole = 'client';
@@ -783,21 +807,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
           isAuthorized = false;
         }
       } else {
-        // Primera vinculación para este registro:
-        if ((leadEmail && cleanAttemptEmail === leadEmail) || 
-            (propEmail && cleanAttemptEmail === propEmail) || 
-            (projEmail && cleanAttemptEmail === projEmail) || 
-            additionalAuth.includes(cleanAttemptEmail)) {
-          isAuthorized = true;
-          authRole = 'client';
-        } else if (!leadEmail && !propEmail) {
-          // Si el registro se creó sin correo, este primer acceso de cliente queda vinculado
-          isAuthorized = true;
-          authRole = 'client';
-        } else {
-          // El registro tiene un correo oficial (ej: evelin@jaybestservices.com) y el correo que intentó acceder no coincide
-          isAuthorized = false;
-        }
+        // Primera vinculación para este expediente:
+        // El cliente puede ingresar con cualquier cuenta de Google (personal o de trabajo).
+        // A partir de este momento, dicha cuenta queda guardada y vinculada como la cuenta oficial de este cliente.
+        isAuthorized = true;
+        authRole = 'client';
       }
 
       if (!isAuthorized) {
@@ -805,8 +819,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
           await auth.signOut();
         } catch (e) {}
         setClientAuthLoading(false);
-        const expectedAccount = boundClientEmail || leadEmail || propEmail || 'la cuenta oficial del cliente';
-        alert(`⛔ Acceso Denegado (Cuenta No Autorizada)\n\nLa cuenta (${email}) no está autorizada para acceder al expediente de "${clientEmpresa}".\n\nEste portal está reservado exclusivamente para:\n• Cliente Oficial: ${expectedAccount}\n• Personal Administrativo: Goglite Digital\n\nPor favor inicia sesión con la cuenta oficial autorizada.`);
+        alert(`⛔ Acceso Denegado (Cuenta No Autorizada)\n\nLa cuenta (${email}) no está autorizada para acceder al expediente de "${clientEmpresa}".\n\nEste portal ya se encuentra registrado y vinculado exclusivamente a:\n👉 ${boundClientEmail}\n\nPor favor inicia sesión con la cuenta oficial registrada del cliente o personal de Goglite Digital.`);
         return;
       }
 
@@ -2208,15 +2221,35 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             <div className="flex items-center gap-2 shrink-0">
               {portalConfig?.clienteAutenticado ? (
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
+                  <div className={`flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-xl border ${
+                    portalConfig.clienteAuthRol === 'agency'
+                      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                      : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                  }`}>
                     <UserCheck className="w-4 h-4" />
-                    <span>Autenticado ({portalConfig.clienteAuthProvider || 'Google'})</span>
+                    <span>{portalConfig.clienteAuthRol === 'agency' ? '👑 Acceso Agencia' : `Autenticado (${portalConfig.clienteAuthProvider || 'Google'})`}</span>
                   </div>
+                  {portalConfig?.cuentaClienteRegistrada && (
+                    <div className="hidden sm:flex items-center gap-1 text-[11px] font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
+                      <span className="text-slate-500">Cliente:</span>
+                      <span className="text-emerald-400 font-bold">{portalConfig.cuentaClienteRegistrada}</span>
+                      {portalConfig?.clienteAuthRol === 'agency' && (
+                        <button
+                          type="button"
+                          onClick={handleUnlinkClientAccount}
+                          className="ml-1 text-[10px] text-rose-400 hover:text-rose-300 underline"
+                          title="Desvincular cuenta registrada del cliente"
+                        >
+                          (Desvincular)
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={handleClientLogout}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/50 text-xs font-medium transition-all shadow-sm"
-                    title="Cerrar sesión de cliente"
+                    title="Cerrar sesión"
                   >
                     <LogOut className="w-3.5 h-3.5" />
                     <span>Cerrar Sesión</span>
@@ -2328,7 +2361,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               description={`Por estrictas políticas de confidencialidad comercial y protección de datos, la propuesta económica y los términos técnicos aprobados de ${clientEmpresa} están protegidos bajo autenticación corporativa de Google. Para acceder a este documento oficial, debes validar tu identidad con tu cuenta autorizada.`}
               clientEmpresa={clientEmpresa}
               leadEmail={lead.email}
-              boundClientEmail={portalConfig?.cuentaClienteRegistrada || portalConfig?.clienteAuthEmail || lead.email}
+              boundClientEmail={portalConfig?.cuentaClienteRegistrada || lead?.cuentaClienteRegistrada || ''}
               onAuthenticate={handleRegisterClientAuth}
               loading={clientAuthLoading}
               clientAuthPass={clientAuthPass}
@@ -2649,7 +2682,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               description={`El Contrato Oficial de Prestación de Servicios Digitales (SOW), las firmas digitales manuscritas y los comprobantes bancarios de ${clientEmpresa} contienen información legal confidencial. Autentica tu cuenta autorizada de Google para consultar o imprimir este contrato formal.`}
               clientEmpresa={clientEmpresa}
               leadEmail={lead.email}
-              boundClientEmail={portalConfig?.cuentaClienteRegistrada || portalConfig?.clienteAuthEmail || lead.email}
+              boundClientEmail={portalConfig?.cuentaClienteRegistrada || lead?.cuentaClienteRegistrada || ''}
               onAuthenticate={handleRegisterClientAuth}
               loading={clientAuthLoading}
               clientAuthPass={clientAuthPass}
