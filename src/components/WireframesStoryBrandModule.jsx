@@ -30,11 +30,17 @@ import {
   UserCheck
 } from 'lucide-react';
 
-export default function WireframesStoryBrandModule({ selectedCountry = 'SV' }) {
+export default function WireframesStoryBrandModule({ selectedCountry = 'SV', externalSelectedProyectoId = null }) {
   const [proyectos, setProyectos] = useState([]);
-  const [selectedProyectoId, setSelectedProyectoId] = useState('');
+  const [selectedProyectoId, setSelectedProyectoId] = useState(externalSelectedProyectoId || '');
   const [activeWireframe, setActiveWireframe] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (externalSelectedProyectoId) {
+      setSelectedProyectoId(externalSelectedProyectoId);
+    }
+  }, [externalSelectedProyectoId]);
 
   // Tabs: 'storybrand' | 'editor_wireframe' | 'preview_visual'
   const [activeTab, setActiveTab] = useState('storybrand');

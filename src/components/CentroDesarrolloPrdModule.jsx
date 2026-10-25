@@ -40,58 +40,102 @@ import apiClient from '../services/apiClient';
 import { getStoredProyectos } from '../services/contractGenerator';
 import { syncAllProyectosWithEvents } from '../services/projectMilestoneSync';
 
-// Plantilla predeterminada de PRD Técnico para proyectos Goglite de alta velocidad (Playbook Maestro 2026)
-const DEFAULT_PRD_CONFIG = {
-  stack: {
-    frontend: 'Astro 5 SSG / HTML5 Semántico + Tailwind CSS v4 + GSAP (Sin WordPress)',
-    bundler: 'Vite v8 / Rollup ultra-ligero con compresión Brotli',
-    hosting: 'Firebase Hosting Plan Spark ($0 Servidores con CDN Google Edge)',
-    cms: 'Headless CMS Goglite API JSON + Cloud Firestore Realtime'
-  },
-  metasRendimiento: {
-    lcp: '< 0.8s en 4G Móvil (Hero WebP < 40 KB con doble preload condicional)',
-    fid: '< 50ms (First Input Delay / TBT = 0 ms)',
-    cls: '0.00 (Dimensiones explícitas width/height)',
-    pageSpeedMobile: '90+ a 98 / 100 en Móvil Garantizado',
-    pesoTotal: '< 350 KB inicial'
-  },
-  preparacionAgentica: {
-    auditScore: '80+ / 100 en is-agentic.com y 3/3 en Agentic Browsing',
-    trustAnchors: [
-      { ruta: '/about', descripcion: 'Historia corporativa, RNC ante DGII, base y flota (> 500 chars).' },
-      { ruta: '/contact', descripcion: 'Horarios 24/7, teléfono oficial, correo y dirección verificada.' },
-      { ruta: '/privacy', descripcion: 'Términos de protección de datos personales conforme a ley.' }
-    ],
-    schema: 'LocalBusiness con contactPoint, hasMap de Google Maps y sameAs oficiales'
-  },
-  seguridadHoneypot: {
-    tipo: 'Honeypot Universal Silencioso (Cero reCAPTCHA pesado para preservar PageSpeed)',
-    campos: ['_hp_security_check', '_website_protection_trap', '_honey'],
-    intercepcion: 'Aborto silencioso en cliente y servidor ante bots'
-  },
-  paginasRequeridas: [
-    { nombre: 'Inicio (Hero + Cotizador en 4 Pasos)', descripcion: 'Hero con prueba de 5s, Bento Grid de servicios y cotizador interactivo directo a WhatsApp en < 2 min.', completado: true },
-    { nombre: 'Servicios Especializados', descripcion: 'Páginas dedicadas con cotizadores individuales por servicio.', completado: false },
-    { nombre: 'Página B2B / Fiscal (DGII)', descripcion: 'Acreditación formal, RNC, cotizaciones corporativas y comprobantes fiscales (NCF B01/B15).', completado: false },
-    { nombre: 'Páginas Ancla de Confianza IA (/about, /contact, /privacy)', descripcion: 'Las 3 anclas obligatorias auditables por agentes de IA con contenido sustancial > 500 caracteres.', completado: true },
-    { nombre: 'Testimonios Nativos Google Maps 5.0★', descripcion: 'Reseñas reales sin widgets pesados de terceros y enlace directo para captar nuevas valoraciones.', completado: false },
+// Generador dinámico de PRD Técnico adaptado al proyecto específico (Playbook Maestro 2026)
+export function generatePrdForProyecto(proyecto, defaultCountry = 'DO') {
+  const empresa = proyecto?.cliente?.empresa || (defaultCountry === 'DO' ? 'L&M Tours Punta Cana' : 'Grúas Andrea San Salvador');
+  const nombreContacto = proyecto?.cliente?.nombre || 'Víctor Matos';
+  const actividad = proyecto?.cliente?.actividad || (defaultCountry === 'DO' ? 'Transporte Turístico & Excursiones Punta Cana' : 'Grúas Plataforma y Auxilio Vial 24 Horas');
+  const telefono = proyecto?.cliente?.telefono || (defaultCountry === 'DO' ? '+1 (809) 408-8070' : '+503 7756-9828');
+  const ubicacion = proyecto?.cliente?.ubicacion || (defaultCountry === 'DO' ? 'Punta Cana, República Dominicana' : 'San Salvador, El Salvador');
+  const codigo = proyecto?.codigo || 'PRD-2026-001';
+  const totalInversion = proyecto?.contrato?.totalInversion || 300;
+  const modulos = proyecto?.contrato?.modulos || [];
+
+  // Construcción dinámica de páginas a partir de los módulos acordados en el contrato del proyecto
+  const paginas = [];
+
+  if (modulos.length > 0) {
+    modulos.forEach((m, idx) => {
+      const tit = (m.titulo || '')
+        .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '')
+        .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\)/gi, '')
+        .trim();
+      const num = m.numero || `MÓDULO ${idx + 1}`;
+      paginas.push({
+        nombre: `${num}: ${tit}`,
+        descripcion: `Especificación y maquetación de ${tit.toLowerCase()} con arquitectura limpia sin WordPress para ${empresa}.`,
+        completado: idx === 0
+      });
+    });
+  } else {
+    paginas.push(
+      { nombre: 'Inicio (Hero + Cotizador en 4 Pasos)', descripcion: `Hero de alta conversión con cotizador directo a WhatsApp para ${empresa}.`, completado: true },
+      { nombre: 'Servicios Especializados & Catálogo', descripcion: `Páginas dedicadas para ${actividad} con cotizadores individuales.`, completado: false }
+    );
+  }
+
+  // Páginas estándar de infraestructura y confianza requeridas para auditorías
+  paginas.push(
+    { nombre: 'Páginas Ancla de Confianza IA (/about, /contact, /privacy)', descripcion: `Las 3 anclas obligatorias auditables por agentes de IA (> 500 caracteres) con datos oficiales de ${empresa}.`, completado: true },
+    { nombre: 'Google Maps Local & Testimonios 5.0★', descripcion: `Integración de ficha local en ${ubicacion} con captación directa de reseñas.`, completado: false },
     { nombre: 'Rutas Legales & 404 Personalizado', descripcion: '/terminos-de-servicio, /aviso-de-privacidad y 404.astro con retorno seguro.', completado: true }
-  ],
-  integraciones: [
-    { nombre: 'Cotizador en 4 Pasos a WhatsApp 24/7', detalle: 'Flujo interactivo sin registro que envía mensaje estructurado directo al chat.', activo: true },
-    { nombre: 'Botón Flotante WhatsApp Business & Click-to-Call', detalle: 'Llamada telefónica en 1 toque para emergencias y chat comercial.', activo: true },
-    { nombre: 'Google Maps Ficha & Schema Sincronizado', detalle: 'Vínculo bidireccional entre la ficha de Google y los datos del sitio.', activo: true },
-    { nombre: 'Google Tag Manager & GA4', detalle: 'Eventos de clic, cotizaciones y conversiones sin bloquear el hilo principal.', activo: true },
-    { nombre: 'Schema.org LocalBusiness JSON-LD con contactPoint', detalle: 'Indexación estructurada para Google y motores agénticos de IA.', activo: true }
-  ],
-  seguridad: [
-    'Blindaje Anti-Spam Honeypot Universal (trampa invisible en 100% de formularios)',
-    'Cabeceras inmutables en firebase.json (Cache-Control: public, max-age=31536000)',
-    'Cero costo por servidor ($0 Hosting Spark garantizado contra Billing Attacks)',
-    'Certificado SSL automático de Firebase Let\'s Encrypt y redirección HTTPS forzada',
-    'Exclusión estricta de credenciales y variables confidenciales'
-  ]
-};
+  );
+
+  return {
+    proyectoId: proyecto?.id || 'demo-proj-1',
+    clienteEmpresa: empresa,
+    clienteContacto: nombreContacto,
+    clienteTelefono: telefono,
+    clienteUbicacion: ubicacion,
+    actividad,
+    codigo,
+    totalInversion,
+    stack: {
+      frontend: 'Astro 5 SSG / HTML5 Semántico + Tailwind CSS v4 + GSAP (Sin WordPress)',
+      bundler: 'Vite v8 / Rollup ultra-ligero con compresión Brotli',
+      hosting: 'Firebase Hosting Plan Spark ($0 Servidores con CDN Google Edge)',
+      cms: 'Headless CMS Goglite API JSON + Cloud Firestore Realtime'
+    },
+    metasRendimiento: {
+      lcp: '< 0.8s en 4G Móvil (Hero WebP < 40 KB con doble preload condicional)',
+      fid: '< 50ms (First Input Delay / TBT = 0 ms)',
+      cls: '0.00 (Dimensiones explícitas width/height)',
+      pageSpeedMobile: '90+ a 98 / 100 en Móvil Garantizado',
+      pesoTotal: '< 350 KB inicial'
+    },
+    preparacionAgentica: {
+      auditScore: '80+ / 100 en is-agentic.com y 3/3 en Agentic Browsing',
+      trustAnchors: [
+        { ruta: '/about', descripcion: `Historia corporativa de ${empresa}, actividad en ${ubicacion} (> 500 chars).` },
+        { ruta: '/contact', descripcion: `Horarios de atención, teléfono oficial (${telefono}), correo y dirección.` },
+        { ruta: '/privacy', descripcion: 'Términos de protección de datos personales conforme a ley.' }
+      ],
+      schema: `LocalBusiness con contactPoint, hasMap de Google Maps en ${ubicacion}`
+    },
+    seguridadHoneypot: {
+      tipo: 'Honeypot Universal Silencioso (Cero reCAPTCHA pesado para preservar PageSpeed)',
+      campos: ['_hp_security_check', '_website_protection_trap', '_honey'],
+      intercepcion: 'Aborto silencioso en cliente y servidor ante bots'
+    },
+    paginasRequeridas: paginas,
+    integraciones: [
+      { nombre: `Cotizador a WhatsApp (${telefono})`, detalle: `Flujo interactivo directo al número oficial de ${empresa} en < 2 min.`, activo: true },
+      { nombre: 'Botón Flotante WhatsApp Business & Click-to-Call', detalle: 'Llamada telefónica en 1 toque para emergencias y chat comercial.', activo: true },
+      { nombre: `Google Maps Ficha & Schema (${ubicacion})`, detalle: 'Vínculo bidireccional entre la ficha de Google y los datos del sitio.', activo: true },
+      { nombre: 'Google Tag Manager & GA4', detalle: 'Eventos de clic, cotizaciones y conversiones sin bloquear el hilo principal.', activo: true },
+      { nombre: 'Schema.org LocalBusiness JSON-LD con contactPoint', detalle: 'Indexación estructurada para Google y motores agénticos de IA.', activo: true }
+    ],
+    seguridad: [
+      'Blindaje Anti-Spam Honeypot Universal (trampa invisible en 100% de formularios)',
+      'Cabeceras inmutables en firebase.json (Cache-Control: public, max-age=31536000)',
+      'Cero costo por servidor ($0 Hosting Spark garantizado contra Billing Attacks)',
+      'Certificado SSL automático de Firebase Let\'s Encrypt y redirección HTTPS forzada',
+      'Exclusión estricta de credenciales y variables confidenciales'
+    ]
+  };
+}
+
+const DEFAULT_PRD_CONFIG = generatePrdForProyecto(null);
 
 // Las 12 Fases Oficiales del Playbook Maestro Goglite 2026 (Inicializan todas en Backlog con 0h registradas)
 const PLAYBOOK_12_FASES_TASKS = [
@@ -221,6 +265,21 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   const [prdConfig, setPrdConfig] = useState(DEFAULT_PRD_CONFIG);
   const [copiedPrdMarkdown, setCopiedPrdMarkdown] = useState(false);
   const [savedPrdNotice, setSavedPrdNotice] = useState(false);
+
+  const updatePrdConfig = (updater) => {
+    setPrdConfig(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (selectedProyectoId) {
+        try {
+          const prdByProjRaw = localStorage.getItem('goglite_prd_by_project');
+          const prdByProj = prdByProjRaw ? JSON.parse(prdByProjRaw) : {};
+          prdByProj[selectedProyectoId] = next;
+          localStorage.setItem('goglite_prd_by_project', JSON.stringify(prdByProj));
+        } catch (e) {}
+      }
+      return next;
+    });
+  };
 
   // Estado del Sprint Kanban (Todas las tareas inician en Backlog ordenadas 1..12 con 0h)
   const [sprintTasks, setSprintTasks] = useState(() => {
@@ -390,8 +449,37 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
           driveAssets: prev.driveAssets || proj?.portalConfig?.driveVaultUrl || proj?.onboarding?.driveFolderUrl || ''
         }));
       }
-    } catch (e) {}
-  }, [selectedProyectoId]);
+
+      // Cargar o generar PRD específico del proyecto seleccionado
+      const prdByProjRaw = localStorage.getItem('goglite_prd_by_project');
+      const prdByProj = prdByProjRaw ? JSON.parse(prdByProjRaw) : {};
+      const proj = proyectos.find(p => p.id === selectedProyectoId);
+
+      if (prdByProj && prdByProj[selectedProyectoId]) {
+        const savedPrd = prdByProj[selectedProyectoId];
+        setPrdConfig({
+          ...savedPrd,
+          clienteEmpresa: proj?.cliente?.empresa || savedPrd.clienteEmpresa,
+          codigo: proj?.codigo || savedPrd.codigo,
+          clienteContacto: proj?.cliente?.nombre || savedPrd.clienteContacto,
+          clienteTelefono: proj?.cliente?.telefono || savedPrd.clienteTelefono,
+          clienteUbicacion: proj?.cliente?.ubicacion || savedPrd.clienteUbicacion,
+          actividad: proj?.cliente?.actividad || savedPrd.actividad,
+          totalInversion: proj?.contrato?.totalInversion || savedPrd.totalInversion || 300
+        });
+      } else if (proj) {
+        const fresh = generatePrdForProyecto(proj, selectedCountry);
+        setPrdConfig(fresh);
+        prdByProj[selectedProyectoId] = fresh;
+        localStorage.setItem('goglite_prd_by_project', JSON.stringify(prdByProj));
+      } else {
+        const fresh = generatePrdForProyecto(null, selectedCountry);
+        setPrdConfig(fresh);
+      }
+    } catch (e) {
+      console.warn('Error en sincronización de proyecto:', e);
+    }
+  }, [selectedProyectoId, proyectos, selectedCountry]);
 
   // Persistir tareas y bóveda en localStorage (aislado por proyecto + fallback global) y sincronizar hitos
   useEffect(() => {
@@ -611,8 +699,13 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     const md = `# PRD TÉCNICO · ESPECIFICACIÓN DE DESARROLLO GOGLITE
 **Proyecto:** ${proyectoActivo.cliente?.empresa}
 **Código:** ${proyectoActivo.codigo}
-**Actividad:** ${proyectoActivo.cliente?.actividad}
-**Meta de Carga:** < 1.2s (PageSpeed > 95) · Mobile-First
+**Contacto:** ${proyectoActivo.cliente?.nombre}
+**Teléfono / WhatsApp:** ${proyectoActivo.cliente?.telefono}
+**Ubicación:** ${proyectoActivo.cliente?.ubicacion || (selectedCountry === 'DO' ? 'República Dominicana' : 'El Salvador')}
+**Actividad:** ${proyectoActivo.cliente?.actividad || 'Servicios Profesionales'}
+**Inversión Acordada:** $${proyectoActivo.contrato?.totalInversion || 300} USD
+**Garantía de Plazos:** 10 a 15 días hábiles llave en mano
+**Meta de Carga:** < 0.8s en 4G Móvil (PageSpeed > 95) · Mobile-First
 
 ---
 
@@ -629,10 +722,10 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
 - **PageSpeed Score:** ${prdConfig.metasRendimiento.pageSpeedMobile}
 - **Límite de Peso:** ${prdConfig.metasRendimiento.pesoTotal}
 
-## 3. Páginas y Secciones a Construir
+## 3. Páginas y Módulos a Construir
 ${prdConfig.paginasRequeridas.map(p => `- [${p.completado ? 'x' : ' '}] **${p.nombre}:** ${p.descripcion}`).join('\n')}
 
-## 4. Integraciones Obligatorias
+## 4. Integraciones de Conversión
 ${prdConfig.integraciones.map(i => `- [${i.activo ? 'x' : ' '}] **${i.nombre}:** ${i.detalle}`).join('\n')}
 
 ## 5. Directrices de Blindaje y Seguridad
@@ -655,7 +748,7 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
 
     navigator.clipboard.writeText(md);
     setCopiedPrdMarkdown(true);
-    setTimeout(() => setCopiedPrdMarkdown(false), 2500);
+    setTimeout(() => setCopiedPrdMarkdown(false), 2000);
   };
 
   const handleCopyText = (text, fieldKey) => {
@@ -986,6 +1079,51 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
             </div>
           </div>
 
+          {/* Banner de Especificación de Proyecto Activo */}
+          <div className="p-4 rounded-xl bg-gradient-to-r from-[#101726] via-[#121c33] to-[#0c1017] border border-orange-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0 mt-0.5">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-mono bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-bold">
+                    {proyectoActivo.codigo || 'PRD-ACTIVO'}
+                  </span>
+                  <span className="text-xs text-slate-400 font-medium">
+                    {proyectoActivo.cliente?.ubicacion || (selectedCountry === 'DO' ? 'Rep. Dominicana' : 'El Salvador')}
+                  </span>
+                  <span className="text-[10px] bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded font-mono font-bold">
+                    Inversión: ${proyectoActivo.contrato?.totalInversion || 300} USD
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-white mt-1">
+                  {proyectoActivo.cliente?.empresa}
+                </h3>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Contacto: <strong className="text-white">{proyectoActivo.cliente?.nombre}</strong> · Tel/WhatsApp: <strong className="text-orange-300">{proyectoActivo.cliente?.telefono}</strong> · {proyectoActivo.cliente?.actividad || 'Servicios Profesionales'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const fresh = generatePrdForProyecto(proyectoActivo, selectedCountry);
+                  updatePrdConfig(fresh);
+                  setSavedPrdNotice(true);
+                  setTimeout(() => setSavedPrdNotice(false), 2500);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors"
+                title="Regenerar y sincronizar PRD con los módulos de este proyecto"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-orange-400" />
+                <span>{savedPrdNotice ? '✓ Sincronizado' : 'Sincronizar Módulos'}</span>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Columna 1: Stack Tecnológico & Metas de Velocidad */}
             <div className="space-y-4">
@@ -1065,7 +1203,7 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
                   <div
                     key={idx}
                     onClick={() => {
-                      setPrdConfig(prev => {
+                      updatePrdConfig(prev => {
                         const updated = [...prev.paginasRequeridas];
                         updated[idx].completado = !updated[idx].completado;
                         return { ...prev, paginasRequeridas: updated };
@@ -1106,7 +1244,7 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
                     <div
                       key={idx}
                       onClick={() => {
-                        setPrdConfig(prev => {
+                        updatePrdConfig(prev => {
                           const updated = [...prev.integraciones];
                           updated[idx].activo = !updated[idx].activo;
                           return { ...prev, integraciones: updated };
@@ -1196,7 +1334,7 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
       {/* ========================================================================= */}
       {activeTab === 'storybrand' && (
         <div className="space-y-4">
-          <WireframesStoryBrandModule selectedCountry={selectedCountry} />
+          <WireframesStoryBrandModule selectedCountry={selectedCountry} externalSelectedProyectoId={selectedProyectoId} />
         </div>
       )}
 
