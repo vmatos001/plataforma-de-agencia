@@ -149,7 +149,8 @@ function initializeCrmData() {
     try {
       const content = fs.readFileSync(CRM_PATH, 'utf8');
       const parsed = JSON.parse(content);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
+        if (parsed.length === 0) return [];
         let changed = false;
         const enriched = parsed.map((item, idx) => {
           if (!item.whatsappData || !Array.isArray(item.whatsappData.mensajes)) {
@@ -168,85 +169,13 @@ function initializeCrmData() {
     }
   }
 
-  // Seed from leads.json
-  const rawLeads = getLeads();
-  const stages = ['nuevo', 'contactado', 'reunion', 'propuesta_enviada', 'negociacion', 'ganado'];
-  const values = [950, 1500, 2200, 1800, 3200, 2600];
-
-  const initialCrmLeads = rawLeads.slice(0, 12).map((l, index) => {
-    const stage = stages[index % stages.length];
-    const val = values[index % values.length];
-    const token = 'portal-' + (l.id || 'lead') + '-' + Math.random().toString(36).substring(2, 8);
-
-    const leadObj = {
-      id: 'crm-' + (l.id || `lead-${index}`),
-      leadId: l.id || null,
-      empresa: l.nombreEmpresa || l.dominio || 'Empresa Prospectada',
-      contacto: l.responsable || 'Director General',
-      cargo: l.cargo || 'Propietario / Gerente',
-      email: l.email || `contacto@${l.dominio}`,
-      telefono: l.telefono || (l.pais === 'DO' ? '+1 809 555-0199' : '+503 7000-1122'),
-      pais: l.pais || 'SV',
-      dominio: l.dominio || '',
-      etapa: stage,
-      valorEstimado: val,
-      probabilidad: stage === 'ganado' ? 100 : stage === 'negociacion' ? 80 : stage === 'propuesta_enviada' ? 60 : stage === 'reunion' ? 40 : stage === 'contactado' ? 25 : 10,
-      fuente: 'Scraper Google SERP',
-      portalToken: token,
-      interacciones: [
-        {
-          id: 'int-1-' + index,
-          tipo: 'nota',
-          fecha: '2026-10-09',
-          titulo: 'Diagnóstico Inicial Detectado',
-          detalle: 'Prospecto captado vía Scraper. Puntos críticos: falta de Schema JSON-LD y tiempo de respuesta.',
-          proximoPaso: 'Enviar primer contacto de auditoría por WhatsApp',
-          fechaProximoPaso: '2026-10-11'
-        },
-        ...(stage !== 'nuevo' ? [{
-          id: 'int-2-' + index,
-          tipo: 'whatsapp',
-          fecha: '2026-10-10',
-          titulo: 'Primer Contacto por WhatsApp',
-          detalle: 'Enviado pitch de valor enfocado en conversión local y optimización en motores de IA.',
-          proximoPaso: stage === 'contactado' ? 'Esperar respuesta o dar seguimiento en 48h' : 'Agendar videollamada de 15 min',
-          fechaProximoPaso: '2026-10-12'
-        }] : []),
-        ...(stage === 'reunion' || stage === 'propuesta_enviada' || stage === 'negociacion' || stage === 'ganado' ? [{
-          id: 'int-3-' + index,
-          tipo: 'reunion',
-          fecha: '2026-10-10',
-          titulo: 'Reunión de Diagnóstico Estratégico',
-          detalle: 'El cliente confirmó interés en rediseñar su sitio para superar a su principal competidor local.',
-          proximoPaso: 'Enviar propuesta formal VIP con opciones de inversión',
-          fechaProximoPaso: '2026-10-11'
-        }] : [])
-      ],
-      portalConfig: {
-        portalActivo: true,
-        faseActual: stage === 'ganado' ? 'Desarrollo Web & StoryBrand' : 'Diagnóstico Comercial',
-        progresoPorcentaje: stage === 'ganado' ? 50 : stage === 'negociacion' ? 35 : stage === 'propuesta_enviada' ? 25 : 10,
-        archivosSubidos: [
-          { id: 'f-1', nombre: 'Logo_Vector_Marca.png', fecha: '2026-10-10', tipo: 'imagen', tamaño: '1.2 MB' }
-        ],
-        notasCliente: 'Prioridad: Captación de citas directas por WhatsApp móvil.',
-        presupuestoId: null,
-        proyectoId: null
-      },
-      creadoEn: '2026-10-08',
-      actualizadoEn: '2026-10-10'
-    };
-
-    return ensureLeadWhatsApp(leadObj, index);
-  });
-
   try {
-    fs.writeFileSync(CRM_PATH, JSON.stringify(initialCrmLeads, null, 2), 'utf8');
+    fs.writeFileSync(CRM_PATH, JSON.stringify([], null, 2), 'utf8');
   } catch (err) {
     console.error('Error inicializando crm_leads.json:', err);
   }
 
-  return initialCrmLeads;
+  return [];
 }
 
 export function getCrmLeads() {

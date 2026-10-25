@@ -147,13 +147,14 @@ const realProposalSample = {
 
 export const getPresupuestos = () => {
   if (!fs.existsSync(presupuestosFile)) {
-    fs.writeFileSync(presupuestosFile, JSON.stringify([realProposalSample], null, 2));
-    return [realProposalSample];
+    fs.writeFileSync(presupuestosFile, JSON.stringify([], null, 2));
+    return [];
   }
   try {
-    return JSON.parse(fs.readFileSync(presupuestosFile, 'utf8'));
+    const data = JSON.parse(fs.readFileSync(presupuestosFile, 'utf8'));
+    return Array.isArray(data) ? data : [];
   } catch {
-    return [realProposalSample];
+    return [];
   }
 };
 
