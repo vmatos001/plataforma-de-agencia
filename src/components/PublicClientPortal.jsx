@@ -1210,12 +1210,23 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             evaluatedProj.portalConfig?.clienteConfirmoInsumos
           );
 
+          const isSaldoLiquidadoEnProj = Boolean(
+            evaluatedProj.pagos?.saldoEstado === 'confirmado' ||
+            evaluatedProj.portalConfig?.fase4Liquidada ||
+            evaluatedProj.portalConfig?.liquidacionPagada ||
+            evaluatedProj.estado === 'entregado' ||
+            evaluatedProj.faseActual >= 5
+          );
+
           loadedData.portalConfig = {
             ...(loadedData.portalConfig || {}),
-            progresoPorcentaje: evaluatedProj.seguimiento?.porcentajeAvance || loadedData.portalConfig?.progresoPorcentaje || 20,
+            progresoPorcentaje: isSaldoLiquidadoEnProj ? 100 : (evaluatedProj.seguimiento?.porcentajeAvance || loadedData.portalConfig?.progresoPorcentaje || 20),
             fase3InsumosCompletos: isValidadosEnProj || Boolean(loadedData.portalConfig?.fase3InsumosCompletos),
             clienteConfirmoInsumos: isClienteConfirmoEnProj || Boolean(loadedData.portalConfig?.clienteConfirmoInsumos),
-            faseActual: isValidadosEnProj ? Math.max(4, loadedData.portalConfig?.faseActual || 4) : (loadedData.portalConfig?.faseActual || 1)
+            fase4Liquidada: isSaldoLiquidadoEnProj || Boolean(loadedData.portalConfig?.fase4Liquidada),
+            liquidacionPagada: isSaldoLiquidadoEnProj || Boolean(loadedData.portalConfig?.liquidacionPagada),
+            fechaLiquidacion: loadedData.portalConfig?.fechaLiquidacion || evaluatedProj.pagos?.saldoFecha || new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
+            faseActual: isSaldoLiquidadoEnProj ? 5 : (isValidadosEnProj ? Math.max(4, loadedData.portalConfig?.faseActual || 4) : (loadedData.portalConfig?.faseActual || 1))
           };
         }
       } catch (projSyncErr) {
@@ -1312,10 +1323,21 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               loadedData.proyecto?.portalConfig?.fase3InsumosCompletos ||
               loadedData.proyecto?.faseActual >= 4
             );
+            const isSaldoLiquidadoEnProj = Boolean(
+              loadedData.proyecto?.pagos?.saldoEstado === 'confirmado' ||
+              loadedData.proyecto?.portalConfig?.fase4Liquidada ||
+              loadedData.proyecto?.portalConfig?.liquidacionPagada ||
+              loadedData.proyecto?.estado === 'entregado' ||
+              loadedData.proyecto?.faseActual >= 5
+            );
             loadedData.portalConfig = {
               ...(loadedData.portalConfig || {}),
               ...parsedLocalPortal,
-              fase3InsumosCompletos: isValidadosEnProj || Boolean(parsedLocalPortal.fase3InsumosCompletos) || Boolean(loadedData.portalConfig?.fase3InsumosCompletos)
+              fase3InsumosCompletos: isValidadosEnProj || Boolean(parsedLocalPortal.fase3InsumosCompletos) || Boolean(loadedData.portalConfig?.fase3InsumosCompletos),
+              fase4Liquidada: isSaldoLiquidadoEnProj || Boolean(parsedLocalPortal.fase4Liquidada) || Boolean(loadedData.portalConfig?.fase4Liquidada),
+              liquidacionPagada: isSaldoLiquidadoEnProj || Boolean(parsedLocalPortal.liquidacionPagada) || Boolean(loadedData.portalConfig?.liquidacionPagada),
+              faseActual: isSaldoLiquidadoEnProj ? 5 : (isValidadosEnProj ? Math.max(4, parsedLocalPortal.faseActual || loadedData.portalConfig?.faseActual || 4) : (parsedLocalPortal.faseActual || loadedData.portalConfig?.faseActual || 1)),
+              progresoPorcentaje: isSaldoLiquidadoEnProj ? 100 : (parsedLocalPortal.progresoPorcentaje || loadedData.portalConfig?.progresoPorcentaje || 80)
             };
           }
         }
@@ -2091,7 +2113,15 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     activeProyecto?.portalConfig?.fase3InsumosCompletos ||
     activeProyecto?.faseActual >= 4
   );
-  const isFase4Done = Boolean(portalConfig?.fase4Liquidada);
+  const isFase4Done = Boolean(
+    portalConfig?.fase4Liquidada ||
+    portalConfig?.liquidacionPagada ||
+    activeProyecto?.pagos?.saldoEstado === 'confirmado' ||
+    activeProyecto?.estado === 'entregado' ||
+    activeProyecto?.portalConfig?.fase4Liquidada ||
+    activeProyecto?.portalConfig?.liquidacionPagada ||
+    activeProyecto?.faseActual >= 5
+  );
   const isFase5Done = Boolean(portalConfig?.fase5CareActivo);
 
   // Cuando el cliente cierra sesión o una vez firmado el contrato, las tarjetas 1 ("Aprobación") y 2 ("Contrato SOW") quedan protegidas por Google
@@ -3984,7 +4014,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               </div>
 
               {/* SECURITY LOCK / CREDENTIALS VAULT */}
-              {portalConfig?.fase4Liquidada ? (
+              {isFase4Done ? (
                 /* UNLOCKED VAULT */
                 <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-[#101b24] to-[#0c121d] border-2 border-emerald-500/50 space-y-4">
                   <div className="flex items-center justify-between">
@@ -3994,7 +4024,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       </div>
                       <div>
                         <h3 className="text-base font-bold text-white">¡Candado Liberado con Éxito!</h3>
-                        <p className="text-xs text-emerald-400">Liquidación recibida el {portalConfig.fechaLiquidacion}. Tus accesos oficiales están activos:</p>
+                        <p className="text-xs text-emerald-400">Liquidación recibida el {portalConfig?.fechaLiquidacion || activeProyecto?.pagos?.saldoFecha || 'recientemente'}. Tus accesos oficiales están activos:</p>
                       </div>
                     </div>
                     <span className="text-xs font-mono font-bold bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/30">
@@ -4024,8 +4054,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
                   <div className="pt-2">
                     <button
-                      onClick={() => setActiveTab(5)}
-                      className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 border border-slate-700"
+                      type="button"
+                      onClick={() => {
+                        setActiveTab(5);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 border border-emerald-500/40 shadow-lg shadow-emerald-950/40 transition-all cursor-pointer"
                     >
                       <span>Continuar a Fase 5: Garantía de 30 Días & Mantenimiento</span>
                       <ChevronRight className="w-4 h-4" />

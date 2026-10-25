@@ -687,6 +687,42 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     return { texto, imagen, nombre, fecha };
   };
 
+  // Helper para obtener datos e imagen del comprobante de liquidación/saldo final (desde proyecto y portalConfig)
+  const getSaldoComprobanteData = (proj = null) => {
+    const target = proj || activeProyecto;
+    if (!target) return { texto: '', imagen: '', nombre: '', fecha: '' };
+
+    let texto = target.pagos?.saldoComprobante || '';
+    let imagen = target.pagos?.saldoComprobanteImagen || '';
+    let nombre = target.pagos?.saldoComprobanteNombre || '';
+    let fecha = target.pagos?.saldoFecha || '';
+
+    try {
+      if (typeof window !== 'undefined') {
+        const tokensToCheck = [
+          target.portalToken,
+          target.presupuestoId,
+          target.id,
+          target.codigo,
+          target.leadId
+        ].filter(Boolean);
+        for (const tk of tokensToCheck) {
+          const raw = localStorage.getItem('goglite_portal_' + tk);
+          if (raw) {
+            const pcfg = JSON.parse(raw);
+            if (!texto && pcfg.comprobanteLiquidacion) texto = pcfg.comprobanteLiquidacion;
+            if (!imagen && pcfg.comprobanteLiquidacionImagen) imagen = pcfg.comprobanteLiquidacionImagen;
+            if (!nombre && pcfg.comprobanteLiquidacionNombre) nombre = pcfg.comprobanteLiquidacionNombre;
+            if (!fecha && pcfg.fechaLiquidacion) fecha = pcfg.fechaLiquidacion;
+            if (imagen || texto) break;
+          }
+        }
+      }
+    } catch (e) {}
+
+    return { texto, imagen, nombre, fecha };
+  };
+
   // Sincronizar insumos en vivo directamente con Google Drive (sitesgoglite@gmail.com -> 01_Insumos_Cliente)
   const handleSyncDriveInsumos = async () => {
     if (!activeProyecto) return;
@@ -855,8 +891,9 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     alert('✓ ¡Insumos validados al 100% en Google Drive! El cronómetro oficial de 10 días hábiles de desarrollo ha comenzado formalmente y la Fase 4 está desbloqueada.');
   };
 
-  // Confirm payment
+  // Confirm payment (Anticipo 50% o Saldo Final 50% de Liquidación)
   const handleConfirmPayment = async (tipoPago) => {
+    if (!activeProyecto) return;
     const updatedPagos = { ...(activeProyecto.pagos || {}) };
     const nowStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -872,7 +909,22 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
 
     const baseProj = {
       ...activeProyecto,
-      pagos: updatedPagos
+      estado: tipoPago === 'saldo' ? 'entregado' : (activeProyecto.estado || 'en_desarrollo'),
+      pagos: updatedPagos,
+      portalConfig: {
+        ...(activeProyecto.portalConfig || {}),
+        ...(tipoPago === 'saldo' ? {
+          fase4Liquidada: true,
+          liquidacionPagada: true,
+          fechaLiquidacion: nowStr,
+          faseActual: 5,
+          progresoPorcentaje: 100
+        } : {
+          anticipoPagado: true,
+          faseActual: Math.max(3, activeProyecto.portalConfig?.faseActual || 3),
+          progresoPorcentaje: Math.max(60, activeProyecto.portalConfig?.progresoPorcentaje || 60)
+        })
+      }
     };
 
     const updatedProj = evaluateProjectMilestones(baseProj);
@@ -883,6 +935,25 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       saveStoredProyectos(next);
       return next;
     });
+
+    // Sincronizar todas las llaves de portal existentes en localStorage
+    if (tipoPago === 'saldo') {
+      syncPortalStorageForProyecto(updatedProj, {
+        fase4Liquidada: true,
+        liquidacionPagada: true,
+        fechaLiquidacion: nowStr,
+        faseActual: 5,
+        progresoPorcentaje: 100
+      });
+      alert('✓ ¡Liquidación confirmada con éxito! El candado de accesos ha sido liberado y la Fase 5 (Garantía de 30 Días & CMS) está desbloqueada en el portal del cliente.');
+    } else {
+      syncPortalStorageForProyecto(updatedProj, {
+        anticipoPagado: true,
+        faseActual: Math.max(3, updatedProj.portalConfig?.faseActual || 3),
+        progresoPorcentaje: Math.max(60, updatedProj.portalConfig?.progresoPorcentaje || 60)
+      });
+      alert('✓ ¡Anticipo del 50% confirmado! El proyecto avanza formalmente a desarrollo y configuración de insumos.');
+    }
 
     try {
       await fetch(`/api/proyectos/${activeProyecto.id}/pago`, {
@@ -898,6 +969,8 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       console.warn('API pago warn:', err);
     }
 
+    window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: [updatedProj] } }));
+    window.dispatchEvent(new Event('storage'));
     showNotification();
   };
 
@@ -2411,41 +2484,111 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                 })()}
 
                 {/* Saldo Final Box */}
-                <div className="p-5 rounded-2xl bg-[#111622] border border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400">2. Saldo Final (50%)</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                      activeProyecto.pagos?.saldoEstado === 'confirmado'
-                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                        : 'bg-slate-800 text-slate-400 border-slate-700'
-                    }`}>
-                      {activeProyecto.pagos?.saldoEstado === 'confirmado' ? 'Liquidado' : 'Pendiente contra Entrega'}
-                    </span>
-                  </div>
+                {(() => {
+                  const comprobanteData = getSaldoComprobanteData(activeProyecto);
+                  const hasComprobante = Boolean(comprobanteData.texto || comprobanteData.imagen);
 
-                  <div className="text-2xl font-mono font-black text-white">
-                    ${activeProyecto.pagos?.saldoMonto} USD
-                  </div>
+                  return (
+                    <div className="p-5 rounded-2xl bg-[#111622] border border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-400">2. Saldo Final (50%) · Liquidación</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          activeProyecto.pagos?.saldoEstado === 'confirmado'
+                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                            : hasComprobante
+                            ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                        }`}>
+                          {activeProyecto.pagos?.saldoEstado === 'confirmado' ? '✓ Liquidado' : hasComprobante ? 'En Verificación' : 'Pendiente contra Entrega'}
+                        </span>
+                      </div>
 
-                  <p className="text-[11px] text-slate-400">
-                    Se abona contra entrega final una vez desplegado el sitio en el dominio oficial.
-                  </p>
+                      <div className="text-2xl font-mono font-black text-white">
+                        ${activeProyecto.pagos?.saldoMonto} USD
+                      </div>
 
-                  {activeProyecto.pagos?.saldoEstado !== 'confirmado' ? (
-                    <button
-                      onClick={() => handleConfirmPayment('saldo')}
-                      className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Marcar Saldo como Liquidado</span>
-                    </button>
-                  ) : (
-                    <div className="text-[11px] text-emerald-400 font-mono flex items-center gap-1.5 pt-1">
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Proyecto 100% Liquidado</span>
+                      <p className="text-[11px] text-slate-400">
+                        Se abona contra entrega final una vez aprobado el sitio para liberar el candado de accesos y la Fase 5.
+                      </p>
+
+                      {hasComprobante && (
+                        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-2.5">
+                          <div className="font-bold flex items-center justify-between gap-1.5 text-amber-400">
+                            <div className="flex items-center gap-1.5">
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>Comprobante de Liquidación Reportado:</span>
+                            </div>
+                            {comprobanteData.fecha && (
+                              <span className="text-[10px] text-slate-400 font-normal">
+                                {comprobanteData.fecha}
+                              </span>
+                            )}
+                          </div>
+
+                          {comprobanteData.texto && (
+                            <div className="font-mono text-white text-[11px] bg-slate-900/60 p-2 rounded-lg border border-amber-500/20">
+                              {comprobanteData.texto}
+                            </div>
+                          )}
+
+                          {comprobanteData.imagen && (
+                            <div className="space-y-1.5 pt-1">
+                              <div
+                                onClick={() => setPreviewFileModal({
+                                  nombre: comprobanteData.nombre || 'Captura Comprobante de Liquidación Final',
+                                  previewUrl: comprobanteData.imagen
+                                })}
+                                className="block rounded-lg overflow-hidden border border-slate-700 bg-[#090d16] max-h-56 flex items-center justify-center group relative cursor-pointer hover:border-orange-500/60 transition-all shadow-inner"
+                                title="Clic para ampliar captura en pantalla completa"
+                              >
+                                <img
+                                  src={comprobanteData.imagen}
+                                  alt="Captura de Liquidación"
+                                  className="max-h-52 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1.5 text-white text-xs font-bold transition-opacity">
+                                  <Eye className="w-4 h-4 text-orange-400" />
+                                  <span>Ampliar Comprobante</span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between text-[10px] pt-1">
+                                <span className="text-emerald-400 font-mono flex items-center gap-1 truncate max-w-[200px]" title={comprobanteData.nombre}>
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                                  <span className="truncate">✓ Captura adjunta ({comprobanteData.nombre || 'Imagen verificada'})</span>
+                                </span>
+                                <a
+                                  href={comprobanteData.imagen}
+                                  download={comprobanteData.nombre || 'Comprobante_Liquidacion.jpg'}
+                                  className="text-orange-400 hover:text-orange-300 flex items-center gap-1 font-semibold shrink-0 transition-colors"
+                                  title="Descargar comprobante"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Descargar</span>
+                                </a>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {activeProyecto.pagos?.saldoEstado !== 'confirmado' ? (
+                        <button
+                          onClick={() => handleConfirmPayment('saldo')}
+                          className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-md"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>{hasComprobante ? 'Validar Liquidación y Desbloquear Fase 5' : 'Marcar Saldo como Confirmado & Desbloquear Fase 5'}</span>
+                        </button>
+                      ) : (
+                        <div className="text-[11px] text-emerald-400 font-mono flex items-center gap-1.5 pt-1">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Liquidado el {activeProyecto.pagos?.saldoFecha || 'hoy'} · Fase 5 Desbloqueada</span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
             </div>
           )}
