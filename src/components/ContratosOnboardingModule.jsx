@@ -43,7 +43,8 @@ import {
   FolderOpen,
   FileUp,
   Download,
-  X
+  X,
+  Edit3
 } from 'lucide-react';
 import {
   getStoredProyectos,
@@ -64,6 +65,15 @@ import {
   savePortalCloud 
 } from '../services/firestoreSyncService';
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
+import {
+  buildInvoiceFromPresupuesto,
+  reconcileInvoiceWithPresupuesto,
+  normalizeFacturaItems,
+  buildCorporateInvoiceHtml,
+  printHtmlViaHiddenIframe,
+  CorporateInvoiceDocument,
+  DEFAULT_CONFIGURACION
+} from './GestionRentabilidadModule';
 
 export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNavigateToPresupuestos }) {
   const [proyectos, setProyectos] = useState([]);
@@ -94,6 +104,10 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
 
   // Import from proposal modal
   const [showImportModal, setShowImportModal] = useState(false);
+
+  // Invoice Audit / Preview Modal State (Auditoría, Descarga e Inspección Financiera)
+  const [invoiceAuditModal, setInvoiceAuditModal] = useState(null); // { invoice, tipoVista, isEditing: false }
+  const [invoiceEditForm, setInvoiceEditForm] = useState(null);
 
   useEffect(() => {
     fetchProyectos();
@@ -1059,6 +1073,233 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
   const showNotification = () => {
     setSavedNotice(true);
     setTimeout(() => setSavedNotice(false), 2500);
+  };
+
+  // Helper para configuración visual e institucional de la factura
+  const getInvoiceConfiguracion = () => {
+    let savedFinanzasConfig = null;
+    try {
+      const raw = localStorage.getItem('goglite_finanzas_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.configuracion) savedFinanzasConfig = parsed.configuracion;
+      }
+    } catch (e) {}
+
+    const documentBrandLogo = (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null) || 
+                              (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || 
+                              DEFAULT_AGENCY_BRANDING.logoUrl;
+
+    const baseConfig = savedFinanzasConfig || DEFAULT_CONFIGURACION;
+
+    return {
+      ...baseConfig,
+      emisor: {
+        ...(baseConfig.emisor || {}),
+        empresa: baseConfig.emisor?.empresa || DEFAULT_AGENCY_BRANDING.nombreAgencia || 'Goglite Digital Hub',
+        subtitulo: baseConfig.emisor?.subtitulo || DEFAULT_AGENCY_BRANDING.eslogan || 'Suite Integral de Crecimiento Digital & Desarrollo Web Antigravity',
+        logoUrl: documentBrandLogo,
+        logoDocumentosUrl: documentBrandLogo,
+        identificacion: baseConfig.emisor?.identificacion || 'NIT / RNC: 0614-290390-102-1',
+        email: baseConfig.emisor?.email || DEFAULT_AGENCY_BRANDING.emailContacto || 'contacto@goglite.com',
+        telefono: baseConfig.emisor?.telefono || DEFAULT_AGENCY_BRANDING.telefonoWhatsapp || '+503 7000-1122',
+        ubicacion: baseConfig.emisor?.ubicacion || DEFAULT_AGENCY_BRANDING.ubicacionPrincipal || 'San Salvador, SV · Santo Domingo, DO'
+      }
+    };
+  };
+
+  // Obtiene o construye la factura vinculada al proyecto activo para auditoría y descarga
+  const getInvoiceForProyecto = (proj = activeProyecto, tipoVista = 'general') => {
+    if (!proj) return null;
+
+    let storedFacturas = [];
+    try {
+      const raw = localStorage.getItem('goglite_facturas');
+      if (raw) storedFacturas = JSON.parse(raw);
+    } catch (e) {}
+
+    const targetPresupuestoId = proj.presupuestoId;
+    const targetCodigo = proj.presupuestoCodigo || proj.codigo;
+    const targetEmpresa = proj.cliente?.empresa?.toLowerCase().trim();
+
+    let found = null;
+    if (Array.isArray(storedFacturas) && storedFacturas.length > 0) {
+      found = storedFacturas.find(f => 
+        (targetPresupuestoId && (f.presupuestoId === targetPresupuestoId || f.id === targetPresupuestoId)) ||
+        (targetCodigo && (f.codigoPresupuesto === targetCodigo || f.numeroFactura?.includes(targetCodigo) || f.codigoProyecto === targetCodigo)) ||
+        (targetEmpresa && f.cliente?.empresa && f.cliente.empresa.toLowerCase().trim() === targetEmpresa)
+      );
+    }
+
+    const prop = presupuestos.find(p => 
+      p.id === proj.presupuestoId || 
+      p.codigo === proj.presupuestoCodigo || 
+      (targetEmpresa && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmpresa)
+    );
+
+    if (!found) {
+      if (prop) {
+        found = buildInvoiceFromPresupuesto(prop, storedFacturas.length, getInvoiceConfiguracion());
+      } else {
+        found = buildInvoiceFromPresupuesto({
+          id: proj.presupuestoId || proj.id,
+          codigo: proj.presupuestoCodigo || proj.codigo || 'P-2026-001',
+          titulo: proj.contrato?.alcanceResumen || 'Desarrollo de Solución Digital Web VIP',
+          cliente: proj.cliente,
+          pais: proj.pais || 'SV',
+          inversion: {
+            precioTotal: proj.contrato?.totalInversion || 300,
+            anticipo: proj.pagos?.anticipoMonto || Math.round((proj.contrato?.totalInversion || 300) * 0.5),
+            contraEntrega: proj.pagos?.saldoMonto || (proj.contrato?.totalInversion || 300) - (proj.pagos?.anticipoMonto || 150)
+          },
+          modulos: proj.contrato?.modulos || []
+        }, storedFacturas.length, getInvoiceConfiguracion());
+      }
+    } else if (prop) {
+      found = reconcileInvoiceWithPresupuesto(found, prop);
+    }
+
+    if (found) {
+      found = { ...normalizeFacturaItems(found) };
+      const totalMonto = Number(found.total) || Number(found.subtotal) || 300;
+      const anticipoMonto = Number(proj.pagos?.anticipoMonto) || Math.round(totalMonto * 0.5);
+
+      if (tipoVista === 'anticipo') {
+        const isAnticipoConfirmado = proj.pagos?.anticipoEstado === 'confirmado';
+        found.montoCobrado = isAnticipoConfirmado ? anticipoMonto : 0;
+        found.saldoPendiente = isAnticipoConfirmado ? Math.max(0, totalMonto - anticipoMonto) : totalMonto;
+        found.estado = isAnticipoConfirmado ? 'parcial' : 'pendiente';
+      } else if (tipoVista === 'saldo') {
+        const isSaldoConfirmado = proj.pagos?.saldoEstado === 'confirmado';
+        found.montoCobrado = isSaldoConfirmado ? totalMonto : anticipoMonto;
+        found.saldoPendiente = isSaldoConfirmado ? 0 : Math.max(0, totalMonto - anticipoMonto);
+        found.estado = isSaldoConfirmado ? 'cobrada' : (anticipoMonto > 0 ? 'parcial' : 'pendiente');
+      } else {
+        if (proj.pagos?.saldoEstado === 'confirmado') {
+          found.montoCobrado = totalMonto;
+          found.saldoPendiente = 0;
+          found.estado = 'cobrada';
+        } else if (proj.pagos?.anticipoEstado === 'confirmado') {
+          found.montoCobrado = anticipoMonto;
+          found.saldoPendiente = Math.max(0, totalMonto - anticipoMonto);
+          found.estado = 'parcial';
+        }
+      }
+    }
+
+    return found;
+  };
+
+  const handleOpenInvoiceAuditModal = (tipoVista = 'anticipo') => {
+    const inv = getInvoiceForProyecto(activeProyecto, tipoVista);
+    if (!inv) {
+      alert('No se pudo encontrar o generar la factura asociada a este proyecto.');
+      return;
+    }
+    setInvoiceAuditModal({ invoice: inv, tipoVista, isEditing: false });
+    setInvoiceEditForm({
+      numeroFactura: inv.numeroFactura || '',
+      empresa: inv.cliente?.empresa || '',
+      contacto: inv.cliente?.contacto || '',
+      identificacion: inv.cliente?.identificacion || '',
+      telefono: inv.cliente?.telefono || '',
+      email: inv.cliente?.email || '',
+      concepto: inv.concepto || '',
+      total: Number(inv.total) || 300,
+      montoCobrado: Number(inv.montoCobrado) || 0,
+      saldoPendiente: Number(inv.saldoPendiente) || 0,
+      estado: inv.estado || 'pendiente'
+    });
+  };
+
+  const handleSaveInvoiceEdit = () => {
+    if (!invoiceAuditModal?.invoice || !invoiceEditForm) return;
+
+    const currentInv = invoiceAuditModal.invoice;
+    const updatedInv = {
+      ...currentInv,
+      numeroFactura: invoiceEditForm.numeroFactura,
+      concepto: invoiceEditForm.concepto,
+      subtotal: Number(invoiceEditForm.total) || currentInv.subtotal,
+      total: Number(invoiceEditForm.total) || currentInv.total,
+      montoCobrado: Number(invoiceEditForm.montoCobrado),
+      saldoPendiente: Number(invoiceEditForm.saldoPendiente),
+      estado: invoiceEditForm.estado,
+      cliente: {
+        ...(currentInv.cliente || {}),
+        empresa: invoiceEditForm.empresa,
+        contacto: invoiceEditForm.contacto,
+        identificacion: invoiceEditForm.identificacion,
+        telefono: invoiceEditForm.telefono,
+        email: invoiceEditForm.email
+      },
+      items: [
+        {
+          ...(currentInv.items?.[0] || { id: 'item-1', cantidad: 1 }),
+          descripcion: invoiceEditForm.concepto,
+          precioUnitario: Number(invoiceEditForm.total) || currentInv.total,
+          total: Number(invoiceEditForm.total) || currentInv.total
+        }
+      ]
+    };
+
+    try {
+      let storedFacturas = [];
+      const raw = localStorage.getItem('goglite_facturas');
+      if (raw) storedFacturas = JSON.parse(raw);
+      const idx = storedFacturas.findIndex(f => f.id === updatedInv.id || f.numeroFactura === updatedInv.numeroFactura);
+      if (idx >= 0) {
+        storedFacturas[idx] = updatedInv;
+      } else {
+        storedFacturas.push(updatedInv);
+      }
+      localStorage.setItem('goglite_facturas', JSON.stringify(storedFacturas));
+
+      const rawFinanzas = localStorage.getItem('goglite_finanzas_v1');
+      if (rawFinanzas) {
+        const parsedFin = JSON.parse(rawFinanzas);
+        const fIdx = (parsedFin.facturas || []).findIndex(f => f.id === updatedInv.id || f.numeroFactura === updatedInv.numeroFactura);
+        if (fIdx >= 0) {
+          parsedFin.facturas[fIdx] = updatedInv;
+        } else {
+          parsedFin.facturas = [...(parsedFin.facturas || []), updatedInv];
+        }
+        localStorage.setItem('goglite_finanzas_v1', JSON.stringify(parsedFin));
+      }
+
+      window.dispatchEvent(new CustomEvent('goglite_facturas_updated', { detail: { factura: updatedInv } }));
+    } catch (e) {
+      console.warn('Error guardando factura editada:', e);
+    }
+
+    setInvoiceAuditModal(prev => ({
+      ...prev,
+      invoice: updatedInv,
+      isEditing: false
+    }));
+    alert('✓ Factura comercial actualizada y sincronizada exitosamente.');
+  };
+
+  const handlePrintAuditInvoice = (inv) => {
+    if (!inv) return;
+    const config = getInvoiceConfiguracion();
+    const html = buildCorporateInvoiceHtml(inv, config);
+    printHtmlViaHiddenIframe(html);
+  };
+
+  const handleDownloadAuditInvoiceHtml = (inv) => {
+    if (!inv) return;
+    const config = getInvoiceConfiguracion();
+    const html = buildCorporateInvoiceHtml(inv, config);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Factura_${inv.numeroFactura || 'Proforma'}_${(inv.cliente?.empresa || 'Cliente').replace(/\s+/g, '_')}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const getPortalUrlForProyecto = (proj = null) => {
@@ -2616,8 +2857,20 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                         </div>
                       )}
 
+                      {/* Botón para Auditar, Verificar y Descargar Factura de Anticipo */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenInvoiceAuditModal('anticipo')}
+                        className="w-full py-2.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 hover:border-orange-500/50 text-slate-200 hover:text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm group"
+                        title="Ver, auditar y descargar la factura comercial correspondiente al 50% de anticipo"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-orange-400 group-hover:scale-110 transition-transform" />
+                        <span>Ver / Auditar Factura de Anticipo</span>
+                      </button>
+
                       {activeProyecto.pagos?.anticipoEstado !== 'confirmado' ? (
                         <button
+                          type="button"
                           onClick={() => handleConfirmPayment('anticipo')}
                           className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-md"
                         >
@@ -2625,9 +2878,29 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                           <span>{hasComprobante ? 'Validar Anticipo y Pasar a Desarrollo' : 'Marcar Anticipo como Confirmado'}</span>
                         </button>
                       ) : (
-                        <div className="text-[11px] text-emerald-400 font-mono flex items-center gap-1.5 pt-1">
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Validado el {activeProyecto.pagos?.anticipoFecha || '10 Oct 2026'}</span>
+                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center justify-between shadow-sm">
+                          <span className="flex items-center gap-1.5 font-semibold">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span>Anticipo validado el {activeProyecto.pagos?.anticipoFecha || '10 Oct 2026'} · En Desarrollo</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updatedPagos = { ...(activeProyecto.pagos || {}), anticipoEstado: 'pendiente' };
+                              const modProj = { ...activeProyecto, pagos: updatedPagos };
+                              setActiveProyecto(modProj);
+                              setProyectos(prev => {
+                                const next = prev.map(p => p.id === modProj.id ? modProj : p);
+                                saveStoredProyectos(next);
+                                return next;
+                              });
+                              syncPortalStorageForProyecto(modProj, { anticipoPagado: false });
+                            }}
+                            className="text-[10px] text-slate-500 hover:text-amber-400 underline transition-colors"
+                            title="Revertir estado de anticipo a pendiente"
+                          >
+                            (Revertir)
+                          </button>
                         </div>
                       )}
                     </div>
@@ -2723,29 +2996,32 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                         </div>
                       )}
 
-                      <div className="pt-2 space-y-2">
-                        <button
-                          type="button"
-                          onClick={() => handleConfirmPayment('saldo')}
-                          className={`w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg ${
-                            activeProyecto.pagos?.saldoEstado === 'confirmado'
-                              ? 'bg-emerald-700/80 hover:bg-emerald-600 text-white border border-emerald-500/50 shadow-emerald-950/40'
-                              : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/60'
-                          }`}
-                        >
-                          <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                          <span>
-                            {activeProyecto.pagos?.saldoEstado === 'confirmado'
-                              ? '✓ Confirmar Pago Recibido (Re-validar & Sincronizar Fase 5)'
-                              : 'Confirmar Pago Recibido & Desbloquear Fase 5'}
-                          </span>
-                        </button>
+                      {/* Botón para Auditar, Verificar y Descargar Factura de Liquidación */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenInvoiceAuditModal('saldo')}
+                        className="w-full py-2.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 hover:border-orange-500/50 text-slate-200 hover:text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm group"
+                        title="Ver, auditar y descargar la factura comercial correspondiente a la liquidación final"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-orange-400 group-hover:scale-110 transition-transform" />
+                        <span>Ver / Auditar Factura de Liquidación</span>
+                      </button>
 
-                        {activeProyecto.pagos?.saldoEstado === 'confirmado' && (
-                          <div className="flex items-center justify-between text-[11px] text-emerald-400 font-mono px-1">
-                            <span className="flex items-center gap-1.5">
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Validado el {activeProyecto.pagos?.saldoFecha || '24 oct 2026'} · Fase 5 Desbloqueada</span>
+                      <div className="pt-1 space-y-2">
+                        {activeProyecto.pagos?.saldoEstado !== 'confirmado' ? (
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmPayment('saldo')}
+                            className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-950/60"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                            <span>Confirmar Pago Recibido & Desbloquear Fase 5</span>
+                          </button>
+                        ) : (
+                          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center justify-between shadow-sm">
+                            <span className="flex items-center gap-1.5 font-semibold">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span>Liquidación validada el {activeProyecto.pagos?.saldoFecha || '24 oct 2026'} · Fase 5 Desbloqueada</span>
                             </span>
                             <button
                               type="button"
@@ -2939,6 +3215,213 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                   Cerrar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL: AUDITORÍA FINANCIERA, VERIFICACIÓN Y DESCARGA DE FACTURA
+          ========================================================================= */}
+      {invoiceAuditModal && invoiceAuditModal.invoice && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-[#0e1320] border border-slate-700/90 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#121828]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-orange-500/15 text-orange-400 border border-orange-500/30">
+                      {invoiceAuditModal.tipoVista === 'anticipo' ? 'Anticipo 50%' : 'Liquidación Final 100%'}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-300">
+                      {invoiceAuditModal.invoice.numeroFactura || 'FAC-2026-001'}
+                    </span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      invoiceAuditModal.invoice.estado === 'cobrada'
+                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                        : invoiceAuditModal.invoice.estado === 'parcial'
+                        ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                        : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                    }`}>
+                      {invoiceAuditModal.invoice.estado === 'cobrada' ? '✓ Cobrada Total' : invoiceAuditModal.invoice.estado === 'parcial' ? 'Anticipo Pagado' : 'Pendiente de Cobro'}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-extrabold text-white truncate max-w-md mt-0.5">
+                    {invoiceAuditModal.invoice.cliente?.empresa || 'Cliente de Agencia'}
+                  </h3>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setInvoiceAuditModal(prev => ({ ...prev, isEditing: !prev.isEditing }))}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border transition-all ${
+                    invoiceAuditModal.isEditing
+                      ? 'bg-orange-500/20 border-orange-500 text-orange-300 shadow-sm'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                  }`}
+                  title="Editar datos fiscales o montos si hay algún error en la generación automática"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-orange-400" />
+                  <span>{invoiceAuditModal.isEditing ? 'Ocultar Editor' : 'Editar Datos / Corregir'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDownloadAuditInvoiceHtml(invoiceAuditModal.invoice)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 border border-slate-700 transition-all shadow-sm"
+                  title="Descargar archivo HTML corporativo ($0)"
+                >
+                  <Download className="w-3.5 h-3.5 text-orange-400" />
+                  <span>Descargar HTML</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handlePrintAuditInvoice(invoiceAuditModal.invoice)}
+                  className="px-3.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-orange-950/40"
+                  title="Imprimir o guardar en PDF (formato 8.5 x 11)"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir / PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setInvoiceAuditModal(null)}
+                  className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Diagnostic Bar */}
+            <div className="bg-[#090d16] px-5 py-2.5 border-b border-slate-800 text-[11px] text-slate-300 flex flex-wrap items-center justify-between gap-3 font-mono">
+              <div className="flex items-center gap-4 flex-wrap">
+                <span>Total: <strong className="text-white">${invoiceAuditModal.invoice.total} USD</strong></span>
+                <span>Cobrado: <strong className="text-emerald-400">${invoiceAuditModal.invoice.montoCobrado || 0} USD</strong></span>
+                <span>Pendiente: <strong className="text-amber-400">${invoiceAuditModal.invoice.saldoPendiente || 0} USD</strong></span>
+                <span>RNC/NIT: <strong className={invoiceAuditModal.invoice.cliente?.identificacion ? 'text-white' : 'text-amber-400'}>
+                  {invoiceAuditModal.invoice.cliente?.identificacion || '⚠️ No especificado'}
+                </strong></span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-sans">
+                ✓ Auditoría preliminar: Puedes revisar o corregir antes de descargar
+              </span>
+            </div>
+
+            {/* Quick Edit Form Panel (if toggled) */}
+            {invoiceAuditModal.isEditing && invoiceEditForm && (
+              <div className="p-4 sm:p-5 bg-[#141b2c] border-b border-slate-800 space-y-4 max-h-64 overflow-y-auto">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-orange-400">
+                    <Edit3 className="w-4 h-4" />
+                    <span>Corrección de Datos de Factura (Anti-Errores)</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400">
+                    Los cambios se guardan localmente y actualizan el documento en tiempo real.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Empresa / Razón Social</label>
+                    <input
+                      type="text"
+                      value={invoiceEditForm.empresa}
+                      onChange={(e) => setInvoiceEditForm(prev => ({ ...prev, empresa: e.target.value }))}
+                      className="w-full bg-[#0a0d16] border border-slate-700 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">RNC / NIT / ID Fiscal</label>
+                    <input
+                      type="text"
+                      value={invoiceEditForm.identificacion}
+                      onChange={(e) => setInvoiceEditForm(prev => ({ ...prev, identificacion: e.target.value }))}
+                      placeholder="Ej. 0614-123456-101-0"
+                      className="w-full bg-[#0a0d16] border border-slate-700 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-orange-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Contacto / Representante</label>
+                    <input
+                      type="text"
+                      value={invoiceEditForm.contacto}
+                      onChange={(e) => setInvoiceEditForm(prev => ({ ...prev, contacto: e.target.value }))}
+                      className="w-full bg-[#0a0d16] border border-slate-700 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Teléfono / WhatsApp</label>
+                    <input
+                      type="text"
+                      value={invoiceEditForm.telefono}
+                      onChange={(e) => setInvoiceEditForm(prev => ({ ...prev, telefono: e.target.value }))}
+                      className="w-full bg-[#0a0d16] border border-slate-700 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Correo Electrónico</label>
+                    <input
+                      type="email"
+                      value={invoiceEditForm.email}
+                      onChange={(e) => setInvoiceEditForm(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full bg-[#0a0d16] border border-slate-700 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nº de Factura</label>
+                    <input
+                      type="text"
+                      value={invoiceEditForm.numeroFactura}
+                      onChange={(e) => setInvoiceEditForm(prev => ({ ...prev, numeroFactura: e.target.value }))}
+                      className="w-full bg-[#0a0d16] border border-slate-700 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-orange-500 font-mono"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Concepto / Glosa Comercial</label>
+                    <input
+                      type="text"
+                      value={invoiceEditForm.concepto}
+                      onChange={(e) => setInvoiceEditForm(prev => ({ ...prev, concepto: e.target.value }))}
+                      className="w-full bg-[#0a0d16] border border-slate-700 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 pt-4">
+                    <button
+                      type="button"
+                      onClick={handleSaveInvoiceEdit}
+                      className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Guardar Correcciones</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInvoiceAuditModal(prev => ({ ...prev, isEditing: false }))}
+                      className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Document Preview 8.5 x 11 Container */}
+            <div className="p-4 sm:p-8 bg-[#FAFAFA] overflow-y-auto max-h-[calc(94vh-180px)] rounded-b-2xl">
+              <CorporateInvoiceDocument
+                invoice={invoiceAuditModal.invoice}
+                configuracion={getInvoiceConfiguracion()}
+              />
             </div>
           </div>
         </div>

@@ -226,7 +226,7 @@ export function normalizeCuentasBancarias(raw) {
   return list;
 }
 
-const DEFAULT_CONFIGURACION = {
+export const DEFAULT_CONFIGURACION = {
   costoHoraInterno: 20,
   tarifaObjetivoHora: 50,
   monedaPrincipal: 'USD',
