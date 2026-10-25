@@ -569,18 +569,20 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
     try {
       const storedSettings = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_settings') : null;
       const storedLogo = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null;
+      const storedLogoDocs = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null;
       const parsed = storedSettings ? JSON.parse(storedSettings) : {};
       return {
         ...DEFAULT_AGENCY_BRANDING,
         ...parsed,
-        logoUrl: parsed.logoUrl || storedLogo || DEFAULT_AGENCY_BRANDING.logoUrl
+        logoUrl: parsed.logoUrl || storedLogo || DEFAULT_AGENCY_BRANDING.logoUrl,
+        logoDocumentosUrl: parsed.logoDocumentosUrl || storedLogoDocs || ''
       };
     } catch {
       return DEFAULT_AGENCY_BRANDING;
     }
   }, []);
 
-  const activeLogo = agencyData.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl;
+  const activeDocLogo = agencyData.logoDocumentosUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null) || agencyData.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl;
   const activeAgencyName = agencyData.nombreAgencia || 'Goglite Digital Hub';
   const activeAgencySlogan = agencyData.eslogan || 'Agencia Web, Automatización & Posicionamiento IA (GEO)';
   const activeAgencyLocation = agencyData.ubicacionPrincipal || 'San Salvador, SV · Santo Domingo, DO';
@@ -1045,9 +1047,9 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
           {/* 1. Cabecera Membretada Oficial con Logo Dinámico de Ajustes */}
           <div className="border-b-2 border-slate-900 pb-3 mb-2.5 flex items-start justify-between avoid-break">
             <div className="flex items-center gap-3">
-              {activeLogo ? (
+              {activeDocLogo ? (
                 <img 
-                  src={activeLogo} 
+                  src={activeDocLogo} 
                   alt={activeAgencyName} 
                   className="h-10 max-h-10 max-w-[170px] object-contain" 
                 />

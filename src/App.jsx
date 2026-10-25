@@ -99,17 +99,21 @@ export default function App() {
 
     const stored = getLocalItem(STORAGE_KEYS.AGENCY_SETTINGS, null);
     const storedLogo = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null;
+    const storedLogoDocs = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null;
 
     if (stored && typeof stored === 'object') {
       return {
         ...defaultSettings,
         ...stored,
-        logoUrl: stored.logoUrl || storedLogo || defaultSettings.logoUrl
+        logoUrl: stored.logoUrl || storedLogo || defaultSettings.logoUrl,
+        logoDocumentosUrl: stored.logoDocumentosUrl || storedLogoDocs || defaultSettings.logoDocumentosUrl || ''
       };
     }
 
-    if (storedLogo) {
-      defaultSettings.logoUrl = storedLogo;
+    if (storedLogo || storedLogoDocs) {
+      if (storedLogo) defaultSettings.logoUrl = storedLogo;
+      if (storedLogoDocs) defaultSettings.logoDocumentosUrl = storedLogoDocs;
+      return defaultSettings;
     }
     return defaultSettings;
   });
@@ -321,9 +325,11 @@ export default function App() {
         const data = await res.json();
         if (data && typeof data === 'object') {
           const storedLogo = localStorage.getItem('goglite_agency_logo');
+          const storedLogoDocs = localStorage.getItem('goglite_agency_logo_docs');
           const merged = {
             ...data,
-            logoUrl: data.logoUrl || storedLogo || DEFAULT_AGENCY_BRANDING.logoUrl
+            logoUrl: data.logoUrl || storedLogo || DEFAULT_AGENCY_BRANDING.logoUrl,
+            logoDocumentosUrl: data.logoDocumentosUrl || storedLogoDocs || ''
           };
           setAgencySettings(merged);
           setLocalItem(STORAGE_KEYS.AGENCY_SETTINGS, merged);
@@ -360,6 +366,13 @@ export default function App() {
           localStorage.setItem('goglite_agency_logo', newSettings.logoUrl);
         } catch (e) {
           console.warn('[App] Error guardando logo en clave dedicada:', e);
+        }
+      }
+      if (newSettings?.logoDocumentosUrl) {
+        try {
+          localStorage.setItem('goglite_agency_logo_docs', newSettings.logoDocumentosUrl);
+        } catch (e) {
+          console.warn('[App] Error guardando logo documentos en clave dedicada:', e);
         }
       }
       try {

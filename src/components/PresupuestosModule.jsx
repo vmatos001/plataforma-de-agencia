@@ -1455,7 +1455,7 @@ export default function PresupuestosModule({
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
                           <img 
-                            src={activePresupuesto?.emisor?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                            src={(typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null) || activePresupuesto?.emisor?.logoDocumentosUrl || activePresupuesto?.emisor?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
                             alt={activePresupuesto.emisor?.empresa || 'Agencia'} 
                             className="h-10 w-auto object-contain"
                           />
@@ -1584,7 +1584,7 @@ export default function PresupuestosModule({
                     <div className="border-b border-slate-200 pb-2.5 mb-4 flex items-center justify-between avoid-break">
                       <div className="flex items-center gap-2">
                         <img 
-                          src={activePresupuesto?.emisor?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                          src={(typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null) || activePresupuesto?.emisor?.logoDocumentosUrl || activePresupuesto?.emisor?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
                           alt={activePresupuesto.emisor?.empresa || 'Agencia'} 
                           className="h-6 w-auto object-contain"
                         />

@@ -794,13 +794,23 @@ export function printHtmlViaHiddenIframe(htmlContent) {
  */
 export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFIGURACION) {
   const emisorRaw = configuracion?.emisor || DEFAULT_CONFIGURACION.emisor;
+  const storedLogoDocs = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null;
   const storedLogo = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null;
+  const docLogo = configuracion?.emisor?.logoDocumentosUrl 
+    || configuracion?.logoDocumentosUrl 
+    || storedLogoDocs 
+    || emisorRaw?.logoUrl 
+    || configuracion?.logoUrl 
+    || storedLogo 
+    || DEFAULT_AGENCY_BRANDING.logoUrl;
+
   const emisor = {
     ...DEFAULT_CONFIGURACION.emisor,
     ...emisorRaw,
     empresa: emisorRaw?.empresa || configuracion?.nombreAgencia || DEFAULT_CONFIGURACION.emisor.empresa,
     subtitulo: emisorRaw?.subtitulo || configuracion?.eslogan || DEFAULT_CONFIGURACION.emisor.subtitulo,
-    logoUrl: emisorRaw?.logoUrl || configuracion?.logoUrl || storedLogo || DEFAULT_AGENCY_BRANDING.logoUrl,
+    logoUrl: docLogo,
+    logoDocumentosUrl: docLogo,
     identificacion: emisorRaw?.identificacion || 'NIT / RNC: 0614-290390-102-1',
     email: emisorRaw?.email || configuracion?.emailContacto || DEFAULT_CONFIGURACION.emisor.email,
     telefono: emisorRaw?.telefono || configuracion?.telefonoWhatsapp || DEFAULT_CONFIGURACION.emisor.telefono,
@@ -1030,13 +1040,23 @@ export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFI
 export function CorporateInvoiceDocument({ invoice, configuracion = DEFAULT_CONFIGURACION }) {
   if (!invoice) return null;
   const emisorRaw = configuracion?.emisor || DEFAULT_CONFIGURACION.emisor;
+  const storedLogoDocs = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null;
   const storedLogo = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null;
+  const docLogo = configuracion?.emisor?.logoDocumentosUrl 
+    || configuracion?.logoDocumentosUrl 
+    || storedLogoDocs 
+    || emisorRaw?.logoUrl 
+    || configuracion?.logoUrl 
+    || storedLogo 
+    || DEFAULT_AGENCY_BRANDING.logoUrl;
+
   const emisor = {
     ...DEFAULT_CONFIGURACION.emisor,
     ...emisorRaw,
     empresa: emisorRaw?.empresa || configuracion?.nombreAgencia || DEFAULT_CONFIGURACION.emisor.empresa,
     subtitulo: emisorRaw?.subtitulo || configuracion?.eslogan || DEFAULT_CONFIGURACION.emisor.subtitulo,
-    logoUrl: emisorRaw?.logoUrl || configuracion?.logoUrl || storedLogo || DEFAULT_AGENCY_BRANDING.logoUrl,
+    logoUrl: docLogo,
+    logoDocumentosUrl: docLogo,
     identificacion: emisorRaw?.identificacion || 'NIT / RNC: 0614-290390-102-1',
     email: emisorRaw?.email || configuracion?.emailContacto || DEFAULT_CONFIGURACION.emisor.email,
     telefono: emisorRaw?.telefono || configuracion?.telefonoWhatsapp || DEFAULT_CONFIGURACION.emisor.telefono,

@@ -237,29 +237,39 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       return {
         ...fallback,
         ...initialAgencySettings,
-        logoUrl: initialAgencySettings.logoUrl || fallback.logoUrl
+        logoUrl: initialAgencySettings.logoUrl || fallback.logoUrl,
+        logoDocumentosUrl: initialAgencySettings.logoDocumentosUrl || ''
       };
     }
     try {
       const raw = localStorage.getItem('goglite_agency_settings');
       const storedLogo = localStorage.getItem('goglite_agency_logo');
+      const storedLogoDocs = localStorage.getItem('goglite_agency_logo_docs');
       if (raw) {
         const parsed = JSON.parse(raw);
         return {
           ...fallback,
           ...parsed,
-          logoUrl: parsed.logoUrl || storedLogo || fallback.logoUrl
+          logoUrl: parsed.logoUrl || storedLogo || fallback.logoUrl,
+          logoDocumentosUrl: parsed.logoDocumentosUrl || storedLogoDocs || ''
         };
       }
-      if (storedLogo) {
+      if (storedLogo || storedLogoDocs) {
         return {
           ...fallback,
-          logoUrl: storedLogo
+          logoUrl: storedLogo || fallback.logoUrl,
+          logoDocumentosUrl: storedLogoDocs || ''
         };
       }
     } catch (e) {}
     return fallback;
   });
+
+  // Dedicated Document Logo (Texto Negro / Fondo Blanco para Impresión)
+  const documentBrandLogo = agencyBranding?.logoDocumentosUrl 
+    || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null)
+    || agencyBranding?.logoUrl 
+    || DEFAULT_AGENCY_BRANDING.logoUrl;
 
   // Client Post-Payment Authentication State
   const [showClientAuthModal, setShowClientAuthModal] = useState(false);
@@ -371,7 +381,8 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       emisor: {
         empresa: agencyBranding?.nombreAgencia || 'Goglite Digital Hub',
         subtitulo: agencyBranding?.eslogan || 'Suite Integral de Crecimiento Digital & Desarrollo Web Antigravity',
-        logoUrl: agencyBranding?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl,
+        logoUrl: documentBrandLogo,
+        logoDocumentosUrl: documentBrandLogo,
         identificacion: agencyBranding?.identificacion || 'NIT / RNC: 0614-290390-102-1',
         email: agencyBranding?.emailContacto || 'contacto@goglite.com',
         telefono: agencyBranding?.telefonoWhatsapp || '+503 7000-1122',
@@ -2693,7 +2704,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <img 
-                          src={agencyBranding?.logoUrl || presupuesto?.emisor?.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                          src={documentBrandLogo} 
                           alt={agencyBranding?.nombreAgencia || presupuesto?.emisor?.empresa || 'Agencia'} 
                           className="h-8 sm:h-9 w-auto object-contain shrink-0"
                         />
@@ -2818,7 +2829,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   <div className="border-b border-slate-200 pb-2.5 mb-4 flex items-center justify-between avoid-break">
                     <div className="flex items-center gap-2">
                       <img 
-                        src={agencyBranding?.logoUrl || presupuesto?.emisor?.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                        src={documentBrandLogo} 
                         alt={agencyBranding?.nombreAgencia || presupuesto?.emisor?.empresa || 'Agencia'} 
                         className="h-6 w-auto object-contain"
                       />
@@ -3103,7 +3114,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   <div className="flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-4 avoid-break">
                     <div className="flex items-center gap-3">
                       <img 
-                        src={agencyBranding?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                        src={documentBrandLogo} 
                         alt={agencyBranding?.nombreAgencia || 'Agencia'} 
                         className="h-8 w-auto object-contain"
                         onError={(e) => { e.target.style.display = 'none'; }}
@@ -3176,7 +3187,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   <div className="border-b border-slate-200 pb-2.5 mb-4 flex items-center justify-between avoid-break">
                     <div className="flex items-center gap-2">
                       <img 
-                        src={agencyBranding?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                        src={documentBrandLogo} 
                         alt={agencyBranding?.nombreAgencia || 'Agencia'} 
                         className="h-6 w-auto object-contain"
                         onError={(e) => { e.target.style.display = 'none'; }}
@@ -4786,7 +4797,8 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   emisor: {
                     empresa: agencyBranding?.nombreAgencia || 'Goglite Digital Hub',
                     subtitulo: agencyBranding?.eslogan,
-                    logoUrl: agencyBranding?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl,
+                    logoUrl: documentBrandLogo,
+        logoDocumentosUrl: documentBrandLogo,
                     identificacion: agencyBranding?.identificacion || 'NIT / RNC: 0614-290390-102-1',
                     email: agencyBranding?.emailContacto || 'contacto@goglite.com',
                     telefono: agencyBranding?.telefonoWhatsapp || '+503 7000-1122',

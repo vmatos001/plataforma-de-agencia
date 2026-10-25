@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Building2, 
   Image, 
+  FileText,
   Palette, 
   DollarSign, 
   Phone, 
@@ -50,6 +51,7 @@ export default function AgencyWhiteLabelSettingsModal({
     nombreAgencia: 'Goglite Digital Hub',
     eslogan: 'Suite Integral de Crecimiento Digital & Desarrollo Web Antigravity',
     logoUrl: '',
+    logoDocumentosUrl: '',
     colorPrimario: '#FF6B00',
     colorSecundario: '#1E293B',
     dominioWeb: 'goglite.com',
@@ -282,10 +284,12 @@ export default function AgencyWhiteLabelSettingsModal({
   useEffect(() => {
     if (agencySettings) {
       const storedLogo = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null;
+      const storedLogoDocs = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null;
       setForm(prev => ({
         ...prev,
         ...agencySettings,
         logoUrl: agencySettings.logoUrl || storedLogo || prev.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl,
+        logoDocumentosUrl: agencySettings.logoDocumentosUrl || storedLogoDocs || prev.logoDocumentosUrl || '',
         mcpAgentKey: agencySettings.mcpAgentKey || prev.mcpAgentKey || DEFAULT_AGENCY_BRANDING.mcpAgentKey || 'gog_agent_live_3554881d91556ec76d8734f10fda7366',
         apisIntegraciones: {
           ...prev.apisIntegraciones,
@@ -389,16 +393,88 @@ export default function AgencyWhiteLabelSettingsModal({
     reader.readAsDataURL(file);
   };
 
+  const handleDocsFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // SVG se lee directamente sin compresión
+    if (file.type === 'image/svg+xml') {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const svgResult = event.target?.result;
+        if (svgResult) {
+          setForm(prev => ({ ...prev, logoDocumentosUrl: svgResult }));
+          try {
+            localStorage.setItem('goglite_agency_logo_docs', svgResult);
+          } catch (err) {
+            console.warn('[LogoDocs] Error guardando SVG en localStorage:', err);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    // Para imágenes raster (PNG, JPEG, WebP)
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX_DIM = 512;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const optimizedDataUrl = canvas.toDataURL('image/png');
+        setForm(prev => ({ ...prev, logoDocumentosUrl: optimizedDataUrl }));
+
+        try {
+          localStorage.setItem('goglite_agency_logo_docs', optimizedDataUrl);
+        } catch (err) {
+          console.warn('[LogoDocs] Error guardando logo documentos optimizado en localStorage:', err);
+        }
+      };
+      img.src = event.target?.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     setSaving(true);
     try {
-      // 1. Asegurar copia de seguridad del logo en clave independiente
+      // 1. Asegurar copia de seguridad de logos en claves independientes
       if (form.logoUrl) {
         try {
           localStorage.setItem('goglite_agency_logo', form.logoUrl);
         } catch (err) {
           console.warn('[Logo] Error persistiendo logo dedicado:', err);
+        }
+      }
+      if (form.logoDocumentosUrl) {
+        try {
+          localStorage.setItem('goglite_agency_logo_docs', form.logoDocumentosUrl);
+        } catch (err) {
+          console.warn('[LogoDocs] Error persistiendo logo documentos dedicado:', err);
         }
       }
 
@@ -634,14 +710,14 @@ export default function AgencyWhiteLabelSettingsModal({
                 </div>
               </div>
 
-              {/* Logo Manager */}
+              {/* Logo Manager - Plataforma (Modo Oscuro) */}
               <div className="p-4 rounded-xl bg-[#121724] border border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-white flex items-center gap-1.5">
                     <Image className="w-4 h-4 text-orange-400" />
-                    Logotipo Oficial de la Empresa
+                    Logotipo de la Plataforma (Modo Oscuro / Texto Blanco)
                   </span>
-                  <span className="text-[10px] text-slate-400 font-mono">Reemplaza la letra G estática</span>
+                  <span className="text-[10px] text-slate-400 font-mono">Cabecera, barra lateral y portal</span>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-4 pt-1">
@@ -667,7 +743,7 @@ export default function AgencyWhiteLabelSettingsModal({
                         type="url"
                         value={form.logoUrl}
                         onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
-                        placeholder="URL de la imagen del logo (https://...)"
+                        placeholder="URL del logo para fondo oscuro (https://...)"
                         className="flex-1 bg-[#141b2a] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
                       />
                       {form.logoUrl && (
@@ -685,7 +761,7 @@ export default function AgencyWhiteLabelSettingsModal({
                     <div className="flex items-center gap-2">
                       <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600/20 hover:bg-orange-600/30 text-orange-300 border border-orange-500/30 text-xs font-semibold transition-all">
                         <Upload className="w-3.5 h-3.5" />
-                        <span>Subir archivo de imagen</span>
+                        <span>Subir logo (fondo oscuro)</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -693,7 +769,83 @@ export default function AgencyWhiteLabelSettingsModal({
                           className="hidden"
                         />
                       </label>
-                      <span className="text-[10px] text-slate-500">JPG, PNG o SVG con fondo transparente</span>
+                      <span className="text-[10px] text-slate-500">PNG con letras blancas o transparentes</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Logo Manager - Documentos Imprimibles (Fondo Blanco / Texto Negro) */}
+              <div className="p-4 rounded-xl bg-[#121724] border border-orange-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-orange-400" />
+                    Logotipo para Documentos (Fondo Blanco / Texto Negro)
+                  </span>
+                  <span className="text-[10px] text-orange-400 font-mono font-semibold">Propuestas, Contratos, Facturas y Certificados</span>
+                </div>
+
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Para que tu logotipo sea legible sobre hojas impresas de papel blanco, sube aquí la versión con texto negro u oscuro. Si no subes una versión específica, se utilizará el logotipo principal.
+                </p>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4 pt-1">
+                  {/* Preview Box en Fondo Blanco */}
+                  <div className="w-28 h-16 rounded-xl bg-white border-2 border-slate-300 flex items-center justify-center p-2 shrink-0 overflow-hidden shadow-md">
+                    {form.logoDocumentosUrl ? (
+                      <img src={form.logoDocumentosUrl} alt="Logo Documentos" className="max-w-full max-h-full object-contain" />
+                    ) : form.logoUrl ? (
+                      <div className="relative w-full h-full flex items-center justify-center">
+                        <img src={form.logoUrl} alt="Logo Principal" className="max-w-full max-h-full object-contain opacity-60" />
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <span 
+                          className="w-9 h-9 rounded-lg flex items-center justify-center font-black text-white text-base shadow-sm"
+                          style={{ backgroundColor: form.colorPrimario }}
+                        >
+                          {(form.nombreAgencia || 'G')[0].toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 w-full space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="url"
+                        value={form.logoDocumentosUrl || ''}
+                        onChange={(e) => setForm({ ...form, logoDocumentosUrl: e.target.value })}
+                        placeholder="URL de imagen para documentos con texto negro (https://...)"
+                        className="flex-1 bg-[#141b2a] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 placeholder-slate-500"
+                      />
+                      {form.logoDocumentosUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForm({ ...form, logoDocumentosUrl: '' });
+                            try { localStorage.removeItem('goglite_agency_logo_docs'); } catch(e){}
+                          }}
+                          className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs"
+                          title="Restablecer"
+                        >
+                          Quitar
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600/20 hover:bg-orange-600/30 text-orange-300 border border-orange-500/30 text-xs font-semibold transition-all">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Subir versión para fondo blanco</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleDocsFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      <span className="text-[10px] text-slate-400">PNG con letras oscuras sobre fondo transparente</span>
                     </div>
                   </div>
                 </div>
