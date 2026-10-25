@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldCheck,
+  Shield,
   FileText,
   Briefcase,
   CheckCircle2,

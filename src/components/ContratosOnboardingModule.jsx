@@ -2572,20 +2572,51 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                         </div>
                       )}
 
-                      {activeProyecto.pagos?.saldoEstado !== 'confirmado' ? (
+                      <div className="pt-2 space-y-2">
                         <button
+                          type="button"
                           onClick={() => handleConfirmPayment('saldo')}
-                          className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-md"
+                          className={`w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg ${
+                            activeProyecto.pagos?.saldoEstado === 'confirmado'
+                              ? 'bg-emerald-700/80 hover:bg-emerald-600 text-white border border-emerald-500/50 shadow-emerald-950/40'
+                              : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/60'
+                          }`}
                         >
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>{hasComprobante ? 'Validar Liquidación y Desbloquear Fase 5' : 'Marcar Saldo como Confirmado & Desbloquear Fase 5'}</span>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                          <span>
+                            {activeProyecto.pagos?.saldoEstado === 'confirmado'
+                              ? '✓ Confirmar Pago Recibido (Re-validar & Sincronizar Fase 5)'
+                              : 'Confirmar Pago Recibido & Desbloquear Fase 5'}
+                          </span>
                         </button>
-                      ) : (
-                        <div className="text-[11px] text-emerald-400 font-mono flex items-center gap-1.5 pt-1">
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Liquidado el {activeProyecto.pagos?.saldoFecha || 'hoy'} · Fase 5 Desbloqueada</span>
-                        </div>
-                      )}
+
+                        {activeProyecto.pagos?.saldoEstado === 'confirmado' && (
+                          <div className="flex items-center justify-between text-[11px] text-emerald-400 font-mono px-1">
+                            <span className="flex items-center gap-1.5">
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Validado el {activeProyecto.pagos?.saldoFecha || '24 oct 2026'} · Fase 5 Desbloqueada</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updatedPagos = { ...(activeProyecto.pagos || {}), saldoEstado: 'verificacion' };
+                                const modProj = { ...activeProyecto, pagos: updatedPagos };
+                                setActiveProyecto(modProj);
+                                setProyectos(prev => {
+                                  const next = prev.map(p => p.id === modProj.id ? modProj : p);
+                                  saveStoredProyectos(next);
+                                  return next;
+                                });
+                                syncPortalStorageForProyecto(modProj, { fase4Liquidada: false, liquidacionPagada: false });
+                              }}
+                              className="text-[10px] text-slate-500 hover:text-amber-400 underline transition-colors"
+                              title="Revertir estado a pendiente"
+                            >
+                              (Revertir a Pendiente)
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })()}
