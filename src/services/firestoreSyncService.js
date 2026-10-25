@@ -10,7 +10,7 @@
  * Multiplataforma: Sincroniza PC, iPhone, Android y tabletas instantáneamente.
  */
 
-import { db, ensureAuth } from './firebase';
+import { db, storage, ensureAuth } from './firebase';
 import { 
   collection, 
   doc, 
@@ -22,6 +22,7 @@ import {
   query, 
   where 
 } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 /**
  * Sanitizador recursivo para Firestore: elimina propiedades 'undefined' y convierte a tipos válidos
@@ -527,5 +528,165 @@ export async function saveSprintTaskCloud(task) {
   } catch (err) {
     console.warn('[FirestoreSync] Error guardando sprint_task:', task.id, err);
     return null;
+  }
+}
+
+// ============================================================================
+// 6. ESTADO DE MÓDULOS INTERNOS (/app_state/{docId})
+//    Finanzas, PRD Técnico, StoryBrand, Launch QA, Repo Vault
+// ============================================================================
+
+/**
+ * Obtiene el estado de un módulo interno desde Firestore
+ */
+export async function getAppStateCloud(docId) {
+  if (!docId) return null;
+  try {
+    await ensureAuth();
+    const cleanId = String(docId).trim();
+    const snap = await getDoc(doc(db, 'app_state', cleanId));
+    if (snap.exists()) {
+      return snap.data()?.payload ?? null;
+    }
+  } catch (err) {
+    console.warn('[FirestoreSync] Error leyendo app_state:', docId, err);
+  }
+  return null;
+}
+
+/**
+ * Guarda o actualiza el estado de un módulo interno en Firestore
+ */
+export async function saveAppStateCloud(docId, moduleName, payloadData) {
+  if (!docId || payloadData === undefined) return null;
+  try {
+    await ensureAuth();
+    const cleanId = String(docId).trim();
+    const docRef = doc(db, 'app_state', cleanId);
+    const record = sanitizeForFirestore({
+      id: cleanId,
+      module: String(moduleName || cleanId),
+      payload: payloadData,
+      updatedAt: new Date().toISOString()
+    });
+    await setDoc(docRef, record, { merge: true });
+    return record;
+  } catch (err) {
+    console.warn('[FirestoreSync] Error guardando app_state:', docId, err);
+    return null;
+  }
+}
+
+/**
+ * Suscripción en tiempo real a un documento de estado de módulo interno
+ */
+export function subscribeAppStateCloud(docId, onUpdate) {
+  if (!docId || typeof onUpdate !== 'function') return () => {};
+  try {
+    const cleanId = String(docId).trim();
+    return onSnapshot(doc(db, 'app_state', cleanId), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data && data.payload !== undefined) {
+          onUpdate(data.payload);
+        }
+      }
+    }, (err) => {
+      console.warn('[FirestoreSync] Error en listener de app_state:', docId, err);
+    });
+  } catch (e) {
+    return () => {};
+  }
+}
+
+// ============================================================================
+// 7. FIREBASE CLOUD STORAGE PARA COMPROBANTES BANCARIOS
+// ============================================================================
+
+/**
+ * Sube la captura de un comprobante bancario a Firebase Cloud Storage
+ * y retorna la URL pública de descarga. Si Storage falla o está offline,
+ * retorna el DataURL optimizado para que nunca se pierda el comprobante.
+ */
+export async function uploadReceiptToCloudStorage(dataUrl, fileName = 'comprobante.jpg', token = 'general', type = 'advance') {
+  if (!dataUrl || typeof dataUrl !== 'string') return '';
+  if (!dataUrl.startsWith('data:')) return dataUrl;
+  try {
+    await ensureAuth();
+    const safeToken = String(token || 'general').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeName = String(fileName || 'comprobante.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `comprobantes/${safeToken}/${type}_${Date.now()}_${safeName}`;
+    const fileRef = ref(storage, storagePath);
+    await uploadString(fileRef, dataUrl, 'data_url');
+    const publicDownloadUrl = await getDownloadURL(fileRef);
+    return publicDownloadUrl || dataUrl;
+  } catch (err) {
+    console.warn('[CloudStorage] Fallback a imagen optimizada inline:', err?.message || err);
+    return dataUrl;
+  }
+}
+
+// ============================================================================
+// 8. SITIOS CMS MULTI-TENANT (/cms_sites/{siteSlug})
+// ============================================================================
+
+/**
+ * Obtiene la configuración y contenido vivo de un sitio CMS por su slug
+ */
+export async function getCmsSiteCloud(siteSlug) {
+  if (!siteSlug) return null;
+  try {
+    await ensureAuth();
+    const cleanSlug = String(siteSlug).toLowerCase().trim().replace(/[^a-z0-9-]/g, '-');
+    const snap = await getDoc(doc(db, 'cms_sites', cleanSlug));
+    if (snap.exists()) {
+      return { id: snap.id, ...snap.data() };
+    }
+  } catch (err) {
+    console.warn('[FirestoreSync] Error leyendo cms_site:', siteSlug, err);
+  }
+  return null;
+}
+
+/**
+ * Guarda o actualiza el contenido de un sitio CMS en tiempo real
+ */
+export async function saveCmsSiteCloud(siteSlug, sitePayload) {
+  if (!siteSlug || !sitePayload) return null;
+  try {
+    await ensureAuth();
+    const cleanSlug = String(siteSlug).toLowerCase().trim().replace(/[^a-z0-9-]/g, '-');
+    const docRef = doc(db, 'cms_sites', cleanSlug);
+    const payload = sanitizeForFirestore({
+      ...sitePayload,
+      slug: cleanSlug,
+      nombre: sitePayload.nombre || cleanSlug,
+      contenido: sitePayload.contenido || {},
+      updatedAt: new Date().toISOString()
+    });
+    await setDoc(docRef, payload, { merge: true });
+    return payload;
+  } catch (err) {
+    console.warn('[FirestoreSync] Error guardando cms_site:', siteSlug, err);
+    return null;
+  }
+}
+
+/**
+ * Suscripción en tiempo real al sitio CMS de un cliente
+ */
+export function subscribeCmsSiteCloud(siteSlug, onUpdate) {
+  if (!siteSlug || typeof onUpdate !== 'function') return () => {};
+  try {
+    const cleanSlug = String(siteSlug).toLowerCase().trim().replace(/[^a-z0-9-]/g, '-');
+    return onSnapshot(doc(db, 'cms_sites', cleanSlug), (snap) => {
+      if (snap.exists()) {
+        onUpdate({ id: snap.id, ...snap.data() });
+      }
+    }, (err) => {
+      console.warn('[FirestoreSync] Error en listener cms_site:', err);
+    });
+  } catch (e) {
+    return () => {};
   }
 }

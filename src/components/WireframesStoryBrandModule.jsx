@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { getStoredProyectos } from '../services/contractGenerator';
+import { getAppStateCloud, saveAppStateCloud } from '../services/firestoreSyncService';
 import {
   Sparkles,
   Copy,
@@ -88,6 +89,7 @@ export default function WireframesStoryBrandModule({ selectedCountry = 'SV', ext
       const map = getStoredStoryBrandsMap();
       map[sbData.proyectoId] = sbData;
       localStorage.setItem('goglite_storybrand_by_project', JSON.stringify(map));
+      saveAppStateCloud('storybrand_by_project', 'storybrand', map).catch(() => {});
 
       // Also mirror into legacy goglite_wireframes_v1 for backward compatibility
       try {
@@ -129,6 +131,17 @@ export default function WireframesStoryBrandModule({ selectedCountry = 'SV', ext
     if (!projId) return;
     const list = currentProjs || proyectos;
     const proj = list.find(p => p.id === projId) || { id: projId };
+
+    // 0. Check Firestore Cloud first
+    try {
+      const cloudMap = await getAppStateCloud('storybrand_by_project');
+      if (cloudMap && typeof cloudMap === 'object' && cloudMap[projId] && !isStaleDentalMockup(cloudMap[projId], proj)) {
+        const cur = getStoredStoryBrandsMap();
+        localStorage.setItem('goglite_storybrand_by_project', JSON.stringify({ ...cur, ...cloudMap }));
+        setActiveStoryBrand(cloudMap[projId]);
+        return;
+      }
+    } catch (e) {}
 
     // 1. Check local dedicated map
     const map = getStoredStoryBrandsMap();

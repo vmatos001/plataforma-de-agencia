@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 
 import { getStoredCrmLeads } from '../services/localStore';
+import { getAppStateCloud, saveAppStateCloud } from '../services/firestoreSyncService';
 
 const STORAGE_KEY_FINANZAS = 'goglite_finanzas_v1';
 const STORAGE_KEY_TIMER = 'goglite_live_timer_v1';
@@ -1296,7 +1297,7 @@ export default function GestionRentabilidadModule({
     setTimeout(() => setToastMsg(''), 3200);
   };
 
-  // Persistir automáticamente en localStorage cada vez que cambie finanzasState
+  // Persistir automáticamente en localStorage y Firestore Cloud cada vez que cambie finanzasState
   useEffect(() => {
     try {
       if (typeof window !== 'undefined' && finanzasState) {
@@ -1304,16 +1305,31 @@ export default function GestionRentabilidadModule({
         if (Array.isArray(finanzasState.facturas)) {
           localStorage.setItem('goglite_facturas', JSON.stringify(finanzasState.facturas));
         }
+        saveAppStateCloud('finanzas_v1', 'finanzas', finanzasState).catch(() => {});
       }
     } catch (e) {
       console.warn('Error guardando finanzas en localStorage:', e);
     }
   }, [finanzasState]);
 
-  // Cargar datos retrospectivos de Módulos 1, 2 y 3 + sincronizar con backend si está online
+  // Cargar datos retrospectivos de Módulos 1, 2 y 3 + sincronizar con Firestore Cloud y backend
   useEffect(() => {
     loadRetrospectiveModules();
     fetchFinanzasFromBackend();
+    (async () => {
+      try {
+        const cloudFin = await getAppStateCloud('finanzas_v1');
+        if (cloudFin && typeof cloudFin === 'object') {
+          setFinanzasState(prev => ({
+            ...prev,
+            facturas: Array.isArray(cloudFin.facturas) && cloudFin.facturas.length > 0 ? cloudFin.facturas.map(normalizeFacturaItems) : prev.facturas,
+            gastos: Array.isArray(cloudFin.gastos) && cloudFin.gastos.length > 0 ? cloudFin.gastos : prev.gastos,
+            suscripciones: Array.isArray(cloudFin.suscripciones) && cloudFin.suscripciones.length > 0 ? cloudFin.suscripciones : prev.suscripciones,
+            registroHoras: Array.isArray(cloudFin.registroHoras) && cloudFin.registroHoras.length > 0 ? cloudFin.registroHoras : prev.registroHoras
+          }));
+        }
+      } catch (e) {}
+    })();
   }, []);
 
   const loadRetrospectiveModules = () => {

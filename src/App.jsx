@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { 
   Search, 
   Sparkles, 
@@ -19,17 +19,9 @@ import {
   ShieldCheck,
   LogOut
 } from 'lucide-react';
-import PresupuestosContratosModule from './components/PresupuestosContratosModule';
-import MotorSeoQaModule from './components/MotorSeoQaModule';
-import CrmPortalModule from './components/CrmPortalModule';
-import GestionRentabilidadModule from './components/GestionRentabilidadModule';
-import HeadlessCmsHubModule from './components/HeadlessCmsHubModule';
-import CentroDesarrolloPrdModule from './components/CentroDesarrolloPrdModule';
-import PublicClientPortal from './components/PublicClientPortal';
 import AgencyWhiteLabelSettingsModal from './components/AgencyWhiteLabelSettingsModal';
 import { DEFAULT_AGENCY_BRANDING } from './constants/defaultAgencyBranding';
 import UserProfileModal from './components/UserProfileModal';
-import ProspectorModule from './components/ProspectorModule';
 import LoginGatekeeper from './components/LoginGatekeeper';
 import { signOutUser } from './services/firebase';
 import { apiClient, subscribeToPlatformEvents } from './services/apiClient';
@@ -40,10 +32,40 @@ import {
   clearAllPlatformData
 } from './services/localStore';
 
+// Code-Splitting (React.lazy) para carga ultrarrápida en dispositivos móviles
+const PresupuestosContratosModule = lazy(() => import('./components/PresupuestosContratosModule'));
+const MotorSeoQaModule = lazy(() => import('./components/MotorSeoQaModule'));
+const CrmPortalModule = lazy(() => import('./components/CrmPortalModule'));
+const GestionRentabilidadModule = lazy(() => import('./components/GestionRentabilidadModule'));
+const HeadlessCmsHubModule = lazy(() => import('./components/HeadlessCmsHubModule'));
+const CentroDesarrolloPrdModule = lazy(() => import('./components/CentroDesarrolloPrdModule'));
+const PublicClientPortal = lazy(() => import('./components/PublicClientPortal'));
+const ClientCmsPortal = lazy(() => import('./components/ClientCmsPortal'));
+const ProspectorModule = lazy(() => import('./components/ProspectorModule'));
+
+function ModuleLoadingFallback({ label = 'Cargando módulo...' }) {
+  return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-slate-300">
+      <div className="w-10 h-10 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center animate-pulse mb-3">
+        <Zap className="w-5 h-5 text-orange-400" />
+      </div>
+      <span className="text-xs font-mono text-slate-400">{label}</span>
+    </div>
+  );
+}
+
 export default function App() {
   const [clientPortalToken, setClientPortalToken] = useState(() => {
     if (typeof window !== 'undefined') {
       const match = window.location.pathname.match(/^\/portal\/([a-zA-Z0-9_-]+)/);
+      return match ? match[1] : null;
+    }
+    return null;
+  });
+
+  const [clientCmsToken, setClientCmsToken] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const match = window.location.pathname.match(/^\/cms-cliente\/([a-zA-Z0-9_-]+)/);
       return match ? match[1] : null;
     }
     return null;
@@ -430,16 +452,26 @@ export default function App() {
     }
   };
 
+  if (clientCmsToken) {
+    return (
+      <Suspense fallback={<ModuleLoadingFallback label="Cargando Panel CMS del Sitio Web..." />}>
+        <ClientCmsPortal token={clientCmsToken} />
+      </Suspense>
+    );
+  }
+
   if (clientPortalToken) {
     return (
-      <PublicClientPortal
-        token={clientPortalToken}
-        agencySettings={agencySettings}
-        onBackToAdmin={() => {
-          window.history.pushState({}, '', '/');
-          setClientPortalToken(null);
-        }}
-      />
+      <Suspense fallback={<ModuleLoadingFallback label="Cargando Portal del Cliente..." />}>
+        <PublicClientPortal
+          token={clientPortalToken}
+          agencySettings={agencySettings}
+          onBackToAdmin={() => {
+            window.history.pushState({}, '', '/');
+            setClientPortalToken(null);
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -794,94 +826,96 @@ export default function App() {
 
         {/* MAIN CONTENT AREA */}
         <main className="flex-1 overflow-y-auto p-6 bg-[#080b11]">
-          {activeModule === 'presupuestos' ? (
-            <PresupuestosContratosModule 
-              selectedCountry={selectedCountry}
-              leadToConvert={leadForPresupuesto}
-              onClearLeadConvert={() => setLeadForPresupuesto(null)}
-              initialTab={presupuestosInitialTab}
-              onConvertToFactura={(presupuesto) => {
-                setPresupuestoForFactura(presupuesto);
-                setActiveModule('gestion_rentabilidad');
-              }}
-            />
-          ) : activeModule === 'crm_portal' ? (
-            <CrmPortalModule
-              onConvertToPresupuesto={(lead) => {
-                setLeadForPresupuesto({
-                  id: lead.id,
-                  leadId: lead.leadId || lead.id,
-                  portalToken: lead.portalToken,
-                  presupuestoId: lead.presupuestoId,
-                  nombreEmpresa: lead.empresa,
-                  responsable: lead.contacto,
-                  cargo: lead.cargo,
-                  email: lead.email,
-                  telefono: lead.telefono,
-                  pais: lead.pais,
-                  dominio: lead.dominio,
-                  valorEstimado: lead.valorEstimado
-                });
-                setPresupuestosInitialTab('presupuestos');
-                setActiveModule('presupuestos');
-              }}
-            />
-          ) : activeModule === 'desarrollo_prd' ? (
-            <CentroDesarrolloPrdModule selectedCountry={selectedCountry} />
-          ) : activeModule === 'seo_motor' ? (
-            <MotorSeoQaModule
-              selectedCountry={selectedCountry}
-              initialTab={seoInitialTab}
-            />
-          ) : activeModule === 'headless_cms' ? (
-            <HeadlessCmsHubModule />
-          ) : activeModule === 'gestion_rentabilidad' ? (
-            currentUser?.rol !== 'admin' ? (
-              <div className="p-8 max-w-2xl mx-auto my-12 text-center rounded-2xl bg-[#0f1422] border border-slate-800 space-y-4 shadow-2xl">
-                <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20">
-                  <Lock className="w-8 h-8" />
-                </div>
-                <h2 className="text-xl font-bold text-slate-100">Acceso Restringido a Finanzas & Rentabilidad</h2>
-                <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                  El Módulo de Rentabilidad, P&L, Cuentas Bancarias y Nómina está reservado exclusivamente para usuarios con rol de <strong>Administrador (Víctor Matos)</strong>.
-                </p>
-                <div className="pt-2">
-                  <button
-                    onClick={() => setActiveModule('desarrollo_prd')}
-                    className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs shadow-md transition-all"
-                  >
-                    Volver a Centro de Desarrollo & PRD
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <GestionRentabilidadModule
+          <Suspense fallback={<ModuleLoadingFallback />}>
+            {activeModule === 'presupuestos' ? (
+              <PresupuestosContratosModule 
                 selectedCountry={selectedCountry}
-                presupuestoToBill={presupuestoForFactura}
-                onClearPresupuestoToBill={() => setPresupuestoForFactura(null)}
+                leadToConvert={leadForPresupuesto}
+                onClearLeadConvert={() => setLeadForPresupuesto(null)}
+                initialTab={presupuestosInitialTab}
+                onConvertToFactura={(presupuesto) => {
+                  setPresupuestoForFactura(presupuesto);
+                  setActiveModule('gestion_rentabilidad');
+                }}
+              />
+            ) : activeModule === 'crm_portal' ? (
+              <CrmPortalModule
+                onConvertToPresupuesto={(lead) => {
+                  setLeadForPresupuesto({
+                    id: lead.id,
+                    leadId: lead.leadId || lead.id,
+                    portalToken: lead.portalToken,
+                    presupuestoId: lead.presupuestoId,
+                    nombreEmpresa: lead.empresa,
+                    responsable: lead.contacto,
+                    cargo: lead.cargo,
+                    email: lead.email,
+                    telefono: lead.telefono,
+                    pais: lead.pais,
+                    dominio: lead.dominio,
+                    valorEstimado: lead.valorEstimado
+                  });
+                  setPresupuestosInitialTab('presupuestos');
+                  setActiveModule('presupuestos');
+                }}
+              />
+            ) : activeModule === 'desarrollo_prd' ? (
+              <CentroDesarrolloPrdModule selectedCountry={selectedCountry} />
+            ) : activeModule === 'seo_motor' ? (
+              <MotorSeoQaModule
+                selectedCountry={selectedCountry}
+                initialTab={seoInitialTab}
+              />
+            ) : activeModule === 'headless_cms' ? (
+              <HeadlessCmsHubModule />
+            ) : activeModule === 'gestion_rentabilidad' ? (
+              currentUser?.rol !== 'admin' ? (
+                <div className="p-8 max-w-2xl mx-auto my-12 text-center rounded-2xl bg-[#0f1422] border border-slate-800 space-y-4 shadow-2xl">
+                  <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20">
+                    <Lock className="w-8 h-8" />
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-100">Acceso Restringido a Finanzas & Rentabilidad</h2>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                    El Módulo de Rentabilidad, P&L, Cuentas Bancarias y Nómina está reservado exclusivamente para usuarios con rol de <strong>Administrador (Víctor Matos)</strong>.
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      onClick={() => setActiveModule('desarrollo_prd')}
+                      className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs shadow-md transition-all"
+                    >
+                      Volver a Centro de Desarrollo & PRD
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <GestionRentabilidadModule
+                  selectedCountry={selectedCountry}
+                  presupuestoToBill={presupuestoForFactura}
+                  onClearPresupuestoToBill={() => setPresupuestoForFactura(null)}
+                  onNavigateToPresupuestos={() => {
+                    setPresupuestosInitialTab('presupuestos');
+                    setActiveModule('presupuestos');
+                  }}
+                />
+              )
+            ) : (
+              <ProspectorModule
+                selectedCountry={selectedCountry}
+                activeSubTab={prospectorSubTab}
+                onSubTabChange={(tab) => setProspectorSubTab(tab)}
+                onConvertToPresupuesto={(lead) => {
+                  setLeadForPresupuesto(lead);
+                  setPresupuestosInitialTab('presupuestos');
+                  setActiveModule('presupuestos');
+                }}
+                onNavigateToCrm={() => setActiveModule('crm_portal')}
                 onNavigateToPresupuestos={() => {
                   setPresupuestosInitialTab('presupuestos');
                   setActiveModule('presupuestos');
                 }}
               />
-            )
-          ) : (
-            <ProspectorModule
-              selectedCountry={selectedCountry}
-              activeSubTab={prospectorSubTab}
-              onSubTabChange={(tab) => setProspectorSubTab(tab)}
-              onConvertToPresupuesto={(lead) => {
-                setLeadForPresupuesto(lead);
-                setPresupuestosInitialTab('presupuestos');
-                setActiveModule('presupuestos');
-              }}
-              onNavigateToCrm={() => setActiveModule('crm_portal')}
-              onNavigateToPresupuestos={() => {
-                setPresupuestosInitialTab('presupuestos');
-                setActiveModule('presupuestos');
-              }}
-            />
-          )}
+            )}
+          </Suspense>
         </main>
       </div>
 

@@ -39,6 +39,7 @@ import WireframesStoryBrandModule from './WireframesStoryBrandModule';
 import apiClient from '../services/apiClient';
 import { getStoredProyectos } from '../services/contractGenerator';
 import { syncAllProyectosWithEvents } from '../services/projectMilestoneSync';
+import { getAppStateCloud, saveAppStateCloud, getProyectosCloud } from '../services/firestoreSyncService';
 
 // Generador dinámico de PRD Técnico adaptado al proyecto específico (Playbook Maestro 2026)
 export function generatePrdForProyecto(proyecto, defaultCountry = 'DO') {
@@ -385,9 +386,31 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     }
   };
 
-  // Cargar proyectos al iniciar y escuchar sincronización de almacenamiento
+  // Cargar proyectos y estado de desarrollo desde Firestore Cloud al iniciar
   useEffect(() => {
     fetchProyectos();
+
+    (async () => {
+      try {
+        const [cloudPrd, cloudTasks, cloudVault] = await Promise.all([
+          getAppStateCloud('prd_by_project'),
+          getAppStateCloud('sprint_tasks_by_project'),
+          getAppStateCloud('repo_vault_by_project')
+        ]);
+        if (cloudPrd && typeof cloudPrd === 'object') {
+          const cur = JSON.parse(localStorage.getItem('goglite_prd_by_project') || '{}');
+          localStorage.setItem('goglite_prd_by_project', JSON.stringify({ ...cur, ...cloudPrd }));
+        }
+        if (cloudTasks && typeof cloudTasks === 'object') {
+          const cur = JSON.parse(localStorage.getItem('goglite_sprint_tasks_by_project') || '{}');
+          localStorage.setItem('goglite_sprint_tasks_by_project', JSON.stringify({ ...cur, ...cloudTasks }));
+        }
+        if (cloudVault && typeof cloudVault === 'object') {
+          const cur = JSON.parse(localStorage.getItem('goglite_repo_vault_by_project') || '{}');
+          localStorage.setItem('goglite_repo_vault_by_project', JSON.stringify({ ...cur, ...cloudVault }));
+        }
+      } catch (e) {}
+    })();
 
     const handleStorageChange = () => {
       fetchProyectos();
@@ -481,7 +504,7 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     }
   }, [selectedProyectoId, proyectos, selectedCountry]);
 
-  // Persistir tareas y bóveda en localStorage (aislado por proyecto + fallback global) y sincronizar hitos
+  // Persistir tareas y bóveda en localStorage + Firestore Cloud (aislado por proyecto) y sincronizar hitos
   useEffect(() => {
     try {
       localStorage.setItem('goglite_sprint_tasks', JSON.stringify(sprintTasks));
@@ -490,6 +513,7 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         const byProj = byProjRaw ? JSON.parse(byProjRaw) : {};
         byProj[selectedProyectoId] = sprintTasks;
         localStorage.setItem('goglite_sprint_tasks_by_project', JSON.stringify(byProj));
+        saveAppStateCloud('sprint_tasks_by_project', 'sprint_tasks', byProj).catch(() => {});
       }
       syncAllProyectosWithEvents(sprintTasks, selectedProyectoId || null);
     } catch (e) {}
@@ -503,6 +527,7 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         const vaultByProj = vaultByProjRaw ? JSON.parse(vaultByProjRaw) : {};
         vaultByProj[selectedProyectoId] = repoVault;
         localStorage.setItem('goglite_repo_vault_by_project', JSON.stringify(vaultByProj));
+        saveAppStateCloud('repo_vault_by_project', 'repo_vault', vaultByProj).catch(() => {});
       }
     } catch (e) {}
   }, [repoVault, selectedProyectoId]);

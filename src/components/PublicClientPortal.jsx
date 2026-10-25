@@ -62,7 +62,7 @@ import {
   normalizeFacturaItems 
 } from './GestionRentabilidadModule';
 import { auth } from '../services/firebase';
-import { getPortalCloud, savePortalCloud, subscribePortalCloud, saveProyectoCloud } from '../services/firestoreSyncService';
+import { getPortalCloud, savePortalCloud, subscribePortalCloud, saveProyectoCloud, uploadReceiptToCloudStorage } from '../services/firestoreSyncService';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 function GoogleProtectedCard({
@@ -383,23 +383,34 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     }
   };
 
-  const applyReceiptDataUrl = (finalUrl, fileName, target = 'advance') => {
+  const applyReceiptDataUrl = async (finalUrl, fileName, target = 'advance') => {
+    const activeToken = token || data?.lead?.portalToken || data?.lead?.id || 'general';
+    // Mostrar previsualización inmediata y respaldar en Firebase Cloud Storage
     if (target === 'settlement') {
       setSettlementReceiptImage(finalUrl);
       setSettlementReceiptFileName(fileName);
-      savePortalUpdates({
-        comprobanteLiquidacionImagen: finalUrl,
-        comprobanteLiquidacionNombre: fileName
-      });
     } else {
       setAdvanceReceiptImage(finalUrl);
       setAdvanceReceiptFileName(fileName);
-      savePortalUpdates({
-        comprobanteAnticipoImagen: finalUrl,
+    }
+    showNotification(`✓ Captura del comprobante "${fileName}" cargada y sincronizando en la nube...`);
+
+    const cloudUrl = await uploadReceiptToCloudStorage(finalUrl, fileName, activeToken, target);
+    const persistedUrl = cloudUrl || finalUrl;
+
+    if (target === 'settlement') {
+      setSettlementReceiptImage(persistedUrl);
+      await savePortalUpdates({
+        comprobanteLiquidacionImagen: persistedUrl,
+        comprobanteLiquidacionNombre: fileName
+      });
+    } else {
+      setAdvanceReceiptImage(persistedUrl);
+      await savePortalUpdates({
+        comprobanteAnticipoImagen: persistedUrl,
         comprobanteAnticipoNombre: fileName
       });
     }
-    showNotification(`✓ Captura del comprobante "${fileName}" cargada correctamente.`);
   };
 
   const handleReceiptImageSelect = (e, target = 'advance') => {
@@ -4397,15 +4408,27 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     <span>Visitar Sitio Oficial</span>
                   </a>
                   <a
-                    href="https://goglite-studio-demo.web.app"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex-1 sm:flex-none justify-center px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 border border-slate-700 transition-colors"
+                    href={`/cms-cliente/${token || lead.portalToken || lead.id}`}
+                    className="flex-1 sm:flex-none justify-center px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 border border-orange-500/40 shadow-lg shadow-orange-950/40 transition-colors"
                   >
-                    <Sliders className="w-3.5 h-3.5 text-orange-400" />
-                    <span>Panel CMS / Admin</span>
+                    <Sliders className="w-3.5 h-3.5 text-white" />
+                    <span>Panel CMS Admin</span>
                   </a>
                 </div>
+              </div>
+
+              {/* Aviso de Vigencia de 30 Días del Portal de Entrega de Proyecto */}
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="text-xs text-slate-200 leading-relaxed">
+                  <strong className="text-amber-300 font-bold">Vigencia del Portal de Entrega (30 Días):</strong>{' '}
+                  Este portal de proyecto permanecerá abierto durante 30 días para que descargues tus entregables y archivos desde Google Drive. Para la gestión operativa continua de tu sitio web (textos sencillos, reseñas de Google y Site Kit), utiliza tu <strong>Panel CMS Admin</strong>.
+                </div>
+                <a
+                  href={`/cms-cliente/${token || lead.portalToken || lead.id}`}
+                  className="px-3.5 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-[11px] font-mono border border-amber-500/40 shrink-0 text-center"
+                >
+                  Ir al CMS del Sitio →
+                </a>
               </div>
 
               {/* Quality Audit Badges (Auditadas en Producción / CMS) */}

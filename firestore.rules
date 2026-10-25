@@ -152,6 +152,17 @@ rules_version = '2';
 //   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación)
 //   - updatedBy: string (opcional, máx 128 caracteres)
 //
+// Collection: app_state
+// Document ID: {docId} (ej: 'finanzas_master', 'prd_specs_proj-1', 'storybrand_proj-1', 'qa_audits_proj-1', 'repo_vault')
+// Fields:
+//   - id: string (opcional, máx 128 caracteres, coincide con {docId} si existe, inmutable)
+//   - module: string (opcional, máx 100 caracteres) - Módulo de origen (finanzas, prd, qa, wireframes, repos)
+//   - payload: map | list (opcional) - Estado serializado del módulo para sincronización en tiempo real
+//   - updatedAt: string | timestamp (opcional, máx 50 caracteres si string)
+//   - createdAt: string | timestamp (opcional, máx 50 caracteres si string, inmutable tras creación)
+//   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación)
+//   - updatedBy: string (opcional, máx 128 caracteres)
+//
 // ===============================================================
 
 service cloud.firestore {
@@ -443,6 +454,28 @@ service cloud.firestore {
     }
 
     // ===============================================================
+    // Domain Validators: App State (Sincronización de Módulos)
+    // ===============================================================
+
+    // Validador de estado de módulos de la agencia (Validator Function Pattern)
+    function isValidAppState(data, docId) {
+      return (!('id' in data) || (data.id is string && data.id.size() <= 128 && data.id == docId)) &&
+        (!('module' in data) || (data.module is string && data.module.size() <= 100)) &&
+        (!('payload' in data) || data.payload is map || data.payload is list) &&
+        (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50) || data.updatedAt is timestamp) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50) || data.createdAt is timestamp) &&
+        (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 128)) &&
+        (!('updatedBy' in data) || (data.updatedBy is string && data.updatedBy.size() <= 128));
+    }
+
+    // Inmutabilidad de estado de módulo
+    function isImmutableAppStateDataPreserved() {
+      return (!('id' in resource.data) || request.resource.data.id == resource.data.id) &&
+        (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt) &&
+        (!('createdBy' in resource.data) || request.resource.data.createdBy == resource.data.createdBy);
+    }
+
+    // ===============================================================
     // Collection Rules
     // ===============================================================
 
@@ -464,17 +497,20 @@ service cloud.firestore {
 
     // Colección: Portales confidenciales de clientes de la agencia
     match /portales/{token} {
-      // 1. Lectura pública: Clientes acceden a su portal privado en iPhone/Android mediante token
-      allow read: if true;
+      // 1. Lectura puntual protegida: Clientes acceden a su portal privado en iPhone/Android mediante el token exacto
+      allow get: if true;
 
-      // 2. Creación: Validación de esquema con concordancia estricta de token
+      // 2. Listado restringido: Previene la enumeración masiva de portales por terceros no autenticados
+      allow list: if isAuthenticated();
+
+      // 3. Creación: Validación de esquema con concordancia estricta de token
       allow create: if isValidPortal(request.resource.data, token);
 
-      // 3. Actualización: Validación de esquema e inmutabilidad de token
+      // 4. Actualización: Validación de esquema e inmutabilidad de token
       allow update: if isValidPortal(request.resource.data, token) &&
                     isImmutablePortalDataPreserved();
 
-      // 4. Eliminación: Restringido a administradores
+      // 5. Eliminación: Restringido a administradores
       allow delete: if isAdmin();
     }
 
@@ -539,6 +575,20 @@ service cloud.firestore {
                     isImmutableTaskDataPreserved();
 
       // 4. Eliminación: Restringido a administradores
+      allow delete: if isAdmin();
+    }
+
+    // Colección: Estado y persistencia unificada de módulos internos de la agencia
+    match /app_state/{docId} {
+      // 1. Lectura: Sincronización en tiempo real de finanzas, PRD, wireframes, QA y repositorios
+      allow read: if true;
+
+      // 2. Creación y actualización: Validación de esquema y datos de módulo
+      allow create: if isValidAppState(request.resource.data, docId);
+      allow update: if isValidAppState(request.resource.data, docId) &&
+                    isImmutableAppStateDataPreserved();
+
+      // 3. Eliminación: Restringido a administradores
       allow delete: if isAdmin();
     }
 

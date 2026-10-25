@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import apiClient from '../services/apiClient';
 import { getStoredProyectos, saveStoredProyectos } from '../services/contractGenerator';
+import { getAppStateCloud, saveAppStateCloud, saveProyectoCloud } from '../services/firestoreSyncService';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -482,15 +483,18 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
 
     try {
       localStorage.setItem(`goglite_launch_qa_${selectedProyectoId}`, JSON.stringify(dataToSave));
+      saveAppStateCloud(`launch_qa_${selectedProyectoId}`, 'qa_audits', dataToSave).catch(() => {});
 
-      // Sincronizar dentro del proyecto
+      // Sincronizar dentro del proyecto local y en Firestore
       const projs = getStoredProyectos();
       const updatedProjs = projs.map(p => {
         if (p.id === selectedProyectoId) {
-          return {
+          const nextP = {
             ...p,
             launchQa: dataToSave
           };
+          saveProyectoCloud(nextP).catch(() => {});
+          return nextP;
         }
         return p;
       });
