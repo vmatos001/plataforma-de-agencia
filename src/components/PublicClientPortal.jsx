@@ -66,6 +66,7 @@ function GoogleProtectedCard({
   description,
   clientEmpresa,
   leadEmail,
+  boundClientEmail,
   onAuthenticate,
   loading,
   clientAuthPass,
@@ -75,6 +76,7 @@ function GoogleProtectedCard({
   matchingFactura,
   onViewInvoice
 }) {
+  const displayedAuthorized = boundClientEmail || leadEmail;
   return (
     <div className="rounded-2xl bg-gradient-to-b from-[#0f172a] to-[#090d16] border-2 border-amber-500/40 p-6 sm:p-10 shadow-2xl text-center max-w-2xl mx-auto space-y-6 my-4">
       <div className="relative mx-auto w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-xl shadow-amber-950/50">
@@ -94,6 +96,12 @@ function GoogleProtectedCard({
         <div className="text-xs font-mono text-emerald-400">
           {subtitle} · {clientEmpresa}
         </div>
+        {displayedAuthorized && (
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-900/80 border border-slate-700/80 text-[11px] font-mono text-slate-300">
+            <span className="text-slate-500">Cuenta de Google autorizada:</span>
+            <span className="text-amber-400 font-bold">{displayedAuthorized}</span>
+          </div>
+        )}
         <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
           {description}
         </p>
@@ -458,7 +466,6 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     }
     await savePortalUpdates({
       clienteAutenticado: false,
-      clienteAuthEmail: '',
       clienteAuthProvider: '',
       sesionCerradaProtegida: true
     });
@@ -467,7 +474,6 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       portalConfig: {
         ...(prev?.portalConfig || {}),
         clienteAutenticado: false,
-        clienteAuthEmail: '',
         clienteAuthProvider: '',
         sesionCerradaProtegida: true
       }
@@ -698,7 +704,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const handleRegisterClientAuth = async (provider = 'google') => {
     try {
       setClientAuthLoading(true);
-      let email = clientAuthEmail.trim() || data?.lead?.email || 'cliente@empresa.com';
+      let email = clientAuthEmail.trim() || data?.lead?.email || '';
       let nombre = signerName.trim() || data?.lead?.contacto || data?.lead?.empresa || 'Cliente';
 
       // Si el proveedor seleccionado es Google o Google Workspace, abrir la ventana oficial de Google
@@ -728,15 +734,95 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         }
       }
 
+      const cleanAttemptEmail = (email || '').toLowerCase().trim();
+      if (!cleanAttemptEmail) {
+        alert('Por favor ingresa un correo electrónico válido para autenticarte.');
+        setClientAuthLoading(false);
+        return;
+      }
+
+      // =========================================================================
+      // FILTRO DE SEGURIDAD 1-A-1: UN SOLO CLIENTE A UN SOLO REGISTRO
+      // =========================================================================
+      const agencyEmail = (agencyBranding?.emailContacto || data?.presupuesto?.emisor?.email || 'info@goglite.com').toLowerCase().trim();
+      const isAgency = cleanAttemptEmail.endsWith('@goglite.com') ||
+                       cleanAttemptEmail === 'info@goglite.com' ||
+                       cleanAttemptEmail === 'sitesgoglite@gmail.com' ||
+                       cleanAttemptEmail === 'vmatos001@gmail.com' ||
+                       cleanAttemptEmail === 'victor@goglite.com' ||
+                       cleanAttemptEmail === agencyEmail;
+
+      const leadEmail = (data?.lead?.email || '').toLowerCase().trim();
+      const propEmail = (data?.presupuesto?.cliente?.email || '').toLowerCase().trim();
+      const projEmail = (data?.proyecto?.cliente?.email || '').toLowerCase().trim();
+
+      const boundClientEmail = (
+        data?.portalConfig?.cuentaClienteRegistrada ||
+        data?.lead?.cuentaClienteRegistrada ||
+        data?.portalConfig?.clienteAuthEmail ||
+        ''
+      ).toLowerCase().trim();
+
+      const additionalAuth = Array.isArray(data?.portalConfig?.cuentasAutorizadas)
+        ? data.portalConfig.cuentasAutorizadas.map(e => e.toLowerCase().trim())
+        : (Array.isArray(data?.lead?.cuentasAutorizadas) ? data.lead.cuentasAutorizadas.map(e => e.toLowerCase().trim()) : []);
+
+      let isAuthorized = false;
+      let authRole = 'client';
+
+      if (isAgency) {
+        isAuthorized = true;
+        authRole = 'agency';
+      } else if (boundClientEmail) {
+        // El expediente ya tiene una cuenta de cliente vinculada formalmente:
+        // Solo se permite esa cuenta oficial de cliente (o cuentas adicionales autorizadas)
+        if (cleanAttemptEmail === boundClientEmail || additionalAuth.includes(cleanAttemptEmail)) {
+          isAuthorized = true;
+          authRole = 'client';
+        } else {
+          isAuthorized = false;
+        }
+      } else {
+        // Primera vinculación para este registro:
+        if ((leadEmail && cleanAttemptEmail === leadEmail) || 
+            (propEmail && cleanAttemptEmail === propEmail) || 
+            (projEmail && cleanAttemptEmail === projEmail) || 
+            additionalAuth.includes(cleanAttemptEmail)) {
+          isAuthorized = true;
+          authRole = 'client';
+        } else if (!leadEmail && !propEmail) {
+          // Si el registro se creó sin correo, este primer acceso de cliente queda vinculado
+          isAuthorized = true;
+          authRole = 'client';
+        } else {
+          // El registro tiene un correo oficial (ej: evelin@jaybestservices.com) y el correo que intentó acceder no coincide
+          isAuthorized = false;
+        }
+      }
+
+      if (!isAuthorized) {
+        try {
+          await auth.signOut();
+        } catch (e) {}
+        setClientAuthLoading(false);
+        const expectedAccount = boundClientEmail || leadEmail || propEmail || 'la cuenta oficial del cliente';
+        alert(`⛔ Acceso Denegado (Cuenta No Autorizada)\n\nLa cuenta (${email}) no está autorizada para acceder al expediente de "${clientEmpresa}".\n\nEste portal está reservado exclusivamente para:\n• Cliente Oficial: ${expectedAccount}\n• Personal Administrativo: Goglite Digital\n\nPor favor inicia sesión con la cuenta oficial autorizada.`);
+        return;
+      }
+
+      // Si es acceso de cliente, consolidar permanentemente la cuenta vinculada al registro
+      const newCuentaRegistrada = boundClientEmail || (authRole === 'client' ? cleanAttemptEmail : '');
+
       try {
         await fetch('/api/auth/client-register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             portalToken: token,
-            email,
+            email: cleanAttemptEmail,
             nombre,
-            authProvider: provider
+            authProvider: provider,
+            authRole
           })
         });
       } catch (e) {
@@ -745,8 +831,10 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
       await savePortalUpdates({
         clienteAutenticado: true,
-        clienteAuthEmail: email,
+        clienteAuthEmail: cleanAttemptEmail,
+        cuentaClienteRegistrada: newCuentaRegistrada,
         clienteAuthProvider: provider,
+        clienteAuthRol: authRole,
         sesionCerradaProtegida: false,
         fechaAutenticacion: new Date().toISOString()
       });
@@ -756,21 +844,24 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         portalConfig: {
           ...(prev?.portalConfig || {}),
           clienteAutenticado: true,
-          clienteAuthEmail: email,
+          clienteAuthEmail: cleanAttemptEmail,
+          cuentaClienteRegistrada: newCuentaRegistrada,
           clienteAuthProvider: provider,
+          clienteAuthRol: authRole,
           sesionCerradaProtegida: false,
           fechaAutenticacion: new Date().toISOString()
         }
       }));
 
       setClientAuthSuccess(true);
-      showNotification(`✓ ¡Acceso autorizado verificado para ${email}! Documentos desbloqueados.`);
+      const roleNotice = authRole === 'agency' ? '👑 Acceso Administrativo Verificado' : `✓ Acceso verificado para ${cleanAttemptEmail}`;
+      showNotification(`${roleNotice}. Documentos desbloqueados.`);
       setTimeout(() => {
         setShowClientAuthModal(false);
         setClientAuthSuccess(false);
       }, 1500);
     } catch (err) {
-      alert('Error vinculando cuenta con Google: ' + (err.message || err));
+      alert('Error vinculando cuenta: ' + (err.message || err));
     } finally {
       setClientAuthLoading(false);
     }
@@ -2237,6 +2328,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               description={`Por estrictas políticas de confidencialidad comercial y protección de datos, la propuesta económica y los términos técnicos aprobados de ${clientEmpresa} están protegidos bajo autenticación corporativa de Google. Para acceder a este documento oficial, debes validar tu identidad con tu cuenta autorizada.`}
               clientEmpresa={clientEmpresa}
               leadEmail={lead.email}
+              boundClientEmail={portalConfig?.cuentaClienteRegistrada || portalConfig?.clienteAuthEmail || lead.email}
               onAuthenticate={handleRegisterClientAuth}
               loading={clientAuthLoading}
               clientAuthPass={clientAuthPass}
@@ -2557,6 +2649,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               description={`El Contrato Oficial de Prestación de Servicios Digitales (SOW), las firmas digitales manuscritas y los comprobantes bancarios de ${clientEmpresa} contienen información legal confidencial. Autentica tu cuenta autorizada de Google para consultar o imprimir este contrato formal.`}
               clientEmpresa={clientEmpresa}
               leadEmail={lead.email}
+              boundClientEmail={portalConfig?.cuentaClienteRegistrada || portalConfig?.clienteAuthEmail || lead.email}
               onAuthenticate={handleRegisterClientAuth}
               loading={clientAuthLoading}
               clientAuthPass={clientAuthPass}
