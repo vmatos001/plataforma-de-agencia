@@ -4107,9 +4107,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       <span className="text-[9px] text-emerald-400">SSL Let's Encrypt Activo</span>
                     </div>
 
-                    <div className="p-3.5 rounded-xl bg-[#090d16] border border-slate-800 font-mono text-xs">
+                    <div className="p-3.5 rounded-xl bg-[#090d16] border border-slate-800 font-mono text-xs overflow-hidden">
                       <span className="text-[10px] text-slate-400 block mb-1">Panel Administrativo / CMS:</span>
-                      <div className="text-white">Usuario: <strong className="text-orange-400">admin@{lead.empresa.toLowerCase().replace(/\s+/g, '')}.com</strong></div>
+                      <div className="text-white break-all">Usuario: <strong className="text-orange-400">admin@{lead.empresa.toLowerCase().replace(/\s+/g, '')}.com</strong></div>
                       <div className="text-white">Clave: <strong className="text-emerald-400">Goglite#2026!Secured</strong></div>
                     </div>
 
@@ -4238,13 +4238,13 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
           <div className="space-y-6">
 
             {/* Banner Superior de Producción en Vivo & Conexión al CMS */}
-            <div className="p-6 rounded-2xl bg-gradient-to-r from-[#0d1526] via-[#101b30] to-[#0a101f] border-2 border-emerald-500/40 shadow-xl space-y-4">
+            <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#0d1526] via-[#101b30] to-[#0a101f] border-2 border-emerald-500/40 shadow-xl space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
                     <Globe className="w-5 h-5" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[10px] font-mono font-bold uppercase bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
                         Sitio Oficial en Producción · Conectado al CMS
@@ -4254,7 +4254,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                         SSL 256-bit Activo
                       </span>
                     </div>
-                    <h3 className="text-base sm:text-lg font-extrabold text-white mt-0.5">
+                    <h3 className="text-base sm:text-lg font-extrabold text-white mt-0.5 break-all">
                       https://{(lead.empresa || 'empresa').toLowerCase().replace(/\s+/g, '')}.com
                     </h3>
                   </div>
@@ -4265,7 +4265,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     href={`https://${(lead.empresa || 'empresa').toLowerCase().replace(/\s+/g, '')}.com`}
                     target="_blank"
                     rel="noreferrer"
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all"
+                    className="flex-1 sm:flex-none justify-center px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                     <span>Visitar Sitio Oficial</span>
@@ -4274,7 +4274,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     href="https://goglite-studio-demo.web.app"
                     target="_blank"
                     rel="noreferrer"
-                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 border border-slate-700 transition-colors"
+                    className="flex-1 sm:flex-none justify-center px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 border border-slate-700 transition-colors"
                   >
                     <Sliders className="w-3.5 h-3.5 text-orange-400" />
                     <span>Panel CMS / Admin</span>
@@ -4284,7 +4284,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
               {/* Quality Audit Badges (Auditadas en Producción / CMS) */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
                   <span className="font-bold text-slate-300 font-mono uppercase tracking-wider text-[11px] flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                     <span>Métricas de Rendimiento & Salud Web en Producción</span>
