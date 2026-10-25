@@ -480,15 +480,30 @@ function computeFinanzasSummary(rawState) {
 
   const totalGastosOperativos = gastos.reduce((acc, g) => acc + (Number(g.monto) || 0), 0);
 
-  // Rentabilidad Unitaria por cada Factura / Proyecto
-  const proyectosRentabilidad = facturas.map(f => {
-    const empLower = (f.cliente?.empresa || '').toLowerCase().trim();
+  // Rentabilidad Unitaria consolidada por Proyecto / Cliente
+  // Agrupamos facturas por proyecto para evitar filas duplicadas cuando existen hitos de Anticipo y Saldo Final
+  const projectGroups = new Map();
+  facturas.forEach(f => {
+    const empNormalized = (f.cliente?.empresa || '').toLowerCase().trim();
+    const groupKey = f.proyectoId || f.presupuestoId || (empNormalized ? `client_${empNormalized}` : f.id);
+    if (!projectGroups.has(groupKey)) {
+      projectGroups.set(groupKey, []);
+    }
+    projectGroups.get(groupKey).push(f);
+  });
 
-    // Gastos directos vinculados a este proyecto o cliente
+  const proyectosRentabilidad = Array.from(projectGroups.values()).map(groupFacturas => {
+    const primaryFac = groupFacturas[0];
+    const empLower = (primaryFac.cliente?.empresa || '').toLowerCase().trim();
+    const facturaIds = groupFacturas.map(f => f.id);
+    const numerosList = groupFacturas.map(f => f.numeroFactura).filter(Boolean);
+    const numerosFactura = numerosList.join(' · ');
+
+    // Gastos directos vinculados a este proyecto o cliente (no duplicar)
     const gastosProyecto = gastos
       .filter(g => {
-        if (g.proyectoId && f.proyectoId && g.proyectoId === f.proyectoId) return true;
-        if (g.facturaId && g.facturaId === f.id) return true;
+        if (g.proyectoId && primaryFac.proyectoId && g.proyectoId === primaryFac.proyectoId) return true;
+        if (g.facturaId && facturaIds.includes(g.facturaId)) return true;
         if (g.clienteAsociado && empLower && g.clienteAsociado.toLowerCase().trim() === empLower) return true;
         return false;
       })
@@ -496,18 +511,21 @@ function computeFinanzasSummary(rawState) {
 
     // Horas registradas en Time Tracking para este proyecto o cliente
     const entriesProj = timeEntries.filter(t => {
-      if (t.proyectoId && f.proyectoId && t.proyectoId === f.proyectoId) return true;
+      if (t.proyectoId && primaryFac.proyectoId && t.proyectoId === primaryFac.proyectoId) return true;
+      if (t.facturaId && facturaIds.includes(t.facturaId)) return true;
       if (t.cliente && empLower && t.cliente.toLowerCase().trim() === empLower) return true;
       return false;
     });
 
     const horasRegistradas = entriesProj.reduce((acc, t) => acc + (Number(t.horas) || 0), 0);
-    const horasEstimadas = Number(f.horasInvertidasEstimadas) || 10;
+    const horasEstimadas = Number(primaryFac.horasInvertidasEstimadas) || 10;
     const horasInvertidas = horasRegistradas > 0 ? horasRegistradas : horasEstimadas;
 
     const costeHoras = horasInvertidas * costoHora;
     const costeTotalProyecto = gastosProyecto + costeHoras;
-    const precioVenta = Number(f.total) || 0;
+    const precioVenta = groupFacturas.reduce((acc, f) => acc + (Number(f.total) || 0), 0);
+    const cobrado = groupFacturas.reduce((acc, f) => acc + (Number(f.montoCobrado) || 0), 0);
+    const saldoPendiente = Math.max(0, precioVenta - cobrado);
     const gananciaNeta = precioVenta - costeTotalProyecto;
     const margenUnitario = precioVenta > 0 ? Math.round((gananciaNeta / precioVenta) * 100) : 0;
 
@@ -516,17 +534,20 @@ function computeFinanzasSummary(rawState) {
     const alertaDilucion = tarifaEfectivaHora < Math.round(tarifaObjetivo * 0.7);
 
     return {
-      facturaId: f.id,
-      numeroFactura: f.numeroFactura,
-      proyectoId: f.proyectoId || f.id,
-      presupuestoId: f.presupuestoId || null,
-      origenModulo: f.origenModulo || 'Facturación Directa',
-      cliente: f.cliente?.empresa || 'Cliente',
-      contacto: f.cliente?.contacto || '',
-      pais: f.cliente?.pais || 'SV',
+      facturaId: primaryFac.id,
+      facturaIds,
+      totalFacturasCount: groupFacturas.length,
+      numeroFactura: primaryFac.numeroFactura,
+      numerosFactura,
+      proyectoId: primaryFac.proyectoId || primaryFac.id,
+      presupuestoId: primaryFac.presupuestoId || null,
+      origenModulo: primaryFac.origenModulo || 'Facturación Directa',
+      cliente: primaryFac.cliente?.empresa || 'Cliente',
+      contacto: primaryFac.cliente?.contacto || '',
+      pais: primaryFac.cliente?.pais || 'SV',
       precioVendido: precioVenta,
-      cobrado: Number(f.montoCobrado) || 0,
-      saldoPendiente: Math.max(0, precioVenta - (Number(f.montoCobrado) || 0)),
+      cobrado,
+      saldoPendiente,
       gastosDirectos: gastosProyecto,
       horasEstimadas,
       horasInvertidas,
@@ -719,6 +740,362 @@ export function reconcileInvoiceWithPresupuesto(fac, prop) {
     saldoPendiente: Math.max(0, subtotal - anticipo),
     items
   };
+}
+
+/**
+ * Genera el par de facturas comerciales por hito (Anticipo 50% y Saldo Final 50%)
+ * para un proyecto o presupuesto bajo el estándar B2B de Goglite Agency Suite.
+ */
+export function buildMilestoneInvoices(propOrProj, existingFacturasCount = 0, configuracion = DEFAULT_CONFIGURACION) {
+  if (!propOrProj) return [];
+
+  const subtotalTotal = Number(propOrProj.contrato?.totalInversion) || Number(propOrProj.inversion?.precioTotal) || 300;
+  const anticipoMonto = Number(propOrProj.pagos?.anticipoMonto) || Number(propOrProj.inversion?.anticipo) || Math.round(subtotalTotal * 0.5);
+  const saldoMonto = Number(propOrProj.pagos?.saldoMonto) || (subtotalTotal - anticipoMonto);
+
+  const pais = propOrProj.pais || (propOrProj.cliente?.ubicacion?.toLowerCase().includes('dominicana') ? 'DO' : 'SV');
+  const projId = propOrProj.id || propOrProj.proyectoId || Date.now();
+  const presId = propOrProj.presupuestoId || (propOrProj.inversion ? propOrProj.id : null);
+  const projCode = propOrProj.codigo || propOrProj.presupuestoCodigo || `CON-2026-${String(existingFacturasCount + 1).padStart(3, '0')}`;
+  const presCode = propOrProj.presupuestoCodigo || propOrProj.codigo || `P-2026-${String(existingFacturasCount + 1).padStart(3, '0')}`;
+
+  const cleanModuleTitle = (t) => (t || '')
+    .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '')
+    .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\)/gi, '')
+    .trim();
+
+  const modulosNombres = Array.isArray(propOrProj.modulos || propOrProj.contrato?.modulos) && (propOrProj.modulos || propOrProj.contrato?.modulos).length > 0
+    ? (propOrProj.modulos || propOrProj.contrato?.modulos).map(m => `${m.numero ? m.numero + ': ' : ''}${cleanModuleTitle(m.titulo)}`).join(' · ')
+    : '';
+
+  const itemDescripcion = propOrProj.portada?.proyecto
+    ? `${propOrProj.titulo || 'Solución Web Corporativa VIP'}: ${propOrProj.portada.proyecto}`
+    : (modulosNombres
+        ? `${propOrProj.titulo || 'Desarrollo Digital VIP'} (${modulosNombres})`
+        : (propOrProj.titulo || propOrProj.contrato?.alcanceResumen || 'Desarrollo de Sistema Digital Web & Posicionamiento IA'));
+
+  const horasEstimadas = Math.max(5, Math.round(subtotalTotal / 50));
+  const today = new Date().toISOString().split('T')[0];
+  const due = new Date(Date.now() + (Number(propOrProj.vigenciaDias) || 15) * 86400000).toISOString().split('T')[0];
+
+  const metodoPago = (() => {
+    const c = normalizeCuentasBancarias(configuracion?.cuentasBancarias);
+    const m = c.find(item => item.pais === pais && item.activa && item.predeterminada) || c.find(item => item.pais === pais && item.activa) || c[0];
+    return m?.banco || 'Transferencia Bancaria';
+  })();
+
+  const cuentaBancariaId = (() => {
+    const c = normalizeCuentasBancarias(configuracion?.cuentasBancarias);
+    const m = c.find(item => item.pais === pais && item.activa && item.predeterminada) || c.find(item => item.pais === pais && item.activa) || c[0];
+    return m?.id || null;
+  })();
+
+  const isAnticipoPaid = propOrProj.pagos?.anticipoEstado === 'confirmado' || propOrProj.anticipoPagado === true;
+  const isSaldoPaid = propOrProj.pagos?.saldoEstado === 'confirmado' || propOrProj.portalConfig?.fase4Liquidada === true || propOrProj.portalConfig?.liquidacionPagada === true;
+
+  const num1 = String(existingFacturasCount + 1).padStart(3, '0');
+  const num2 = String(existingFacturasCount + 2).padStart(3, '0');
+
+  const facAnticipo = {
+    id: `fac-${projId}-anticipo`,
+    numeroFactura: `FAC-2026-${num1}`,
+    tipoHito: 'anticipo',
+    presupuestoId: presId,
+    codigoPresupuesto: presCode,
+    proyectoId: `proj-${projId}`,
+    codigoProyecto: projCode,
+    origenModulo: `Módulo 4 · Contrato ${projCode} (Anticipo 50%)`,
+    cliente: {
+      empresa: propOrProj.cliente?.empresa || 'Cliente de Agencia',
+      contacto: propOrProj.cliente?.nombre || propOrProj.cliente?.contacto || 'Director',
+      email: propOrProj.cliente?.email || '',
+      telefono: propOrProj.cliente?.telefono || '',
+      identificacion: propOrProj.cliente?.identificacion || 'ID Fiscal Comercial',
+      pais
+    },
+    concepto: `Anticipo Inicial (50%) · ${cleanModuleTitle(propOrProj.titulo || propOrProj.contrato?.alcanceResumen || 'Desarrollo Web VIP')}`,
+    fechaEmision: propOrProj.pagos?.anticipoFecha || today,
+    fechaVencimiento: due,
+    subtotal: anticipoMonto,
+    impuestoPorcentaje: 0,
+    impuestoTotal: 0,
+    total: anticipoMonto,
+    moneda: propOrProj.moneda || 'USD',
+    montoCobrado: isAnticipoPaid ? anticipoMonto : 0,
+    saldoPendiente: isAnticipoPaid ? 0 : anticipoMonto,
+    estado: isAnticipoPaid ? 'cobrada' : 'pendiente',
+    metodoPago,
+    cuentaBancariaId,
+    horasInvertidasEstimadas: Math.round(horasEstimadas / 2),
+    items: [
+      {
+        id: 'item-anticipo',
+        descripcion: `Anticipo Inicial (50%) - Inicio de Desarrollo Web VIP, Estructura & Setup Técnico (${itemDescripcion})`,
+        cantidad: 1,
+        precioUnitario: anticipoMonto,
+        total: anticipoMonto
+      }
+    ]
+  };
+
+  const facSaldo = {
+    id: `fac-${projId}-saldo`,
+    numeroFactura: `FAC-2026-${num2}`,
+    tipoHito: 'saldo',
+    presupuestoId: presId,
+    codigoPresupuesto: presCode,
+    proyectoId: `proj-${projId}`,
+    codigoProyecto: projCode,
+    origenModulo: `Módulo 4 · Contrato ${projCode} (Saldo 50%)`,
+    cliente: { ...facAnticipo.cliente },
+    concepto: `Saldo Final & Liquidación de Cierre (50%) · ${cleanModuleTitle(propOrProj.titulo || propOrProj.contrato?.alcanceResumen || 'Desarrollo Web VIP')}`,
+    fechaEmision: propOrProj.pagos?.saldoFecha || today,
+    fechaVencimiento: due,
+    subtotal: saldoMonto,
+    impuestoPorcentaje: 0,
+    impuestoTotal: 0,
+    total: saldoMonto,
+    moneda: propOrProj.moneda || 'USD',
+    montoCobrado: isSaldoPaid ? saldoMonto : 0,
+    saldoPendiente: isSaldoPaid ? 0 : saldoMonto,
+    estado: isSaldoPaid ? 'cobrada' : 'pendiente',
+    metodoPago,
+    cuentaBancariaId,
+    horasInvertidasEstimadas: Math.round(horasEstimadas / 2),
+    items: [
+      {
+        id: 'item-saldo',
+        descripcion: `Saldo Final & Liquidación de Cierre (50%) - Entrega Oficial, Despliegue en Producción & Cesión de Accesos (${itemDescripcion})`,
+        cantidad: 1,
+        precioUnitario: saldoMonto,
+        total: saldoMonto
+      }
+    ]
+  };
+
+  return [facAnticipo, facSaldo];
+}
+
+/**
+ * Reconcilia la lista de facturas en memoria y localStorage para asegurar que
+ * cualquier proyecto con esquema de pagos (Anticipo 50% + Cierre 50%) tenga sus
+ * dos facturas individuales e independientes en el historial del cliente.
+ */
+export function reconcileMilestoneInvoices(currentFacturas = [], configuracion = DEFAULT_CONFIGURACION) {
+  if (!Array.isArray(currentFacturas)) return [];
+
+  let proyectos = [];
+  let presupuestos = [];
+  try {
+    if (typeof window !== 'undefined') {
+      const rawProj = localStorage.getItem('goglite_proyectos');
+      if (rawProj) proyectos = JSON.parse(rawProj);
+      const rawPres = localStorage.getItem('goglite_presupuestos');
+      if (rawPres) presupuestos = JSON.parse(rawPres);
+    }
+  } catch (e) {}
+
+  let facturas = [...currentFacturas];
+  let modified = false;
+
+  const getNextInvoiceNum = (existingList) => {
+    let maxNum = 0;
+    existingList.forEach(f => {
+      const m = (f.numeroFactura || '').match(/FAC-\d{4}-(\d+)/);
+      if (m && m[1]) {
+        const n = parseInt(m[1], 10);
+        if (n > maxNum) maxNum = n;
+      }
+    });
+    return String(Math.max(maxNum + 1, existingList.length + 1)).padStart(3, '0');
+  };
+
+  // 1. Reconciliar contra proyectos en goglite_proyectos
+  if (Array.isArray(proyectos)) {
+    proyectos.forEach(proj => {
+      if (!proj) return;
+      const projEmp = (proj.cliente?.empresa || '').toLowerCase().trim();
+      const projId = proj.id;
+      const projCode = proj.codigo || proj.presupuestoCodigo;
+      const presId = proj.presupuestoId;
+
+      const totalInversion = Number(proj.contrato?.totalInversion) || 300;
+      const anticipoMonto = Number(proj.pagos?.anticipoMonto) || Math.round(totalInversion * 0.5);
+      const saldoMonto = Number(proj.pagos?.saldoMonto) || (totalInversion - anticipoMonto);
+      const isAnticipoPaid = proj.pagos?.anticipoEstado === 'confirmado';
+      const isSaldoPaid = proj.pagos?.saldoEstado === 'confirmado';
+
+      const cleanTitle = (proj.contrato?.alcanceResumen || proj.titulo || 'Desarrollo Digital VIP')
+        .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '')
+        .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\)/gi, '')
+        .trim();
+
+      const matched = facturas.filter(f => {
+        if (projId && (f.proyectoId === projId || f.id === `fac-${projId}` || f.id.startsWith(`fac-${projId}`))) return true;
+        if (presId && f.presupuestoId === presId) return true;
+        if (projCode && (f.codigoProyecto === projCode || f.codigoPresupuesto === projCode)) return true;
+        if (projEmp && f.cliente?.empresa && f.cliente.empresa.toLowerCase().trim() === projEmp) return true;
+        return false;
+      });
+
+      if (matched.length === 1) {
+        // Había 1 sola factura monolítica (el caso exacto del usuario): la dividimos en Anticipo y Saldo
+        const f1 = matched[0];
+        const f1Idx = facturas.findIndex(f => f.id === f1.id);
+
+        const updatedF1 = {
+          ...f1,
+          tipoHito: 'anticipo',
+          subtotal: anticipoMonto,
+          total: anticipoMonto,
+          montoCobrado: isAnticipoPaid ? anticipoMonto : Math.min(anticipoMonto, Number(f1.montoCobrado) || 0),
+          saldoPendiente: isAnticipoPaid ? 0 : Math.max(0, anticipoMonto - (Number(f1.montoCobrado) || 0)),
+          estado: (isAnticipoPaid || Number(f1.montoCobrado) >= anticipoMonto) ? 'cobrada' : 'pendiente',
+          concepto: f1.concepto?.includes('Anticipo') ? f1.concepto : `Anticipo Inicial (50%) · ${cleanTitle || f1.concepto || 'Desarrollo Web VIP'}`,
+          origenModulo: `Módulo 4 · Contrato ${projCode || ''} (Anticipo 50%)`,
+          items: [
+            {
+              id: 'item-anticipo',
+              descripcion: `Anticipo Inicial (50%) - Inicio de Desarrollo Web VIP (${cleanTitle})`,
+              cantidad: 1,
+              precioUnitario: anticipoMonto,
+              total: anticipoMonto
+            }
+          ]
+        };
+        if (f1Idx >= 0) facturas[f1Idx] = updatedF1;
+
+        const num2 = getNextInvoiceNum(facturas);
+        const facSaldo = {
+          id: `${f1.id}-saldo`,
+          numeroFactura: `FAC-2026-${num2}`,
+          tipoHito: 'saldo',
+          proyectoId: f1.proyectoId || projId,
+          codigoProyecto: f1.codigoProyecto || projCode,
+          presupuestoId: f1.presupuestoId || presId,
+          codigoPresupuesto: f1.codigoPresupuesto || proj.presupuestoCodigo || projCode,
+          origenModulo: `Módulo 4 · Contrato ${projCode || ''} (Saldo 50%)`,
+          cliente: { ...f1.cliente },
+          concepto: `Saldo Final & Liquidación de Cierre (50%) · ${cleanTitle}`,
+          fechaEmision: proj.pagos?.saldoFecha || f1.fechaEmision || new Date().toISOString().split('T')[0],
+          fechaVencimiento: f1.fechaVencimiento || new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+          subtotal: saldoMonto,
+          impuestoPorcentaje: 0,
+          impuestoTotal: 0,
+          total: saldoMonto,
+          moneda: f1.moneda || 'USD',
+          montoCobrado: (isSaldoPaid || Number(f1.montoCobrado) >= totalInversion) ? saldoMonto : 0,
+          saldoPendiente: (isSaldoPaid || Number(f1.montoCobrado) >= totalInversion) ? 0 : saldoMonto,
+          estado: (isSaldoPaid || Number(f1.montoCobrado) >= totalInversion) ? 'cobrada' : 'pendiente',
+          metodoPago: f1.metodoPago || 'Transferencia Bancaria',
+          cuentaBancariaId: f1.cuentaBancariaId,
+          horasInvertidasEstimadas: f1.horasInvertidasEstimadas || 10,
+          items: [
+            {
+              id: 'item-saldo',
+              descripcion: `Saldo Final & Liquidación de Cierre (50%) - Entrega Oficial & Despliegue en Producción (${cleanTitle})`,
+              cantidad: 1,
+              precioUnitario: saldoMonto,
+              total: saldoMonto
+            }
+          ]
+        };
+        facturas.push(facSaldo);
+        modified = true;
+      } else if (matched.length >= 2) {
+        // Ya existen 2 o más facturas: sincronizar estados de cobro con pagos del proyecto
+        matched.forEach(fac => {
+          const idx = facturas.findIndex(f => f.id === fac.id);
+          if (idx < 0) return;
+          const isSaldo = fac.tipoHito === 'saldo' || fac.id.endsWith('-saldo') || fac.concepto?.toLowerCase().includes('saldo') || fac.concepto?.toLowerCase().includes('liquidaci');
+          const isAnticipo = fac.tipoHito === 'anticipo' || fac.id.endsWith('-anticipo') || fac.concepto?.toLowerCase().includes('anticipo') || !isSaldo;
+
+          if (isSaldo && isSaldoPaid && fac.estado !== 'cobrada') {
+            facturas[idx] = {
+              ...fac,
+              tipoHito: 'saldo',
+              montoCobrado: Number(fac.total) || saldoMonto,
+              saldoPendiente: 0,
+              estado: 'cobrada'
+            };
+            modified = true;
+          } else if (isAnticipo && isAnticipoPaid && fac.estado !== 'cobrada') {
+            facturas[idx] = {
+              ...fac,
+              tipoHito: 'anticipo',
+              montoCobrado: Number(fac.total) || anticipoMonto,
+              saldoPendiente: 0,
+              estado: 'cobrada'
+            };
+            modified = true;
+          }
+        });
+      }
+    });
+  }
+
+  // 2. Reconciliar también presupuestos aceptados si no están en proyectos
+  if (Array.isArray(presupuestos)) {
+    presupuestos.forEach(prop => {
+      if (prop.estado !== 'aceptado') return;
+      const propEmp = (prop.cliente?.empresa || '').toLowerCase().trim();
+      const matched = facturas.filter(f => 
+        (prop.id && f.presupuestoId === prop.id) ||
+        (prop.codigo && f.codigoPresupuesto === prop.codigo) ||
+        (propEmp && f.cliente?.empresa && f.cliente.empresa.toLowerCase().trim() === propEmp)
+      );
+
+      if (matched.length === 1 && (Number(matched[0].total) > (Number(prop.inversion?.anticipo) || 150))) {
+        // Monolítica: dividirla
+        const f1 = matched[0];
+        const f1Idx = facturas.findIndex(f => f.id === f1.id);
+        const subtotalTotal = Number(prop.inversion?.precioTotal) || Number(f1.total) || 300;
+        const anticipoMonto = Number(prop.inversion?.anticipo) || Math.round(subtotalTotal * 0.5);
+        const saldoMonto = subtotalTotal - anticipoMonto;
+
+        const updatedF1 = {
+          ...f1,
+          tipoHito: 'anticipo',
+          subtotal: anticipoMonto,
+          total: anticipoMonto,
+          concepto: `Anticipo Inicial (50%) · ${f1.concepto.replace(/^Anticipo Inicial \(50%\) · /i, '')}`,
+          items: [{ id: 'item-anticipo', descripcion: `Anticipo Inicial (50%) - ${f1.items?.[0]?.descripcion || 'Desarrollo Web VIP'}`, cantidad: 1, precioUnitario: anticipoMonto, total: anticipoMonto }]
+        };
+        if (f1Idx >= 0) facturas[f1Idx] = updatedF1;
+
+        const num2 = getNextInvoiceNum(facturas);
+        const facSaldo = {
+          ...f1,
+          id: `${f1.id}-saldo`,
+          numeroFactura: `FAC-2026-${num2}`,
+          tipoHito: 'saldo',
+          concepto: `Saldo Final & Liquidación de Cierre (50%) · ${f1.concepto.replace(/^Anticipo Inicial \(50%\) · /i, '')}`,
+          subtotal: saldoMonto,
+          total: saldoMonto,
+          montoCobrado: (Number(f1.montoCobrado) >= subtotalTotal) ? saldoMonto : 0,
+          saldoPendiente: (Number(f1.montoCobrado) >= subtotalTotal) ? 0 : saldoMonto,
+          estado: (Number(f1.montoCobrado) >= subtotalTotal) ? 'cobrada' : 'pendiente',
+          items: [{ id: 'item-saldo', descripcion: `Saldo Final & Liquidación de Cierre (50%) - Entrega Oficial & Despliegue`, cantidad: 1, precioUnitario: saldoMonto, total: saldoMonto }]
+        };
+        facturas.push(facSaldo);
+        modified = true;
+      }
+    });
+  }
+
+  if (modified && typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('goglite_facturas', JSON.stringify(facturas));
+      const rawFin = localStorage.getItem('goglite_finanzas_v1');
+      if (rawFin) {
+        const parsed = JSON.parse(rawFin);
+        parsed.facturas = facturas;
+        localStorage.setItem('goglite_finanzas_v1', JSON.stringify(parsed));
+      }
+    } catch (e) {}
+  }
+
+  return facturas;
 }
 
 /**
@@ -1177,8 +1554,10 @@ export default function GestionRentabilidadModule({
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed && typeof parsed === 'object') {
+            const rawFacturas = Array.isArray(parsed.facturas) ? parsed.facturas.map(normalizeFacturaItems) : [];
+            const reconciledFacturas = reconcileMilestoneInvoices(rawFacturas, parsed.configuracion || DEFAULT_CONFIGURACION);
             return {
-              facturas: Array.isArray(parsed.facturas) ? parsed.facturas.map(normalizeFacturaItems) : [],
+              facturas: reconciledFacturas,
               gastos: Array.isArray(parsed.gastos) ? parsed.gastos : [],
               timeEntries: Array.isArray(parsed.timeEntries) ? parsed.timeEntries : [],
               configuracion: {
@@ -1427,11 +1806,10 @@ export default function GestionRentabilidadModule({
       const parsedM1 = rawM1 ? JSON.parse(rawM1) : [];
       if (Array.isArray(parsedM1)) setM1ScrapperLeads(parsedM1);
 
-      // Auto-importar presupuestos aceptados del Módulo 3 que aún no tengan factura en Módulo 7
+      // Auto-importar presupuestos aceptados del Módulo 3 y asegurar dos facturas por hito (Anticipo 50% + Saldo 50%)
       if (Array.isArray(parsedM3) && parsedM3.length > 0) {
         setFinanzasState(prev => {
-          const currentFacturas = [...(prev.facturas || [])];
-          let added = 0;
+          let currentFacturas = [...(prev.facturas || [])];
 
           parsedM3.forEach(prop => {
             if (prop.estado === 'aceptado') {
@@ -1442,23 +1820,51 @@ export default function GestionRentabilidadModule({
                       f.cliente.empresa.toLowerCase().trim() === prop.cliente.empresa.toLowerCase().trim())
               );
               if (!alreadyExists) {
-                const newFac = buildInvoiceFromPresupuesto(prop, currentFacturas.length, prev.configuracion);
-                currentFacturas.unshift(newFac);
-                added++;
+                const milestoneInvoices = buildMilestoneInvoices(prop, currentFacturas.length, prev.configuracion);
+                currentFacturas.unshift(...milestoneInvoices);
               }
             }
           });
 
-          if (added > 0) {
-            return { ...prev, facturas: currentFacturas };
-          }
-          return prev;
+          const reconciled = reconcileMilestoneInvoices(currentFacturas, prev.configuracion);
+          return { ...prev, facturas: reconciled };
         });
+      } else {
+        setFinanzasState(prev => ({
+          ...prev,
+          facturas: reconcileMilestoneInvoices(prev.facturas || [], prev.configuracion)
+        }));
       }
     } catch (e) {
       console.warn('Error cargando módulos retrospectivos 1-3:', e);
     }
   };
+
+  // Escuchar eventos en vivo desde Módulo 4 (Contratos & Pagos) para sincronizar facturas por hito en 0ms
+  useEffect(() => {
+    const handleSyncFromEvents = () => {
+      try {
+        let stored = [];
+        const raw = localStorage.getItem('goglite_facturas');
+        if (raw) stored = JSON.parse(raw);
+        if (Array.isArray(stored)) {
+          setFinanzasState(prev => ({
+            ...prev,
+            facturas: reconcileMilestoneInvoices(stored.map(normalizeFacturaItems), prev.configuracion)
+          }));
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('goglite_facturas_updated', handleSyncFromEvents);
+    window.addEventListener('goglite_proyectos_synced', handleSyncFromEvents);
+    window.addEventListener('storage', handleSyncFromEvents);
+    return () => {
+      window.removeEventListener('goglite_facturas_updated', handleSyncFromEvents);
+      window.removeEventListener('goglite_proyectos_synced', handleSyncFromEvents);
+      window.removeEventListener('storage', handleSyncFromEvents);
+    };
+  }, []);
 
   // Si el usuario pulsó "Facturar M4" desde un presupuesto en el Módulo 3
   useEffect(() => {
@@ -2649,6 +3055,7 @@ export default function GestionRentabilidadModule({
     // Filtro contextual por cliente (cuando se pulsa 'Ver Factura' en Rentabilidad Unitaria)
     const matchClient = !facturaClientFilter || (() => {
       if (typeof facturaClientFilter === 'object' && facturaClientFilter !== null) {
+        if (Array.isArray(facturaClientFilter.facturaIds) && facturaClientFilter.facturaIds.includes(f.id)) return true;
         if (facturaClientFilter.facturaId && f.id === facturaClientFilter.facturaId) return true;
         if (facturaClientFilter.proyectoId && f.proyectoId && f.proyectoId === facturaClientFilter.proyectoId) return true;
         if (facturaClientFilter.presupuestoId && f.presupuestoId && f.presupuestoId === facturaClientFilter.presupuestoId) return true;
@@ -3106,7 +3513,7 @@ export default function GestionRentabilidadModule({
                       <td className="p-3">
                         <div className="font-bold text-white">{p.cliente}</div>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] text-orange-400 font-mono font-semibold">{p.numeroFactura}</span>
+                          <span className="text-[10px] text-orange-400 font-mono font-semibold">{p.numerosFactura || p.numeroFactura}</span>
                           <span className="text-[10px] text-slate-500">· {p.origenModulo}</span>
                         </div>
                       </td>
@@ -3146,10 +3553,11 @@ export default function GestionRentabilidadModule({
                       <td className="p-3 text-right">
                         <button
                           onClick={() => {
-                            const found = facturas.find(f => f.id === p.facturaId);
+                            const found = facturas.find(f => (p.facturaIds && p.facturaIds.includes(f.id)) || f.id === p.facturaId);
                             setFacturaClientFilter({
                               nombre: p.cliente,
                               facturaId: p.facturaId,
+                              facturaIds: p.facturaIds,
                               proyectoId: p.proyectoId,
                               presupuestoId: p.presupuestoId
                             });
@@ -3162,9 +3570,9 @@ export default function GestionRentabilidadModule({
                             setActiveTab('facturas');
                           }}
                           className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
-                          title={`Ver historial de facturas de ${p.cliente}`}
+                          title={`Ver historial de facturas (${p.totalFacturasCount || 1}) de ${p.cliente}`}
                         >
-                          Ver Factura
+                          {p.totalFacturasCount > 1 ? `Ver Facturas (${p.totalFacturasCount})` : 'Ver Factura'}
                         </button>
                       </td>
                     </tr>
@@ -4084,7 +4492,7 @@ export default function GestionRentabilidadModule({
                     <tr key={p.facturaId} className="hover:bg-slate-800/30 transition-colors">
                       <td className="p-3">
                         <div className="font-semibold text-white">{p.cliente}</div>
-                        <div className="text-[10px] font-mono text-slate-500">{p.numeroFactura}</div>
+                        <div className="text-[10px] font-mono text-slate-500">{p.numerosFactura || p.numeroFactura}</div>
                       </td>
                       <td className="p-3">
                         <span className="text-xs">{p.pais === 'SV' ? '🇸🇻 SV' : '🇩🇴 DO'}</span>

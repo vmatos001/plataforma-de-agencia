@@ -67,6 +67,8 @@ import {
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 import {
   buildInvoiceFromPresupuesto,
+  buildMilestoneInvoices,
+  reconcileMilestoneInvoices,
   reconcileInvoiceWithPresupuesto,
   normalizeFacturaItems,
   buildCorporateInvoiceHtml,
@@ -1032,6 +1034,25 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       return next;
     });
 
+    // Sincronizar en tiempo real las facturas de Anticipo y Saldo en goglite_facturas
+    try {
+      let storedFacturas = [];
+      const rawFac = localStorage.getItem('goglite_facturas');
+      if (rawFac) storedFacturas = JSON.parse(rawFac);
+      const reconciled = reconcileMilestoneInvoices(storedFacturas, getInvoiceConfiguracion());
+      localStorage.setItem('goglite_facturas', JSON.stringify(reconciled));
+
+      const rawFin = localStorage.getItem('goglite_finanzas_v1');
+      if (rawFin) {
+        const parsedFin = JSON.parse(rawFin);
+        parsedFin.facturas = reconciled;
+        localStorage.setItem('goglite_finanzas_v1', JSON.stringify(parsedFin));
+      }
+      window.dispatchEvent(new CustomEvent('goglite_facturas_updated', { detail: { proyectoId: updatedProj.id, tipoPago } }));
+    } catch (e) {
+      console.warn('Error sincronizando facturas por hito en pago:', e);
+    }
+
     // Sincronizar todas las llaves de portal existentes en localStorage
     if (tipoPago === 'saldo') {
       syncPortalStorageForProyecto(updatedProj, {
@@ -1108,7 +1129,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     };
   };
 
-  // Obtiene o construye la factura vinculada al proyecto activo para auditoría y descarga
+  // Obtiene o construye la factura vinculada al proyecto activo para auditoría y descarga por hito
   const getInvoiceForProyecto = (proj = activeProyecto, tipoVista = 'general') => {
     if (!proj) return null;
 
@@ -1118,71 +1139,69 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       if (raw) storedFacturas = JSON.parse(raw);
     } catch (e) {}
 
+    // 1. Reconciliar para asegurar que los dos hitos (anticipo y saldo) existen de forma independiente
+    storedFacturas = reconcileMilestoneInvoices(storedFacturas, getInvoiceConfiguracion());
+
     const targetPresupuestoId = proj.presupuestoId;
     const targetCodigo = proj.presupuestoCodigo || proj.codigo;
     const targetEmpresa = proj.cliente?.empresa?.toLowerCase().trim();
 
-    let found = null;
-    if (Array.isArray(storedFacturas) && storedFacturas.length > 0) {
-      found = storedFacturas.find(f => 
-        (targetPresupuestoId && (f.presupuestoId === targetPresupuestoId || f.id === targetPresupuestoId)) ||
-        (targetCodigo && (f.codigoPresupuesto === targetCodigo || f.numeroFactura?.includes(targetCodigo) || f.codigoProyecto === targetCodigo)) ||
-        (targetEmpresa && f.cliente?.empresa && f.cliente.empresa.toLowerCase().trim() === targetEmpresa)
-      );
-    }
-
-    const prop = presupuestos.find(p => 
-      p.id === proj.presupuestoId || 
-      p.codigo === proj.presupuestoCodigo || 
-      (targetEmpresa && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmpresa)
+    // Buscar todas las facturas que pertenezcan a este proyecto
+    const matchedFacturas = (storedFacturas || []).filter(f => 
+      (targetPresupuestoId && (f.presupuestoId === targetPresupuestoId || f.id === targetPresupuestoId)) ||
+      (targetCodigo && (f.codigoPresupuesto === targetCodigo || f.numeroFactura?.includes(targetCodigo) || f.codigoProyecto === targetCodigo)) ||
+      (targetEmpresa && f.cliente?.empresa && f.cliente.empresa.toLowerCase().trim() === targetEmpresa)
     );
 
+    let found = null;
+    if (tipoVista === 'anticipo') {
+      found = matchedFacturas.find(f => f.tipoHito === 'anticipo' || f.id.endsWith('-anticipo') || f.concepto?.toLowerCase().includes('anticipo'));
+    } else if (tipoVista === 'saldo') {
+      found = matchedFacturas.find(f => f.tipoHito === 'saldo' || f.id.endsWith('-saldo') || f.concepto?.toLowerCase().includes('saldo') || f.concepto?.toLowerCase().includes('liquidaci'));
+    }
+
+    if (!found && matchedFacturas.length > 0) {
+      found = matchedFacturas[0];
+    }
+
+    // Si aún no existe en el almacenamiento, generamos el par de hitos oficial
     if (!found) {
-      if (prop) {
-        found = buildInvoiceFromPresupuesto(prop, storedFacturas.length, getInvoiceConfiguracion());
+      const milestones = buildMilestoneInvoices(proj, storedFacturas.length, getInvoiceConfiguracion());
+      if (tipoVista === 'saldo') {
+        found = milestones[1] || milestones[0];
       } else {
-        found = buildInvoiceFromPresupuesto({
-          id: proj.presupuestoId || proj.id,
-          codigo: proj.presupuestoCodigo || proj.codigo || 'P-2026-001',
-          titulo: proj.contrato?.alcanceResumen || 'Desarrollo de Solución Digital Web VIP',
-          cliente: proj.cliente,
-          pais: proj.pais || 'SV',
-          inversion: {
-            precioTotal: proj.contrato?.totalInversion || 300,
-            anticipo: proj.pagos?.anticipoMonto || Math.round((proj.contrato?.totalInversion || 300) * 0.5),
-            contraEntrega: proj.pagos?.saldoMonto || (proj.contrato?.totalInversion || 300) - (proj.pagos?.anticipoMonto || 150)
-          },
-          modulos: proj.contrato?.modulos || []
-        }, storedFacturas.length, getInvoiceConfiguracion());
+        found = milestones[0];
       }
-    } else if (prop) {
-      found = reconcileInvoiceWithPresupuesto(found, prop);
+      if (found) {
+        storedFacturas.push(found);
+        try {
+          localStorage.setItem('goglite_facturas', JSON.stringify(storedFacturas));
+        } catch (e) {}
+      }
     }
 
     if (found) {
       found = { ...normalizeFacturaItems(found) };
-      const totalMonto = Number(found.total) || Number(found.subtotal) || 300;
-      const anticipoMonto = Number(proj.pagos?.anticipoMonto) || Math.round(totalMonto * 0.5);
+      const isAnticipoConfirmado = proj.pagos?.anticipoEstado === 'confirmado';
+      const isSaldoConfirmado = proj.pagos?.saldoEstado === 'confirmado';
 
-      if (tipoVista === 'anticipo') {
-        const isAnticipoConfirmado = proj.pagos?.anticipoEstado === 'confirmado';
-        found.montoCobrado = isAnticipoConfirmado ? anticipoMonto : 0;
-        found.saldoPendiente = isAnticipoConfirmado ? Math.max(0, totalMonto - anticipoMonto) : totalMonto;
-        found.estado = isAnticipoConfirmado ? 'parcial' : 'pendiente';
-      } else if (tipoVista === 'saldo') {
-        const isSaldoConfirmado = proj.pagos?.saldoEstado === 'confirmado';
-        found.montoCobrado = isSaldoConfirmado ? totalMonto : anticipoMonto;
-        found.saldoPendiente = isSaldoConfirmado ? 0 : Math.max(0, totalMonto - anticipoMonto);
-        found.estado = isSaldoConfirmado ? 'cobrada' : (anticipoMonto > 0 ? 'parcial' : 'pendiente');
+      if (found.tipoHito === 'anticipo' || tipoVista === 'anticipo') {
+        found.montoCobrado = isAnticipoConfirmado ? Number(found.total) : 0;
+        found.saldoPendiente = isAnticipoConfirmado ? 0 : Number(found.total);
+        found.estado = isAnticipoConfirmado ? 'cobrada' : 'pendiente';
+      } else if (found.tipoHito === 'saldo' || tipoVista === 'saldo') {
+        found.montoCobrado = isSaldoConfirmado ? Number(found.total) : 0;
+        found.saldoPendiente = isSaldoConfirmado ? 0 : Number(found.total);
+        found.estado = isSaldoConfirmado ? 'cobrada' : 'pendiente';
       } else {
         if (proj.pagos?.saldoEstado === 'confirmado') {
-          found.montoCobrado = totalMonto;
+          found.montoCobrado = Number(found.total);
           found.saldoPendiente = 0;
           found.estado = 'cobrada';
         } else if (proj.pagos?.anticipoEstado === 'confirmado') {
-          found.montoCobrado = anticipoMonto;
-          found.saldoPendiente = Math.max(0, totalMonto - anticipoMonto);
-          found.estado = 'parcial';
+          found.montoCobrado = Number(found.total);
+          found.saldoPendiente = 0;
+          found.estado = 'cobrada';
         }
       }
     }
