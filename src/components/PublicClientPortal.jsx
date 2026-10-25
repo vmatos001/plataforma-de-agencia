@@ -57,10 +57,12 @@ import { evaluateProjectMilestones } from '../services/projectMilestoneSync';
 import { 
   CorporateInvoiceDocument, 
   buildCorporateInvoiceHtml, 
+  printHtmlViaHiddenIframe, 
   buildInvoiceFromPresupuesto, 
   reconcileInvoiceWithPresupuesto,
   normalizeFacturaItems 
 } from './GestionRentabilidadModule';
+import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 import { auth } from '../services/firebase';
 import { getPortalCloud, savePortalCloud, subscribePortalCloud, saveProyectoCloud, uploadReceiptToCloudStorage } from '../services/firestoreSyncService';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
@@ -229,13 +231,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   // Agency White-Label Branding State
   const [agencyBranding, setAgencyBranding] = useState(() => {
     const fallback = {
-      nombreAgencia: 'Goglite Digital Hub',
-      logoUrl: '/assets/goglite_logo.png',
-      colorPrimario: '#FF6B00',
-      telefonoWhatsapp: '+503 7000-1122',
-      emailContacto: 'contacto@goglite.com',
-      dominioWeb: 'goglite.com',
-      ubicacionPrincipal: 'San Salvador (SV) & Santo Domingo (DO)'
+      ...DEFAULT_AGENCY_BRANDING
     };
     if (initialAgencySettings && typeof initialAgencySettings === 'object') {
       return {
@@ -371,16 +367,20 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   const handlePrintClientInvoicePdf = (fac) => {
     if (!fac) return;
-    const html = buildCorporateInvoiceHtml(fac, data?.portalConfig);
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(html);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-      }, 450);
-    }
+    const invoiceConfig = {
+      emisor: {
+        empresa: agencyBranding?.nombreAgencia || 'Goglite Digital Hub',
+        subtitulo: agencyBranding?.eslogan || 'Suite Integral de Crecimiento Digital & Desarrollo Web Antigravity',
+        logoUrl: agencyBranding?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl,
+        identificacion: agencyBranding?.identificacion || 'NIT / RNC: 0614-290390-102-1',
+        email: agencyBranding?.emailContacto || 'contacto@goglite.com',
+        telefono: agencyBranding?.telefonoWhatsapp || '+503 7000-1122',
+        ubicacion: agencyBranding?.ubicacionPrincipal || 'San Salvador, SV · Santo Domingo, DO'
+      },
+      cuentasBancarias: data?.portalConfig?.cuentasBancarias
+    };
+    const html = buildCorporateInvoiceHtml(fac, invoiceConfig);
+    printHtmlViaHiddenIframe(html);
   };
 
   const applyReceiptDataUrl = async (finalUrl, fileName, target = 'advance') => {
@@ -2693,8 +2693,8 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <img 
-                          src="/assets/goglite_logo.png" 
-                          alt={presupuesto?.emisor?.empresa || 'Goglite'} 
+                          src={agencyBranding?.logoUrl || presupuesto?.emisor?.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                          alt={agencyBranding?.nombreAgencia || presupuesto?.emisor?.empresa || 'Agencia'} 
                           className="h-8 sm:h-9 w-auto object-contain shrink-0"
                         />
                         <div className="text-[10px] text-slate-600 font-medium space-y-0.5 border-l border-slate-300 pl-2.5 sm:pl-3">
@@ -2818,11 +2818,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   <div className="border-b border-slate-200 pb-2.5 mb-4 flex items-center justify-between avoid-break">
                     <div className="flex items-center gap-2">
                       <img 
-                        src="/assets/goglite_logo.png" 
-                        alt={presupuesto?.emisor?.empresa || 'Goglite'} 
+                        src={agencyBranding?.logoUrl || presupuesto?.emisor?.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                        alt={agencyBranding?.nombreAgencia || presupuesto?.emisor?.empresa || 'Agencia'} 
                         className="h-6 w-auto object-contain"
                       />
-                      <span className="font-bold text-slate-900 text-xs">Goglite Digital Hub</span>
+                      <span className="font-bold text-slate-900 text-xs">{agencyBranding?.nombreAgencia || presupuesto?.emisor?.empresa || 'Goglite Digital Hub'}</span>
                     </div>
                     <div className="text-[10px] font-mono text-slate-500">
                       {presupuesto?.codigo || 'P-2026-001'} · {clientEmpresa}
@@ -3103,14 +3103,14 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   <div className="flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-4 avoid-break">
                     <div className="flex items-center gap-3">
                       <img 
-                        src="/assets/goglite_logo.png" 
-                        alt="Goglite Digital" 
+                        src={agencyBranding?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                        alt={agencyBranding?.nombreAgencia || 'Agencia'} 
                         className="h-8 w-auto object-contain"
                         onError={(e) => { e.target.style.display = 'none'; }}
                       />
                       <div>
-                        <div className="font-black text-sm uppercase tracking-wider text-slate-900">Goglite Digital</div>
-                        <div className="text-[10px] text-slate-500 font-mono">Agencia de Desarrollo Web Nativo & IA</div>
+                        <div className="font-black text-sm uppercase tracking-wider text-slate-900">{agencyBranding?.nombreAgencia || 'Goglite Digital'}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{agencyBranding?.eslogan || 'Agencia de Desarrollo Web Nativo & IA'}</div>
                       </div>
                     </div>
 
@@ -3176,12 +3176,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   <div className="border-b border-slate-200 pb-2.5 mb-4 flex items-center justify-between avoid-break">
                     <div className="flex items-center gap-2">
                       <img 
-                        src="/assets/goglite_logo.png" 
-                        alt="Goglite Digital" 
+                        src={agencyBranding?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                        alt={agencyBranding?.nombreAgencia || 'Agencia'} 
                         className="h-6 w-auto object-contain"
                         onError={(e) => { e.target.style.display = 'none'; }}
                       />
-                      <span className="font-bold text-slate-900 text-xs">Goglite Digital · Contrato Oficial</span>
+                      <span className="font-bold text-slate-900 text-xs">{agencyBranding?.nombreAgencia || 'Goglite Digital'} · Contrato Oficial</span>
                     </div>
                     <div className="text-[10px] font-mono text-slate-500">
                       {activeProyecto?.codigo || 'CON-2026-001'} · {clientEmpresa}
@@ -4779,7 +4779,21 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               </div>
             </div>
             <div className="p-6 overflow-y-auto bg-[#FAFAFA]">
-              <CorporateInvoiceDocument invoice={selectedClientInvoiceModal} configuracion={portalConfig} />
+              <CorporateInvoiceDocument 
+                invoice={selectedClientInvoiceModal} 
+                configuracion={{
+                  ...(portalConfig || {}),
+                  emisor: {
+                    empresa: agencyBranding?.nombreAgencia || 'Goglite Digital Hub',
+                    subtitulo: agencyBranding?.eslogan,
+                    logoUrl: agencyBranding?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl,
+                    identificacion: agencyBranding?.identificacion || 'NIT / RNC: 0614-290390-102-1',
+                    email: agencyBranding?.emailContacto || 'contacto@goglite.com',
+                    telefono: agencyBranding?.telefonoWhatsapp || '+503 7000-1122',
+                    ubicacion: agencyBranding?.ubicacionPrincipal || 'San Salvador, SV · Santo Domingo, DO'
+                  }
+                }} 
+              />
             </div>
           </div>
         </div>

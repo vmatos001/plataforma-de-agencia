@@ -93,6 +93,7 @@
   #printable-contract,
   #printable-client-contract,
   #printable-invoice,
+  #printable-qa-certificate,
   .printable-invoice-document {
     display: block !important;
     position: static !important;
@@ -105,6 +106,25 @@
     background: #ffffff !important;
     color: #0f172a !important;
     overflow: visible !important;
+  }
+
+  /* Single-sheet QA Launch Certificate (Letter 8.5" x 11") */
+  #printable-qa-certificate {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    width: 8.5in !important;
+    height: 11in !important;
+    max-height: 11in !important;
+    min-height: 11in !important;
+    padding: 0.45in 0.5in !important;
+    box-sizing: border-box !important;
+    margin: 0 auto !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    overflow: hidden !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
 
   /* Exact physical letter page container (8.5 x 11 in / 215.9mm x 279.4mm) */

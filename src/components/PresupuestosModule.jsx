@@ -41,6 +41,7 @@ import {
   subscribePresupuestosCloud,
   savePortalCloud
 } from '../services/firestoreSyncService';
+import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 
 const DEFAULT_VIP_TEMPLATE = {
   titulo: "PROPUESTA DE DESARROLLO DIGITAL VIP",
@@ -1454,8 +1455,8 @@ export default function PresupuestosModule({
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
                           <img 
-                            src="/assets/goglite_logo.png" 
-                            alt="Goglite" 
+                            src={activePresupuesto?.emisor?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                            alt={activePresupuesto.emisor?.empresa || 'Agencia'} 
                             className="h-10 w-auto object-contain"
                           />
                           <div className="text-[10px] text-slate-600 font-medium space-y-0.5 border-l border-slate-300 pl-3">
@@ -1583,11 +1584,11 @@ export default function PresupuestosModule({
                     <div className="border-b border-slate-200 pb-2.5 mb-4 flex items-center justify-between avoid-break">
                       <div className="flex items-center gap-2">
                         <img 
-                          src="/assets/goglite_logo.png" 
-                          alt="Goglite" 
+                          src={activePresupuesto?.emisor?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                          alt={activePresupuesto.emisor?.empresa || 'Agencia'} 
                           className="h-6 w-auto object-contain"
                         />
-                        <span className="font-bold text-slate-900 text-xs">Goglite Digital Hub</span>
+                        <span className="font-bold text-slate-900 text-xs">{activePresupuesto.emisor?.empresa || 'Goglite Digital Hub'}</span>
                       </div>
                       <div className="text-[10px] font-mono text-slate-500">
                         {activePresupuesto.codigo} · {activePresupuesto.cliente?.empresa}

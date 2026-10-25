@@ -323,7 +323,7 @@ export default function App() {
           const storedLogo = localStorage.getItem('goglite_agency_logo');
           const merged = {
             ...data,
-            logoUrl: data.logoUrl || storedLogo || '/assets/goglite_logo.png'
+            logoUrl: data.logoUrl || storedLogo || DEFAULT_AGENCY_BRANDING.logoUrl
           };
           setAgencySettings(merged);
           setLocalItem(STORAGE_KEYS.AGENCY_SETTINGS, merged);

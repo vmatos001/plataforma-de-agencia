@@ -63,6 +63,7 @@ import {
   subscribeProyectosCloud, 
   savePortalCloud 
 } from '../services/firestoreSyncService';
+import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 
 export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNavigateToPresupuestos }) {
   const [proyectos, setProyectos] = useState([]);
@@ -1487,8 +1488,8 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                     <div className="flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-4 avoid-break">
                       <div className="flex items-center gap-3">
                         <img 
-                          src="/assets/goglite_logo.png" 
-                          alt="Goglite Digital" 
+                          src={(typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                          alt="Agencia" 
                           className="h-8 w-auto object-contain"
                           onError={(e) => { e.target.style.display = 'none'; }}
                         />
@@ -1560,8 +1561,8 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                     <div className="border-b border-slate-200 pb-2.5 mb-4 flex items-center justify-between avoid-break">
                       <div className="flex items-center gap-2">
                         <img 
-                          src="/assets/goglite_logo.png" 
-                          alt="Goglite Digital" 
+                          src={(typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                          alt="Agencia" 
                           className="h-6 w-auto object-contain"
                           onError={(e) => { e.target.style.display = 'none'; }}
                         />

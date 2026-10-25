@@ -42,6 +42,7 @@ import {
 
 import { getStoredCrmLeads } from '../services/localStore';
 import { getAppStateCloud, saveAppStateCloud } from '../services/firestoreSyncService';
+import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 
 const STORAGE_KEY_FINANZAS = 'goglite_finanzas_v1';
 const STORAGE_KEY_TIMER = 'goglite_live_timer_v1';
@@ -721,11 +722,90 @@ export function reconcileInvoiceWithPresupuesto(fac, prop) {
 }
 
 /**
+ * Imprime un documento HTML corporativo a través de un iframe invisible in-place.
+ * Elimina la necesidad de abrir pestañas emergentes en blanco en el navegador y
+ * suprime de forma automática los encabezados y pies de página molestos (URL, fecha, título).
+ */
+export function printHtmlViaHiddenIframe(htmlContent) {
+  if (typeof window === 'undefined') return;
+
+  // 1. Limpiar iframe previo si aún existiera
+  const prevFrame = document.getElementById('goglite-silent-print-frame');
+  if (prevFrame) {
+    try { prevFrame.remove(); } catch (e) {}
+  }
+
+  // 2. Crear iframe aislado oculto
+  const iframe = document.createElement('iframe');
+  iframe.id = 'goglite-silent-print-frame';
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.style.opacity = '0';
+  iframe.style.pointerEvents = 'none';
+  iframe.style.zIndex = '-9999';
+
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument || iframe.contentWindow?.document;
+
+  if (!doc) {
+    // Fallback de contingencia si el navegador bloquea manipulación de iframe dinámico
+    const fallbackWin = window.open('', '_blank');
+    if (fallbackWin) {
+      fallbackWin.document.write(htmlContent);
+      fallbackWin.document.close();
+      fallbackWin.focus();
+      setTimeout(() => fallbackWin.print(), 350);
+    }
+    return;
+  }
+
+  doc.open();
+  doc.write(htmlContent);
+  doc.close();
+
+  // 3. Disparar impresión nativa tan pronto los estilos e imágenes se rendericen
+  setTimeout(() => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } catch (err) {
+      console.warn('[Print] Error disparando impresión silenciosa en iframe:', err);
+      window.print();
+    } finally {
+      // 4. Limpieza del DOM posterior a la interacción del usuario
+      setTimeout(() => {
+        try {
+          const toRemove = document.getElementById('goglite-silent-print-frame');
+          if (toRemove) toRemove.remove();
+        } catch (e) {}
+      }, 4000);
+    }
+  }, 400);
+}
+
+/**
  * Generador de Factura Comercial HTML/PDF Autosuficiente (Skill: automated-html-invoice)
  * Sigue estrictamente la paleta corporativa (#FF6B00, #1A1A1A, #FAFAFA)
  */
 export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFIGURACION) {
-  const emisor = configuracion?.emisor || DEFAULT_CONFIGURACION.emisor;
+  const emisorRaw = configuracion?.emisor || DEFAULT_CONFIGURACION.emisor;
+  const storedLogo = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null;
+  const emisor = {
+    ...DEFAULT_CONFIGURACION.emisor,
+    ...emisorRaw,
+    empresa: emisorRaw?.empresa || configuracion?.nombreAgencia || DEFAULT_CONFIGURACION.emisor.empresa,
+    subtitulo: emisorRaw?.subtitulo || configuracion?.eslogan || DEFAULT_CONFIGURACION.emisor.subtitulo,
+    logoUrl: emisorRaw?.logoUrl || configuracion?.logoUrl || storedLogo || DEFAULT_AGENCY_BRANDING.logoUrl,
+    identificacion: emisorRaw?.identificacion || 'NIT / RNC: 0614-290390-102-1',
+    email: emisorRaw?.email || configuracion?.emailContacto || DEFAULT_CONFIGURACION.emisor.email,
+    telefono: emisorRaw?.telefono || configuracion?.telefonoWhatsapp || DEFAULT_CONFIGURACION.emisor.telefono,
+    ubicacion: emisorRaw?.ubicacion || configuracion?.ubicacionPrincipal || DEFAULT_CONFIGURACION.emisor.ubicacion
+  };
   const pais = invoice.cliente?.pais || 'SV';
   const cuentas = normalizeCuentasBancarias(configuracion?.cuentasBancarias);
 
@@ -807,7 +887,7 @@ export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFI
     @media print {
       @page {
         size: letter portrait;
-        margin: 0.5in;
+        margin: 0 !important;
       }
       html, body {
         background: #FFFFFF !important;
@@ -820,9 +900,11 @@ export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFI
       .invoice-card {
         box-shadow: none !important;
         border: none !important;
-        padding: 0 !important;
-        width: 100% !important;
-        max-width: 7.5in !important;
+        padding: 0.6in 0.65in !important;
+        width: 8.5in !important;
+        max-width: 8.5in !important;
+        min-height: 11in !important;
+        box-sizing: border-box !important;
         margin: 0 auto !important;
         page-break-inside: avoid !important;
         break-inside: avoid !important;
@@ -837,10 +919,14 @@ export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFI
 <body>
   <div class="invoice-card">
     <div class="header">
-      <div class="brand-box">
-        <div class="brand-badge">G</div>
+      <div class="brand-box" style="display: flex; align-items: center; gap: 14px;">
+        ${emisor.logoUrl ? `
+          <img src="${emisor.logoUrl}" alt="${emisor.empresa}" style="max-height: 48px; max-width: 175px; object-fit: contain;" />
+        ` : `
+          <div class="brand-badge">${(emisor.empresa || 'G').charAt(0)}</div>
+        `}
         <div>
-          <div class="logo">GOG<span>LITE</span></div>
+          <div class="logo" style="font-size: 19px; font-weight: 900; color: #1A1A1A; text-transform: uppercase; letter-spacing: -0.5px;">${emisor.empresa}</div>
           <div class="brand-sub">${emisor.subtitulo}</div>
           <div class="brand-sub">${emisor.ubicacion}</div>
         </div>
@@ -943,7 +1029,19 @@ export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFI
  */
 export function CorporateInvoiceDocument({ invoice, configuracion = DEFAULT_CONFIGURACION }) {
   if (!invoice) return null;
-  const emisor = configuracion?.emisor || DEFAULT_CONFIGURACION.emisor;
+  const emisorRaw = configuracion?.emisor || DEFAULT_CONFIGURACION.emisor;
+  const storedLogo = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null;
+  const emisor = {
+    ...DEFAULT_CONFIGURACION.emisor,
+    ...emisorRaw,
+    empresa: emisorRaw?.empresa || configuracion?.nombreAgencia || DEFAULT_CONFIGURACION.emisor.empresa,
+    subtitulo: emisorRaw?.subtitulo || configuracion?.eslogan || DEFAULT_CONFIGURACION.emisor.subtitulo,
+    logoUrl: emisorRaw?.logoUrl || configuracion?.logoUrl || storedLogo || DEFAULT_AGENCY_BRANDING.logoUrl,
+    identificacion: emisorRaw?.identificacion || 'NIT / RNC: 0614-290390-102-1',
+    email: emisorRaw?.email || configuracion?.emailContacto || DEFAULT_CONFIGURACION.emisor.email,
+    telefono: emisorRaw?.telefono || configuracion?.telefonoWhatsapp || DEFAULT_CONFIGURACION.emisor.telefono,
+    ubicacion: emisorRaw?.ubicacion || configuracion?.ubicacionPrincipal || DEFAULT_CONFIGURACION.emisor.ubicacion
+  };
   const cuentas = normalizeCuentasBancarias(configuracion?.cuentasBancarias);
   const p = invoice.cliente?.pais || 'SV';
   let activeAcc = null;
@@ -967,12 +1065,16 @@ export function CorporateInvoiceDocument({ invoice, configuracion = DEFAULT_CONF
       {/* 1. Header de Factura */}
       <div className="flex flex-col sm:flex-row items-start justify-between gap-4 pb-5 border-b-2 border-[#1A1A1A]">
         <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-[#FF6B00] flex items-center justify-center font-black text-white text-xl shadow-sm">
-            G
-          </div>
+          {emisor?.logoUrl ? (
+            <img src={emisor.logoUrl} alt={emisor.empresa} className="max-h-11 max-w-[170px] object-contain" />
+          ) : (
+            <div className="w-11 h-11 rounded-xl bg-[#FF6B00] flex items-center justify-center font-black text-white text-xl shadow-sm">
+              {(emisor?.empresa || 'G').charAt(0)}
+            </div>
+          )}
           <div>
-            <h1 className="text-xl font-black text-[#1A1A1A] tracking-tight">
-              GOG<span className="text-[#FF6B00]">LITE</span>
+            <h1 className="text-xl font-black text-[#1A1A1A] tracking-tight uppercase">
+              {emisor?.empresa || 'GOGLITE'}
             </h1>
             <p className="text-[11px] text-[#555555] font-medium">{emisor?.subtitulo || 'Estudio de Ingeniería Web & Software'}</p>
             <p className="text-[10px] text-[#555555]">{emisor?.ubicacion || 'San Salvador (SV) · Santo Domingo (DO)'}</p>
@@ -2518,18 +2620,7 @@ export default function GestionRentabilidadModule({
   // Print or Save PDF using Corporate Automated HTML Invoice Template ($0 Cost)
   const handlePrintInvoicePdf = (invoice) => {
     const html = buildCorporateInvoiceHtml(invoice, configuracion);
-    const printWin = window.open('', '_blank', 'width=900,height=950');
-    if (printWin) {
-      printWin.document.open();
-      printWin.document.write(html);
-      printWin.document.close();
-      printWin.focus();
-      setTimeout(() => {
-        printWin.print();
-      }, 250);
-    } else {
-      window.print();
-    }
+    printHtmlViaHiddenIframe(html);
   };
 
   // Download Standalone HTML Invoice ($0 Cost)

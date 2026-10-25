@@ -285,7 +285,7 @@ export default function AgencyWhiteLabelSettingsModal({
       setForm(prev => ({
         ...prev,
         ...agencySettings,
-        logoUrl: agencySettings.logoUrl || storedLogo || prev.logoUrl || '/assets/goglite_logo.png',
+        logoUrl: agencySettings.logoUrl || storedLogo || prev.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl,
         mcpAgentKey: agencySettings.mcpAgentKey || prev.mcpAgentKey || DEFAULT_AGENCY_BRANDING.mcpAgentKey || 'gog_agent_live_3554881d91556ec76d8734f10fda7366',
         apisIntegraciones: {
           ...prev.apisIntegraciones,

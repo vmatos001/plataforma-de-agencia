@@ -29,6 +29,7 @@ import {
   CheckSquare,
   Square
 } from 'lucide-react';
+import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 
 /**
  * PROTOCOLO MAESTRO DE 30 CHEQUEOS DE PRE-ENTREGA
@@ -563,6 +564,28 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
 
   const currentProject = proyectos.find(p => p.id === selectedProyectoId) || proyectos[0];
 
+  // Dynamic Agency Settings from System / LocalStorage / White-Label
+  const agencyData = useMemo(() => {
+    try {
+      const storedSettings = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_settings') : null;
+      const storedLogo = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null;
+      const parsed = storedSettings ? JSON.parse(storedSettings) : {};
+      return {
+        ...DEFAULT_AGENCY_BRANDING,
+        ...parsed,
+        logoUrl: parsed.logoUrl || storedLogo || DEFAULT_AGENCY_BRANDING.logoUrl
+      };
+    } catch {
+      return DEFAULT_AGENCY_BRANDING;
+    }
+  }, []);
+
+  const activeLogo = agencyData.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl;
+  const activeAgencyName = agencyData.nombreAgencia || 'Goglite Digital Hub';
+  const activeAgencySlogan = agencyData.eslogan || 'Agencia Web, Automatización & Posicionamiento IA (GEO)';
+  const activeAgencyLocation = agencyData.ubicacionPrincipal || 'San Salvador, SV · Santo Domingo, DO';
+  const activeDirectorName = agencyData.responsable || 'Víctor Matos';
+
   // Filtrado de ítems para el operador
   const filteredChecklist = useMemo(() => {
     return checklist.filter(item => {
@@ -1011,123 +1034,163 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
 
       {/* ========================================================================= */}
       {/* ACTA DE CERTIFICACIÓN Y CONTROL DE CALIDAD IMPRIMIBLE (SOLO IMPRESIÓN / PDF) */}
+      {/* CARTA 8.5" x 11" - PROTOCOLO EXCLUSIVO 1 PÁGINA SIN DESBORDES NI DISTORSIÓN */}
       {/* ========================================================================= */}
-      <div className="hidden print:block bg-white text-slate-900 p-8 max-w-4xl mx-auto rounded-none font-sans text-xs leading-relaxed">
-        {/* Cabecera Membretada Goglite */}
-        <div className="border-b-2 border-slate-900 pb-5 mb-6 flex items-start justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-orange-600 text-white font-black text-2xl flex items-center justify-center">
-              G
+      <div 
+        id="printable-qa-certificate" 
+        className="hidden print:flex flex-col justify-between print-letter-page bg-white text-slate-900 mx-auto rounded-none font-sans text-xs leading-tight w-[8.5in] h-[11in] min-h-[11in] max-h-[11in] overflow-hidden p-[0.45in_0.5in] box-border"
+        style={{ width: '8.5in', height: '11in', minHeight: '11in', maxHeight: '11in', boxSizing: 'border-box' }}
+      >
+        <div>
+          {/* 1. Cabecera Membretada Oficial con Logo Dinámico de Ajustes */}
+          <div className="border-b-2 border-slate-900 pb-3 mb-2.5 flex items-start justify-between avoid-break">
+            <div className="flex items-center gap-3">
+              {activeLogo ? (
+                <img 
+                  src={activeLogo} 
+                  alt={activeAgencyName} 
+                  className="h-10 max-h-10 max-w-[170px] object-contain" 
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-xl bg-orange-600 text-white font-black text-xl flex items-center justify-center">
+                  {activeAgencyName.charAt(0) || 'G'}
+                </div>
+              )}
+              <div>
+                <h1 className="text-base font-black tracking-tight text-slate-950 uppercase">
+                  {activeAgencyName}
+                </h1>
+                <p className="text-[9.5px] text-slate-600 font-mono leading-tight">
+                  {activeAgencySlogan}
+                </p>
+                <p className="text-[9px] text-slate-500 font-mono">
+                  {activeAgencyLocation}
+                </p>
+              </div>
+            </div>
+
+            <div className="text-right font-mono">
+              <div className="text-xs font-black text-orange-600 uppercase tracking-wide">
+                ACTA OFICIAL DE CONTROL DE CALIDAD
+              </div>
+              <div className="text-[9.5px] text-slate-700 font-bold mt-0.5">
+                Protocolo Estándar de 30 Puntos Pre-Lanzamiento
+              </div>
+              <div className="text-[9px] text-slate-500 mt-0.5">
+                Fecha de Emisión: {new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Metadatos del Proyecto Auditado */}
+          <div className="bg-slate-50 border border-slate-300 rounded-lg p-2.5 mb-2.5 grid grid-cols-4 gap-2 text-[10px] avoid-break">
+            <div>
+              <span className="text-slate-500 font-mono block text-[8.5px] uppercase">Cliente / Empresa:</span>
+              <strong className="text-slate-950 text-[10.5px] truncate block">{currentProject?.cliente?.empresa || 'Cliente'}</strong>
             </div>
             <div>
-              <h1 className="text-xl font-black tracking-tight text-slate-900">
-                GOGLITE DIGITAL STUDIO
-              </h1>
-              <p className="text-[10px] text-slate-600 font-mono">
-                Agencia Web, Automatización & Posicionamiento IA (GEO) · SV & DO
-              </p>
+              <span className="text-slate-500 font-mono block text-[8.5px] uppercase">Código Proyecto:</span>
+              <strong className="text-slate-950 text-[10.5px] font-mono block">{currentProject?.codigo || 'P-2026-001'}</strong>
+            </div>
+            <div>
+              <span className="text-slate-500 font-mono block text-[8.5px] uppercase">URL Oficial Auditada:</span>
+              <strong className="text-slate-950 font-mono text-[9.5px] truncate block">{siteUrl}</strong>
+            </div>
+            <div>
+              <span className="text-slate-500 font-mono block text-[8.5px] uppercase">Dictamen Global:</span>
+              <strong className="text-emerald-700 font-bold text-[10.5px] block">
+                {completadosCount} / 30 Puntos ({scoreSalud}%)
+              </strong>
             </div>
           </div>
 
-          <div className="text-right font-mono">
-            <div className="text-sm font-black text-orange-600">
-              ACTA OFICIAL DE CONTROL DE CALIDAD
-            </div>
-            <div className="text-[10px] text-slate-600 mt-0.5">
-              Protocolo Estándar de 30 Puntos
-            </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">
-              Fecha de Emisión: {new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}
-            </div>
+          {/* 3. Declaración de Garantía y Certificación Técnica */}
+          <div className="mb-2.5 p-2 rounded-lg bg-orange-50/80 border border-orange-200 text-slate-800 text-[9.5px] leading-snug avoid-break">
+            <strong>Certificación de Calidad Técnica:</strong> Por medio de la presente acta, el equipo técnico de <strong>{activeAgencyName}</strong> certifica que el sitio web y sus activos digitales han superado la auditoría exhaustiva de <strong>30 puntos de control de calidad</strong> previo a su entrega oficial, garantizando el cumplimiento de estándares de velocidad Core Web Vitals, indexabilidad en buscadores, posicionamiento IA (GEO), seguridad TLS/HTTPS, analítica de conversiones y adaptabilidad responsive en dispositivos móviles.
           </div>
-        </div>
 
-        {/* Metadatos del Proyecto Auditado */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
-          <div>
-            <span className="text-slate-500 font-mono block text-[9px] uppercase">Cliente / Empresa:</span>
-            <strong className="text-slate-900 text-xs">{currentProject?.cliente?.empresa || 'Cliente'}</strong>
-          </div>
-          <div>
-            <span className="text-slate-500 font-mono block text-[9px] uppercase">Código de Proyecto:</span>
-            <strong className="text-slate-900 text-xs font-mono">{currentProject?.codigo || 'P-2026-001'}</strong>
-          </div>
-          <div>
-            <span className="text-slate-500 font-mono block text-[9px] uppercase">URL Oficial Auditada:</span>
-            <strong className="text-slate-900 font-mono text-[10px] truncate block">{siteUrl}</strong>
-          </div>
-          <div>
-            <span className="text-slate-500 font-mono block text-[9px] uppercase">Resultado Global:</span>
-            <strong className="text-emerald-700 font-bold text-xs">{completadosCount} / 30 Chequeos ({scoreSalud}%)</strong>
-          </div>
-        </div>
-
-        {/* Declaración de Garantía y Certificación Técnica */}
-        <div className="mb-6 p-4 rounded-xl bg-orange-50 border border-orange-200 text-slate-800 text-[11px] leading-relaxed">
-          <strong>Certificación de Calidad Técnica:</strong> Por medio de la presente acta, el equipo técnico de <strong>Goglite Digital</strong> certifica que el sitio web y los activos digitales del proyecto han sido sometidos a la auditoría exhaustiva de <strong>30 puntos de control de calidad</strong> previo a su entrega oficial, garantizando el cumplimiento de los estándares de indexabilidad, rastreo en motores de búsqueda, velocidad Core Web Vitals, seguridad TLS/HTTPS, analítica de conversiones y adaptabilidad en dispositivos móviles.
-        </div>
-
-        {/* Tabla de los 30 Chequeos Verificados */}
-        <div className="mb-6">
-          <table className="w-full text-left border-collapse text-[10px]">
-            <thead>
-              <tr className="border-b-2 border-slate-900 bg-slate-100 text-slate-800 font-mono">
-                <th className="py-2 px-2 w-10">#</th>
-                <th className="py-2 px-2">REQUISITO DE CONTROL DE CALIDAD</th>
-                <th className="py-2 px-2">CATEGORÍA / PILAR</th>
-                <th className="py-2 px-2 w-28 text-center">ESTADO</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {DEFAULT_CHECKLIST_ITEMS.map((item) => {
-                const currentStatus = checklist.find(c => c.id === item.id)?.completado;
-
-                return (
-                  <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="py-1.5 px-2 font-mono font-bold text-slate-500">
-                      {String(item.numero).padStart(2, '0')}
-                    </td>
-                    <td className="py-1.5 px-2 font-semibold text-slate-900">
-                      {item.item}
-                      {item.critico && <span className="text-[8px] text-rose-600 font-bold ml-1.5 font-mono">[Crítico]</span>}
-                    </td>
-                    <td className="py-1.5 px-2 text-slate-600 text-[9px]">
-                      {item.categoria.replace(/^\d+\.\s*/, '')}
-                    </td>
-                    <td className="py-1.5 px-2 text-center font-mono font-bold">
-                      {currentStatus ? (
-                        <span className="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[9px]">
-                          ✓ VERIFICADO
+          {/* 4. Tabla de los 30 Chequeos Verificados en 2 Columnas Limpias (15 Izq + 15 Der) */}
+          <div className="grid grid-cols-2 gap-3 mb-2 avoid-break">
+            {/* Columna Izquierda: Chequeos 1 al 15 */}
+            <div className="border border-slate-300 rounded-lg overflow-hidden">
+              <div className="bg-slate-100 border-b border-slate-300 px-2 py-1 flex items-center justify-between text-[9px] font-mono font-bold text-slate-800">
+                <span># REQUISITO DE CALIDAD (01 - 15)</span>
+                <span>ESTADO</span>
+              </div>
+              <div className="divide-y divide-slate-200 text-[8.5px] leading-tight">
+                {DEFAULT_CHECKLIST_ITEMS.slice(0, 15).map((item) => {
+                  const isDone = checklist.find(c => c.id === item.id)?.completado;
+                  return (
+                    <div key={item.id} className="px-2 py-[2.5px] flex items-center justify-between gap-1 hover:bg-slate-50">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-mono font-bold text-slate-500 shrink-0 text-[8px]">
+                          {String(item.numero).padStart(2, '0')}
                         </span>
-                      ) : (
-                        <span className="text-amber-700 bg-amber-100 px-2 py-0.5 rounded text-[9px]">
-                          PENDIENTE
+                        <span className="font-medium text-slate-900 truncate">
+                          {item.item}
+                          {item.critico && <span className="text-rose-600 font-bold ml-1 text-[7.5px] font-mono">[Crítico]</span>}
                         </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </div>
+                      <span className={`shrink-0 font-mono font-bold text-[7.5px] px-1 py-0.2 rounded ${
+                        isDone ? 'text-emerald-800 bg-emerald-100' : 'text-amber-800 bg-amber-100'
+                      }`}>
+                        {isDone ? '✓ OK' : 'PENDIENTE'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Columna Derecha: Chequeos 16 al 30 */}
+            <div className="border border-slate-300 rounded-lg overflow-hidden">
+              <div className="bg-slate-100 border-b border-slate-300 px-2 py-1 flex items-center justify-between text-[9px] font-mono font-bold text-slate-800">
+                <span># REQUISITO DE CALIDAD (16 - 30)</span>
+                <span>ESTADO</span>
+              </div>
+              <div className="divide-y divide-slate-200 text-[8.5px] leading-tight">
+                {DEFAULT_CHECKLIST_ITEMS.slice(15, 30).map((item) => {
+                  const isDone = checklist.find(c => c.id === item.id)?.completado;
+                  return (
+                    <div key={item.id} className="px-2 py-[2.5px] flex items-center justify-between gap-1 hover:bg-slate-50">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-mono font-bold text-slate-500 shrink-0 text-[8px]">
+                          {String(item.numero).padStart(2, '0')}
+                        </span>
+                        <span className="font-medium text-slate-900 truncate">
+                          {item.item}
+                          {item.critico && <span className="text-rose-600 font-bold ml-1 text-[7.5px] font-mono">[Crítico]</span>}
+                        </span>
+                      </div>
+                      <span className={`shrink-0 font-mono font-bold text-[7.5px] px-1 py-0.2 rounded ${
+                        isDone ? 'text-emerald-800 bg-emerald-100' : 'text-amber-800 bg-amber-100'
+                      }`}>
+                        {isDone ? '✓ OK' : 'PENDIENTE'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Firmas de Autorización y Sello Oficial */}
-        <div className="pt-8 border-t-2 border-slate-300 grid grid-cols-2 gap-8 text-center avoid-break">
+        {/* 5. Firmas de Autorización y Sello Oficial */}
+        <div className="pt-2 border-t-2 border-slate-300 grid grid-cols-2 gap-8 text-center avoid-break">
           <div>
-            <div className="h-14 border-b border-slate-400 mx-auto w-48 mb-2 flex items-end justify-center">
-              <span className="font-serif italic text-base text-slate-800">Víctor Matos</span>
+            <div className="h-9 border-b border-slate-400 mx-auto w-40 mb-1 flex items-end justify-center">
+              <span className="font-serif italic text-xs text-slate-800">{activeDirectorName}</span>
             </div>
-            <div className="font-bold text-slate-900 text-xs">Víctor Matos</div>
-            <div className="text-[10px] text-slate-500">Director General & CEO · Goglite</div>
+            <div className="font-bold text-slate-950 text-[10.5px]">{activeDirectorName}</div>
+            <div className="text-[8.5px] text-slate-500 font-mono">Director General & CEO · {activeAgencyName}</div>
           </div>
 
           <div>
-            <div className="h-14 border-b border-slate-400 mx-auto w-48 mb-2 flex items-end justify-center">
-              <span className="font-serif italic text-base text-slate-800">{currentProject?.cliente?.nombre || 'Cliente'}</span>
+            <div className="h-9 border-b border-slate-400 mx-auto w-40 mb-1 flex items-end justify-center">
+              <span className="font-serif italic text-xs text-slate-800">{currentProject?.cliente?.nombre || 'Cliente'}</span>
             </div>
-            <div className="font-bold text-slate-900 text-xs">{currentProject?.cliente?.nombre || 'Recibido por el Cliente'}</div>
-            <div className="text-[10px] text-slate-500">Aceptación y Recepción Conforme del Sitio</div>
+            <div className="font-bold text-slate-950 text-[10.5px]">{currentProject?.cliente?.nombre || 'Recibido por el Cliente'}</div>
+            <div className="text-[8.5px] text-slate-500 font-mono">Aceptación y Recepción Conforme · {currentProject?.cliente?.empresa || 'Cliente'}</div>
           </div>
         </div>
       </div>
