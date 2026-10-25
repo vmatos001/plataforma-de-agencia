@@ -36,11 +36,11 @@
 }
 
 /* ==========================================================================
-   PRINT STYLES FOR GOGLITE PROPOSALS (A4 / LETTER)
+   PRINT STYLES FOR GOGLITE PROPOSALS & CONTRACTS (LETTER 8.5" x 11")
    ========================================================================== */
 @media print {
   @page {
-    size: A4 portrait;
+    size: letter portrait;
     margin: 0;
   }
 
@@ -50,7 +50,7 @@
     color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
-    width: 100% !important;
+    width: 8.5in !important;
     height: auto !important;
     min-height: 100% !important;
     overflow: visible !important;
@@ -58,13 +58,18 @@
     print-color-adjust: exact !important;
   }
 
-  /* Hide all app shells, headers, sidebars, modals, toolbars, buttons */
+  /* Hide all app shells, headers, sidebars, modals, toolbars, buttons, footers */
   header, 
   aside, 
   nav, 
+  footer,
   button, 
   .no-print,
-  [data-no-print="true"] {
+  [data-no-print="true"],
+  .portal-welcome-hero,
+  .portal-auth-banner,
+  .portal-stepper,
+  .portal-thumb-bar {
     display: none !important;
   }
 
@@ -82,29 +87,58 @@
     border: none !important;
   }
 
-  /* Printable proposal sheet takes the whole printed document */
-  #printable-proposal {
+  /* Printable proposal sheet takes the whole printed document without dark backgrounds or outer borders */
+  #printable-proposal,
+  #printable-client-proposal,
+  #printable-client-contract {
     display: block !important;
     position: static !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-height: auto !important;
-    height: auto !important;
+    width: 8.5in !important;
+    max-width: 8.5in !important;
+    margin: 0 auto !important;
     padding: 0 !important;
-    margin: 0 !important;
     box-shadow: none !important;
     border: none !important;
-    background-color: #ffffff !important;
-    color: #111827 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
     overflow: visible !important;
   }
 
-  /* Front cover: EXACT A4 full bleed from PDF */
+  /* Exact physical letter page container (8.5 x 11 in / 215.9mm x 279.4mm) */
+  .print-letter-page {
+    width: 8.5in !important;
+    height: 11in !important;
+    max-height: 11in !important;
+    min-height: 11in !important;
+    margin: 0 auto !important;
+    padding: 0.55in 0.65in !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    overflow: hidden !important;
+    page-break-before: auto !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  .print-letter-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  /* Front cover: EXACT Letter full bleed from PDF */
+  .print-letter-page.print-cover-sheet,
   .pdf-page-cover {
-    width: 210mm !important;
-    height: 297mm !important;
-    max-height: 297mm !important;
-    min-height: 297mm !important;
+    width: 8.5in !important;
+    height: 11in !important;
+    max-height: 11in !important;
+    min-height: 11in !important;
     margin: 0 auto !important;
     padding: 0 !important;
     page-break-before: auto !important;
@@ -116,30 +150,40 @@
     position: relative !important;
     background: #ffffff !important;
     overflow: hidden !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
   }
 
+  .print-letter-page.print-cover-sheet img,
   .pdf-page-cover img {
-    width: 210mm !important;
-    height: 297mm !important;
-    max-width: 210mm !important;
-    max-height: 297mm !important;
+    width: 8.5in !important;
+    height: 11in !important;
+    max-width: 8.5in !important;
+    max-height: 11in !important;
     object-fit: cover !important;
     display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   /* Content pages (Páginas 2, 3...) */
+  .print-content-sheet,
   .pdf-page-content {
-    width: 210mm !important;
-    min-height: 297mm !important;
-    height: auto !important;
-    max-height: none !important;
+    width: 8.5in !important;
+    height: 11in !important;
+    max-height: 11in !important;
+    min-height: 11in !important;
     margin: 0 auto !important;
-    padding: 16mm 18mm 18mm 18mm !important;
+    padding: 0.55in 0.65in !important;
     box-sizing: border-box !important;
     position: relative !important;
     background: #ffffff !important;
-    overflow: visible !important;
-    page-break-inside: auto !important;
+    color: #0f172a !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
   }
 
   /* Page break helper */

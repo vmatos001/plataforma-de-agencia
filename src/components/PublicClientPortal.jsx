@@ -2332,10 +2332,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       )}
 
       {/* Top Header Navigation */}
-      <header className="border-b border-slate-800/80 bg-[#0b0f19]/95 backdrop-blur sticky top-0 z-40 px-4 sm:px-6 py-3.5">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+      <header className="border-b border-slate-800/80 bg-[#0b0f19]/95 backdrop-blur sticky top-0 z-40 px-4 sm:px-6 py-2.5 sm:py-3.5 no-print print:hidden">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
+          {/* Fila 1 en móvil / Izquierda en Desktop: Ícono y Título de la Agencia */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#090d16] border border-slate-700 flex items-center justify-center shrink-0 overflow-hidden shadow-lg shadow-orange-500/10">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#090d16] border border-slate-700 flex items-center justify-center shrink-0 overflow-hidden shadow-lg shadow-orange-500/10">
               {agencyBranding.logoUrl ? (
                 <img src={agencyBranding.logoUrl} alt={agencyBranding.nombreAgencia} className="max-w-full max-h-full object-contain p-0.5" />
               ) : (
@@ -2348,26 +2349,22 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               )}
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-white text-sm sm:text-base tracking-tight">
-                  {agencyBranding.nombreAgencia || 'Goglite Studio'}
-                </span>
-                <span className="text-[10px] bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded-full font-mono font-semibold flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" /> SSL Protegido
-                </span>
-              </div>
+              <span className="font-bold text-white text-sm sm:text-base tracking-tight block">
+                {agencyBranding.nombreAgencia || 'Goglite Digital Hub'}
+              </span>
               <p className="text-[11px] text-slate-400 hidden sm:block">
                 {agencyBranding.eslogan || 'Portal Blindado de Cliente · 5 Fases de Ejecución'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          {/* Fila 2 en móvil / Derecha en Desktop: Botones de Acción */}
+          <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
             {matchingFactura && (
               <button
                 type="button"
                 onClick={() => setSelectedClientInvoiceModal(matchingFactura)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold shadow-lg shadow-orange-950/40 border border-orange-500/30 transition-all transform hover:scale-[1.02]"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold shadow-lg shadow-orange-950/40 border border-orange-500/30 transition-all transform hover:scale-[1.02]"
                 title="Consultar e Imprimir Factura Oficial"
               >
                 <FileText className="w-3.5 h-3.5 text-orange-200" />
@@ -2379,7 +2376,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               href={`https://wa.me/${(agencyBranding.telefonoWhatsapp || '+503 7000-1122').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola, te escribo desde el Portal de Cliente de ${clientEmpresa}.`)}`}
               target="_blank"
               rel="noreferrer"
-              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950 transition-all"
+              className="flex-1 sm:flex-none px-3.5 py-2 sm:py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950 transition-all"
             >
               <MessageSquare className="w-3.5 h-3.5" />
               <span>WhatsApp de Soporte</span>
@@ -2392,7 +2389,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       <main className="max-w-6xl mx-auto px-3.5 sm:px-6 py-4 sm:py-8 space-y-5 sm:space-y-6 flex-1 w-full pb-28 sm:pb-8">
         
         {/* Welcome Client Hero Box */}
-        <div className="rounded-2xl bg-gradient-to-br from-[#101626] to-[#0b0e17] border border-slate-800 p-5 sm:p-7 relative overflow-hidden shadow-2xl">
+        <div className="no-print print:hidden portal-welcome-hero rounded-2xl bg-gradient-to-br from-[#101626] to-[#0b0e17] border border-slate-800 p-5 sm:p-7 relative overflow-hidden shadow-2xl">
           <div className="absolute top-0 right-0 w-80 h-80 bg-orange-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
@@ -2437,7 +2434,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
         {/* Post-Payment Authentication Banner (Visible when Fase 2 is signed/paid) */}
         {portalConfig?.fase2Firmada && (
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-[#0d1525] to-cyan-500/10 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+          <div className="no-print print:hidden portal-auth-banner p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-[#0d1525] to-cyan-500/10 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
             <div className="flex items-center gap-3.5">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
                 <KeyRound className="w-5 h-5" />
@@ -2518,7 +2515,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         )}
 
         {/* 5-Phase Interactive Stepper Bar (Mobile-First Horizontal Swipe Snap + Desktop Grid) */}
-        <div className="flex overflow-x-auto no-scrollbar snap-x touch-pan-x gap-2 pb-2 -mx-3.5 px-3.5 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-5 sm:gap-2.5">
+        <div className="no-print print:hidden portal-stepper flex overflow-x-auto no-scrollbar snap-x touch-pan-x gap-2 pb-2 -mx-3.5 px-3.5 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-5 sm:gap-2.5">
           {steps.map((st) => {
             const isCurrent = activeTab === st.num;
             const isCompleted = st.done;
@@ -2670,204 +2667,244 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               </div>
             </div>
 
-            {/* FULL EXECUTIVE PROPOSAL DOCUMENT (ESTILO GOOGLE DOCS / GOGLITE OFICIAL) */}
+            {/* FULL EXECUTIVE PROPOSAL DOCUMENT (ESTILO OFICIAL GOGLITE / 3 HOJAS 8.5 x 11 in) */}
             <div 
               id="printable-client-proposal"
-              className="bg-slate-900/40 p-0 sm:p-6 text-slate-900 rounded-2xl border border-slate-800/80 overflow-hidden shadow-2xl print:border-none print:p-0 print:shadow-none print:bg-transparent print:m-0 space-y-4 sm:space-y-6 print:space-y-0"
+              className="bg-transparent p-0 text-slate-900 overflow-visible print:border-none print:p-0 print:shadow-none print:bg-transparent print:m-0 space-y-6 sm:space-y-8 print:space-y-0"
             >
-              {/* PÁGINA 1: PORTADA OFICIAL GOGLITE */}
-              <div className="pdf-page-cover relative w-full max-h-[220px] sm:max-h-none sm:aspect-[210/297] max-w-4xl mx-auto overflow-hidden bg-white shadow-2xl rounded-xl print:rounded-none print:shadow-none">
+              {/* =========================================================================
+                  HOJA 1: PORTADA OFICIAL GOGLITE (TAMAÑO CARTA 8.5 x 11 in / FULL BLEED)
+                  ========================================================================= */}
+              <div className="print-letter-page print-cover-sheet relative w-full max-w-4xl mx-auto overflow-hidden bg-white shadow-2xl rounded-2xl print:rounded-none print:shadow-none print:m-0 aspect-[8.5/11]">
                 <img 
                   src="/assets/portada_oficial_fija.png" 
                   alt="Propuesta de Desarrollo Digital VIP" 
-                  className="w-full h-full object-cover object-top block"
+                  className="w-full h-full object-cover block"
                 />
               </div>
 
-              {/* PÁGINA 2: RESUMEN EJECUTIVO, ESTRATEGIA, ALCANCE Y CONDICIONES */}
-              <div className="pdf-page-content max-w-4xl mx-auto p-4 sm:p-12 bg-white shadow-2xl rounded-xl print:rounded-none print:shadow-none text-slate-900 font-sans leading-relaxed text-xs">
-                {/* Sub-Header con Marca Goglite y Metadatos */}
-                <div className="border-b-2 border-slate-900 pb-4 mb-6 avoid-break">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <img 
-                        src="/assets/goglite_logo.png" 
-                        alt={presupuesto?.emisor?.empresa || 'Goglite'} 
-                        className="h-9 sm:h-10 w-auto object-contain shrink-0"
-                      />
-                      <div className="text-[10px] text-slate-600 font-medium space-y-0.5 border-l border-slate-300 pl-2.5 sm:pl-3">
-                        <div><strong>Ubicación:</strong> {presupuesto?.emisor?.ubicacion || 'Santa Ana, El Salvador · Santo Domingo, RD'}</div>
-                        <div><strong>Contacto:</strong> {presupuesto?.emisor?.telefono || '(503) 7756-9828'} | {presupuesto?.emisor?.email || 'info@goglite.com'}</div>
-                        <div><strong>Director:</strong> {presupuesto?.emisor?.responsable || 'Víctor Matos'}</div>
-                      </div>
-                    </div>
-
-                    <div className="flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200">
-                      <div className="text-[10px] sm:text-[11px] font-mono font-bold text-slate-900 uppercase">
-                        Fecha: {presupuesto?.fecha || new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
-                      </div>
-                      <div className="text-[11px] font-mono text-orange-600 font-bold sm:mt-0.5">
-                        {presupuesto?.codigo || 'P-2026-001'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* DESTINATARIO */}
-                  <div className="mt-4 p-3.5 rounded-lg bg-slate-50 border border-slate-200">
-                    <div className="text-[10px] font-mono uppercase text-slate-500 font-bold">Cliente / Destinatario:</div>
-                    <div className="text-sm font-extrabold text-slate-900 mt-0.5">
-                      {clientContacto} | {clientEmpresa}
-                    </div>
-                    <div className="text-[11px] text-slate-700">
-                      Tel: {presupuesto?.cliente?.telefono || lead?.telefono || ''} · {presupuesto?.cliente?.actividad || 'Servicios Comerciales'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. TÍTULO DE LA PROPUESTA VIP */}
-                <div className="mb-6 avoid-break">
-                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug uppercase">
-                    {presupuesto?.titulo || 'PROPUESTA DE DESARROLLO DIGITAL VIP'}
-                  </h2>
-                  {(presupuesto?.subtitulo || lead?.servicio) && (
-                    <div className="text-xs font-semibold text-orange-600 mt-0.5">
-                      {presupuesto?.subtitulo || lead?.servicio}
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. BLOQUES ESTRATÉGICOS FIJOS */}
-                <div className="space-y-3 mb-6 bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200/80 avoid-break text-[11px]">
-                  <div>
-                    <span className="font-extrabold text-slate-900 block mb-0.5">
-                      • Proyecto & Diagnóstico:
-                    </span>
-                    <p className="text-slate-700 leading-normal">
-                      {presupuesto?.portada?.proyecto || `Desarrollo e implementación del Sistema Web Mobile-First para ${clientEmpresa}, diseñado con arquitectura limpia y optimizado para captación de clientes.`}
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="font-extrabold text-slate-900 block mb-0.5">
-                      • Enfoque de Conversión Inmediata:
-                    </span>
-                    <p className="text-slate-700 leading-normal">
-                      {presupuesto?.portada?.enfoqueEstrategico || 'Arquitectura orientada a la conversión directa con botones de llamada instantánea (Click-to-Call), botón flotante de WhatsApp Business y embudo de respuesta inmediata.'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="font-extrabold text-slate-900 block mb-0.5">
-                      • Tecnología y Rendimiento Mobile-First:
-                    </span>
-                    <p className="text-slate-700 leading-normal">
-                      {presupuesto?.portada?.tecnologiaMobileFirst || 'Arquitectura ultra-rápida optimizada al 100% para teléfonos inteligentes (velocidad de carga inferior a 1.2 segundos y Core Web Vitals en verde).'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="font-extrabold text-slate-900 block mb-0.5">
-                      • GEO & SEO Local de Nueva Generación (Optimizado para IA y Buscadores):
-                    </span>
-                    <p className="text-slate-700 leading-normal">
-                      {presupuesto?.portada?.geoSeoLocal || 'Estructura semántica avanzada (Schema.org LocalBusiness) para asegurar máxima visibilidad en Google Maps, buscadores y motores de IA (ChatGPT / Perplexity).'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* 4. COMPONENTES DEL SISTEMA INTEGRAL */}
-                <div className="mb-6">
-                  <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1.5 mb-3.5">
-                    1. Componentes del Sistema Integral (Alcance y Entregables)
-                  </h2>
-
-                  <div className="space-y-3.5">
-                    {(presupuesto?.modulos && presupuesto.modulos.length > 0 ? presupuesto.modulos : [
-                      { numero: 'MÓDULO 1', titulo: 'Plataforma Web Corporativa de Alta Conversión (Mobile-First)', descripcion: 'Arquitectura responsive optimizada al 100% para dispositivos móviles. Incluye secciones estratégicas StoryBrand, catálogo de servicios, cobertura y llamado a la acción.' },
-                      { numero: 'MÓDULO 2', titulo: 'Canales de Cierre y Contacto Directo (WhatsApp & Click-to-Call)', descripcion: 'Integración de botón flotante inteligente de WhatsApp Business con mensaje preconfigurado y marcado directo de un solo toque.' },
-                      { numero: 'MÓDULO 3', titulo: 'Optimización del Perfil de Google Negocio & SEO/GEO Local', descripcion: 'Configuración técnica de Schema.org JSON-LD, categorización en Google Maps y ecosistema de códigos QR para captación de reseñas 5 estrellas.' }
-                    ]).map((m, i) => (
-                      <div key={i} className="pl-3.5 border-l-2 border-orange-500 space-y-0.5 avoid-break">
-                        <div className="font-extrabold text-slate-900 text-xs">
-                          {m.numero}: {m.titulo}
+              {/* =========================================================================
+                  HOJA 2: RESUMEN EJECUTIVO & ALCANCE TÉCNICO (TAMAÑO CARTA 8.5 x 11 in)
+                  ========================================================================= */}
+              <div className="print-letter-page print-content-sheet max-w-4xl mx-auto p-6 sm:p-10 bg-white shadow-2xl rounded-2xl print:rounded-none print:shadow-none print:m-0 text-slate-900 font-sans leading-relaxed text-xs aspect-auto sm:min-h-[11in] flex flex-col justify-between">
+                <div>
+                  {/* Sub-Header con Marca Goglite y Metadatos */}
+                  <div className="border-b-2 border-slate-900 pb-3 mb-4 avoid-break">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <img 
+                          src="/assets/goglite_logo.png" 
+                          alt={presupuesto?.emisor?.empresa || 'Goglite'} 
+                          className="h-8 sm:h-9 w-auto object-contain shrink-0"
+                        />
+                        <div className="text-[10px] text-slate-600 font-medium space-y-0.5 border-l border-slate-300 pl-2.5 sm:pl-3">
+                          <div><strong>Ubicación:</strong> {presupuesto?.emisor?.ubicacion || 'Santa Ana, El Salvador · Santo Domingo, RD'}</div>
+                          <div><strong>Contacto:</strong> {presupuesto?.emisor?.telefono || '(503) 7756-9828'} | {presupuesto?.emisor?.email || 'info@goglite.com'}</div>
+                          <div><strong>Director:</strong> {presupuesto?.emisor?.responsable || 'Víctor Matos'}</div>
                         </div>
-                        <p className="text-slate-700 text-[11px] leading-relaxed">
-                          {m.descripcion}
-                        </p>
                       </div>
-                    ))}
-                  </div>
-                </div>
 
-                {/* 2. HOJA DE RUTA Y FASES */}
-                <div className="mb-6 avoid-break">
-                  <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1.5 mb-3.5">
-                    2. Hoja de Ruta y Fases de Implementación (10 a 15 Días Hábiles)
-                  </h2>
-
-                  <div className="space-y-2">
-                    {(presupuesto?.fases && presupuesto.fases.length > 0 ? presupuesto.fases : [
-                      { fase: 'Fase 1', plazo: 'Días 1 a 4', detalle: 'Configuración de activos digitales, arquitectura de información StoryBrand, ficha de Google Maps y códigos QR vectoriales.' },
-                      { fase: 'Fase 2', plazo: 'Días 5 a 10', detalle: 'Desarrollo de la plataforma web Mobile-First, integración de canales de cierre en WhatsApp y optimización SEO/GEO.' },
-                      { fase: 'Fase 3', plazo: 'Días 11 a 15', detalle: 'Auditoría de velocidad móvil, revisión conjunta con el cliente, ajustes finales y despliegue en producción.' }
-                    ]).map((f, i) => (
-                      <div key={i} className="text-[11px] text-slate-800">
-                        <span className="font-extrabold text-slate-900">• {f.fase} ({f.plazo}):</span> {f.detalle}
+                      <div className="flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200">
+                        <div className="text-[10px] sm:text-[11px] font-mono font-bold text-slate-900 uppercase">
+                          Fecha: {presupuesto?.fecha || new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                        </div>
+                        <div className="text-[11px] font-mono text-orange-600 font-bold sm:mt-0.5">
+                          {presupuesto?.codigo || 'P-2026-001'}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 3. INVERSIÓN ESTRATÉGICA Y CONDICIONES */}
-                <div className="mb-6 p-4 sm:p-6 rounded-xl bg-slate-900 text-white avoid-break shadow-md">
-                  <h2 className="text-xs font-black uppercase tracking-wider text-orange-400 mb-2">
-                    3. Inversión Estratégica y Condiciones Comerciales
-                  </h2>
-
-                  <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
-                    La inversión en un sistema digital integral de esta envergadura suele oscilar entre los <strong>${presupuesto?.inversion?.precioMercadoReferencial || Math.max(1500, totalInversion * 2)} USD</strong> en el mercado profesional. Para <strong>{clientEmpresa}</strong> hemos estructurado un paquete preferencial:
-                  </p>
-
-                  <div className="bg-white/10 p-3 sm:p-3.5 rounded-lg border border-white/15 space-y-1.5 font-mono mb-4">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-300">Inversión Total del Sistema Completo:</span>
-                      <span className="text-sm sm:text-base font-extrabold text-orange-400">
-                        ${totalInversion} USD
-                      </span>
                     </div>
-                    {presupuesto?.inversion?.beneficioExclusivo && (
-                      <div className="text-[10px] text-emerald-300 font-sans pt-1 border-t border-white/10">
-                        ★ <strong>Beneficio Exclusivo:</strong> {presupuesto.inversion.beneficioExclusivo}
+
+                    {/* DESTINATARIO */}
+                    <div className="mt-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="text-[9.5px] font-mono uppercase text-slate-500 font-bold">Cliente / Destinatario:</div>
+                      <div className="text-sm font-extrabold text-slate-900 mt-0.5">
+                        {clientContacto} | {clientEmpresa}
+                      </div>
+                      <div className="text-[10.5px] text-slate-700">
+                        Tel: {presupuesto?.cliente?.telefono || lead?.telefono || ''} · {presupuesto?.cliente?.actividad || 'Servicios Comerciales'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. TÍTULO DE LA PROPUESTA VIP */}
+                  <div className="mb-4 avoid-break">
+                    <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug uppercase">
+                      {presupuesto?.titulo || 'PROPUESTA DE DESARROLLO DIGITAL VIP'}
+                    </h2>
+                    {(presupuesto?.subtitulo || lead?.servicio) && (
+                      <div className="text-xs font-semibold text-orange-600 mt-0.5">
+                        {presupuesto?.subtitulo || lead?.servicio}
                       </div>
                     )}
                   </div>
 
-                  <div className="text-[10px] text-slate-300 space-y-1.5 font-sans">
-                    <div>• <strong>Forma de Pago:</strong> ${anticipoMonto} USD de anticipo para iniciar y ${liquidacionMonto} USD contra entrega final y publicación.</div>
-                    <div>• <strong>Revisiones:</strong> {presupuesto?.inversion?.revisiones || 'Dos (2) rondas completas de ajustes de diseño y contenido.'}</div>
-                    <div>• <strong>Requisitos de Inicio:</strong> {presupuesto?.inversion?.requisitosInicio || 'Logotipo, fotografías del negocio/servicios, número oficial de WhatsApp y datos de contacto.'}</div>
-                    <div>• <strong>Vigencia de la Oferta:</strong> {presupuesto?.vigenciaDias || 15} días calendario.</div>
+                  {/* 3. BLOQUES ESTRATÉGICOS FIJOS */}
+                  <div className="space-y-2 mb-4 bg-slate-50 p-3.5 sm:p-4 rounded-xl border border-slate-200/80 avoid-break text-[10.5px]">
+                    <div>
+                      <span className="font-extrabold text-slate-900 block mb-0.5">
+                        • Proyecto & Diagnóstico:
+                      </span>
+                      <p className="text-slate-700 leading-normal">
+                        {presupuesto?.portada?.proyecto || `Desarrollo e implementación del Sistema Web Mobile-First para ${clientEmpresa}, diseñado con arquitectura limpia y optimizado para captación de clientes.`}
+                      </p>
+                    </div>
+
+                    <div>
+                      <span className="font-extrabold text-slate-900 block mb-0.5">
+                        • Enfoque de Conversión Inmediata:
+                      </span>
+                      <p className="text-slate-700 leading-normal">
+                        {presupuesto?.portada?.enfoqueEstrategico || 'Arquitectura orientada a la conversión directa con botones de llamada instantánea (Click-to-Call), botón flotante de WhatsApp Business y embudo de respuesta inmediata.'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <span className="font-extrabold text-slate-900 block mb-0.5">
+                        • Tecnología y Rendimiento Mobile-First:
+                      </span>
+                      <p className="text-slate-700 leading-normal">
+                        {presupuesto?.portada?.tecnologiaMobileFirst || 'Arquitectura ultra-rápida optimizada al 100% para teléfonos inteligentes (velocidad de carga inferior a 1.2 segundos y Core Web Vitals en verde).'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <span className="font-extrabold text-slate-900 block mb-0.5">
+                        • GEO & SEO Local de Nueva Generación (Optimizado para IA y Buscadores):
+                      </span>
+                      <p className="text-slate-700 leading-normal">
+                        {presupuesto?.portada?.geoSeoLocal || 'Estructura semántica avanzada (Schema.org LocalBusiness) para asegurar máxima visibilidad en Google Maps, buscadores y motores de IA (ChatGPT / Perplexity).'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 4. COMPONENTES DEL SISTEMA INTEGRAL */}
+                  <div className="mb-2">
+                    <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-2.5">
+                      1. Componentes del Sistema Integral (Alcance y Entregables)
+                    </h2>
+
+                    <div className="space-y-2.5">
+                      {(presupuesto?.modulos && presupuesto.modulos.length > 0 ? presupuesto.modulos : [
+                        { numero: 'MÓDULO 1', titulo: 'Plataforma Web Corporativa de Alta Conversión (Mobile-First)', descripcion: 'Arquitectura responsive optimizada al 100% para dispositivos móviles. Incluye secciones estratégicas StoryBrand, catálogo de servicios, cobertura y llamado a la acción.' },
+                        { numero: 'MÓDULO 2', titulo: 'Canales de Cierre y Contacto Directo (WhatsApp & Click-to-Call)', descripcion: 'Integración de botón flotante inteligente de WhatsApp Business con mensaje preconfigurado y marcado directo de un solo toque.' },
+                        { numero: 'MÓDULO 3', titulo: 'Optimización del Perfil de Google Negocio & SEO/GEO Local', descripcion: 'Configuración técnica de Schema.org JSON-LD, categorización en Google Maps y ecosistema de códigos QR para captación de reseñas 5 estrellas.' }
+                      ]).map((m, i) => (
+                        <div key={i} className="pl-3 border-l-2 border-orange-500 space-y-0.5 avoid-break">
+                          <div className="font-extrabold text-slate-900 text-xs">
+                            {m.numero}: {m.titulo}
+                          </div>
+                          <p className="text-slate-700 text-[10.5px] leading-relaxed">
+                            {m.descripcion}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                {/* 4. FIRMA OFICIAL GOGLITE */}
-                <div className="pt-4 border-t border-slate-300 flex items-center justify-between text-[11px] text-slate-600 avoid-break mt-6">
-                  <div>
-                    <div className="font-extrabold text-slate-900 text-xs">{presupuesto?.emisor?.responsable || 'Víctor Matos'}</div>
-                    <div className="text-orange-600 font-bold">{presupuesto?.emisor?.empresa || 'Goglite'}</div>
-                    <div className="text-[10px] text-slate-500">{presupuesto?.emisor?.telefono || '(503) 7756-9828'} | {presupuesto?.emisor?.email || 'info@goglite.com'}</div>
+                {/* Footer de Hoja 2 */}
+                <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 font-mono avoid-break">
+                  <span>Goglite Digital Hub · Suite Integral</span>
+                  <span>Página 2 de 3 · Propuesta Oficial</span>
+                </div>
+              </div>
+
+              {/* =========================================================================
+                  HOJA 3: CRONOGRAMA, INVERSIÓN Y FIRMA (TAMAÑO CARTA 8.5 x 11 in)
+                  ========================================================================= */}
+              <div className="print-letter-page print-content-sheet max-w-4xl mx-auto p-6 sm:p-10 bg-white shadow-2xl rounded-2xl print:rounded-none print:shadow-none print:m-0 text-slate-900 font-sans leading-relaxed text-xs aspect-auto sm:min-h-[11in] flex flex-col justify-between">
+                <div>
+                  {/* Mini-Header Hoja 3 */}
+                  <div className="border-b border-slate-200 pb-2.5 mb-4 flex items-center justify-between avoid-break">
+                    <div className="flex items-center gap-2">
+                      <img 
+                        src="/assets/goglite_logo.png" 
+                        alt={presupuesto?.emisor?.empresa || 'Goglite'} 
+                        className="h-6 w-auto object-contain"
+                      />
+                      <span className="font-bold text-slate-900 text-xs">Goglite Digital Hub</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-500">
+                      {presupuesto?.codigo || 'P-2026-001'} · {clientEmpresa}
+                    </div>
                   </div>
 
-                  <div className="text-right">
-                    <div className="font-mono text-[10px] text-slate-400">Documento Oficial Certificado</div>
-                    <div className="text-xs font-bold text-slate-900 uppercase">Estado: {presupuesto?.estado || 'EMITIDO'}</div>
+                  {/* 2. HOJA DE RUTA Y FASES */}
+                  <div className="mb-4 avoid-break">
+                    <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-2.5">
+                      2. Hoja de Ruta y Fases de Implementación (10 a 15 Días Hábiles)
+                    </h2>
+
+                    <div className="space-y-2">
+                      {(presupuesto?.fases && presupuesto.fases.length > 0 ? presupuesto.fases : [
+                        { fase: 'Fase 1', plazo: 'Días 1 a 4', detalle: 'Configuración de activos digitales, arquitectura de información StoryBrand, ficha de Google Maps y códigos QR vectoriales.' },
+                        { fase: 'Fase 2', plazo: 'Días 5 a 10', detalle: 'Desarrollo de la plataforma web Mobile-First, integración de canales de cierre en WhatsApp y optimización SEO/GEO.' },
+                        { fase: 'Fase 3', plazo: 'Días 11 a 15', detalle: 'Auditoría de velocidad móvil, revisión conjunta con el cliente, ajustes finales y despliegue en producción.' }
+                      ]).map((f, i) => (
+                        <div key={i} className="text-[10.5px] text-slate-800">
+                          <span className="font-extrabold text-slate-900">• {f.fase} ({f.plazo}):</span> {f.detalle}
+                        </div>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* 3. INVERSIÓN ESTRATÉGICA Y CONDICIONES */}
+                  <div className="mb-4 p-4 sm:p-5 rounded-xl bg-slate-900 text-white avoid-break shadow-md">
+                    <h2 className="text-xs font-black uppercase tracking-wider text-orange-400 mb-2">
+                      3. Inversión Estratégica y Condiciones Comerciales
+                    </h2>
+
+                    <p className="text-[10.5px] text-slate-300 leading-relaxed mb-3">
+                      La inversión en un sistema digital integral de esta envergadura suele oscilar entre los <strong>${presupuesto?.inversion?.precioMercadoReferencial || Math.max(1500, totalInversion * 2)} USD</strong> en el mercado profesional. Para <strong>{clientEmpresa}</strong> hemos estructurado un paquete preferencial:
+                    </p>
+
+                    <div className="bg-white/10 p-3 sm:p-3.5 rounded-lg border border-white/15 space-y-1 font-mono mb-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-300">Inversión Total del Sistema Completo:</span>
+                        <span className="text-sm sm:text-base font-extrabold text-orange-400">
+                          ${totalInversion} USD
+                        </span>
+                      </div>
+                      {presupuesto?.inversion?.beneficioExclusivo && (
+                        <div className="text-[10px] text-emerald-300 font-sans pt-1 border-t border-white/10">
+                          ★ <strong>Beneficio Exclusivo:</strong> {presupuesto.inversion.beneficioExclusivo}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="text-[10px] text-slate-300 space-y-1.5 font-sans">
+                      <div>• <strong>Forma de Pago:</strong> ${anticipoMonto} USD de anticipo para iniciar y ${liquidacionMonto} USD contra entrega final y publicación.</div>
+                      <div>• <strong>Revisiones:</strong> {presupuesto?.inversion?.revisiones || 'Dos (2) rondas completas de ajustes de diseño y contenido.'}</div>
+                      <div>• <strong>Requisitos de Inicio:</strong> {presupuesto?.inversion?.requisitosInicio || 'Logotipo, fotografías del negocio/servicios, número oficial de WhatsApp y datos de contacto.'}</div>
+                      <div>• <strong>Vigencia de la Oferta:</strong> {presupuesto?.vigenciaDias || 15} días calendario.</div>
+                    </div>
+                  </div>
+
+                  {/* 4. FIRMA OFICIAL GOGLITE */}
+                  <div className="pt-3 border-t border-slate-300 flex items-center justify-between text-[10.5px] text-slate-600 avoid-break">
+                    <div>
+                      <div className="font-extrabold text-slate-900 text-xs">{presupuesto?.emisor?.responsable || 'Víctor Matos'}</div>
+                      <div className="text-orange-600 font-bold">{presupuesto?.emisor?.empresa || 'Goglite'}</div>
+                      <div className="text-[10px] text-slate-500">{presupuesto?.emisor?.telefono || '(503) 7756-9828'} | {presupuesto?.emisor?.email || 'info@goglite.com'}</div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="font-mono text-[9.5px] text-slate-400">Documento Oficial Certificado</div>
+                      <div className="text-xs font-bold text-slate-900 uppercase">Estado: {presupuesto?.estado || 'EMITIDO'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer de Hoja 3 */}
+                <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 font-mono avoid-break">
+                  <span>Goglite Digital Hub · Suite Integral</span>
+                  <span>Página 3 de 3 · Conclusión & Firmas</span>
                 </div>
               </div>
             </div>
 
             {/* Bottom Executive Approval Banner */}
-            <div className="no-print rounded-2xl bg-gradient-to-r from-[#101626] via-[#121c33] to-[#101626] border border-orange-500/30 p-6 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-2xl">
+            <div className="no-print print:hidden rounded-2xl bg-gradient-to-r from-[#101626] via-[#121c33] to-[#101626] border border-orange-500/30 p-6 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-2xl">
               <div className="space-y-1.5 text-center sm:text-left">
                 <span className="text-[10px] font-mono uppercase text-orange-400 font-bold tracking-wider">
                   Compromiso de Garantía de Ejecución
@@ -2913,7 +2950,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             </div>
 
             {/* Barra Móvil Flotante Fija (Mobile-First Thumb-Zone) */}
-            <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-[#080b12]/95 backdrop-blur-lg border-t border-orange-500/30 z-40 shadow-2xl flex items-center gap-2">
+            <div className="no-print print:hidden portal-thumb-bar sm:hidden fixed bottom-0 left-0 right-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-[#080b12]/95 backdrop-blur-lg border-t border-orange-500/30 z-40 shadow-2xl flex items-center gap-2">
               {portalConfig?.fase1Aprobada ? (
                 <button
                   type="button"
@@ -3529,7 +3566,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             </div>
 
             {/* Barra Móvil Flotante Fija para Fase 2 (Mobile-First Thumb-Zone) */}
-            <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-[#080b12]/95 backdrop-blur-lg border-t border-orange-500/30 z-40 shadow-2xl flex items-center gap-2">
+            <div className="no-print print:hidden portal-thumb-bar sm:hidden fixed bottom-0 left-0 right-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-[#080b12]/95 backdrop-blur-lg border-t border-orange-500/30 z-40 shadow-2xl flex items-center gap-2">
               {portalConfig?.fase2Firmada ? (
                 <button
                   type="button"
@@ -4616,7 +4653,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800/80 mt-10 py-6 text-center text-xs text-slate-500 bg-[#080b12]">
+      <footer className="no-print print:hidden border-t border-slate-800/80 mt-10 py-6 text-center text-xs text-slate-500 bg-[#080b12]">
         {agencyBranding.nombreAgencia || 'Goglite Studio Agency'} · {agencyBranding.eslogan || 'Suite Integral de Crecimiento Digital'} · {agencyBranding.ubicacionPrincipal || 'San Salvador (SV) & Santo Domingo (DO)'}
       </footer>
 

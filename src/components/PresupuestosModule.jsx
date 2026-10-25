@@ -1428,15 +1428,15 @@ export default function PresupuestosModule({
             {/* RIGHT PANEL: 7 COLUMNS - VISTA PREVIA CORPORATIVA EN VIVO CON PORTADA GOGLITE */}
             <div className="lg:col-span-7 bg-[#0c1017] p-2 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl print:border-none print:p-0 print:shadow-none print:bg-transparent print:m-0 print:overflow-visible">
               
-              {/* PRINTABLE PROPOSAL SHEET (ESTILO OFICIAL GOOGLE DOCS / GOGLITE) */}
+              {/* PRINTABLE PROPOSAL SHEET (ESTILO OFICIAL GOGLITE / 3 HOJAS 8.5 x 11 in) */}
               <div 
                 id="printable-proposal"
-                className="bg-slate-900/60 p-2 sm:p-4 text-slate-900 rounded-xl text-xs leading-relaxed max-h-[85vh] overflow-y-auto print:max-h-none print:shadow-none print:p-0 print:text-black font-sans space-y-4 print:space-y-0 print:bg-white"
+                className="bg-transparent p-0 text-slate-900 rounded-xl text-xs leading-relaxed max-h-[85vh] overflow-y-auto print:max-h-none print:shadow-none print:p-0 print:text-black font-sans space-y-4 print:space-y-0"
               >
                 {/* =========================================================================
-                    PÁGINA 1: PORTADA OFICIAL GOGLITE (DEL PDF ADJUNTO, 100% FIEL Y EXACTA)
+                    HOJA 1: PORTADA OFICIAL GOGLITE (TAMAÑO CARTA 8.5 x 11 in / FULL BLEED)
                     ========================================================================= */}
-                <div className="pdf-page-cover relative w-full aspect-[210/297] sm:h-auto overflow-hidden bg-white shadow-xl rounded-lg print:rounded-none print:shadow-none">
+                <div className="print-letter-page print-cover-sheet relative w-full aspect-[8.5/11] sm:h-auto overflow-hidden bg-white shadow-xl rounded-lg print:rounded-none print:shadow-none">
                   <img 
                     src="/assets/portada_oficial_fija.png" 
                     alt="Propuesta de Desarrollo Digital VIP" 
@@ -1445,155 +1445,184 @@ export default function PresupuestosModule({
                 </div>
 
                 {/* =========================================================================
-                    PÁGINA 2: RESUMEN EJECUTIVO, ESTRATEGIA Y ALCANCE TÉCNICO (MÓDULOS)
+                    HOJA 2: RESUMEN EJECUTIVO & ALCANCE TÉCNICO (TAMAÑO CARTA 8.5 x 11 in)
                     ========================================================================= */}
-                <div className="pdf-page-content p-8 sm:p-10 bg-white shadow-xl rounded-lg print:rounded-none print:shadow-none">
-                  {/* Sub-Header with Goglite Brand & Metadata */}
-                  <div className="border-b-2 border-slate-900 pb-4 mb-5 avoid-break">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
+                <div className="print-letter-page print-content-sheet p-6 sm:p-10 bg-white shadow-xl rounded-lg print:rounded-none print:shadow-none flex flex-col justify-between aspect-auto sm:min-h-[11in]">
+                  <div>
+                    {/* Sub-Header with Goglite Brand & Metadata */}
+                    <div className="border-b-2 border-slate-900 pb-4 mb-5 avoid-break">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src="/assets/goglite_logo.png" 
+                            alt="Goglite" 
+                            className="h-10 w-auto object-contain"
+                          />
+                          <div className="text-[10px] text-slate-600 font-medium space-y-0.5 border-l border-slate-300 pl-3">
+                            <div><strong>Ubicación:</strong> {activePresupuesto.emisor?.ubicacion}</div>
+                            <div><strong>Contacto:</strong> {activePresupuesto.emisor?.telefono} | {activePresupuesto.emisor?.email}</div>
+                            <div><strong>Director:</strong> {activePresupuesto.emisor?.responsable}</div>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-[11px] font-mono font-bold text-slate-900 uppercase">
+                            Fecha: {activePresupuesto.fecha}
+                          </div>
+                          <div className="text-[10px] font-mono text-orange-600 font-bold mt-0.5">
+                            {activePresupuesto.codigo}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* DESTINATARIO */}
+                      <div className="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                        <div className="text-[10px] font-mono uppercase text-slate-500 font-bold">Cliente / Destinatario:</div>
+                        <div className="text-sm font-extrabold text-slate-900 mt-0.5">
+                          {activePresupuesto.cliente?.nombre} | {activePresupuesto.cliente?.empresa}
+                        </div>
+                        <div className="text-[11px] text-slate-700">
+                          Tel: {activePresupuesto.cliente?.telefono} · {activePresupuesto.cliente?.actividad}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2. TÍTULO DE LA PROPUESTA VIP */}
+                    <div className="mb-5 avoid-break">
+                      <h2 className="text-base font-black text-slate-900 tracking-tight leading-snug uppercase">
+                        {activePresupuesto.titulo}
+                      </h2>
+                      {activePresupuesto.subtitulo && (
+                        <div className="text-[11px] font-semibold text-orange-600 mt-0.5">
+                          {activePresupuesto.subtitulo}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 3. BLOQUES ESTRATÉGICOS FIJOS */}
+                    <div className="space-y-2.5 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200/80 avoid-break text-[11px]">
+                      {activePresupuesto.portada?.proyecto && (
+                        <div>
+                          <span className="font-extrabold text-slate-900 block mb-0.5">
+                            • Proyecto & Diagnóstico:
+                          </span>
+                          <p className="text-slate-700 leading-normal">
+                            {activePresupuesto.portada?.proyecto}
+                          </p>
+                        </div>
+                      )}
+
+                      {activePresupuesto.portada?.enfoqueEstrategico && (
+                        <div>
+                          <span className="font-extrabold text-slate-900 block mb-0.5">
+                            • Enfoque de Conversión Inmediata:
+                          </span>
+                          <p className="text-slate-700 leading-normal">
+                            {activePresupuesto.portada?.enfoqueEstrategico}
+                          </p>
+                        </div>
+                      )}
+
+                      {activePresupuesto.portada?.tecnologiaMobileFirst && (
+                        <div>
+                          <span className="font-extrabold text-slate-900 block mb-0.5">
+                            • Tecnología y Rendimiento Mobile-First:
+                          </span>
+                          <p className="text-slate-700 leading-normal">
+                            {activePresupuesto.portada?.tecnologiaMobileFirst}
+                          </p>
+                        </div>
+                      )}
+
+                      {activePresupuesto.portada?.geoSeoLocal && (
+                        <div>
+                          <span className="font-extrabold text-slate-900 block mb-0.5">
+                            • GEO & SEO Local de Nueva Generación (Optimizado para IA y Buscadores):
+                          </span>
+                          <p className="text-slate-700 leading-normal">
+                            {activePresupuesto.portada?.geoSeoLocal}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 4. COMPONENTES DEL SISTEMA INTEGRAL */}
+                    <div className="mb-4">
+                      <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-3">
+                        1. Componentes del Sistema Integral (Alcance y Entregables)
+                      </h2>
+
+                      <div className="space-y-3">
+                        {activePresupuesto.modulos?.map((m, i) => (
+                          <div key={i} className="pl-3 border-l-2 border-orange-500 space-y-0.5 avoid-break">
+                            <div className="font-extrabold text-slate-900 text-xs">
+                              {m.numero}: {m.titulo}
+                            </div>
+                            <p className="text-slate-700 text-[11px] leading-relaxed">
+                              {m.descripcion}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer de Hoja 2 */}
+                  <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 font-mono avoid-break">
+                    <span>Goglite Digital Hub · Suite Integral</span>
+                    <span>Página 2 de 3 · Propuesta Oficial</span>
+                  </div>
+                </div>
+
+                {/* =========================================================================
+                    HOJA 3: CRONOGRAMA, INVERSIÓN Y FIRMA (TAMAÑO CARTA 8.5 x 11 in)
+                    ========================================================================= */}
+                <div className="print-letter-page print-content-sheet p-6 sm:p-10 bg-white shadow-xl rounded-lg print:rounded-none print:shadow-none flex flex-col justify-between aspect-auto sm:min-h-[11in]">
+                  <div>
+                    {/* Mini-Header Hoja 3 */}
+                    <div className="border-b border-slate-200 pb-2.5 mb-4 flex items-center justify-between avoid-break">
+                      <div className="flex items-center gap-2">
                         <img 
                           src="/assets/goglite_logo.png" 
                           alt="Goglite" 
-                          className="h-10 w-auto object-contain"
+                          className="h-6 w-auto object-contain"
                         />
-                        <div className="text-[10px] text-slate-600 font-medium space-y-0.5 border-l border-slate-300 pl-3">
-                          <div><strong>Ubicación:</strong> {activePresupuesto.emisor?.ubicacion}</div>
-                          <div><strong>Contacto:</strong> {activePresupuesto.emisor?.telefono} | {activePresupuesto.emisor?.email}</div>
-                          <div><strong>Director:</strong> {activePresupuesto.emisor?.responsable}</div>
-                        </div>
+                        <span className="font-bold text-slate-900 text-xs">Goglite Digital Hub</span>
                       </div>
-
-                      <div className="text-right">
-                        <div className="text-[11px] font-mono font-bold text-slate-900 uppercase">
-                          Fecha: {activePresupuesto.fecha}
-                        </div>
-                        <div className="text-[10px] font-mono text-orange-600 font-bold mt-0.5">
-                          {activePresupuesto.codigo}
-                        </div>
+                      <div className="text-[10px] font-mono text-slate-500">
+                        {activePresupuesto.codigo} · {activePresupuesto.cliente?.empresa}
                       </div>
                     </div>
 
-                    {/* DESTINATARIO */}
-                    <div className="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-200">
-                      <div className="text-[10px] font-mono uppercase text-slate-500 font-bold">Cliente / Destinatario:</div>
-                      <div className="text-sm font-extrabold text-slate-900 mt-0.5">
-                        {activePresupuesto.cliente?.nombre} | {activePresupuesto.cliente?.empresa}
-                      </div>
-                      <div className="text-[11px] text-slate-700">
-                        Tel: {activePresupuesto.cliente?.telefono} · {activePresupuesto.cliente?.actividad}
-                      </div>
-                    </div>
-                  </div>
+                    {/* 2. HOJA DE RUTA Y FASES */}
+                    <div className="mb-4 avoid-break">
+                      <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-2.5">
+                        2. Hoja de Ruta y Fases de Implementación (10 a 15 Días Hábiles)
+                      </h2>
 
-                  {/* 2. TÍTULO DE LA PROPUESTA VIP */}
-                  <div className="mb-5 avoid-break">
-                    <h2 className="text-base font-black text-slate-900 tracking-tight leading-snug uppercase">
-                      {activePresupuesto.titulo}
-                    </h2>
-                    {activePresupuesto.subtitulo && (
-                      <div className="text-[11px] font-semibold text-orange-600 mt-0.5">
-                        {activePresupuesto.subtitulo}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 3. BLOQUES ESTRATÉGICOS FIJOS */}
-                  <div className="space-y-2.5 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200/80 avoid-break text-[11px]">
-                    {activePresupuesto.portada?.proyecto && (
-                      <div>
-                        <span className="font-extrabold text-slate-900 block mb-0.5">
-                          • Proyecto & Diagnóstico:
-                        </span>
-                        <p className="text-slate-700 leading-normal">
-                          {activePresupuesto.portada?.proyecto}
-                        </p>
-                      </div>
-                    )}
-
-                    {activePresupuesto.portada?.enfoqueEstrategico && (
-                      <div>
-                        <span className="font-extrabold text-slate-900 block mb-0.5">
-                          • Enfoque de Conversión Inmediata:
-                        </span>
-                        <p className="text-slate-700 leading-normal">
-                          {activePresupuesto.portada?.enfoqueEstrategico}
-                        </p>
-                      </div>
-                    )}
-
-                    {activePresupuesto.portada?.tecnologiaMobileFirst && (
-                      <div>
-                        <span className="font-extrabold text-slate-900 block mb-0.5">
-                          • Tecnología y Rendimiento Mobile-First:
-                        </span>
-                        <p className="text-slate-700 leading-normal">
-                          {activePresupuesto.portada?.tecnologiaMobileFirst}
-                        </p>
-                      </div>
-                    )}
-
-                    {activePresupuesto.portada?.geoSeoLocal && (
-                      <div>
-                        <span className="font-extrabold text-slate-900 block mb-0.5">
-                          • GEO & SEO Local de Nueva Generación (Optimizado para IA y Buscadores):
-                        </span>
-                        <p className="text-slate-700 leading-normal">
-                          {activePresupuesto.portada?.geoSeoLocal}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 4. COMPONENTES DEL SISTEMA INTEGRAL */}
-                  <div className="mb-5">
-                    <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-3">
-                      1. Componentes del Sistema Integral (Alcance y Entregables)
-                    </h2>
-
-                    <div className="space-y-3">
-                      {activePresupuesto.modulos?.map((m, i) => (
-                        <div key={i} className="pl-3 border-l-2 border-orange-500 space-y-0.5 avoid-break">
-                          <div className="font-extrabold text-slate-900 text-xs">
-                            {m.numero}: {m.titulo}
+                      <div className="space-y-2">
+                        {activePresupuesto.fases?.map((f, i) => (
+                          <div key={i} className="text-[10.5px] text-slate-800">
+                            <span className="font-extrabold text-slate-900">• {f.fase} ({f.plazo}):</span> {f.detalle}
                           </div>
-                          <p className="text-slate-700 text-[11px] leading-relaxed">
-                            {m.descripcion}
-                          </p>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-
-                  {/* 2. HOJA DE RUTA Y FASES */}
-                  <div className="mb-5 avoid-break">
-                    <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-3">
-                      2. Hoja de Ruta y Fases de Implementación (10 a 15 Días Hábiles)
-                    </h2>
-
-                    <div className="space-y-2">
-                      {activePresupuesto.fases?.map((f, i) => (
-                        <div key={i} className="text-[11px] text-slate-800">
-                          <span className="font-extrabold text-slate-900">• {f.fase} ({f.plazo}):</span> {f.detalle}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
 
                     {/* 3. INVERSIÓN ESTRATÉGICA Y CONDICIONES */}
-                    <div className="mb-6 p-5 rounded-xl bg-slate-900 text-white avoid-break">
+                    <div className="mb-4 p-4 sm:p-5 rounded-xl bg-slate-900 text-white avoid-break shadow-md">
                       <h2 className="text-xs font-black uppercase tracking-wider text-orange-400 mb-2">
                         3. Inversión Estratégica y Condiciones Comerciales
                       </h2>
 
-                      <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
+                      <p className="text-[10.5px] text-slate-300 leading-relaxed mb-3">
                         La inversión en un sistema digital integral de esta envergadura suele oscilar entre los <strong>${activePresupuesto.inversion?.precioMercadoReferencial} USD</strong> en el mercado profesional. Para <strong>{activePresupuesto.cliente?.empresa}</strong> hemos estructurado un paquete preferencial:
                       </p>
 
-                      <div className="bg-white/10 p-3.5 rounded-lg border border-white/15 space-y-1.5 font-mono mb-4">
+                      <div className="bg-white/10 p-3 sm:p-3.5 rounded-lg border border-white/15 space-y-1 font-mono mb-3">
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-slate-300">Inversión Total del Sistema Completo:</span>
-                          <span className="text-base font-extrabold text-orange-400">
+                          <span className="text-sm sm:text-base font-extrabold text-orange-400">
                             ${activePresupuesto.inversion?.precioTotal} USD
                           </span>
                         </div>
@@ -1612,18 +1641,25 @@ export default function PresupuestosModule({
                       </div>
                     </div>
 
-                  {/* 4. FIRMA OFICIAL GOGLITE */}
-                  <div className="pt-4 border-t border-slate-300 flex items-center justify-between text-[11px] text-slate-600 avoid-break mt-6">
-                    <div>
-                      <div className="font-extrabold text-slate-900 text-xs">{activePresupuesto.emisor?.responsable}</div>
-                      <div className="text-orange-600 font-bold">{activePresupuesto.emisor?.empresa}</div>
-                      <div className="text-[10px] text-slate-500">{activePresupuesto.emisor?.telefono} | {activePresupuesto.emisor?.email}</div>
-                    </div>
+                    {/* 4. FIRMA OFICIAL GOGLITE */}
+                    <div className="pt-3 border-t border-slate-300 flex items-center justify-between text-[10.5px] text-slate-600 avoid-break">
+                      <div>
+                        <div className="font-extrabold text-slate-900 text-xs">{activePresupuesto.emisor?.responsable}</div>
+                        <div className="text-orange-600 font-bold">{activePresupuesto.emisor?.empresa}</div>
+                        <div className="text-[10px] text-slate-500">{activePresupuesto.emisor?.telefono} | {activePresupuesto.emisor?.email}</div>
+                      </div>
 
-                    <div className="text-right">
-                      <div className="font-mono text-[10px] text-slate-400">Documento Oficial Certificado</div>
-                      <div className="text-xs font-bold text-slate-900">Estado: {activePresupuesto.estado.toUpperCase()}</div>
+                      <div className="text-right">
+                        <div className="font-mono text-[9.5px] text-slate-400">Documento Oficial Certificado</div>
+                        <div className="text-xs font-bold text-slate-900">Estado: {activePresupuesto.estado.toUpperCase()}</div>
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Footer de Hoja 3 */}
+                  <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 font-mono avoid-break">
+                    <span>Goglite Digital Hub · Suite Integral</span>
+                    <span>Página 3 de 3 · Conclusión & Firmas</span>
                   </div>
                 </div>
               </div>
