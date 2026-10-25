@@ -1426,7 +1426,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     const { x, y } = getCoordinates(e);
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = '#0f172a'; // Tinta oscura/negra profesional
     ctx.lineTo(x, y);
     ctx.stroke();
   };
@@ -2936,7 +2936,8 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                         <img 
                           src={portalConfig.firmaDigital} 
                           alt="Firma Digital Cliente" 
-                          className="max-h-14 max-w-full object-contain filter invert"
+                          className="max-h-14 max-w-full object-contain filter brightness-0"
+                          style={{ filter: 'brightness(0)' }}
                         />
                       </div>
                     ) : (
@@ -3001,14 +3002,19 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     </div>
 
                     {portalConfig?.fase2Firmada && portalConfig?.firmaDigital ? (
-                      <div className="p-4 rounded-xl bg-[#141b2a] border border-emerald-500/30 flex flex-col items-center">
-                        <img src={portalConfig.firmaDigital} alt="Firma Registrada" className="h-20 object-contain filter invert" />
-                        <div className="text-[11px] text-emerald-400 font-mono mt-2">
+                      <div className="p-4 rounded-xl bg-slate-100 border border-emerald-500/30 flex flex-col items-center">
+                        <img 
+                          src={portalConfig.firmaDigital} 
+                          alt="Firma Registrada" 
+                          className="h-20 object-contain filter brightness-0" 
+                          style={{ filter: 'brightness(0)' }} 
+                        />
+                        <div className="text-[11px] text-emerald-800 font-mono font-bold mt-2">
                           ✓ Firmado digitalmente por: {portalConfig.nombreFirmante} ({portalConfig.documentoFirmante})
                         </div>
                       </div>
                     ) : (
-                      <div className="border-2 border-dashed border-slate-700 rounded-xl overflow-hidden bg-[#0a0d15] relative">
+                      <div className="border-2 border-dashed border-slate-300 rounded-xl overflow-hidden bg-white relative">
                         <canvas
                           ref={canvasRef}
                           width={520}
@@ -3020,11 +3026,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                           onTouchStart={startDrawing}
                           onTouchMove={draw}
                           onTouchEnd={stopDrawing}
-                          className="w-full h-36 cursor-crosshair touch-none"
+                          className="w-full h-36 cursor-crosshair touch-none bg-white"
                         />
                         {!hasSignature && (
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-600 text-xs font-mono">
-                            ✍ Haz clic y dibuja tu firma aquí
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-400 text-xs font-mono">
+                            ✍ Haz clic y dibuja tu firma aquí con tinta digital
                           </div>
                         )}
                       </div>

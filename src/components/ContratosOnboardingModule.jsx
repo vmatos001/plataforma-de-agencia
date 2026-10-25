@@ -1322,7 +1322,8 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                           <img 
                             src={activeProyecto.contrato.firmaCliente.firmaBase64} 
                             alt="Firma Digital Cliente" 
-                            className="max-h-14 max-w-full object-contain"
+                            className="max-h-14 max-w-full object-contain filter brightness-0"
+                            style={{ filter: 'brightness(0)' }}
                           />
                         </div>
                       ) : (
