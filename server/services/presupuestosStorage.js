@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { syncPresupuestoToCloud } from './cloudSync.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -160,6 +161,13 @@ export const getPresupuestos = () => {
 
 export const savePresupuestos = (list) => {
   fs.writeFileSync(presupuestosFile, JSON.stringify(list, null, 2));
+  if (Array.isArray(list)) {
+    list.forEach(p => {
+      syncPresupuestoToCloud(p).catch(err => {
+        console.warn('[Presupuestos Sync] Error en background:', p.id, err.message);
+      });
+    });
+  }
   return list;
 };
 

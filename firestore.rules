@@ -194,6 +194,11 @@ service cloud.firestore {
         email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
 
+    // Valida si un valor es de tipo numérico (entero o punto flotante en CEL de Firestore)
+    function isNumeric(val) {
+      return val is int || val is float;
+    }
+
     // ===============================================================
     // Domain Validators: CMS Sites
     // ===============================================================
@@ -300,7 +305,7 @@ service cloud.firestore {
         (!('cliente' in data) || data.cliente is map) &&
         (!('presupuestoId' in data) || (data.presupuestoId is string && data.presupuestoId.size() <= 128)) &&
         (!('presupuestoCodigo' in data) || (data.presupuestoCodigo is string && data.presupuestoCodigo.size() <= 100)) &&
-        (!('faseActual' in data) || ((data.faseActual is int || data.faseActual is number) && data.faseActual >= 1 && data.faseActual <= 5)) &&
+        (!('faseActual' in data) || (isNumeric(data.faseActual) && data.faseActual >= 1 && data.faseActual <= 5)) &&
         (!('portalConfig' in data) || data.portalConfig is map) &&
         (!('pagos' in data) || data.pagos is map) &&
         (!('onboarding' in data) || data.onboarding is map) &&
@@ -309,7 +314,7 @@ service cloud.firestore {
         (!('portalToken' in data) || (data.portalToken is string && data.portalToken.size() <= 128)) &&
         (!('leadId' in data) || (data.leadId is string && data.leadId.size() <= 128)) &&
         (!('pais' in data) || (data.pais is string && data.pais.size() <= 10)) &&
-        (!('progresoPorcentaje' in data) || (data.progresoPorcentaje is number && data.progresoPorcentaje >= 0 && data.progresoPorcentaje <= 100)) &&
+        (!('progresoPorcentaje' in data) || (isNumeric(data.progresoPorcentaje) && data.progresoPorcentaje >= 0 && data.progresoPorcentaje <= 100)) &&
         (!('wireframesAprobados' in data) || data.wireframesAprobados is bool) &&
         (!('frontendCompletado' in data) || data.frontendCompletado is bool) &&
         (!('qaAprobado' in data) || data.qaAprobado is bool) &&
@@ -348,9 +353,9 @@ service cloud.firestore {
         (!('etapa' in data) || (data.etapa is string && data.etapa.size() <= 50)) &&
         (!('seguimientoEtapa' in data) || (data.seguimientoEtapa is string && data.seguimientoEtapa.size() <= 50)) &&
         (!('servicio' in data) || (data.servicio is string && data.servicio.size() <= 150)) &&
-        (!('presupuestoMonto' in data) || (data.presupuestoMonto is number && data.presupuestoMonto >= 0)) &&
-        (!('valorEstimado' in data) || (data.valorEstimado is number && data.valorEstimado >= 0)) &&
-        (!('probabilidad' in data) || (data.probabilidad is number && data.probabilidad >= 0 && data.probabilidad <= 100)) &&
+        (!('presupuestoMonto' in data) || (isNumeric(data.presupuestoMonto) && data.presupuestoMonto >= 0)) &&
+        (!('valorEstimado' in data) || (isNumeric(data.valorEstimado) && data.valorEstimado >= 0)) &&
+        (!('probabilidad' in data) || (isNumeric(data.probabilidad) && data.probabilidad >= 0 && data.probabilidad <= 100)) &&
         (!('fuente' in data) || (data.fuente is string && data.fuente.size() <= 100)) &&
         (!('temperatura' in data) || (data.temperatura is string && data.temperatura.size() <= 50)) &&
         (!('notas' in data) || (data.notas is string && data.notas.size() <= 5000)) &&
@@ -396,15 +401,15 @@ service cloud.firestore {
         (!('subtitulo' in data) || (data.subtitulo is string && data.subtitulo.size() <= 500)) &&
         (!('portada' in data) || data.portada is map) &&
         (!('inversion' in data) || data.inversion is map) &&
-        (!('subtotal' in data) || (data.subtotal is number && data.subtotal >= 0)) &&
-        (!('impuestos' in data) || (data.impuestos is number && data.impuestos >= 0)) &&
-        (!('total' in data) || (data.total is number && data.total >= 0)) &&
+        (!('subtotal' in data) || (isNumeric(data.subtotal) && data.subtotal >= 0)) &&
+        (!('impuestos' in data) || (isNumeric(data.impuestos) && data.impuestos >= 0)) &&
+        (!('total' in data) || (isNumeric(data.total) && data.total >= 0)) &&
         (!('modulos' in data) || (data.modulos is list && data.modulos.size() <= 50)) &&
         (!('fases' in data) || (data.fases is list && data.fases.size() <= 50)) &&
         (!('items' in data) || (data.items is list && data.items.size() <= 50)) &&
         (!('terminos' in data) || data.terminos is map) &&
         (!('estado' in data) || (data.estado is string && data.estado.size() <= 50)) &&
-        (!('vigenciaDias' in data) || (data.vigenciaDias is number && data.vigenciaDias >= 1 && data.vigenciaDias <= 365)) &&
+        (!('vigenciaDias' in data) || (isNumeric(data.vigenciaDias) && data.vigenciaDias >= 1 && data.vigenciaDias <= 365)) &&
         (!('portalToken' in data) || (data.portalToken is string && data.portalToken.size() <= 128)) &&
         (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50) || data.updatedAt is timestamp) &&
         (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50) || data.createdAt is timestamp) &&
@@ -430,14 +435,14 @@ service cloud.firestore {
         (!('proyectoId' in data) || (data.proyectoId is string && data.proyectoId.size() <= 128)) &&
         (!('titulo' in data) || (data.titulo is string && data.titulo.size() >= 1 && data.titulo.size() <= 300)) &&
         (!('descripcion' in data) || (data.descripcion is string && data.descripcion.size() <= 2000)) &&
-        (!('fase' in data) || (data.fase is string && data.fase.size() <= 50) || data.fase is number) &&
-        (!('faseNum' in data) || (data.faseNum is number && data.faseNum >= 1 && data.faseNum <= 50)) &&
+        (!('fase' in data) || (data.fase is string && data.fase.size() <= 50) || isNumeric(data.fase)) &&
+        (!('faseNum' in data) || (isNumeric(data.faseNum) && data.faseNum >= 1 && data.faseNum <= 50)) &&
         (!('hitoTarget' in data) || (data.hitoTarget is string && data.hitoTarget.size() <= 50)) &&
         (!('estado' in data) || (data.estado is string && data.estado.size() <= 50)) &&
         (!('columna' in data) || (data.columna is string && data.columna.size() <= 50)) &&
         (!('prioridad' in data) || (data.prioridad is string && data.prioridad.size() <= 50)) &&
-        (!('horasEstimadas' in data) || (data.horasEstimadas is number && data.horasEstimadas >= 0)) &&
-        (!('horasRegistradas' in data) || (data.horasRegistradas is number && data.horasRegistradas >= 0)) &&
+        (!('horasEstimadas' in data) || (isNumeric(data.horasEstimadas) && data.horasEstimadas >= 0)) &&
+        (!('horasRegistradas' in data) || (isNumeric(data.horasRegistradas) && data.horasRegistradas >= 0)) &&
         (!('asignadoA' in data) || (data.asignadoA is string && data.asignadoA.size() <= 128)) &&
         (!('fechaLimite' in data) || (data.fechaLimite is string && data.fechaLimite.size() <= 50) || data.fechaLimite is timestamp) &&
         (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50) || data.updatedAt is timestamp) &&

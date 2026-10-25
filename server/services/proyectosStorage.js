@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { syncProyectoToCloud } from './cloudSync.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,6 +24,13 @@ export function getProyectos() {
 export function saveProyectos(list) {
   try {
     fs.writeFileSync(PROYECTOS_PATH, JSON.stringify(list, null, 2), 'utf8');
+    if (Array.isArray(list)) {
+      list.forEach(p => {
+        syncProyectoToCloud(p).catch(err => {
+          console.warn('[Proyectos Sync] Error en background:', p.id, err.message);
+        });
+      });
+    }
     return true;
   } catch (err) {
     console.error('Error guardando proyectos.json:', err);

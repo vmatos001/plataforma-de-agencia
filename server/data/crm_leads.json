@@ -1,1 +1,59 @@
-[]
+[
+  {
+    "id": "crm-lead-1792969777629-cjfz",
+    "leadId": "crm-lead-1792969777629-cjfz",
+    "empresa": "TurisRan",
+    "contacto": "Ransel",
+    "cargo": "Representante / Propietario",
+    "email": "",
+    "telefono": "+1 (809) WhatsApp Directo",
+    "pais": "DO",
+    "dominio": "",
+    "etapa": "contactado",
+    "valorEstimado": 650,
+    "probabilidad": 25,
+    "fuente": "WhatsApp Inbound",
+    "portalToken": "portal-crm-lead-1792969777629-cjfz-dre5xs",
+    "temperatura": "tibio",
+    "resumenEjecutivo": "Contacto y conversación vía WhatsApp para servicios de traslados turísticos y presencia digital de TurisRan en República Dominicana.",
+    "proximaAccion": "Continuar seguimiento de la conversación en WhatsApp y validar necesidades de servicio.",
+    "interacciones": [
+      {
+        "id": "int-1792969777629",
+        "tipo": "whatsapp_registro",
+        "fecha": "2026-10-25",
+        "titulo": "Registro de Conversación WhatsApp",
+        "detalle": "Contacto y conversación vía WhatsApp para servicios de traslados turísticos y presencia digital de TurisRan en República Dominicana.",
+        "proximoPaso": "Continuar seguimiento de la conversación en WhatsApp y validar necesidades de servicio.",
+        "fechaProximoPaso": "2026-10-25"
+      }
+    ],
+    "portalConfig": {
+      "portalActivo": true,
+      "faseActual": "Diagnóstico Comercial",
+      "progresoPorcentaje": 20,
+      "archivosSubidos": [],
+      "notasCliente": "Continuar seguimiento de la conversación en WhatsApp y validar necesidades de servicio.",
+      "presupuestoId": null,
+      "proyectoId": null
+    },
+    "whatsappData": {
+      "telefono": "+1 (809) WhatsApp Directo",
+      "temperatura": "tibio",
+      "estadoSeguimiento": "conversacion_activa",
+      "resumenEjecutivo": "Contacto y conversación vía WhatsApp para servicios de traslados turísticos y presencia digital de TurisRan en República Dominicana.",
+      "proximaAccion": "Continuar seguimiento de la conversación en WhatsApp y validar necesidades de servicio.",
+      "fechaResumen": "2026-10-25",
+      "mensajes": [
+        {
+          "id": "wmsg-1792969777629",
+          "fecha": "2026-10-25T23:09:37.631Z",
+          "emisor": "cliente",
+          "texto": "Contacto y conversación vía WhatsApp para servicios de traslados turísticos y presencia digital de TurisRan en República Dominicana."
+        }
+      ]
+    },
+    "creadoEn": "2026-10-25",
+    "actualizadoEn": "2026-10-25"
+  }
+]

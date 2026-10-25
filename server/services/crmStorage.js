@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getLeads } from './storage.js';
+import { syncLeadToCloud, deleteLeadFromCloud } from './cloudSync.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -212,9 +213,32 @@ export function getCrmLeads() {
 export function saveCrmLeads(list) {
   try {
     fs.writeFileSync(CRM_PATH, JSON.stringify(list, null, 2), 'utf8');
+    // Sincronización transparente en segundo plano con Cloud Firestore y Neon PostgreSQL
+    if (Array.isArray(list)) {
+      list.forEach(lead => {
+        syncLeadToCloud(lead).catch(err => {
+          console.warn('[CRM Sync] Error sincronizando lead en background:', lead.id, err.message);
+        });
+      });
+    }
     return true;
   } catch (err) {
     console.error('Error guardando crm_leads.json:', err);
+    return false;
+  }
+}
+
+export function deleteCrmLead(id) {
+  try {
+    const leads = getCrmLeads();
+    const filtered = leads.filter(l => l.id !== id && l.leadId !== id);
+    fs.writeFileSync(CRM_PATH, JSON.stringify(filtered, null, 2), 'utf8');
+    deleteLeadFromCloud(id).catch(err => {
+      console.warn('[CRM Sync] Error eliminando lead en background:', id, err.message);
+    });
+    return true;
+  } catch (err) {
+    console.error('Error eliminando lead:', id, err);
     return false;
   }
 }
