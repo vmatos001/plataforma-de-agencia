@@ -842,7 +842,7 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
             }`}
           >
             <Layout className="w-3.5 h-3.5" />
-            <span>3. Wireframes & StoryBrand UX</span>
+            <span>3. Brand Story (StoryBrand 7 Partes)</span>
           </button>
 
           <button
