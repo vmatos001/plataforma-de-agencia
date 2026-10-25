@@ -42,12 +42,22 @@ function sanitizeForFirestore(obj) {
   return clean;
 }
 
+/**
+ * Filtra leads de prueba que no deben persistirse en producción
+ */
+function isExcludedTestRecord(empresaOrName) {
+  if (!empresaOrName) return false;
+  const norm = String(empresaOrName).toLowerCase().trim();
+  return norm.includes('multiservicios gisselle') || norm.includes('clínica dental escalón');
+}
+
 // ============================================================================
 // 1. PORTALES DE CLIENTES (/portales/{token})
 // ============================================================================
 
 /**
- * Obtiene el documento completo de un portal desde Firestore
+ * Obtiene el documento completo de un portal desde Firestore,
+ * reconciliando automáticamente con proyectos, presupuestos y crm_leads en la nube.
  */
 export async function getPortalCloud(token) {
   if (!token) return null;
@@ -55,9 +65,77 @@ export async function getPortalCloud(token) {
     const cleanToken = String(token).trim();
     const portalRef = doc(db, 'portales', cleanToken);
     const snap = await getDoc(portalRef);
-    if (snap.exists()) {
-      return snap.data();
+    let portalData = snap.exists() ? snap.data() : null;
+
+    // Si falta proyecto, presupuesto o lead, buscar en las colecciones maestras de Firestore
+    if (!portalData || !portalData.proyecto || !portalData.presupuesto || !portalData.lead) {
+      const [cloudProjs, cloudProps, cloudLeads] = await Promise.all([
+        getProyectosCloud().catch(() => []),
+        getPresupuestosCloud().catch(() => []),
+        getCrmLeadsCloud().catch(() => [])
+      ]);
+
+      const matchToken = (item) => {
+        if (!item) return false;
+        return (
+          item.portalToken === cleanToken ||
+          item.id === cleanToken ||
+          item.leadId === cleanToken ||
+          item.codigo === cleanToken ||
+          (item.id && cleanToken.includes(item.id)) ||
+          (item.leadId && cleanToken.includes(item.leadId))
+        );
+      };
+
+      const matchedLead = portalData?.lead || cloudLeads.find(matchToken) || null;
+      const targetEmp = (matchedLead?.empresa || portalData?.proyecto?.cliente?.empresa || portalData?.presupuesto?.cliente?.empresa || '').toLowerCase().trim();
+
+      const matchedProp = portalData?.presupuesto || cloudProps.find(p =>
+        matchToken(p) || (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
+      ) || null;
+
+      const matchedProj = portalData?.proyecto || cloudProjs.find(p =>
+        matchToken(p) ||
+        (matchedProp?.id && p.presupuestoId === matchedProp.id) ||
+        (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
+      ) || null;
+
+      if (matchedLead || matchedProp || matchedProj) {
+        const mergedConfig = {
+          ...(matchedLead?.portalConfig || {}),
+          ...(matchedProj?.portalConfig || {}),
+          ...(portalData?.portalConfig || {})
+        };
+        portalData = {
+          ...(portalData || {}),
+          token: cleanToken,
+          lead: matchedLead || (matchedProj?.cliente ? {
+            id: matchedProj.leadId || matchedProj.id,
+            empresa: matchedProj.cliente.empresa,
+            contacto: matchedProj.cliente.nombre,
+            telefono: matchedProj.cliente.telefono,
+            email: matchedProj.cliente.email,
+            pais: matchedProj.pais || 'SV',
+            portalToken: cleanToken
+          } : (matchedProp?.cliente ? {
+            id: matchedProp.leadId || matchedProp.id,
+            empresa: matchedProp.cliente.empresa,
+            contacto: matchedProp.cliente.nombre,
+            telefono: matchedProp.cliente.telefono,
+            email: matchedProp.cliente.email,
+            pais: matchedProp.pais || 'SV',
+            presupuestoMonto: Number(matchedProp.inversion?.precioTotal) || 0,
+            presupuestoCodigo: matchedProp.codigo,
+            portalToken: cleanToken
+          } : null)),
+          presupuesto: matchedProp,
+          proyecto: matchedProj,
+          portalConfig: mergedConfig
+        };
+      }
     }
+
+    return portalData;
   } catch (err) {
     console.warn('[FirestoreSync] Error leyendo portal:', token, err);
   }
@@ -140,6 +218,7 @@ export async function getProyectosCloud() {
  */
 export async function saveProyectoCloud(proyecto) {
   if (!proyecto || !proyecto.id) return null;
+  if (isExcludedTestRecord(proyecto.cliente?.empresa)) return null;
   try {
     await ensureAuth();
     const docId = String(proyecto.id).trim();
@@ -245,6 +324,7 @@ export async function getCrmLeadsCloud() {
  */
 export async function saveCrmLeadCloud(lead) {
   if (!lead || !lead.id) return null;
+  if (isExcludedTestRecord(lead.empresa || lead.nombreEmpresa)) return null;
   try {
     await ensureAuth();
     const docId = String(lead.id).trim();
@@ -255,6 +335,13 @@ export async function saveCrmLeadCloud(lead) {
       updatedAt: new Date().toISOString()
     });
     await setDoc(leadRef, payload, { merge: true });
+    if (lead.portalToken) {
+      savePortalCloud(lead.portalToken, {
+        token: lead.portalToken,
+        lead: payload,
+        portalConfig: lead.portalConfig || {}
+      }).catch(() => {});
+    }
     return payload;
   } catch (err) {
     console.warn('[FirestoreSync] Error guardando lead en Firestore:', lead.id, err);
@@ -330,6 +417,7 @@ export async function getPresupuestosCloud() {
  */
 export async function savePresupuestoCloud(presupuesto) {
   if (!presupuesto || !presupuesto.id) return null;
+  if (isExcludedTestRecord(presupuesto.cliente?.empresa)) return null;
   try {
     await ensureAuth();
     const docId = String(presupuesto.id).trim();
@@ -340,6 +428,12 @@ export async function savePresupuestoCloud(presupuesto) {
       updatedAt: new Date().toISOString()
     });
     await setDoc(presRef, payload, { merge: true });
+    if (presupuesto.portalToken) {
+      savePortalCloud(presupuesto.portalToken, {
+        token: presupuesto.portalToken,
+        presupuesto: payload
+      }).catch(() => {});
+    }
     return payload;
   } catch (err) {
     console.warn('[FirestoreSync] Error guardando presupuesto en Firestore:', presupuesto.id, err);

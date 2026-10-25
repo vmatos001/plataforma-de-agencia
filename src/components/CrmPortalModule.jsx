@@ -711,6 +711,13 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       if (finalLeads.length > 0) {
         setLeads(finalLeads);
         saveStoredCrmLeads(finalLeads);
+        // Asegurar que los leads locales estén respaldados en Firestore Cloud
+        const cloudIds = new Set((cloudLeads || []).map(cl => cl?.id));
+        finalLeads.forEach(fl => {
+          if (fl?.id && !cloudIds.has(fl.id)) {
+            saveCrmLeadCloud(fl).catch(() => {});
+          }
+        });
         if (!selectedPortalLeadId) setSelectedPortalLeadId(finalLeads[0].id);
         if (!selectedWaLeadId) setSelectedWaLeadId(finalLeads[0].id);
       } else if (SEED_CRM_LEADS.length > 0) {

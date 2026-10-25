@@ -1249,21 +1249,38 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         setSelectedBankTab('SV');
       }
 
-      // Enlazar con proyecto formal si existe y reconciliar progreso por eventos y sprint
+      // Enlazar con proyecto formal si existe (en localStorage o desde Firestore) y reconciliar progreso por eventos y sprint
       try {
         const storedProjs = getStoredProyectos();
         const leadEmp = (loadedData?.lead?.empresa || '').toLowerCase().trim();
-        const matchedProj = storedProjs.find(p => 
+        const localProj = storedProjs.find(p => 
           (loadedData.proyecto && p.id === loadedData.proyecto.id) ||
           (loadedData.presupuesto && (p.presupuestoId === loadedData.presupuesto.id || p.presupuestoCodigo === loadedData.presupuesto.codigo)) ||
           (leadEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === leadEmp)
         );
+        const matchedProj = loadedData.proyecto
+          ? { ...(localProj || {}), ...loadedData.proyecto }
+          : localProj;
+
         if (matchedProj) {
           const synchronizedProj = loadedData.presupuesto
             ? reconcileProyectoWithPresupuesto(matchedProj, loadedData.presupuesto)
             : matchedProj;
           const evaluatedProj = evaluateProjectMilestones(synchronizedProj);
           loadedData.proyecto = evaluatedProj;
+
+          const isFirmadoEnProj = Boolean(
+            evaluatedProj.contrato?.firmaCliente?.firmado ||
+            evaluatedProj.contrato?.firmaCliente?.firmaBase64 ||
+            evaluatedProj.portalConfig?.fase2Firmada
+          );
+
+          const isAnticipoEnProj = Boolean(
+            evaluatedProj.pagos?.anticipoEstado === 'confirmado' ||
+            evaluatedProj.pagos?.anticipoEstado === 'verificacion' ||
+            evaluatedProj.pagos?.anticipoComprobante ||
+            evaluatedProj.portalConfig?.anticipoPagado
+          );
 
           const isValidadosEnProj = Boolean(
             evaluatedProj.onboarding?.insumosValidados100 || 
@@ -1285,14 +1302,21 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
           );
 
           loadedData.portalConfig = {
+            ...(evaluatedProj.portalConfig || {}),
             ...(loadedData.portalConfig || {}),
+            fase1Aprobada: isFirmadoEnProj || isAnticipoEnProj || Boolean(loadedData.portalConfig?.fase1Aprobada),
+            fase2Firmada: isFirmadoEnProj || Boolean(loadedData.portalConfig?.fase2Firmada),
+            firmaDigital: loadedData.portalConfig?.firmaDigital || evaluatedProj.contrato?.firmaCliente?.firmaBase64 || '',
+            nombreFirmante: loadedData.portalConfig?.nombreFirmante || evaluatedProj.contrato?.firmaCliente?.nombreFirmante || '',
+            documentoFirmante: loadedData.portalConfig?.documentoFirmante || evaluatedProj.contrato?.firmaCliente?.identificacion || '',
+            anticipoPagado: isAnticipoEnProj || Boolean(loadedData.portalConfig?.anticipoPagado),
             progresoPorcentaje: isSaldoLiquidadoEnProj ? 100 : (evaluatedProj.seguimiento?.porcentajeAvance || loadedData.portalConfig?.progresoPorcentaje || 20),
             fase3InsumosCompletos: isValidadosEnProj || Boolean(loadedData.portalConfig?.fase3InsumosCompletos),
             clienteConfirmoInsumos: isClienteConfirmoEnProj || Boolean(loadedData.portalConfig?.clienteConfirmoInsumos),
             fase4Liquidada: isSaldoLiquidadoEnProj || Boolean(loadedData.portalConfig?.fase4Liquidada),
             liquidacionPagada: isSaldoLiquidadoEnProj || Boolean(loadedData.portalConfig?.liquidacionPagada),
             fechaLiquidacion: loadedData.portalConfig?.fechaLiquidacion || evaluatedProj.pagos?.saldoFecha || new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
-            faseActual: isSaldoLiquidadoEnProj ? 5 : (isValidadosEnProj ? Math.max(4, loadedData.portalConfig?.faseActual || 4) : (loadedData.portalConfig?.faseActual || 1))
+            faseActual: isSaldoLiquidadoEnProj ? 5 : (isValidadosEnProj ? Math.max(4, loadedData.portalConfig?.faseActual || 4) : (isFirmadoEnProj ? Math.max(3, loadedData.portalConfig?.faseActual || 3) : (loadedData.portalConfig?.faseActual || 1)))
           };
         }
       } catch (projSyncErr) {
@@ -1409,6 +1433,19 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         }
       } catch (e) {}
 
+      // Sincronizar automáticamente el estado consolidado hacia Firestore si no es el portal demo
+      if (loadedData && loadedData.lead && loadedData.lead.id !== 'lead-demo-portal') {
+        const activeToken = token || loadedData.lead.portalToken || loadedData.lead.id;
+        savePortalCloud(activeToken, {
+          token: activeToken,
+          lead: loadedData.lead,
+          presupuesto: loadedData.presupuesto || null,
+          proyecto: loadedData.proyecto || null,
+          portalConfig: loadedData.portalConfig || {},
+          workflowData: loadedData.workflowData || null
+        }).catch(() => {});
+      }
+
       setData(prev => {
         if (!prev) return loadedData;
         return {
@@ -1430,7 +1467,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   };
 
   // Helper to persist portal config changes
-  const savePortalUpdates = async (updates) => {
+  const savePortalUpdates = async (updates, overrideProyecto = null) => {
     if (!data?.lead) return;
 
     const newPortalConfig = {
@@ -1449,9 +1486,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       newLead.probabilidad = 100;
     }
 
+    const effectiveProyecto = overrideProyecto || data.proyecto || null;
+
     setData(prev => ({
       ...prev,
       lead: newLead,
+      proyecto: effectiveProyecto || prev?.proyecto || null,
       portalConfig: newPortalConfig
     }));
 
@@ -1477,13 +1517,13 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         token: activeToken,
         lead: newLead,
         presupuesto: data.presupuesto || null,
-        proyecto: data.proyecto ? { ...data.proyecto, portalConfig: newPortalConfig } : null,
+        proyecto: effectiveProyecto ? { ...effectiveProyecto, portalConfig: newPortalConfig } : null,
         portalConfig: newPortalConfig
       }).catch(err => console.warn('[Portal] Firestore sync background err:', err));
 
-      if (data.proyecto?.id) {
+      if (effectiveProyecto?.id) {
         saveProyectoCloud({
-          ...data.proyecto,
+          ...effectiveProyecto,
           portalConfig: newPortalConfig
         }).catch(() => {});
       }
@@ -1635,7 +1675,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         fechaAprobacionPropuesta: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
         progresoPorcentaje: 40,
         faseActual: 2
-      });
+      }, generatedProj);
     } catch (err) {
       console.warn('Portal update err:', err);
     }
@@ -1812,7 +1852,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       }
     } catch (e) {}
 
-    // 3. Persistir en portal config
+    // 3. Persistir en portal config y Firestore Cloud con el proyecto firmado
     await savePortalUpdates({
       fase2Firmada: true,
       fechaFirmaContrato: fechaFirma,
@@ -1825,7 +1865,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       anticipoPagado: true,
       progresoPorcentaje: 60,
       faseActual: 3
-    });
+    }, targetUpdatedProj);
 
     if (targetUpdatedProj) {
       setData(prev => ({

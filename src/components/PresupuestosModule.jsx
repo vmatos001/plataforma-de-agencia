@@ -391,6 +391,13 @@ export default function PresupuestosModule({
         if (typeof window !== 'undefined') {
           localStorage.setItem('goglite_presupuestos', JSON.stringify(clean));
         }
+        // Asegurar que las propuestas locales estén respaldadas en Firestore Cloud
+        const cloudIds = new Set((cloudProps || []).map(cp => cp?.id));
+        clean.forEach(p => {
+          if (p?.id && !cloudIds.has(p.id)) {
+            savePresupuestoCloud(p).catch(() => {});
+          }
+        });
       }
     } catch (err) {
       console.warn('Error al sincronizar presupuestos:', err);

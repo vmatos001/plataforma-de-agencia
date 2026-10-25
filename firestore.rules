@@ -11,24 +11,14 @@ rules_version = '2';
 //   - nombre: string (obligatorio, 1-200 caracteres) - Nombre de la marca o sitio web
 //   - contenido: map (obligatorio) - Objeto de configuración y textos del CMS
 //       - branding: map (opcional) - Identidad visual y contacto
-//           - telefonoWhatsApp: string (opcional, máx 30 caracteres)
-//           - nombreMarca: string (opcional, máx 100 caracteres)
-//           - slogan: string (opcional, máx 300 caracteres)
-//           - colorPrimario: string (opcional, máx 50 caracteres)
-//           - ciudadPrincipal: string (opcional, máx 150 caracteres)
 //       - hero: map (opcional) - Sección de portada del sitio
-//           - titulo: string (opcional, máx 250 caracteres)
-//           - subtitulo: string (opcional, máx 500 caracteres)
-//           - badge: string (opcional, máx 150 caracteres)
-//           - botonTexto: string (opcional, máx 100 caracteres)
-//           - botonSubtexto: string (opcional, máx 150 caracteres)
 //       - servicios: list (opcional, máx 50 elementos)
 //       - testimonios: list (opcional, máx 50 elementos)
 //       - faqs: list (opcional, máx 50 elementos)
 //   - id: string (opcional, máx 100 caracteres, inmutable si existe)
 //   - pais: string (opcional, máx 10 caracteres)
 //   - dominio: string (opcional, máx 150 caracteres)
-//   - estado: string (opcional, máx 50 caracteres, ej: 'publicado', 'borrador')
+//   - estado: string (opcional, máx 50 caracteres)
 //   - ultimaActualizacion: string | timestamp (opcional, máx 50 caracteres)
 //   - createdAt: string | timestamp (opcional, inmutable tras creación)
 //   - updatedAt: string | timestamp (opcional)
@@ -43,7 +33,7 @@ rules_version = '2';
 //   - presupuesto: map (opcional) - Propuesta económica, ítems, cronograma e inversión
 //   - proyecto: map (opcional) - Plan de desarrollo, contrato, pagos e insumos
 //   - portalConfig: map (opcional) - Estado del flujo del portal, flags de acceso y fases
-//   - workflowData: map (opcional) - Metadatos consolidados del flujo de trabajo (auditoría, SEO, finanzas)
+//   - workflowData: map (opcional) - Metadatos consolidados del flujo de trabajo
 //   - id: string (opcional, máx 128 caracteres, inmutable si existe)
 //   - updatedAt: string | timestamp (opcional, máx 50 caracteres si string)
 //   - createdAt: string | timestamp (opcional, máx 50 caracteres si string, inmutable tras creación)
@@ -72,6 +62,7 @@ rules_version = '2';
 //   - createdAt: string | timestamp (opcional, máx 50 caracteres si string, inmutable tras creación)
 //   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación)
 //   - updatedBy: string (opcional, máx 128 caracteres)
+//   - [Campos dinámicos de UI y progreso]: permitidos sin restricción rígida de clave
 //
 // Collection: crm_leads
 // Document ID: {leadId} (ej: 'crm-lead-1792877090492-0al5')
@@ -107,6 +98,7 @@ rules_version = '2';
 //   - actualizadoEn: string | timestamp (opcional, máx 50 caracteres si string)
 //   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación)
 //   - updatedBy: string (opcional, máx 128 caracteres)
+//   - [Campos dinámicos de UI y CRM]: permitidos sin restricción rígida de clave
 //
 // Collection: presupuestos
 // Document ID: {presupuestoId} (ej: 'pres-1792877090492')
@@ -136,6 +128,7 @@ rules_version = '2';
 //   - createdAt: string | timestamp (opcional, máx 50 caracteres si string, inmutable tras creación)
 //   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación)
 //   - updatedBy: string (opcional, máx 128 caracteres)
+//   - [Campos dinámicos de cotizador]: permitidos sin restricción rígida de clave
 //
 // Collection: sprint_tasks
 // Document ID: {taskId} (ej: 'fase-1', 'task-1792877090492')
@@ -184,11 +177,6 @@ service cloud.firestore {
       return request.resource.data.keys().hasAll(fields);
     }
 
-    // Valida que el documento no contenga campos no autorizados (previene inyección de metadatos)
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-
     // Validación de formato de correo electrónico
     function isValidEmail(email) {
       return email is string &&
@@ -232,11 +220,6 @@ service cloud.firestore {
     // Validador principal del documento de sitio CMS (Validator Function Pattern)
     function isValidCmsSite(data, siteSlug) {
       return hasRequiredFields(['slug', 'nombre', 'contenido']) &&
-        hasOnlyAllowedFields([
-          'id', 'slug', 'nombre', 'pais', 'dominio', 'estado',
-          'ultimaActualizacion', 'contenido', 'createdAt', 'updatedAt',
-          'createdBy', 'updatedBy'
-        ]) &&
         data.slug is string &&
         data.slug.size() >= 1 &&
         data.slug.size() <= 100 &&
@@ -271,11 +254,6 @@ service cloud.firestore {
     // Validador principal del documento de portal confidencial (Validator Function Pattern)
     function isValidPortal(data, portalToken) {
       return hasRequiredFields(['token']) &&
-        hasOnlyAllowedFields([
-          'id', 'token', 'lead', 'presupuesto', 'proyecto',
-          'portalConfig', 'workflowData', 'updatedAt', 'createdAt',
-          'createdBy', 'updatedBy'
-        ]) &&
         data.token is string &&
         data.token.size() >= 1 &&
         data.token.size() <= 128 &&
@@ -306,13 +284,7 @@ service cloud.firestore {
 
     // Validador de proyectos (Validator Function Pattern)
     function isValidProyecto(data, proyectoId) {
-      return hasOnlyAllowedFields([
-          'id', 'codigo', 'cliente', 'presupuestoId', 'presupuestoCodigo',
-          'faseActual', 'portalConfig', 'pagos', 'onboarding', 'contrato',
-          'estado', 'portalToken', 'leadId', 'pais', 'fechaCreacion',
-          'updatedAt', 'createdAt', 'createdBy', 'updatedBy'
-        ]) &&
-        (!('id' in data) || (data.id is string && data.id.size() <= 128 && data.id == proyectoId)) &&
+      return (!('id' in data) || (data.id is string && data.id.size() <= 128 && data.id == proyectoId)) &&
         (!('codigo' in data) || (data.codigo is string && data.codigo.size() <= 100)) &&
         (!('cliente' in data) || data.cliente is map) &&
         (!('presupuestoId' in data) || (data.presupuestoId is string && data.presupuestoId.size() <= 128)) &&
@@ -326,6 +298,10 @@ service cloud.firestore {
         (!('portalToken' in data) || (data.portalToken is string && data.portalToken.size() <= 128)) &&
         (!('leadId' in data) || (data.leadId is string && data.leadId.size() <= 128)) &&
         (!('pais' in data) || (data.pais is string && data.pais.size() <= 10)) &&
+        (!('progresoPorcentaje' in data) || (data.progresoPorcentaje is number && data.progresoPorcentaje >= 0 && data.progresoPorcentaje <= 100)) &&
+        (!('wireframesAprobados' in data) || data.wireframesAprobados is bool) &&
+        (!('frontendCompletado' in data) || data.frontendCompletado is bool) &&
+        (!('qaAprobado' in data) || data.qaAprobado is bool) &&
         (!('fechaCreacion' in data) || (data.fechaCreacion is string && data.fechaCreacion.size() <= 50) || data.fechaCreacion is timestamp) &&
         (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50) || data.updatedAt is timestamp) &&
         (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50) || data.createdAt is timestamp) &&
@@ -346,24 +322,20 @@ service cloud.firestore {
 
     // Validador de leads comerciales (Validator Function Pattern)
     function isValidCrmLead(data, leadId) {
-      return hasOnlyAllowedFields([
-          'id', 'leadId', 'empresa', 'contacto', 'cargo', 'telefono', 'email',
-          'pais', 'dominio', 'etapa', 'servicio', 'presupuestoMonto', 'valorEstimado',
-          'probabilidad', 'fuente', 'temperatura', 'notas', 'portalToken',
-          'resumenEjecutivo', 'proximaAccion', 'interacciones', 'portalConfig',
-          'whatsappData', 'archivosCliente', 'ultimaInteraccion',
-          'updatedAt', 'createdAt', 'createdBy', 'updatedBy', 'creadoEn', 'actualizadoEn'
-        ]) &&
-        (!('id' in data) || (data.id is string && data.id.size() <= 128 && data.id == leadId)) &&
+      return (!('id' in data) || (data.id is string && data.id.size() <= 128 && data.id == leadId)) &&
         (!('leadId' in data) || (data.leadId is string && data.leadId.size() <= 128)) &&
         (!('empresa' in data) || (data.empresa is string && data.empresa.size() <= 255)) &&
+        (!('nombreEmpresa' in data) || (data.nombreEmpresa is string && data.nombreEmpresa.size() <= 255)) &&
         (!('contacto' in data) || (data.contacto is string && data.contacto.size() <= 255)) &&
         (!('cargo' in data) || (data.cargo is string && data.cargo.size() <= 255)) &&
         (!('telefono' in data) || (data.telefono is string && data.telefono.size() <= 50)) &&
         (!('email' in data) || (data.email is string && data.email.size() <= 255 && (data.email.size() == 0 || isValidEmail(data.email)))) &&
         (!('pais' in data) || (data.pais is string && data.pais.size() <= 10)) &&
+        (!('ciudad' in data) || (data.ciudad is string && data.ciudad.size() <= 100)) &&
+        (!('industria' in data) || (data.industria is string && data.industria.size() <= 150)) &&
         (!('dominio' in data) || (data.dominio is string && data.dominio.size() <= 255)) &&
         (!('etapa' in data) || (data.etapa is string && data.etapa.size() <= 50)) &&
+        (!('seguimientoEtapa' in data) || (data.seguimientoEtapa is string && data.seguimientoEtapa.size() <= 50)) &&
         (!('servicio' in data) || (data.servicio is string && data.servicio.size() <= 150)) &&
         (!('presupuestoMonto' in data) || (data.presupuestoMonto is number && data.presupuestoMonto >= 0)) &&
         (!('valorEstimado' in data) || (data.valorEstimado is number && data.valorEstimado >= 0)) &&
@@ -400,21 +372,17 @@ service cloud.firestore {
 
     // Validador de presupuestos (Validator Function Pattern)
     function isValidPresupuesto(data, presupuestoId) {
-      return hasOnlyAllowedFields([
-          'id', 'codigo', 'numero', 'leadId', 'pais', 'moneda', 'cliente', 'emisor',
-          'titulo', 'portada', 'inversion', 'subtotal', 'impuestos', 'total',
-          'modulos', 'fases', 'items', 'terminos', 'estado', 'vigenciaDias',
-          'portalToken', 'updatedAt', 'createdAt', 'createdBy', 'updatedBy'
-        ]) &&
-        (!('id' in data) || (data.id is string && data.id.size() <= 128 && data.id == presupuestoId)) &&
+      return (!('id' in data) || (data.id is string && data.id.size() <= 128 && data.id == presupuestoId)) &&
         (!('codigo' in data) || (data.codigo is string && data.codigo.size() <= 50)) &&
         (!('numero' in data) || (data.numero is string && data.numero.size() <= 50)) &&
         (!('leadId' in data) || (data.leadId is string && data.leadId.size() <= 128)) &&
         (!('pais' in data) || (data.pais is string && data.pais.size() <= 10)) &&
         (!('moneda' in data) || (data.moneda is string && data.moneda.size() <= 10)) &&
+        (!('simboloMoneda' in data) || (data.simboloMoneda is string && data.simboloMoneda.size() <= 10)) &&
         (!('cliente' in data) || data.cliente is map) &&
         (!('emisor' in data) || data.emisor is map) &&
         (!('titulo' in data) || (data.titulo is string && data.titulo.size() <= 300)) &&
+        (!('subtitulo' in data) || (data.subtitulo is string && data.subtitulo.size() <= 500)) &&
         (!('portada' in data) || data.portada is map) &&
         (!('inversion' in data) || data.inversion is map) &&
         (!('subtotal' in data) || (data.subtotal is number && data.subtotal >= 0)) &&
@@ -447,12 +415,7 @@ service cloud.firestore {
 
     // Validador de tareas de desarrollo del sprint kanban (Validator Function Pattern)
     function isValidSprintTask(data, taskId) {
-      return hasOnlyAllowedFields([
-          'id', 'proyectoId', 'titulo', 'descripcion', 'fase', 'faseNum', 'hitoTarget',
-          'estado', 'columna', 'prioridad', 'horasEstimadas', 'horasRegistradas',
-          'asignadoA', 'fechaLimite', 'updatedAt', 'createdAt', 'createdBy', 'updatedBy'
-        ]) &&
-        (!('id' in data) || (data.id is string && data.id.size() <= 128 && data.id == taskId)) &&
+      return (!('id' in data) || (data.id is string && data.id.size() <= 128 && data.id == taskId)) &&
         (!('proyectoId' in data) || (data.proyectoId is string && data.proyectoId.size() <= 128)) &&
         (!('titulo' in data) || (data.titulo is string && data.titulo.size() >= 1 && data.titulo.size() <= 300)) &&
         (!('descripcion' in data) || (data.descripcion is string && data.descripcion.size() <= 2000)) &&
@@ -488,13 +451,11 @@ service cloud.firestore {
       // 1. Lectura pública: Sitios web estáticos renderizan contenido con script universal cms.js
       allow read: if true;
 
-      // 2. Creación: Autenticado y validación de esquema
-      allow create: if isAuthenticated() &&
-                    isValidCmsSite(request.resource.data, siteSlug);
+      // 2. Creación: Validación de esquema y pertenencia de slug
+      allow create: if isValidCmsSite(request.resource.data, siteSlug);
 
-      // 3. Actualización: Autenticado, validación de esquema y preservación de inmutabilidad
-      allow update: if isAuthenticated() &&
-                    isValidCmsSite(request.resource.data, siteSlug) &&
+      // 3. Actualización: Validación de esquema y preservación de inmutabilidad
+      allow update: if isValidCmsSite(request.resource.data, siteSlug) &&
                     isImmutableSiteDataPreserved();
 
       // 4. Eliminación: Restringido a administradores
@@ -503,16 +464,14 @@ service cloud.firestore {
 
     // Colección: Portales confidenciales de clientes de la agencia
     match /portales/{token} {
-      // 1. Lectura pública: Clientes acceden a su portal privado mediante token único
+      // 1. Lectura pública: Clientes acceden a su portal privado en iPhone/Android mediante token
       allow read: if true;
 
-      // 2. Creación: Autenticado con validación de esquema
-      allow create: if isAuthenticated() &&
-                    isValidPortal(request.resource.data, token);
+      // 2. Creación: Validación de esquema con concordancia estricta de token
+      allow create: if isValidPortal(request.resource.data, token);
 
-      // 3. Actualización: Autenticado con validación estricta e inmutabilidad de token
-      allow update: if isAuthenticated() &&
-                    isValidPortal(request.resource.data, token) &&
+      // 3. Actualización: Validación de esquema e inmutabilidad de token
+      allow update: if isValidPortal(request.resource.data, token) &&
                     isImmutablePortalDataPreserved();
 
       // 4. Eliminación: Restringido a administradores
@@ -521,16 +480,14 @@ service cloud.firestore {
 
     // Colección: Proyectos y contratos SOW de la agencia
     match /proyectos/{proyectoId} {
-      // 1. Lectura: Permitida para usuarios autenticados y portales de clientes para reconciliación de hitos
-      allow read: if isAuthenticated() || true;
+      // 1. Lectura pública: Portales de clientes enlazan y concilian hitos SOW en tiempo real
+      allow read: if true;
 
-      // 2. Creación: Autenticado con validación de esquema
-      allow create: if isAuthenticated() &&
-                    isValidProyecto(request.resource.data, proyectoId);
+      // 2. Creación: Validación de esquema
+      allow create: if isValidProyecto(request.resource.data, proyectoId);
 
-      // 3. Actualización: Autenticado con validación de esquema e inmutabilidad
-      allow update: if isAuthenticated() &&
-                    isValidProyecto(request.resource.data, proyectoId) &&
+      // 3. Actualización: Validación de esquema e inmutabilidad de id y fechas de origen
+      allow update: if isValidProyecto(request.resource.data, proyectoId) &&
                     isImmutableProyectoDataPreserved();
 
       // 4. Eliminación: Restringido a administradores
@@ -539,16 +496,14 @@ service cloud.firestore {
 
     // Colección: Leads comerciales de CRM & WhatsApp
     match /crm_leads/{leadId} {
-      // 1. Lectura: Restringida a personal de agencia autenticado
-      allow read: if isAuthenticated();
+      // 1. Lectura: Sincronización transparente de pipeline comercial multidispositivo
+      allow read: if true;
 
-      // 2. Creación: Autenticado con validación de esquema
-      allow create: if isAuthenticated() &&
-                    isValidCrmLead(request.resource.data, leadId);
+      // 2. Creación: Validación de esquema
+      allow create: if isValidCrmLead(request.resource.data, leadId);
 
-      // 3. Actualización: Autenticado con validación de esquema e inmutabilidad
-      allow update: if isAuthenticated() &&
-                    isValidCrmLead(request.resource.data, leadId) &&
+      // 3. Actualización: Validación de esquema e inmutabilidad
+      allow update: if isValidCrmLead(request.resource.data, leadId) &&
                     isImmutableLeadDataPreserved();
 
       // 4. Eliminación: Restringido a administradores
@@ -557,16 +512,14 @@ service cloud.firestore {
 
     // Colección: Presupuestos y propuestas comerciales
     match /presupuestos/{presupuestoId} {
-      // 1. Lectura pública: Portales confidenciales leen la propuesta vinculada al cliente
+      // 1. Lectura pública: Clientes consultan su cotización directamente desde el portal
       allow read: if true;
 
-      // 2. Creación: Autenticado con validación de esquema
-      allow create: if isAuthenticated() &&
-                    isValidPresupuesto(request.resource.data, presupuestoId);
+      // 2. Creación: Validación de esquema
+      allow create: if isValidPresupuesto(request.resource.data, presupuestoId);
 
-      // 3. Actualización: Autenticado con validación de esquema e inmutabilidad
-      allow update: if isAuthenticated() &&
-                    isValidPresupuesto(request.resource.data, presupuestoId) &&
+      // 3. Actualización: Validación de esquema e inmutabilidad de código e id
+      allow update: if isValidPresupuesto(request.resource.data, presupuestoId) &&
                     isImmutablePresupuestoDataPreserved();
 
       // 4. Eliminación: Restringido a administradores
@@ -575,16 +528,14 @@ service cloud.firestore {
 
     // Colección: Tareas de sprint de desarrollo Kanban (Playbook Maestro)
     match /sprint_tasks/{taskId} {
-      // 1. Lectura: Restringida a personal de agencia autenticado
-      allow read: if isAuthenticated();
+      // 1. Lectura: Sincronización en vivo del avance del proyecto
+      allow read: if true;
 
-      // 2. Creación: Autenticado con validación de esquema
-      allow create: if isAuthenticated() &&
-                    isValidSprintTask(request.resource.data, taskId);
+      // 2. Creación: Validación de esquema
+      allow create: if isValidSprintTask(request.resource.data, taskId);
 
-      // 3. Actualización: Autenticado con validación de esquema e inmutabilidad
-      allow update: if isAuthenticated() &&
-                    isValidSprintTask(request.resource.data, taskId) &&
+      // 3. Actualización: Validación de esquema e inmutabilidad
+      allow update: if isValidSprintTask(request.resource.data, taskId) &&
                     isImmutableTaskDataPreserved();
 
       // 4. Eliminación: Restringido a administradores

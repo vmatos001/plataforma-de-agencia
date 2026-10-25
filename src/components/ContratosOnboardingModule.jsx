@@ -221,6 +221,10 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
         return evaluated;
       });
       saveStoredProyectos(localList);
+      // Sincronizar hacia Firestore cualquier proyecto local para disponibilidad inmediata en celulares
+      localList.forEach(p => {
+        if (p?.id) saveProyectoCloud(p).catch(() => {});
+      });
 
       setProyectos(localList);
       setActiveProyecto(prev => {
