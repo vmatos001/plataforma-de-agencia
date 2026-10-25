@@ -57,6 +57,8 @@ import {
   reconcileInvoiceWithPresupuesto,
   normalizeFacturaItems 
 } from './GestionRentabilidadModule';
+import { auth } from '../services/firebase';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 function GoogleProtectedCard({
   title,
@@ -449,6 +451,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   const handleClientLogout = async () => {
     if (!window.confirm('¿Deseas cerrar tu sesión segura en este portal? Las tarjetas de Aprobación y Contrato SOW quedarán protegidas bajo autenticación de Google.')) return;
+    try {
+      await auth.signOut();
+    } catch (e) {
+      console.warn('Error signing out from auth:', e);
+    }
     await savePortalUpdates({
       clienteAutenticado: false,
       clienteAuthEmail: '',
@@ -691,8 +698,35 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const handleRegisterClientAuth = async (provider = 'google') => {
     try {
       setClientAuthLoading(true);
-      const email = clientAuthEmail.trim() || data?.lead?.email || 'sitesgoglite@gmail.com';
-      const nombre = signerName.trim() || data?.lead?.contacto || data?.lead?.empresa || 'Cliente';
+      let email = clientAuthEmail.trim() || data?.lead?.email || 'cliente@empresa.com';
+      let nombre = signerName.trim() || data?.lead?.contacto || data?.lead?.empresa || 'Cliente';
+
+      // Si el proveedor seleccionado es Google o Google Workspace, abrir la ventana oficial de Google
+      if (provider === 'google' || provider === 'Google Workspace') {
+        try {
+          const googleProvider = new GoogleAuthProvider();
+          // Forzar a Google a mostrar el diálogo de selección de cuentas para permitir cambiar o agregar otra cuenta
+          googleProvider.setCustomParameters({ prompt: 'select_account' });
+          const userCredential = await signInWithPopup(auth, googleProvider);
+          if (userCredential?.user) {
+            email = userCredential.user.email || email;
+            nombre = userCredential.user.displayName || nombre;
+          }
+        } catch (popupErr) {
+          console.warn('[Portal Google Auth] Error o cancelación en popup:', popupErr);
+          // Si el usuario cerró intencionalmente el popup de Google, no forzar login
+          if (popupErr?.code === 'auth/popup-closed-by-user' || popupErr?.code === 'auth/cancelled-popup-request') {
+            setClientAuthLoading(false);
+            return;
+          }
+          if (popupErr?.code === 'auth/popup-blocked') {
+            alert('El navegador bloqueó la ventana emergente de Google. Por favor, permite las ventanas emergentes (popups) para iniciar sesión con Google.');
+            setClientAuthLoading(false);
+            return;
+          }
+          throw popupErr;
+        }
+      }
 
       try {
         await fetch('/api/auth/client-register', {
@@ -730,13 +764,13 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       }));
 
       setClientAuthSuccess(true);
-      showNotification('✓ ¡Acceso autorizado verificado con Google! Documentos desbloqueados.');
+      showNotification(`✓ ¡Acceso autorizado verificado para ${email}! Documentos desbloqueados.`);
       setTimeout(() => {
         setShowClientAuthModal(false);
         setClientAuthSuccess(false);
       }, 1500);
     } catch (err) {
-      alert('Error vinculando cuenta: ' + err.message);
+      alert('Error vinculando cuenta con Google: ' + (err.message || err));
     } finally {
       setClientAuthLoading(false);
     }
