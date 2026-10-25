@@ -56,7 +56,13 @@ import {
   syncAllProyectosWithEvents,
   getStoredSprintTasks
 } from '../services/projectMilestoneSync';
-import { savePortalToFirestore } from '../services/firebase';
+import { 
+  getProyectosCloud, 
+  saveProyectoCloud, 
+  deleteProyectoCloud,
+  subscribeProyectosCloud, 
+  savePortalCloud 
+} from '../services/firestoreSyncService';
 
 export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNavigateToPresupuestos }) {
   const [proyectos, setProyectos] = useState([]);
@@ -92,6 +98,19 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     fetchProyectos();
     fetchPresupuestos();
 
+    // Suscripción en tiempo real a proyectos en Firestore para actualización instantánea multiplataforma
+    const unsubscribeProyectos = subscribeProyectosCloud((cloudList) => {
+      if (Array.isArray(cloudList) && cloudList.length > 0) {
+        setProyectos(prev => {
+          const map = new Map();
+          [...cloudList, ...prev].forEach(p => {
+            if (p?.id && !map.has(p.id)) map.set(p.id, p);
+          });
+          return Array.from(map.values());
+        });
+      }
+    });
+
     const handleStorageChange = () => {
       fetchProyectos();
       fetchPresupuestos();
@@ -100,6 +119,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     window.addEventListener('goglite_proyectos_synced', handleStorageChange);
     window.addEventListener('goglite_tasks_updated', handleStorageChange);
     return () => {
+      if (typeof unsubscribeProyectos === 'function') unsubscribeProyectos();
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('goglite_proyectos_synced', handleStorageChange);
       window.removeEventListener('goglite_tasks_updated', handleStorageChange);
@@ -108,6 +128,20 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
 
   const fetchProyectos = async () => {
     let localList = getStoredProyectos();
+
+    // 1. Consultar Firestore para proyectos en la nube
+    try {
+      const cloudList = await getProyectosCloud();
+      if (Array.isArray(cloudList) && cloudList.length > 0) {
+        const map = new Map();
+        [...cloudList, ...localList].forEach(p => {
+          if (p?.id && !map.has(p.id)) map.set(p.id, p);
+        });
+        localList = Array.from(map.values());
+      }
+    } catch (cErr) {
+      console.warn('[Contratos] Error leyendo proyectos de Firestore:', cErr);
+    }
 
     // Auto-generar y vincular contratos para cualquier propuesta que ya haya sido aceptada
     try {
@@ -272,10 +306,12 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
         createdProj = buildProyectoFromPresupuesto(prop, proyectos);
       }
 
-      // 3. Persistir en estado y localStorage
+      // 3. Persistir en estado, localStorage y Firestore Cloud
       const updatedList = [createdProj, ...proyectos.filter(p => p.id !== createdProj.id)];
       setProyectos(updatedList);
       saveStoredProyectos(updatedList);
+      saveProyectoCloud(createdProj).catch(() => {});
+      syncPortalStorageForProyecto(createdProj);
 
       // 4. Actualizar estado del presupuesto a 'aceptado' si no lo estaba
       try {
@@ -296,6 +332,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     e?.stopPropagation();
     if (!confirm('¿Seguro que deseas eliminar este proyecto y su contrato?')) return;
     try {
+      deleteProyectoCloud(id).catch(() => {});
       try {
         await fetch(`/api/proyectos/${id}`, { method: 'DELETE' });
       } catch (e) {}
@@ -392,6 +429,9 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       return next;
     });
 
+    saveProyectoCloud(updatedProj).catch(() => {});
+    syncPortalStorageForProyecto(updatedProj);
+
     try {
       await fetch(`/api/proyectos/${activeProyecto.id}/firmar`, {
         method: 'POST',
@@ -440,6 +480,9 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       return next;
     });
 
+    saveProyectoCloud(updatedProj).catch(() => {});
+    syncPortalStorageForProyecto(updatedProj);
+
     try {
       await fetch(`/api/proyectos/${activeProyecto.id}/hito`, {
         method: 'POST',
@@ -464,6 +507,8 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       saveStoredProyectos(next);
       return next;
     });
+    saveProyectoCloud(reEvaluated).catch(() => {});
+    syncPortalStorageForProyecto(reEvaluated);
     showNotification();
   };
 
@@ -533,7 +578,13 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
 
       // Sincronizar en Firestore para acceso inmediato desde celulares y otros dispositivos
       const syncToken = proj.portalToken || (proj.leadId ? 'portal-' + proj.leadId : 'portal-' + proj.id);
-      savePortalToFirestore(syncToken, {
+      saveProyectoCloud({
+        ...proj,
+        faseActual: updates.faseActual || proj.faseActual || 1,
+        portalConfig: { ...(proj.portalConfig || {}), ...updates }
+      }).catch(() => {});
+
+      savePortalCloud(syncToken, {
         token: syncToken,
         lead: {
           id: proj.leadId || proj.id,

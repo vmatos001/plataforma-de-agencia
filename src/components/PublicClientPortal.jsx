@@ -61,7 +61,8 @@ import {
   reconcileInvoiceWithPresupuesto,
   normalizeFacturaItems 
 } from './GestionRentabilidadModule';
-import { auth, getPortalFromFirestore, savePortalToFirestore } from '../services/firebase';
+import { auth } from '../services/firebase';
+import { getPortalCloud, savePortalCloud, subscribePortalCloud, saveProyectoCloud } from '../services/firestoreSyncService';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 function GoogleProtectedCard({
@@ -670,9 +671,23 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   useEffect(() => {
     loadPortalData({ silent: false });
 
-    // Escuchar actualizaciones en tiempo real de la base de datos de la aplicación (Fases 1 a 7)
-    // IMPORTANTE: No escuchar 'focus' porque al cerrar el selector de archivos del sistema operativo
-    // se dispara 'focus' y recargaría el portal desmontando el formulario.
+    // Escuchar actualizaciones en tiempo real de Firestore para sincronización instantánea multiplataforma (PC <-> Móvil)
+    const unsubscribeFirestore = subscribePortalCloud(token, (livePortal) => {
+      if (livePortal && (livePortal.lead || livePortal.presupuesto || livePortal.proyecto || livePortal.portalConfig)) {
+        setData(prev => {
+          if (!prev) return livePortal;
+          return {
+            ...prev,
+            ...livePortal,
+            lead: { ...(prev.lead || {}), ...(livePortal.lead || {}) },
+            presupuesto: livePortal.presupuesto || prev.presupuesto,
+            proyecto: livePortal.proyecto || prev.proyecto,
+            portalConfig: { ...(prev.portalConfig || {}), ...(livePortal.portalConfig || {}) }
+          };
+        });
+      }
+    });
+
     const handleDatabaseSync = () => {
       loadPortalData({ silent: true });
     };
@@ -681,6 +696,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     window.addEventListener('goglite_proyectos_synced', handleDatabaseSync);
 
     return () => {
+      if (typeof unsubscribeFirestore === 'function') unsubscribeFirestore();
       window.removeEventListener('storage', handleDatabaseSync);
       window.removeEventListener('goglite_proyectos_synced', handleDatabaseSync);
     };
@@ -1023,7 +1039,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
       // 1. Consultar Firestore en tiempo real para sincronización multidispositivo (PC <-> Móvil)
       try {
-        const firestoreData = await getPortalFromFirestore(token);
+        const firestoreData = await getPortalCloud(token);
         if (firestoreData && (firestoreData.lead || firestoreData.presupuesto || firestoreData.proyecto)) {
           if (loadedData) {
             loadedData = {
@@ -1452,6 +1468,27 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       }
     } catch (e) {
       console.error('Error saving to localStore:', e);
+    }
+
+    // Sync con Firestore Cloud para persistencia multiplataforma inmediata (Móvil <-> PC)
+    try {
+      const activeToken = token || data.lead.portalToken || data.lead.id;
+      savePortalCloud(activeToken, {
+        token: activeToken,
+        lead: newLead,
+        presupuesto: data.presupuesto || null,
+        proyecto: data.proyecto ? { ...data.proyecto, portalConfig: newPortalConfig } : null,
+        portalConfig: newPortalConfig
+      }).catch(err => console.warn('[Portal] Firestore sync background err:', err));
+
+      if (data.proyecto?.id) {
+        saveProyectoCloud({
+          ...data.proyecto,
+          portalConfig: newPortalConfig
+        }).catch(() => {});
+      }
+    } catch (fsErr) {
+      console.warn('[Portal] Error sincronizando con Firestore:', fsErr);
     }
 
     // Sync with server API

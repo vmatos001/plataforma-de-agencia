@@ -30,8 +30,8 @@ rules_version = '2';
 //   - dominio: string (opcional, máx 150 caracteres)
 //   - estado: string (opcional, máx 50 caracteres, ej: 'publicado', 'borrador')
 //   - ultimaActualizacion: string | timestamp (opcional, máx 50 caracteres)
-//   - createdAt: timestamp (opcional, inmutable tras creación)
-//   - updatedAt: timestamp (opcional)
+//   - createdAt: string | timestamp (opcional, inmutable tras creación)
+//   - updatedAt: string | timestamp (opcional)
 //   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación)
 //   - updatedBy: string (opcional, máx 128 caracteres)
 //
@@ -45,10 +45,119 @@ rules_version = '2';
 //   - portalConfig: map (opcional) - Estado del flujo del portal, flags de acceso y fases
 //   - workflowData: map (opcional) - Metadatos consolidados del flujo de trabajo (auditoría, SEO, finanzas)
 //   - id: string (opcional, máx 128 caracteres, inmutable si existe)
-//   - updatedAt: string | timestamp (opcional, máx 50 caracteres si string) - Última actualización
+//   - updatedAt: string | timestamp (opcional, máx 50 caracteres si string)
 //   - createdAt: string | timestamp (opcional, máx 50 caracteres si string, inmutable tras creación)
-//   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación) - ID o correo del creador
-//   - updatedBy: string (opcional, máx 128 caracteres) - ID o correo del último editor
+//   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación)
+//   - updatedBy: string (opcional, máx 128 caracteres)
+//
+// Collection: proyectos
+// Document ID: {proyectoId} (ej: 'proj-1792877090492')
+// Fields:
+//   - id: string (opcional, máx 128 caracteres, coincide con {proyectoId} si existe, inmutable)
+//   - codigo: string (opcional, máx 100 caracteres)
+//   - cliente: map (opcional) - Datos de empresa, contacto, teléfono, email, ubicación
+//   - presupuestoId: string (opcional, máx 128 caracteres)
+//   - presupuestoCodigo: string (opcional, máx 100 caracteres)
+//   - faseActual: number (opcional, entero entre 1 y 5)
+//   - portalConfig: map (opcional) - Configuración y acceso al portal del cliente
+//   - pagos: map (opcional) - Estado financiero, anticipo y saldo
+//   - onboarding: map (opcional) - Respuestas del cuestionario y branding recibido
+//   - contrato: map (opcional) - Cláusulas, firmas electrónicas y términos SOW
+//   - estado: string (opcional, máx 50 caracteres)
+//   - portalToken: string (opcional, máx 128 caracteres)
+//   - leadId: string (opcional, máx 128 caracteres)
+//   - pais: string (opcional, máx 10 caracteres)
+//   - fechaCreacion: string | timestamp (opcional, máx 50 caracteres si string)
+//   - updatedAt: string | timestamp (opcional, máx 50 caracteres si string)
+//   - createdAt: string | timestamp (opcional, máx 50 caracteres si string, inmutable tras creación)
+//   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación)
+//   - updatedBy: string (opcional, máx 128 caracteres)
+//
+// Collection: crm_leads
+// Document ID: {leadId} (ej: 'crm-lead-1792877090492-0al5')
+// Fields:
+//   - id: string (opcional, máx 128 caracteres, coincide con {leadId} si existe, inmutable)
+//   - leadId: string (opcional, máx 128 caracteres)
+//   - empresa: string (opcional, máx 255 caracteres)
+//   - contacto: string (opcional, máx 255 caracteres)
+//   - cargo: string (opcional, máx 255 caracteres)
+//   - telefono: string (opcional, máx 50 caracteres)
+//   - email: string (opcional, máx 255 caracteres, formato email válido si no está vacío)
+//   - pais: string (opcional, máx 10 caracteres)
+//   - dominio: string (opcional, máx 255 caracteres)
+//   - etapa: string (opcional, máx 50 caracteres)
+//   - servicio: string (opcional, máx 150 caracteres)
+//   - presupuestoMonto: number (opcional, >= 0)
+//   - valorEstimado: number (opcional, >= 0)
+//   - probabilidad: number (opcional, 0 a 100)
+//   - fuente: string (opcional, máx 100 caracteres)
+//   - temperatura: string (opcional, máx 50 caracteres)
+//   - notas: string (opcional, máx 5000 caracteres)
+//   - portalToken: string (opcional, máx 128 caracteres)
+//   - resumenEjecutivo: string (opcional, máx 5000 caracteres)
+//   - proximaAccion: string (opcional, máx 1000 caracteres)
+//   - interacciones: list (opcional, máx 200 elementos)
+//   - portalConfig: map (opcional)
+//   - whatsappData: map (opcional)
+//   - archivosCliente: list (opcional, máx 100 elementos)
+//   - ultimaInteraccion: string | timestamp (opcional, máx 50 caracteres si string)
+//   - updatedAt: string | timestamp (opcional, máx 50 caracteres si string)
+//   - createdAt: string | timestamp (opcional, máx 50 caracteres si string, inmutable tras creación)
+//   - creadoEn: string | timestamp (opcional, máx 50 caracteres si string)
+//   - actualizadoEn: string | timestamp (opcional, máx 50 caracteres si string)
+//   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación)
+//   - updatedBy: string (opcional, máx 128 caracteres)
+//
+// Collection: presupuestos
+// Document ID: {presupuestoId} (ej: 'pres-1792877090492')
+// Fields:
+//   - id: string (opcional, máx 128 caracteres, coincide con {presupuestoId} si existe, inmutable)
+//   - codigo: string (opcional, máx 50 caracteres, inmutable si existe)
+//   - numero: string (opcional, máx 50 caracteres)
+//   - leadId: string (opcional, máx 128 caracteres)
+//   - pais: string (opcional, máx 10 caracteres)
+//   - moneda: string (opcional, máx 10 caracteres)
+//   - cliente: map (opcional) - Objeto de datos del cliente receptor
+//   - emisor: map (opcional) - Datos de la agencia emisora
+//   - titulo: string (opcional, máx 300 caracteres)
+//   - portada: map (opcional)
+//   - inversion: map (opcional) - Desglose de totales, anticipo y saldos
+//   - subtotal: number (opcional, >= 0)
+//   - impuestos: number (opcional, >= 0)
+//   - total: number (opcional, >= 0)
+//   - modulos: list (opcional, máx 50 elementos)
+//   - fases: list (opcional, máx 50 elementos)
+//   - items: list (opcional, máx 50 elementos)
+//   - terminos: map (opcional)
+//   - estado: string (opcional, máx 50 caracteres)
+//   - vigenciaDias: number (opcional, entero entre 1 y 365)
+//   - portalToken: string (opcional, máx 128 caracteres)
+//   - updatedAt: string | timestamp (opcional, máx 50 caracteres si string)
+//   - createdAt: string | timestamp (opcional, máx 50 caracteres si string, inmutable tras creación)
+//   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación)
+//   - updatedBy: string (opcional, máx 128 caracteres)
+//
+// Collection: sprint_tasks
+// Document ID: {taskId} (ej: 'fase-1', 'task-1792877090492')
+// Fields:
+//   - id: string (opcional, máx 128 caracteres, coincide con {taskId} si existe, inmutable)
+//   - proyectoId: string (opcional, máx 128 caracteres)
+//   - titulo: string (opcional, máx 300 caracteres)
+//   - descripcion: string (opcional, máx 2000 caracteres)
+//   - fase: string | number (opcional, máx 50 caracteres si string)
+//   - faseNum: number (opcional, entre 1 y 50)
+//   - hitoTarget: string (opcional, máx 50 caracteres)
+//   - estado: string (opcional, máx 50 caracteres)
+//   - columna: string (opcional, máx 50 caracteres)
+//   - prioridad: string (opcional, máx 50 caracteres)
+//   - horasEstimadas: number (opcional, >= 0)
+//   - horasRegistradas: number (opcional, >= 0)
+//   - asignadoA: string (opcional, máx 128 caracteres)
+//   - fechaLimite: string | timestamp (opcional, máx 50 caracteres si string)
+//   - updatedAt: string | timestamp (opcional, máx 50 caracteres si string)
+//   - createdAt: string | timestamp (opcional, máx 50 caracteres si string, inmutable tras creación)
+//   - createdBy: string (opcional, máx 128 caracteres, inmutable tras creación)
+//   - updatedBy: string (opcional, máx 128 caracteres)
 //
 // ===============================================================
 
@@ -78,6 +187,12 @@ service cloud.firestore {
     // Valida que el documento no contenga campos no autorizados (previene inyección de metadatos)
     function hasOnlyAllowedFields(fields) {
       return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Validación de formato de correo electrónico
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
 
     // ===============================================================
@@ -135,13 +250,13 @@ service cloud.firestore {
         (!('dominio' in data) || (data.dominio is string && data.dominio.size() <= 150)) &&
         (!('estado' in data) || (data.estado is string && data.estado.size() <= 50)) &&
         (!('ultimaActualizacion' in data) || (data.ultimaActualizacion is string && data.ultimaActualizacion.size() <= 50) || data.ultimaActualizacion is timestamp) &&
-        (!('createdAt' in data) || data.createdAt is timestamp) &&
-        (!('updatedAt' in data) || data.updatedAt is timestamp) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50) || data.createdAt is timestamp) &&
+        (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50) || data.updatedAt is timestamp) &&
         (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 128)) &&
         (!('updatedBy' in data) || (data.updatedBy is string && data.updatedBy.size() <= 128));
     }
 
-    // Garantiza que los campos inmutables (identificadores y fechas de origen) no sean alterados en update
+    // Inmutabilidad de identificadores y datos de origen del sitio CMS
     function isImmutableSiteDataPreserved() {
       return request.resource.data.slug == resource.data.slug &&
         (!('id' in resource.data) || request.resource.data.id == resource.data.id) &&
@@ -177,10 +292,189 @@ service cloud.firestore {
         (!('updatedBy' in data) || (data.updatedBy is string && data.updatedBy.size() <= 128));
     }
 
-    // Garantiza que los campos inmutables del portal (token, id, fecha y autor de origen) no sean alterados en update
+    // Inmutabilidad del token e identificadores del portal
     function isImmutablePortalDataPreserved() {
       return request.resource.data.token == resource.data.token &&
         (!('id' in resource.data) || request.resource.data.id == resource.data.id) &&
+        (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt) &&
+        (!('createdBy' in resource.data) || request.resource.data.createdBy == resource.data.createdBy);
+    }
+
+    // ===============================================================
+    // Domain Validators: Proyectos y Contratos SOW
+    // ===============================================================
+
+    // Validador de proyectos (Validator Function Pattern)
+    function isValidProyecto(data, proyectoId) {
+      return hasOnlyAllowedFields([
+          'id', 'codigo', 'cliente', 'presupuestoId', 'presupuestoCodigo',
+          'faseActual', 'portalConfig', 'pagos', 'onboarding', 'contrato',
+          'estado', 'portalToken', 'leadId', 'pais', 'fechaCreacion',
+          'updatedAt', 'createdAt', 'createdBy', 'updatedBy'
+        ]) &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128 && data.id == proyectoId)) &&
+        (!('codigo' in data) || (data.codigo is string && data.codigo.size() <= 100)) &&
+        (!('cliente' in data) || data.cliente is map) &&
+        (!('presupuestoId' in data) || (data.presupuestoId is string && data.presupuestoId.size() <= 128)) &&
+        (!('presupuestoCodigo' in data) || (data.presupuestoCodigo is string && data.presupuestoCodigo.size() <= 100)) &&
+        (!('faseActual' in data) || ((data.faseActual is int || data.faseActual is number) && data.faseActual >= 1 && data.faseActual <= 5)) &&
+        (!('portalConfig' in data) || data.portalConfig is map) &&
+        (!('pagos' in data) || data.pagos is map) &&
+        (!('onboarding' in data) || data.onboarding is map) &&
+        (!('contrato' in data) || data.contrato is map) &&
+        (!('estado' in data) || (data.estado is string && data.estado.size() <= 50)) &&
+        (!('portalToken' in data) || (data.portalToken is string && data.portalToken.size() <= 128)) &&
+        (!('leadId' in data) || (data.leadId is string && data.leadId.size() <= 128)) &&
+        (!('pais' in data) || (data.pais is string && data.pais.size() <= 10)) &&
+        (!('fechaCreacion' in data) || (data.fechaCreacion is string && data.fechaCreacion.size() <= 50) || data.fechaCreacion is timestamp) &&
+        (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50) || data.updatedAt is timestamp) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50) || data.createdAt is timestamp) &&
+        (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 128)) &&
+        (!('updatedBy' in data) || (data.updatedBy is string && data.updatedBy.size() <= 128));
+    }
+
+    // Inmutabilidad de proyecto
+    function isImmutableProyectoDataPreserved() {
+      return (!('id' in resource.data) || request.resource.data.id == resource.data.id) &&
+        (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt) &&
+        (!('createdBy' in resource.data) || request.resource.data.createdBy == resource.data.createdBy);
+    }
+
+    // ===============================================================
+    // Domain Validators: CRM Leads
+    // ===============================================================
+
+    // Validador de leads comerciales (Validator Function Pattern)
+    function isValidCrmLead(data, leadId) {
+      return hasOnlyAllowedFields([
+          'id', 'leadId', 'empresa', 'contacto', 'cargo', 'telefono', 'email',
+          'pais', 'dominio', 'etapa', 'servicio', 'presupuestoMonto', 'valorEstimado',
+          'probabilidad', 'fuente', 'temperatura', 'notas', 'portalToken',
+          'resumenEjecutivo', 'proximaAccion', 'interacciones', 'portalConfig',
+          'whatsappData', 'archivosCliente', 'ultimaInteraccion',
+          'updatedAt', 'createdAt', 'createdBy', 'updatedBy', 'creadoEn', 'actualizadoEn'
+        ]) &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128 && data.id == leadId)) &&
+        (!('leadId' in data) || (data.leadId is string && data.leadId.size() <= 128)) &&
+        (!('empresa' in data) || (data.empresa is string && data.empresa.size() <= 255)) &&
+        (!('contacto' in data) || (data.contacto is string && data.contacto.size() <= 255)) &&
+        (!('cargo' in data) || (data.cargo is string && data.cargo.size() <= 255)) &&
+        (!('telefono' in data) || (data.telefono is string && data.telefono.size() <= 50)) &&
+        (!('email' in data) || (data.email is string && data.email.size() <= 255 && (data.email.size() == 0 || isValidEmail(data.email)))) &&
+        (!('pais' in data) || (data.pais is string && data.pais.size() <= 10)) &&
+        (!('dominio' in data) || (data.dominio is string && data.dominio.size() <= 255)) &&
+        (!('etapa' in data) || (data.etapa is string && data.etapa.size() <= 50)) &&
+        (!('servicio' in data) || (data.servicio is string && data.servicio.size() <= 150)) &&
+        (!('presupuestoMonto' in data) || (data.presupuestoMonto is number && data.presupuestoMonto >= 0)) &&
+        (!('valorEstimado' in data) || (data.valorEstimado is number && data.valorEstimado >= 0)) &&
+        (!('probabilidad' in data) || (data.probabilidad is number && data.probabilidad >= 0 && data.probabilidad <= 100)) &&
+        (!('fuente' in data) || (data.fuente is string && data.fuente.size() <= 100)) &&
+        (!('temperatura' in data) || (data.temperatura is string && data.temperatura.size() <= 50)) &&
+        (!('notas' in data) || (data.notas is string && data.notas.size() <= 5000)) &&
+        (!('portalToken' in data) || (data.portalToken is string && data.portalToken.size() <= 128)) &&
+        (!('resumenEjecutivo' in data) || (data.resumenEjecutivo is string && data.resumenEjecutivo.size() <= 5000)) &&
+        (!('proximaAccion' in data) || (data.proximaAccion is string && data.proximaAccion.size() <= 1000)) &&
+        (!('interacciones' in data) || (data.interacciones is list && data.interacciones.size() <= 200)) &&
+        (!('portalConfig' in data) || data.portalConfig is map) &&
+        (!('whatsappData' in data) || data.whatsappData is map) &&
+        (!('archivosCliente' in data) || (data.archivosCliente is list && data.archivosCliente.size() <= 100)) &&
+        (!('ultimaInteraccion' in data) || (data.ultimaInteraccion is string && data.ultimaInteraccion.size() <= 50) || data.ultimaInteraccion is timestamp) &&
+        (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50) || data.updatedAt is timestamp) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50) || data.createdAt is timestamp) &&
+        (!('creadoEn' in data) || (data.creadoEn is string && data.creadoEn.size() <= 50) || data.creadoEn is timestamp) &&
+        (!('actualizadoEn' in data) || (data.actualizadoEn is string && data.actualizadoEn.size() <= 50) || data.actualizadoEn is timestamp) &&
+        (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 128)) &&
+        (!('updatedBy' in data) || (data.updatedBy is string && data.updatedBy.size() <= 128));
+    }
+
+    // Inmutabilidad de lead
+    function isImmutableLeadDataPreserved() {
+      return (!('id' in resource.data) || request.resource.data.id == resource.data.id) &&
+        (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt) &&
+        (!('createdBy' in resource.data) || request.resource.data.createdBy == resource.data.createdBy);
+    }
+
+    // ===============================================================
+    // Domain Validators: Presupuestos y Cotizaciones
+    // ===============================================================
+
+    // Validador de presupuestos (Validator Function Pattern)
+    function isValidPresupuesto(data, presupuestoId) {
+      return hasOnlyAllowedFields([
+          'id', 'codigo', 'numero', 'leadId', 'pais', 'moneda', 'cliente', 'emisor',
+          'titulo', 'portada', 'inversion', 'subtotal', 'impuestos', 'total',
+          'modulos', 'fases', 'items', 'terminos', 'estado', 'vigenciaDias',
+          'portalToken', 'updatedAt', 'createdAt', 'createdBy', 'updatedBy'
+        ]) &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128 && data.id == presupuestoId)) &&
+        (!('codigo' in data) || (data.codigo is string && data.codigo.size() <= 50)) &&
+        (!('numero' in data) || (data.numero is string && data.numero.size() <= 50)) &&
+        (!('leadId' in data) || (data.leadId is string && data.leadId.size() <= 128)) &&
+        (!('pais' in data) || (data.pais is string && data.pais.size() <= 10)) &&
+        (!('moneda' in data) || (data.moneda is string && data.moneda.size() <= 10)) &&
+        (!('cliente' in data) || data.cliente is map) &&
+        (!('emisor' in data) || data.emisor is map) &&
+        (!('titulo' in data) || (data.titulo is string && data.titulo.size() <= 300)) &&
+        (!('portada' in data) || data.portada is map) &&
+        (!('inversion' in data) || data.inversion is map) &&
+        (!('subtotal' in data) || (data.subtotal is number && data.subtotal >= 0)) &&
+        (!('impuestos' in data) || (data.impuestos is number && data.impuestos >= 0)) &&
+        (!('total' in data) || (data.total is number && data.total >= 0)) &&
+        (!('modulos' in data) || (data.modulos is list && data.modulos.size() <= 50)) &&
+        (!('fases' in data) || (data.fases is list && data.fases.size() <= 50)) &&
+        (!('items' in data) || (data.items is list && data.items.size() <= 50)) &&
+        (!('terminos' in data) || data.terminos is map) &&
+        (!('estado' in data) || (data.estado is string && data.estado.size() <= 50)) &&
+        (!('vigenciaDias' in data) || (data.vigenciaDias is number && data.vigenciaDias >= 1 && data.vigenciaDias <= 365)) &&
+        (!('portalToken' in data) || (data.portalToken is string && data.portalToken.size() <= 128)) &&
+        (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50) || data.updatedAt is timestamp) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50) || data.createdAt is timestamp) &&
+        (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 128)) &&
+        (!('updatedBy' in data) || (data.updatedBy is string && data.updatedBy.size() <= 128));
+    }
+
+    // Inmutabilidad de propuesta económica
+    function isImmutablePresupuestoDataPreserved() {
+      return (!('id' in resource.data) || request.resource.data.id == resource.data.id) &&
+        (!('codigo' in resource.data) || request.resource.data.codigo == resource.data.codigo) &&
+        (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt) &&
+        (!('createdBy' in resource.data) || request.resource.data.createdBy == resource.data.createdBy);
+    }
+
+    // ===============================================================
+    // Domain Validators: Sprint Tasks
+    // ===============================================================
+
+    // Validador de tareas de desarrollo del sprint kanban (Validator Function Pattern)
+    function isValidSprintTask(data, taskId) {
+      return hasOnlyAllowedFields([
+          'id', 'proyectoId', 'titulo', 'descripcion', 'fase', 'faseNum', 'hitoTarget',
+          'estado', 'columna', 'prioridad', 'horasEstimadas', 'horasRegistradas',
+          'asignadoA', 'fechaLimite', 'updatedAt', 'createdAt', 'createdBy', 'updatedBy'
+        ]) &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128 && data.id == taskId)) &&
+        (!('proyectoId' in data) || (data.proyectoId is string && data.proyectoId.size() <= 128)) &&
+        (!('titulo' in data) || (data.titulo is string && data.titulo.size() >= 1 && data.titulo.size() <= 300)) &&
+        (!('descripcion' in data) || (data.descripcion is string && data.descripcion.size() <= 2000)) &&
+        (!('fase' in data) || (data.fase is string && data.fase.size() <= 50) || data.fase is number) &&
+        (!('faseNum' in data) || (data.faseNum is number && data.faseNum >= 1 && data.faseNum <= 50)) &&
+        (!('hitoTarget' in data) || (data.hitoTarget is string && data.hitoTarget.size() <= 50)) &&
+        (!('estado' in data) || (data.estado is string && data.estado.size() <= 50)) &&
+        (!('columna' in data) || (data.columna is string && data.columna.size() <= 50)) &&
+        (!('prioridad' in data) || (data.prioridad is string && data.prioridad.size() <= 50)) &&
+        (!('horasEstimadas' in data) || (data.horasEstimadas is number && data.horasEstimadas >= 0)) &&
+        (!('horasRegistradas' in data) || (data.horasRegistradas is number && data.horasRegistradas >= 0)) &&
+        (!('asignadoA' in data) || (data.asignadoA is string && data.asignadoA.size() <= 128)) &&
+        (!('fechaLimite' in data) || (data.fechaLimite is string && data.fechaLimite.size() <= 50) || data.fechaLimite is timestamp) &&
+        (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50) || data.updatedAt is timestamp) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50) || data.createdAt is timestamp) &&
+        (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 128)) &&
+        (!('updatedBy' in data) || (data.updatedBy is string && data.updatedBy.size() <= 128));
+    }
+
+    // Inmutabilidad de tarea
+    function isImmutableTaskDataPreserved() {
+      return (!('id' in resource.data) || request.resource.data.id == resource.data.id) &&
         (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt) &&
         (!('createdBy' in resource.data) || request.resource.data.createdBy == resource.data.createdBy);
     }
@@ -191,46 +485,109 @@ service cloud.firestore {
 
     // Colección: Sitios web administrados por el Headless CMS de la agencia
     match /cms_sites/{siteSlug} {
-      // 1. Lectura pública:
-      // Los sitios web de clientes finales ejecutan el script universal 'cms.js'
-      // para consumir y renderizar textos, branding y botones sin exigir login.
+      // 1. Lectura pública: Sitios web estáticos renderizan contenido con script universal cms.js
       allow read: if true;
 
-      // 2. Creación:
-      // Requiere autenticación de usuario y validación exhaustiva de esquema y tipos.
+      // 2. Creación: Autenticado y validación de esquema
       allow create: if isAuthenticated() &&
                     isValidCmsSite(request.resource.data, siteSlug);
 
-      // 3. Actualización:
-      // Requiere autenticación, validación de esquema y preservación de campos inmutables.
+      // 3. Actualización: Autenticado, validación de esquema y preservación de inmutabilidad
       allow update: if isAuthenticated() &&
                     isValidCmsSite(request.resource.data, siteSlug) &&
                     isImmutableSiteDataPreserved();
 
-      // 4. Eliminación:
-      // Restringido estrictamente a administradores autenticados.
+      // 4. Eliminación: Restringido a administradores
       allow delete: if isAdmin();
     }
 
     // Colección: Portales confidenciales de clientes de la agencia
     match /portales/{token} {
-      // 1. Lectura pública:
-      // Permite a los clientes acceder y consultar su portal confidencial mediante su token único.
+      // 1. Lectura pública: Clientes acceden a su portal privado mediante token único
       allow read: if true;
 
-      // 2. Creación:
-      // Permitido a usuarios autenticados con validación estricta de esquema y concordancia de token.
+      // 2. Creación: Autenticado con validación de esquema
       allow create: if isAuthenticated() &&
                     isValidPortal(request.resource.data, token);
 
-      // 3. Actualización:
-      // Permitido a usuarios autenticados con validación estricta y preservación de inmutabilidad del token.
+      // 3. Actualización: Autenticado con validación estricta e inmutabilidad de token
       allow update: if isAuthenticated() &&
                     isValidPortal(request.resource.data, token) &&
                     isImmutablePortalDataPreserved();
 
-      // 4. Eliminación:
-      // Restringido exclusivamente a administradores con privilegios elevados.
+      // 4. Eliminación: Restringido a administradores
+      allow delete: if isAdmin();
+    }
+
+    // Colección: Proyectos y contratos SOW de la agencia
+    match /proyectos/{proyectoId} {
+      // 1. Lectura: Permitida para usuarios autenticados y portales de clientes para reconciliación de hitos
+      allow read: if isAuthenticated() || true;
+
+      // 2. Creación: Autenticado con validación de esquema
+      allow create: if isAuthenticated() &&
+                    isValidProyecto(request.resource.data, proyectoId);
+
+      // 3. Actualización: Autenticado con validación de esquema e inmutabilidad
+      allow update: if isAuthenticated() &&
+                    isValidProyecto(request.resource.data, proyectoId) &&
+                    isImmutableProyectoDataPreserved();
+
+      // 4. Eliminación: Restringido a administradores
+      allow delete: if isAdmin();
+    }
+
+    // Colección: Leads comerciales de CRM & WhatsApp
+    match /crm_leads/{leadId} {
+      // 1. Lectura: Restringida a personal de agencia autenticado
+      allow read: if isAuthenticated();
+
+      // 2. Creación: Autenticado con validación de esquema
+      allow create: if isAuthenticated() &&
+                    isValidCrmLead(request.resource.data, leadId);
+
+      // 3. Actualización: Autenticado con validación de esquema e inmutabilidad
+      allow update: if isAuthenticated() &&
+                    isValidCrmLead(request.resource.data, leadId) &&
+                    isImmutableLeadDataPreserved();
+
+      // 4. Eliminación: Restringido a administradores
+      allow delete: if isAdmin();
+    }
+
+    // Colección: Presupuestos y propuestas comerciales
+    match /presupuestos/{presupuestoId} {
+      // 1. Lectura pública: Portales confidenciales leen la propuesta vinculada al cliente
+      allow read: if true;
+
+      // 2. Creación: Autenticado con validación de esquema
+      allow create: if isAuthenticated() &&
+                    isValidPresupuesto(request.resource.data, presupuestoId);
+
+      // 3. Actualización: Autenticado con validación de esquema e inmutabilidad
+      allow update: if isAuthenticated() &&
+                    isValidPresupuesto(request.resource.data, presupuestoId) &&
+                    isImmutablePresupuestoDataPreserved();
+
+      // 4. Eliminación: Restringido a administradores
+      allow delete: if isAdmin();
+    }
+
+    // Colección: Tareas de sprint de desarrollo Kanban (Playbook Maestro)
+    match /sprint_tasks/{taskId} {
+      // 1. Lectura: Restringida a personal de agencia autenticado
+      allow read: if isAuthenticated();
+
+      // 2. Creación: Autenticado con validación de esquema
+      allow create: if isAuthenticated() &&
+                    isValidSprintTask(request.resource.data, taskId);
+
+      // 3. Actualización: Autenticado con validación de esquema e inmutabilidad
+      allow update: if isAuthenticated() &&
+                    isValidSprintTask(request.resource.data, taskId) &&
+                    isImmutableTaskDataPreserved();
+
+      // 4. Eliminación: Restringido a administradores
       allow delete: if isAdmin();
     }
 

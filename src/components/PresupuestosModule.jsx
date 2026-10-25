@@ -34,6 +34,13 @@ import {
   getStoredCrmLeads,
   saveStoredCrmLeads
 } from '../services/localStore';
+import {
+  getPresupuestosCloud,
+  savePresupuestoCloud,
+  deletePresupuestoCloud,
+  subscribePresupuestosCloud,
+  savePortalCloud
+} from '../services/firestoreSyncService';
 
 const DEFAULT_VIP_TEMPLATE = {
   titulo: "PROPUESTA DE DESARROLLO DIGITAL VIP",
@@ -229,6 +236,19 @@ export default function PresupuestosModule({
     fetchPresupuestos();
     fetchPlantillas();
 
+    // Suscripción en tiempo real a Firestore Cloud
+    const unsubscribeCloud = subscribePresupuestosCloud((cloudProps) => {
+      if (Array.isArray(cloudProps) && cloudProps.length > 0) {
+        setPresupuestos(prev => {
+          const merged = deduplicatePresupuestos([...prev, ...cloudProps]);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('goglite_presupuestos', JSON.stringify(merged));
+          }
+          return merged;
+        });
+      }
+    });
+
     const handleRealtimeUpdate = () => {
       syncPresupuestosFromStorage();
       fetchPresupuestos();
@@ -251,6 +271,7 @@ export default function PresupuestosModule({
     }, 2500);
 
     return () => {
+      unsubscribeCloud();
       window.removeEventListener('storage', handleRealtimeUpdate);
       window.removeEventListener('focus', handleRealtimeUpdate);
       window.removeEventListener('goglite_presupuestos_updated', handleRealtimeUpdate);
@@ -329,24 +350,50 @@ export default function PresupuestosModule({
 
   const fetchPresupuestos = async () => {
     try {
-      let res;
+      // 1. Obtener cotizaciones de Firestore Cloud (Fuente de verdad)
+      const cloudProps = await getPresupuestosCloud();
+
+      // 2. Intentar backend API si existe
+      let apiData = null;
       try {
-        res = await fetch(getBackendEndpoint('/api/presupuestos'));
-      } catch {
-        res = await fetch('/api/presupuestos');
+        let res;
+        try {
+          res = await fetch(getBackendEndpoint('/api/presupuestos'));
+        } catch {
+          res = await fetch('/api/presupuestos');
+        }
+        if (res && res.ok) {
+          apiData = await res.json();
+        }
+      } catch (errApi) {
+        // Backend offline
       }
-      if (res && res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const clean = deduplicatePresupuestos(data);
-          setPresupuestos(clean);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('goglite_presupuestos', JSON.stringify(clean));
-          }
+
+      // 3. Local storage caché
+      const local = [];
+      try {
+        const cached = localStorage.getItem('goglite_presupuestos');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) local.push(...parsed);
+        }
+      } catch (e) {}
+
+      const combined = [
+        ...local,
+        ...(Array.isArray(apiData) ? apiData : []),
+        ...(Array.isArray(cloudProps) ? cloudProps : [])
+      ];
+
+      if (combined.length > 0) {
+        const clean = deduplicatePresupuestos(combined);
+        setPresupuestos(clean);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('goglite_presupuestos', JSON.stringify(clean));
         }
       }
     } catch (err) {
-      console.warn('API presupuestos offline:', err);
+      console.warn('Error al sincronizar presupuestos:', err);
     } finally {
       setLoading(false);
     }
@@ -467,7 +514,25 @@ export default function PresupuestosModule({
         return updated;
       });
 
-      // 2. Intentar sincronizar con el backend
+      // 2. Persistir en Firestore Cloud (Multiplataforma PC / Móvil)
+      savePresupuestoCloud(propToSave).catch(e => console.warn('[Presupuestos] Error guardando en nube:', e));
+      if (propToSave.portalToken) {
+        savePortalCloud(propToSave.portalToken, {
+          token: propToSave.portalToken,
+          presupuesto: propToSave,
+          lead: propToSave.cliente ? {
+            id: propToSave.leadId || propToSave.id,
+            empresa: propToSave.cliente.empresa,
+            contacto: propToSave.cliente.nombre,
+            telefono: propToSave.cliente.telefono,
+            email: propToSave.cliente.email,
+            pais: propToSave.pais || 'SV',
+            portalToken: propToSave.portalToken
+          } : null
+        }).catch(() => {});
+      }
+
+      // 3. Intentar sincronizar con el backend local si está presente
       try {
         await fetch(url, {
           method,
@@ -536,6 +601,7 @@ export default function PresupuestosModule({
     e?.stopPropagation();
     if (!confirm('¿Eliminar esta propuesta?')) return;
     try {
+      deletePresupuestoCloud(id).catch(e => console.warn('[Presupuestos] Error eliminando de nube:', e));
       try {
         await fetch(getBackendEndpoint(`/api/presupuestos/${id}`), { method: 'DELETE' });
       } catch (err) {

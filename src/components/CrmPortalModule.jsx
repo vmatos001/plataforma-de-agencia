@@ -56,6 +56,12 @@ import {
   saveStoredCrmLeads,
   syncCrmLeadsWithPresupuestos
 } from '../services/localStore';
+import {
+  getCrmLeadsCloud,
+  saveCrmLeadCloud,
+  deleteCrmLeadCloud,
+  subscribeCrmLeadsCloud
+} from '../services/firestoreSyncService';
 
 const PIPELINE_STAGES = [
   { id: 'contactado', label: 'Contactado', color: 'border-sky-500/40', badge: 'bg-sky-500/10 text-sky-400', dot: 'bg-sky-400' },
@@ -606,18 +612,42 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     };
   }, [isQrModalOpen]);
 
-  // Helper para persistir leads siempre en localStorage
+  // Helper para persistir leads tanto en localStorage como en Firestore Cloud
   const updateAndPersistLeads = (updater) => {
     setLeads(prev => {
       const nextLeads = typeof updater === 'function' ? updater(prev) : updater;
       saveStoredCrmLeads(nextLeads);
+      if (Array.isArray(nextLeads)) {
+        nextLeads.forEach(lead => {
+          if (lead && lead.id) {
+            saveCrmLeadCloud(lead).catch(() => {});
+          }
+        });
+      }
       return nextLeads;
     });
   };
 
-  // Fetch leads de API y sincronizar en tiempo real (Backend-First + SSE)
+  // Fetch leads de API y Firestore en tiempo real (Cloud-First + SSE + Listeners)
   useEffect(() => {
     fetchCrmLeads();
+
+    // Listener en tiempo real desde Firestore Cloud
+    const unsubscribeCloud = subscribeCrmLeadsCloud((cloudLeads) => {
+      if (Array.isArray(cloudLeads) && cloudLeads.length > 0) {
+        setLeads(prev => {
+          const map = new Map(prev.map(l => [l.id, l]));
+          cloudLeads.forEach(cl => {
+            if (cl?.id) {
+              map.set(cl.id, { ...(map.get(cl.id) || {}), ...cl });
+            }
+          });
+          const merged = Array.from(map.values());
+          saveStoredCrmLeads(merged);
+          return merged;
+        });
+      }
+    });
 
     const handleRealtimeCrmUpdate = (e) => {
       if (e.detail && typeof e.detail === 'object') {
@@ -632,6 +662,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
             updated = [item, ...prev];
           }
           saveStoredCrmLeads(updated);
+          if (item?.id) saveCrmLeadCloud(item).catch(() => {});
           return updated;
         });
       } else {
@@ -640,34 +671,59 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     };
 
     window.addEventListener('goglite_crm_updated', handleRealtimeCrmUpdate);
-    return () => window.removeEventListener('goglite_crm_updated', handleRealtimeCrmUpdate);
+    return () => {
+      unsubscribeCloud();
+      window.removeEventListener('goglite_crm_updated', handleRealtimeCrmUpdate);
+    };
   }, []);
 
   const fetchCrmLeads = async () => {
     try {
       setLoading(true);
-      const res = await apiClient.get('/api/crm/leads');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          updateAndPersistLeads(data);
-          if (data.length > 0) {
-            if (!selectedPortalLeadId) setSelectedPortalLeadId(data[0].id);
-            if (!selectedWaLeadId) setSelectedWaLeadId(data[0].id);
-          }
+      let apiData = null;
+      try {
+        const res = await apiClient.get('/api/crm/leads');
+        if (res.ok) {
+          apiData = await res.json();
         }
+      } catch (errApi) {
+        // Ignorar si API local está offline
       }
-    } catch (err) {
-      console.warn('API de CRM offline o estática, operando con almacenamiento local:', err);
-      if (leads.length === 0 && SEED_CRM_LEADS.length > 0) {
+
+      const cloudLeads = await getCrmLeadsCloud();
+      const mergedMap = new Map();
+
+      // 1. Memoria local previa
+      const local = getStoredCrmLeads();
+      if (Array.isArray(local)) {
+        local.forEach(l => { if (l?.id) mergedMap.set(l.id, l); });
+      }
+      // 2. API Backend
+      if (Array.isArray(apiData)) {
+        apiData.forEach(l => { if (l?.id) mergedMap.set(l.id, { ...(mergedMap.get(l.id) || {}), ...l }); });
+      }
+      // 3. Firestore Nube (Máxima autoridad en producción)
+      if (Array.isArray(cloudLeads)) {
+        cloudLeads.forEach(l => { if (l?.id) mergedMap.set(l.id, { ...(mergedMap.get(l.id) || {}), ...l }); });
+      }
+
+      const finalLeads = Array.from(mergedMap.values());
+      if (finalLeads.length > 0) {
+        setLeads(finalLeads);
+        saveStoredCrmLeads(finalLeads);
+        if (!selectedPortalLeadId) setSelectedPortalLeadId(finalLeads[0].id);
+        if (!selectedWaLeadId) setSelectedWaLeadId(finalLeads[0].id);
+      } else if (SEED_CRM_LEADS.length > 0) {
         updateAndPersistLeads(SEED_CRM_LEADS);
       }
+    } catch (err) {
+      console.warn('Error sincronizando CRM leads:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Delete Lead con confirmación y persistencia inmediata
+  // Delete Lead con confirmación y persistencia inmediata en la nube y local
   const handleDeleteLead = async (leadId, empresaNombre, e) => {
     if (e) e.stopPropagation();
     if (!window.confirm(`¿Estás seguro de que deseas eliminar al lead "${empresaNombre || leadId}" del CRM?`)) {
@@ -676,6 +732,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
 
     // 1. Eliminar de inmediato en estado local y localStorage
     updateAndPersistLeads(prev => prev.filter(l => l.id !== leadId));
+    deleteCrmLeadCloud(leadId).catch(() => {});
 
     // Si estaba seleccionado en portal o whatsapp, cambiar la selección
     if (selectedPortalLeadId === leadId) setSelectedPortalLeadId(null);
