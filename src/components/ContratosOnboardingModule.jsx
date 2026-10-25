@@ -740,6 +740,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
           const cfg = JSON.parse(raw);
           localStorage.setItem('goglite_portal_' + tk, JSON.stringify({
             ...cfg,
+            clienteConfirmoInsumos: true,
             fase3InsumosCompletos: true,
             fechaInsumosCompletos: nowStr,
             faseActual: 4,
@@ -1609,24 +1610,34 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                       <div className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
                         is100InsumosValidados
                           ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-200'
+                          : activeProyecto.onboarding?.clienteConfirmoInsumos
+                          ? 'bg-amber-950/30 border-amber-500/50 text-amber-200'
                           : 'bg-amber-950/20 border-amber-500/30 text-amber-200'
                       }`}>
                         <div className="flex items-center gap-2.5">
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                            is100InsumosValidados ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                            is100InsumosValidados 
+                              ? 'bg-emerald-500/20 text-emerald-400' 
+                              : activeProyecto.onboarding?.clienteConfirmoInsumos
+                              ? 'bg-amber-500/30 text-amber-300'
+                              : 'bg-amber-500/20 text-amber-400'
                           }`}>
-                            {is100InsumosValidados ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                            {is100InsumosValidados ? <CheckCircle2 className="w-4 h-4" /> : <Clock className={`w-4 h-4 ${activeProyecto.onboarding?.clienteConfirmoInsumos ? 'animate-pulse' : ''}`} />}
                           </div>
                           <div>
                             <div className="font-bold text-white text-xs">
                               {is100InsumosValidados 
                                 ? '✓ 100% Insumos Validados · Plazo de 10 Días Oficial Iniciado' 
+                                : activeProyecto.onboarding?.clienteConfirmoInsumos
+                                ? '🔔 El Cliente Confirmó Subida de Insumos al Drive · Pendiente Validación'
                                 : '⚖️ Esperando Recepción & Validación de Insumos (Regla 10 Días)'}
                             </div>
                             <div className="text-[11px] opacity-90 mt-0.5">
                               {is100InsumosValidados 
                                 ? `Validado el ${activeProyecto.onboarding?.fechaValidacionAgencia || activeProyecto.onboarding?.fecha || 'hoy'}. El equipo de desarrollo tiene luz verde.`
-                                : `Total recibidos hasta el momento: ${insumos.length} archivo(s). El plazo de 10 días se activa al validar los insumos.`}
+                                : activeProyecto.onboarding?.clienteConfirmoInsumos
+                                ? `El cliente notificó que subió los documentos (${activeProyecto.onboarding?.fechaConfirmacionCliente || 'reciente'}). Revisa la carpeta 01_Insumos_Cliente y haz clic en validar para iniciar el reloj.`
+                                : 'El cliente debe subir sus archivos a la carpeta 01_Insumos_Cliente en Google Drive y confirmar. El plazo de 10 días se activará cuando la agencia confirme los archivos.'}
                             </div>
                           </div>
                         </div>
@@ -1638,7 +1649,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                             className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0 self-start sm:self-center"
                           >
                             <Check className="w-3.5 h-3.5" />
-                            <span>Validar Insumos 100%</span>
+                            <span>Validar Insumos en Drive y Activar Reloj de 10 Días</span>
                           </button>
                         )}
                       </div>

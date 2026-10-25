@@ -81,12 +81,10 @@ export function evaluateProjectMilestones(proyecto, customSprintTasks = null) {
     proyecto.portalConfig?.comprobanteAnticipo
   );
 
-  const totalArchivosOnb = (proyecto.onboarding?.archivos?.length || 0) + (proyecto.portalConfig?.archivosSubidos?.length || 0);
   const eventoOnboarding = Boolean(
+    proyecto.onboarding?.insumosValidados100 ||
     proyecto.onboarding?.completado ||
-    proyecto.portalConfig?.fase3InsumosCompletos ||
-    totalArchivosOnb > 0 ||
-    (proyecto.onboarding?.datos && Object.keys(proyecto.onboarding.datos).length >= 2)
+    proyecto.portalConfig?.fase3InsumosCompletos
   );
 
   // --- Detección de Eventos de la Agencia (12 Fases) ---

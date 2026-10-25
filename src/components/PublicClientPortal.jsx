@@ -20,6 +20,7 @@ import {
   PenTool,
   Sparkles,
   AlertTriangle,
+  ShieldAlert,
   CreditCard,
   Laptop,
   Globe,
@@ -1875,7 +1876,47 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     showNotification('Insumo eliminado del proyecto.');
   };
 
+  const handleConfirmarSubidaInsumosCliente = async () => {
+    const nowFecha = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+    const nowHora = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const fullTimestamp = `${nowFecha} (${nowHora})`;
+
+    try {
+      const storedProjs = getStoredProyectos();
+      const leadEmp = (data?.lead?.empresa || '').toLowerCase().trim();
+      const idx = storedProjs.findIndex(p => 
+        (data?.proyecto && p.id === data.proyecto.id) ||
+        (data?.presupuesto && (p.presupuestoId === data.presupuesto.id || p.presupuestoCodigo === data.presupuesto.codigo)) ||
+        (leadEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === leadEmp)
+      );
+      if (idx !== -1) {
+        storedProjs[idx] = {
+          ...storedProjs[idx],
+          onboarding: {
+            ...(storedProjs[idx].onboarding || {}),
+            clienteConfirmoInsumos: true,
+            fechaConfirmacionCliente: fullTimestamp,
+            estadoInsumos: 'pendiente_validacion_agencia'
+          }
+        };
+        saveStoredProyectos(storedProjs);
+        window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: storedProjs } }));
+      }
+    } catch (e) {
+      console.warn('Error sync confirmation with project:', e);
+    }
+
+    await savePortalUpdates({
+      clienteConfirmoInsumos: true,
+      fechaConfirmacionClienteInsumos: fullTimestamp,
+      fase3InsumosCompletos: false // Regla: el cliente confirma subida, pero NO activa el reloj de 10 días hasta que la agencia valide
+    });
+
+    showNotification('✓ Confirmación registrada. Nuestro equipo validará los archivos en Google Drive antes de activar el reloj de 10 días.');
+  };
+
   const handleCompletarInsumos = async () => {
+    const nowStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
     try {
       const storedProjs = getStoredProyectos();
       const leadEmp = (data?.lead?.empresa || '').toLowerCase().trim();
@@ -1887,10 +1928,14 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       if (idx !== -1) {
         storedProjs[idx] = evaluateProjectMilestones({
           ...storedProjs[idx],
+          faseActual: 4,
           onboarding: {
             ...(storedProjs[idx].onboarding || {}),
             completado: true,
-            fecha: new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+            insumosValidados100: true,
+            clienteConfirmoInsumos: true,
+            fecha: nowStr,
+            fechaValidacionAgencia: nowStr
           }
         });
         saveStoredProyectos(storedProjs);
@@ -1902,12 +1947,13 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
     await savePortalUpdates({
       fase3InsumosCompletos: true,
-      fechaInsumosCompletos: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
+      clienteConfirmoInsumos: true,
+      fechaInsumosCompletos: nowStr,
       progresoPorcentaje: 80,
       faseActual: 4
     });
     setActiveTab(4);
-    showNotification('✓ Insumos validados al 100%. El cronómetro oficial de 10 días ha iniciado.');
+    showNotification('✓ ¡Insumos validados al 100%! El cronómetro oficial de 10 días hábiles ha iniciado.');
   };
 
   const handleLiquidarProyecto = async (e) => {
@@ -2018,7 +2064,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   const isFase1Done = Boolean(portalConfig?.fase1Aprobada);
   const isFase2Done = Boolean(portalConfig?.fase2Firmada);
-  const isFase3Done = Boolean(portalConfig?.fase3InsumosCompletos || (portalConfig?.archivosSubidos && portalConfig.archivosSubidos.length > 0));
+  const isFase3Done = Boolean(portalConfig?.fase3InsumosCompletos);
   const isFase4Done = Boolean(portalConfig?.fase4Liquidada);
   const isFase5Done = Boolean(portalConfig?.fase5CareActivo);
 
@@ -2046,7 +2092,13 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       unlocked: isFase1Done,
       isGoogleProtected: isDocumentosAnterioresProtegidos
     },
-    { num: 3, title: 'Intake Insumos', label: 'Garantía 10 Días', done: isFase3Done, unlocked: isFase1Done && isFase2Done },
+    { 
+      num: 3, 
+      title: 'Intake Insumos', 
+      label: portalConfig?.fase3InsumosCompletos ? '✓ Validados' : portalConfig?.clienteConfirmoInsumos ? '⏳ En Revisión' : 'Garantía 10 Días', 
+      done: isFase3Done, 
+      unlocked: isFase1Done && isFase2Done 
+    },
     { num: 4, title: 'Liquidación', label: 'Candado de Accesos', done: isFase4Done, unlocked: isFase1Done && isFase2Done && isFase3Done },
     { num: 5, title: 'Garantía 30 Días', label: 'Plan CMS $99/mes', done: isFase5Done, unlocked: isFase1Done && isFase2Done && isFase3Done && isFase4Done }
   ];
@@ -2118,16 +2170,6 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 <FileText className="w-3.5 h-3.5 text-orange-200" />
                 <span className="hidden sm:inline">Factura Oficial</span>
                 <span className="sm:hidden">Factura</span>
-              </button>
-            )}
-            {onBackToAdmin && (
-              <button
-                onClick={onBackToAdmin}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition-colors"
-                title="Volver al panel administrativo"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Panel Interno</span>
               </button>
             )}
             <a
@@ -3571,229 +3613,282 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left Column: Asset Upload Form */}
-              <div className="lg:col-span-5 space-y-6">
-                <div className="rounded-2xl bg-[#0e1320] border border-slate-800 p-6 space-y-4 shadow-xl">
-                  <div>
+            {/* INSTRUCTIVO DETALLADO DE CARGA DE INSUMOS EN GOOGLE DRIVE */}
+            <div className="rounded-2xl bg-[#0e1320] border border-slate-800 p-6 sm:p-7 space-y-6 shadow-xl">
+              {/* Header del Instructivo */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-800/80">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
                     <span className="text-[11px] font-mono uppercase text-orange-400 font-bold tracking-wider">
-                      Fase 3 · Entrega de Materiales
+                      Fase 3 · Entrega de Insumos & Materiales
                     </span>
-                    <h2 className="text-lg font-bold text-white">Subir Insumos de Marca</h2>
-                    <p className="text-xs text-slate-400 mt-1">Registra aquí los archivos y recursos necesarios para la construcción:</p>
+                    <span className="text-[10px] bg-blue-500/15 border border-blue-500/30 text-blue-300 px-2 py-0.5 rounded-full font-mono font-bold">
+                      Google Drive Vault
+                    </span>
                   </div>
+                  <h2 className="text-xl font-bold text-white">
+                    Instructivo para Carga de Materiales de tu Marca
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-300 max-w-2xl">
+                    Para asegurar que tus fotografías mantengan resolución 4K y tus logotipos vectoriales no pierdan nitidez ni calidad, los insumos se gestionan directamente a través de tu carpeta privada de Google Drive.
+                  </p>
+                </div>
 
-                  <form onSubmit={handleSubirInsumo} className="space-y-3.5">
-                    <div>
-                      <label className="text-[11px] text-slate-400 font-mono block mb-1">Categoría del Insumo</label>
-                      <select
-                        value={assetCategory}
-                        onChange={(e) => setAssetCategory(e.target.value)}
-                        className="w-full bg-[#141b2b] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                      >
-                        <option value="Logotipo Vectorial">1. Logotipo Vectorial (SVG / PNG HD)</option>
-                        <option value="Fotografías & Gráficos">2. Fotografías de Local / Equipo / Productos</option>
-                        <option value="Textos & Catálogo">3. Textos de Servicios / Precios / Historia</option>
-                        <option value="Accesos & Dominio">4. Accesos de Dominio / DNS Cloudflare</option>
-                        <option value="WhatsApp & Redes">5. Teléfonos Oficiales de Contacto WhatsApp</option>
-                      </select>
-                    </div>
-
-                    {/* Selector de Archivo Local del Dispositivo */}
-                    <div>
-                      <label className="text-[11px] text-slate-400 font-mono block mb-1">
-                        Archivo de tu Dispositivo (PC / Móvil)
-                      </label>
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileSelect}
-                        className="hidden"
-                      />
-                      
-                      <div 
-                        onClick={() => fileInputRef.current?.click()}
-                        className={`p-3 rounded-xl border border-dashed cursor-pointer transition-all flex items-center justify-between gap-3 ${
-                          selectedFile 
-                            ? 'bg-emerald-500/10 border-emerald-500/50 hover:bg-emerald-500/15' 
-                            : 'bg-[#141b2b] border-slate-700 hover:border-orange-500 hover:bg-[#182135]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                            selectedFile ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/10 text-orange-400'
-                          }`}>
-                            {selectedFile ? <FileUp className="w-4 h-4" /> : <FolderOpen className="w-4 h-4" />}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-white truncate">
-                              {selectedFile ? selectedFile.name : 'Examinar y seleccionar archivo...'}
-                            </p>
-                            <p className="text-[10px] text-slate-400">
-                              {selectedFile 
-                                ? `${selectedFile.size > 1048576 ? (selectedFile.size / 1048576).toFixed(1) + ' MB' : Math.round(selectedFile.size / 1024) + ' KB'} · Listo para adjuntar`
-                                : 'SVG, PNG, JPG, PDF, ZIP desde tu computadora o celular'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-200 border border-slate-700 shrink-0"
-                        >
-                          {selectedFile ? 'Cambiar' : 'Explorar'}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] text-slate-400 font-mono block mb-1">
-                        Nombre o Enlace Web (Opcional si seleccionaste archivo)
-                      </label>
-                      <input
-                        type="text"
-                        value={assetName}
-                        onChange={(e) => setAssetName(e.target.value)}
-                        placeholder="Ej. Logo_Clinica_Vector.svg o enlace a Google Drive / Dropbox"
-                        className="w-full bg-[#141b2b] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] text-slate-400 font-mono block mb-1">Notas o Instrucciones (Opcional)</label>
-                      <textarea
-                        value={assetNotes}
-                        onChange={(e) => setAssetNotes(e.target.value)}
-                        rows={2}
-                        placeholder="Instrucciones sobre colores corporativos o tipografía..."
-                        className="w-full bg-[#141b2b] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 resize-none"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={(!assetName.trim() && !selectedFile) || subiendoInsumo}
-                      className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-orange-950 transition-all"
-                    >
-                      {subiendoInsumo ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>Guardando en Google Drive...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-3.5 h-3.5" />
-                          <span>Subir Insumo a Google Drive</span>
-                        </>
-                      )}
-                    </button>
-                  </form>
+                <div className="shrink-0">
+                  <a
+                    href={data.portalConfig?.driveVault?.subfolders?.insumos?.url || data.portalConfig?.driveVault?.vaultUrl || 'https://drive.google.com'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-950/60 transition-all hover:scale-[1.02]"
+                  >
+                    <FolderOpen className="w-4 h-4" />
+                    <span>Abrir Carpeta 01_Insumos_Cliente</span>
+                    <ExternalLink className="w-3.5 h-3.5 ml-0.5" />
+                  </a>
                 </div>
               </div>
 
-              {/* Right Column: Uploaded Assets Checklist */}
-              <div className="lg:col-span-7 space-y-6">
-                <div className="rounded-2xl bg-[#0e1320] border border-slate-800 p-6 space-y-4 shadow-xl">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                    <div>
-                      <h2 className="text-base font-bold text-white">Insumos Registrados en el Proyecto</h2>
-                      <p className="text-xs text-slate-400">Total: {(portalConfig?.archivosSubidos || []).length} archivos en Google Drive</p>
+              {/* Los 3 Pasos del Flujo */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 rounded-xl bg-[#141b2c] border border-slate-700/60 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-mono font-bold text-blue-400">
+                    <span className="w-6 h-6 rounded-lg bg-blue-500/20 flex items-center justify-center text-xs">1</span>
+                    <span>ABRE TU CARPETA</span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Haz clic en el botón superior o en el acceso rápido <strong className="text-white">01_Insumos_Cliente</strong> para abrir tu carpeta privada de Google Drive en una nueva pestaña.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-[#141b2c] border border-slate-700/60 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-mono font-bold text-orange-400">
+                    <span className="w-6 h-6 rounded-lg bg-orange-500/20 flex items-center justify-center text-xs">2</span>
+                    <span>SUBE TUS MATERIALES</span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Arrastra y suelta tus archivos directamente en la carpeta: logos, fotografías en alta definición, textos descriptivos y credenciales de dominio o redes.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-[#141b2c] border border-slate-700/60 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-mono font-bold text-emerald-400">
+                    <span className="w-6 h-6 rounded-lg bg-emerald-500/20 flex items-center justify-center text-xs">3</span>
+                    <span>CONFIRMA LA ENTREGA</span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Regresa a este portal y presiona el botón inferior para avisar a la agencia que ya subiste los documentos para que el equipo valide el contenido.
+                  </p>
+                </div>
+              </div>
+
+              {/* Guía de Insumos Obligatorios a Cargar */}
+              <div className="space-y-3 pt-2">
+                <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-slate-400">
+                  📋 Lista de Materiales Recomendados a Depositar en la Carpeta:
+                </h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                  <div className="p-4 rounded-xl bg-[#111726] border border-slate-800 hover:border-slate-700 transition-colors space-y-2">
+                    <div className="flex items-center gap-2 text-orange-400">
+                      <span className="text-lg">🎨</span>
+                      <span className="font-bold text-white text-xs">1. Logotipo Oficial</span>
                     </div>
-                    {portalConfig?.fase3InsumosCompletos ? (
-                      <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20 font-bold">
-                        ✓ 100% Insumos Recibidos
-                      </span>
-                    ) : (
-                      <span className="text-xs font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
-                        En Proceso de Recepción
-                      </span>
-                    )}
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Formatos vectoriales (<code className="text-orange-300 font-mono">.SVG</code>, <code className="text-orange-300 font-mono">.AI</code>) o imágenes en alta resolución con fondo transparente (<code className="text-orange-300 font-mono">.PNG</code>).
+                    </p>
                   </div>
 
-                  <div className="space-y-2.5 max-h-80 overflow-y-auto">
-                    {(portalConfig?.archivosSubidos || []).length === 0 ? (
-                      <div className="p-6 text-center text-xs text-slate-500 italic bg-slate-900/40 rounded-xl border border-slate-800/60">
-                        Aún no se han registrado insumos. Utiliza el formulario a la izquierda para subir archivos a Google Drive.
-                      </div>
-                    ) : (
-                      portalConfig.archivosSubidos.map((arch) => (
-                        <div
-                          key={arch.id}
-                          className="p-3 rounded-xl bg-[#141b2a] border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:border-slate-700 transition-colors shadow-sm"
-                        >
-                          <div className="flex items-start gap-3 min-w-0">
-                            <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-                              <CheckCircle2 className="w-5 h-5" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-bold text-white truncate flex items-center gap-1.5">
-                                <span>{arch.nombre}</span>
-                                {arch.tamano && <span className="text-[10px] text-slate-400 font-mono font-normal">({arch.tamano})</span>}
-                              </div>
-                              <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                                <span className="text-orange-400 font-bold">{arch.categoria}</span> · Recibido {arch.fecha} {arch.hora ? `(${arch.hora})` : ''}
-                              </div>
-                              {arch.notas && (
-                                <p className="text-[11px] text-slate-300 italic mt-1 line-clamp-2 bg-slate-900/60 px-2 py-1 rounded border border-slate-800/80">
-                                  "{arch.notas}"
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                            {arch.driveUrl ? (
-                              <a
-                                href={arch.driveUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-2.5 py-1 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 hover:text-white font-mono text-[10px] font-bold flex items-center gap-1 transition-all"
-                                title="Ver archivo en Google Drive"
-                              >
-                                <ExternalLink className="w-3 h-3 text-blue-400" />
-                                <span>Ver en Drive</span>
-                              </a>
-                            ) : (
-                              <span className="text-[10px] bg-slate-800 text-emerald-400 px-2 py-1 rounded font-mono font-bold">
-                                {arch.estado || 'Recibido'}
-                              </span>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => handleEliminarInsumo(arch.id)}
-                              className="p-1 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 transition-colors border border-slate-700/60"
-                              title="Eliminar insumo"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
+                  <div className="p-4 rounded-xl bg-[#111726] border border-slate-800 hover:border-slate-700 transition-colors space-y-2">
+                    <div className="flex items-center gap-2 text-sky-400">
+                      <span className="text-lg">📸</span>
+                      <span className="font-bold text-white text-xs">2. Fotos en Alta Calidad</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Fotografías reales del establecimiento, consultorios, productos, equipo o trabajos. Evitar capturas borrosas de pantalla.
+                    </p>
                   </div>
 
-                  {/* Completion Action */}
-                  <div className="pt-2">
-                    {portalConfig?.fase3InsumosCompletos ? (
-                      <button
-                        onClick={() => setActiveTab(4)}
-                        className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 border border-slate-700"
-                      >
-                        <span>Ir a la Fase 4: Liquidación & Candado de Accesos</span>
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleCompletarInsumos}
-                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-emerald-950 transition-all"
-                      >
-                        <CheckCheck className="w-4 h-4" />
-                        <span>Confirmar Recepción 100% de Insumos & Iniciar Desarrollo</span>
-                      </button>
-                    )}
+                  <div className="p-4 rounded-xl bg-[#111726] border border-slate-800 hover:border-slate-700 transition-colors space-y-2">
+                    <div className="flex items-center gap-2 text-purple-400">
+                      <span className="text-lg">📝</span>
+                      <span className="font-bold text-white text-xs">3. Textos & Servicios</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Documento Word o PDF con la lista de servicios, precios o catálogo, historia, testimonios y números de contacto WhatsApp.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-[#111726] border border-slate-800 hover:border-slate-700 transition-colors space-y-2">
+                    <div className="flex items-center gap-2 text-emerald-400">
+                      <span className="text-lg">🔑</span>
+                      <span className="font-bold text-white text-xs">4. Accesos & Dominio</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Credenciales o proveedor de tu dominio actual (GoDaddy, Namecheap, Cloudflare, etc.) para el despliegue y lanzamiento.
+                    </p>
                   </div>
                 </div>
+              </div>
+
+              {/* SECCIÓN DE ESTADO & CONFIRMACIÓN DE ENTREGA */}
+              <div className="pt-3 border-t border-slate-800/80">
+                {portalConfig?.fase3InsumosCompletos ? (
+                  /* ESTADO 1: INSUMOS VALIDADOS POR LA AGENCIA (RELOJ ACTIVO) */
+                  <div className="p-5 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/40 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-500/30">
+                          <CheckCircle2 className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                            <span>✓ Insumos Validados al 100% en Google Drive</span>
+                            <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                              Sprint Activo
+                            </span>
+                          </h4>
+                          <p className="text-xs text-slate-200 mt-1 leading-relaxed">
+                            El equipo de Goglite Digital verificó y validó formalmente que los materiales en tu carpeta están completos. El cronómetro oficial de <strong>10 días hábiles</strong> de desarrollo se encuentra activo.
+                          </p>
+                          {portalConfig?.fechaInsumosCompletos && (
+                            <p className="text-[11px] font-mono text-emerald-400 mt-1">
+                              📅 Fecha de validación por la agencia: <strong>{portalConfig.fechaInsumosCompletos}</strong>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab(4)}
+                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950 transition-all shrink-0"
+                      >
+                        <span>Ir a la Fase 4: Liquidación & Staging</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : portalConfig?.clienteConfirmoInsumos ? (
+                  /* ESTADO 2: EL CLIENTE CONFIRMÓ LA SUBIDA, PERO PENDIENTE DE VALIDACIÓN POR AGENCIA */
+                  <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-[#0e1424] border-2 border-amber-500/40 space-y-4">
+                    <div className="flex items-start gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 mt-0.5 border border-amber-500/30">
+                        <Clock className="w-5 h-5 animate-pulse" />
+                      </div>
+                      <div className="space-y-1 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="text-sm font-bold text-white">
+                            ⏳ Confirmación Recibida · Insumos en Proceso de Validación
+                          </h4>
+                          <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30 font-bold">
+                            Pendiente Validación de Agencia
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-200 leading-relaxed">
+                          Has notificado que subiste tus archivos a Google Drive el <strong>{portalConfig?.fechaConfirmacionClienteInsumos || 'recientemente'}</strong>. Nuestro equipo técnico está inspeccionando la carpeta <strong className="text-white">01_Insumos_Cliente</strong> para verificar que los archivos estén completos y cumplan con los requerimientos técnicos de resolución y formato.
+                        </p>
+                        <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 text-[11px] text-amber-300/90 flex items-start gap-2 mt-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                          <span>
+                            ⚖️ <strong>Cláusula de Garantía de Plazos:</strong> El reloj oficial de <strong>10 días hábiles</strong> de desarrollo se activará formalmente en cuanto la agencia confirme que los archivos en el Drive están completos y validados.
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-amber-500/20">
+                      <a
+                        href={data.portalConfig?.driveVault?.subfolders?.insumos?.url || data.portalConfig?.driveVault?.vaultUrl || 'https://drive.google.com'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 border border-slate-700 transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Ver mi Carpeta en Google Drive</span>
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={handleConfirmarSubidaInsumosCliente}
+                        className="text-xs text-slate-400 hover:text-white underline font-mono text-center sm:text-right"
+                      >
+                        ¿Subiste más archivos recientemente? Re-confirmar subida
+                      </button>
+                    </div>
+
+                    {/* Botón de validación rápida si la sesión pertenece a la agencia */}
+                    {portalConfig?.clienteAuthRol === 'agency' && (
+                      <div className="p-3.5 rounded-xl bg-orange-950/40 border border-orange-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-3">
+                        <div className="flex items-center gap-2 text-orange-300 text-xs font-mono font-bold">
+                          <ShieldCheck className="w-4 h-4 text-orange-400" />
+                          <span>[Vista de Agencia] ¿Revisaste los archivos en Google Drive?</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCompletarInsumos}
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all shrink-0"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Validar Insumos en Drive y Activar Reloj de 10 Días</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* ESTADO 3: EL CLIENTE AÚN NO HA CONFIRMADO LA SUBIDA */
+                  <div className="p-6 rounded-2xl bg-gradient-to-r from-[#101728] via-[#0e1424] to-[#12192a] border border-slate-700/80 space-y-4 text-center sm:text-left">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <h4 className="text-sm sm:text-base font-bold text-white flex items-center justify-center sm:justify-start gap-2">
+                          <CheckCheck className="w-4 h-4 text-orange-400" />
+                          <span>¿Ya subiste los insumos a tu carpeta de Google Drive?</span>
+                        </h4>
+                        <p className="text-xs text-slate-300 max-w-xl">
+                          Una vez que hayas colocado tus logotipos, fotos y textos dentro de la carpeta <strong className="text-white">01_Insumos_Cliente</strong>, presiona el botón a continuación para notificar al equipo técnico:
+                        </p>
+                      </div>
+
+                      <div className="shrink-0 flex flex-col items-center sm:items-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={handleConfirmarSubidaInsumosCliente}
+                          className="w-full sm:w-auto px-6 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xl shadow-orange-950/60 border border-orange-500/30 transition-all transform hover:scale-[1.02]"
+                        >
+                          <Upload className="w-4 h-4 text-orange-200" />
+                          <span>He Subido los Documentos a mi Carpeta de Google Drive</span>
+                        </button>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          Notifica al equipo de desarrollo de Goglite Digital
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2 text-left">
+                      <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <span>
+                        ℹ️ <strong>Importante:</strong> Al presionar este botón confirmas que cargaste tus documentos. El plazo contractual de <strong>10 días hábiles</strong> de entrega se activará formalmente una vez que la agencia confirme que en el Google Drive sí se encuentran todos los insumos necesarios.
+                      </span>
+                    </div>
+
+                    {/* Botón de validación rápida si la sesión pertenece a la agencia */}
+                    {portalConfig?.clienteAuthRol === 'agency' && (
+                      <div className="p-3.5 rounded-xl bg-orange-950/40 border border-orange-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
+                        <div className="flex items-center gap-2 text-orange-300 text-xs font-mono font-bold">
+                          <ShieldCheck className="w-4 h-4 text-orange-400" />
+                          <span>[Vista de Agencia] ¿Ya validaste los archivos en Drive?</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCompletarInsumos}
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all shrink-0"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Validar Insumos en Drive y Activar Reloj de 10 Días</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
