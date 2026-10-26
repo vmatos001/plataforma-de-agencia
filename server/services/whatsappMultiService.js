@@ -11,11 +11,17 @@ import { getCrmLeads, saveCrmLeads, addWhatsAppMessage } from './crmStorage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const SESSIONS_BASE_DIR = path.join(__dirname, '../sessions');
+const SESSIONS_BASE_DIR = process.env.VERCEL
+  ? path.join('/tmp', 'sessions')
+  : path.join(__dirname, '../sessions');
 
 // Ensure base sessions directory exists
-if (!fs.existsSync(SESSIONS_BASE_DIR)) {
-  fs.mkdirSync(SESSIONS_BASE_DIR, { recursive: true });
+try {
+  if (!fs.existsSync(SESSIONS_BASE_DIR)) {
+    fs.mkdirSync(SESSIONS_BASE_DIR, { recursive: true });
+  }
+} catch (e) {
+  console.warn('[WhatsApp] Could not create sessions directory:', e.message);
 }
 
 // Logger silencioso para no ensuciar la consola de dev
@@ -105,8 +111,12 @@ export async function startWhatsAppSession(countryCode) {
   }
 
   const sessionDir = path.join(SESSIONS_BASE_DIR, `whatsapp_${key.toLowerCase()}`);
-  if (!fs.existsSync(sessionDir)) {
-    fs.mkdirSync(sessionDir, { recursive: true });
+  try {
+    if (!fs.existsSync(sessionDir)) {
+      fs.mkdirSync(sessionDir, { recursive: true });
+    }
+  } catch (e) {
+    console.warn(`[WhatsApp] Could not create sessionDir for ${key}:`, e.message);
   }
 
   session.status = 'connecting';
