@@ -684,15 +684,17 @@ export function buildInvoiceFromPresupuesto(prop, existingCount = 0, configuraci
 }
 
 /**
- * Reconcilia una factura existente con el presupuesto actual.
- * Asegura total comercial cerrado ($300 USD), anticipo exacto ($150 USD) y cero desglose por módulo.
+ * Reconcilia una factura existente con el presupuesto actual y estado de pagos por hito.
+ * Respeta rigurosamente facturas por hito (Anticipo 50% y Saldo Final 50%) evitando
+ * sobreescribir facturas de liquidación con montos monolíticos o saldos pendientes erróneos.
  */
-export function reconcileInvoiceWithPresupuesto(fac, prop) {
+export function reconcileInvoiceWithPresupuesto(fac, prop, extraContext = {}) {
   if (!fac) return buildInvoiceFromPresupuesto(prop);
   if (!prop) return fac;
 
-  const subtotal = Number(prop.inversion?.precioTotal) || Number(fac.total) || 300;
-  const anticipo = Number(prop.inversion?.anticipo) ?? Math.round(subtotal * 0.5);
+  const precioTotal = Number(prop.inversion?.precioTotal) || Number(prop.contrato?.totalInversion) || Number(fac.total) || 300;
+  const anticipoMonto = Number(prop.inversion?.anticipo) || Number(prop.pagos?.anticipoMonto) || Math.round(precioTotal * 0.5);
+  const saldoMonto = Number(prop.inversion?.contraEntrega) || Number(prop.pagos?.saldoMonto) || (precioTotal - anticipoMonto);
   const pais = prop.pais || fac.cliente?.pais || (prop.cliente?.ubicacion?.toLowerCase().includes('dominicana') ? 'DO' : 'SV');
 
   const cleanModuleTitle = (t) => (t || '')
@@ -704,24 +706,160 @@ export function reconcileInvoiceWithPresupuesto(fac, prop) {
     ? prop.modulos.map(m => `${m.numero ? m.numero + ': ' : ''}${cleanModuleTitle(m.titulo)}`).join(' · ')
     : '';
 
-  const itemDescripcion = prop.portada?.proyecto
-    ? `${prop.titulo || 'Solución Web Corporativa VIP'}: ${prop.portada.proyecto}`
-    : (modulosNombres
-        ? `${prop.titulo || 'Desarrollo Digital VIP'} (Entregables: ${modulosNombres})`
-        : (prop.titulo || fac.concepto || 'Desarrollo de Sistema Digital Web & Posicionamiento IA'));
+  const cleanTitle = cleanModuleTitle(prop.titulo || prop.portada?.proyecto || fac.concepto || 'Desarrollo Web VIP');
 
-  const items = [
-    {
-      id: 'item-1',
-      descripcion: itemDescripcion,
-      cantidad: 1,
-      precioUnitario: subtotal,
-      total: subtotal
+  const isSaldo = fac.tipoHito === 'saldo' ||
+    fac.id?.endsWith('-saldo') ||
+    fac.concepto?.toLowerCase().includes('saldo') ||
+    fac.concepto?.toLowerCase().includes('liquidaci');
+
+  const isAnticipo = fac.tipoHito === 'anticipo' ||
+    fac.id?.endsWith('-anticipo') ||
+    fac.concepto?.toLowerCase().includes('anticipo') ||
+    (!isSaldo && fac.tipoHito !== 'total');
+
+  // Determinar estado de pagos cruzando extraContext, prop y localStorage
+  let isAnticipoPaid = Boolean(
+    (fac.estado === 'cobrada' && isAnticipo) ||
+    extraContext?.isAnticipoPaid ||
+    prop.pagos?.anticipoEstado === 'confirmado' ||
+    prop.pagos?.anticipoEstado === 'verificacion' ||
+    prop.portalConfig?.anticipoConfirmadoAgencia ||
+    prop.portalConfig?.facturaAnticipoHabilitada ||
+    extraContext?.portalConfig?.anticipoConfirmadoAgencia ||
+    extraContext?.proyecto?.pagos?.anticipoEstado === 'confirmado'
+  );
+
+  let isSaldoPaid = Boolean(
+    (fac.estado === 'cobrada' && isSaldo) ||
+    extraContext?.isSaldoPaid ||
+    prop.pagos?.saldoEstado === 'confirmado' ||
+    prop.pagos?.saldoEstado === 'verificacion' ||
+    prop.portalConfig?.fase4Liquidada ||
+    prop.portalConfig?.liquidacionPagada ||
+    prop.portalConfig?.liquidacionReportada ||
+    prop.portalConfig?.saldoConfirmadoAgencia ||
+    Boolean(prop.portalConfig?.comprobanteLiquidacion) ||
+    extraContext?.portalConfig?.fase4Liquidada ||
+    extraContext?.portalConfig?.liquidacionPagada ||
+    extraContext?.portalConfig?.liquidacionReportada ||
+    extraContext?.portalConfig?.saldoConfirmadoAgencia ||
+    extraContext?.proyecto?.pagos?.saldoEstado === 'confirmado' ||
+    extraContext?.proyecto?.pagos?.saldoEstado === 'verificacion'
+  );
+
+  if (typeof window !== 'undefined' && (!isAnticipoPaid || !isSaldoPaid)) {
+    try {
+      const rawProj = localStorage.getItem('goglite_proyectos');
+      if (rawProj) {
+        const projs = JSON.parse(rawProj);
+        const targetProj = projs.find(p => 
+          (fac.proyectoId && (p.id === fac.proyectoId || p.id === `proj-${fac.proyectoId}`)) ||
+          (prop.id && (p.presupuestoId === prop.id || p.id === prop.id)) ||
+          (prop.codigo && (p.codigo === prop.codigo || p.presupuestoCodigo === prop.codigo)) ||
+          (fac.codigoPresupuesto && (p.codigo === fac.codigoPresupuesto || p.presupuestoCodigo === fac.codigoPresupuesto)) ||
+          (fac.cliente?.empresa && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === fac.cliente.empresa.toLowerCase().trim())
+        );
+        if (targetProj) {
+          if (targetProj.pagos?.anticipoEstado === 'confirmado' || targetProj.portalConfig?.anticipoConfirmadoAgencia) {
+            isAnticipoPaid = true;
+          }
+          if (
+            targetProj.pagos?.saldoEstado === 'confirmado' ||
+            targetProj.pagos?.saldoEstado === 'verificacion' ||
+            targetProj.portalConfig?.fase4Liquidada ||
+            targetProj.portalConfig?.liquidacionPagada ||
+            targetProj.portalConfig?.liquidacionReportada ||
+            targetProj.portalConfig?.saldoConfirmadoAgencia ||
+            targetProj.portalConfig?.comprobanteLiquidacion
+          ) {
+            isSaldoPaid = true;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  let finalSubtotal = precioTotal;
+  let finalTotal = precioTotal;
+  let montoCobrado = 0;
+  let saldoPendiente = precioTotal;
+  let estado = 'pendiente';
+  let items = [];
+  let concepto = '';
+
+  if (isSaldo) {
+    finalSubtotal = saldoMonto;
+    finalTotal = saldoMonto;
+    const paid = isSaldoPaid || fac.estado === 'cobrada' || (Number(fac.montoCobrado) >= finalTotal);
+    montoCobrado = paid ? finalTotal : Math.min(finalTotal, Number(fac.montoCobrado) || 0);
+    saldoPendiente = paid ? 0 : Math.max(0, finalTotal - montoCobrado);
+    estado = paid ? 'cobrada' : (montoCobrado > 0 ? 'parcial' : 'pendiente');
+    concepto = `Saldo Final & Liquidación de Cierre (50%) · ${cleanTitle}`;
+    items = [
+      {
+        id: 'item-saldo',
+        descripcion: `Saldo Final & Liquidación de Cierre (50%) - Entrega Oficial, Despliegue en Producción & Cesión de Accesos (${cleanTitle})`,
+        cantidad: 1,
+        precioUnitario: finalTotal,
+        total: finalTotal
+      }
+    ];
+  } else if (isAnticipo) {
+    finalSubtotal = anticipoMonto;
+    finalTotal = anticipoMonto;
+    const paid = isAnticipoPaid || fac.estado === 'cobrada' || (Number(fac.montoCobrado) >= finalTotal);
+    montoCobrado = paid ? finalTotal : Math.min(finalTotal, Number(fac.montoCobrado) || 0);
+    saldoPendiente = paid ? 0 : Math.max(0, finalTotal - montoCobrado);
+    estado = paid ? 'cobrada' : (montoCobrado > 0 ? 'parcial' : 'pendiente');
+    concepto = `Anticipo Inicial (50%) · ${cleanTitle}`;
+    items = [
+      {
+        id: 'item-anticipo',
+        descripcion: `Anticipo Inicial (50%) - Inicio de Desarrollo Web VIP, Estructura & Setup Técnico (${cleanTitle})`,
+        cantidad: 1,
+        precioUnitario: finalTotal,
+        total: finalTotal
+      }
+    ];
+  } else {
+    // Factura Monolítica (Proyecto Completo)
+    finalSubtotal = precioTotal;
+    finalTotal = precioTotal;
+    const isPaidFull = isSaldoPaid || (Number(fac.montoCobrado) >= finalTotal);
+    const isPaidHalf = isAnticipoPaid || (Number(fac.montoCobrado) >= anticipoMonto);
+    if (isPaidFull) {
+      montoCobrado = finalTotal;
+      saldoPendiente = 0;
+      estado = 'cobrada';
+    } else if (isPaidHalf) {
+      montoCobrado = anticipoMonto;
+      saldoPendiente = Math.max(0, finalTotal - anticipoMonto);
+      estado = 'parcial';
+    } else {
+      montoCobrado = Number(fac.montoCobrado) || 0;
+      saldoPendiente = Math.max(0, finalTotal - montoCobrado);
+      estado = montoCobrado >= finalTotal ? 'cobrada' : (montoCobrado > 0 ? 'parcial' : 'pendiente');
     }
-  ];
+    concepto = `${prop.titulo || 'Propuesta Digital VIP'} ${prop.subtitulo || ''}`.trim();
+    items = [
+      {
+        id: 'item-1',
+        descripcion: prop.portada?.proyecto
+          ? `${prop.titulo || 'Solución Web Corporativa VIP'}: ${prop.portada.proyecto}`
+          : (modulosNombres
+              ? `${prop.titulo || 'Desarrollo Digital VIP'} (Entregables: ${modulosNombres})`
+              : (prop.titulo || fac.concepto || 'Desarrollo de Sistema Digital Web & Posicionamiento IA')),
+        cantidad: 1,
+        precioUnitario: finalTotal,
+        total: finalTotal
+      }
+    ];
+  }
 
   return {
     ...fac,
+    tipoHito: isSaldo ? 'saldo' : (isAnticipo ? 'anticipo' : (fac.tipoHito || 'total')),
     presupuestoId: prop.id || fac.presupuestoId,
     codigoPresupuesto: prop.codigo || fac.codigoPresupuesto,
     cliente: {
@@ -733,11 +871,13 @@ export function reconcileInvoiceWithPresupuesto(fac, prop) {
       identificacion: prop.cliente?.identificacion || fac.cliente?.identificacion || 'ID Fiscal Comercial',
       pais
     },
-    concepto: `${prop.titulo || 'Propuesta Digital VIP'} ${prop.subtitulo || ''}`.trim(),
-    subtotal,
-    total: subtotal,
-    montoCobrado: anticipo,
-    saldoPendiente: Math.max(0, subtotal - anticipo),
+    concepto,
+    subtotal: finalSubtotal,
+    total: finalTotal,
+    montoCobrado,
+    saldoPendiente,
+    estado,
+    habilitadaCliente: estado === 'cobrada' || fac.habilitadaCliente === true,
     items
   };
 }
@@ -924,8 +1064,8 @@ export function reconcileMilestoneInvoices(currentFacturas = [], configuracion =
       const totalInversion = Number(proj.contrato?.totalInversion) || 300;
       const anticipoMonto = Number(proj.pagos?.anticipoMonto) || Math.round(totalInversion * 0.5);
       const saldoMonto = Number(proj.pagos?.saldoMonto) || (totalInversion - anticipoMonto);
-      const isAnticipoPaid = proj.pagos?.anticipoEstado === 'confirmado';
-      const isSaldoPaid = proj.pagos?.saldoEstado === 'confirmado';
+      const isAnticipoPaid = proj.pagos?.anticipoEstado === 'confirmado' || proj.pagos?.anticipoEstado === 'verificacion' || proj.portalConfig?.anticipoConfirmadoAgencia || proj.portalConfig?.facturaAnticipoHabilitada;
+      const isSaldoPaid = proj.pagos?.saldoEstado === 'confirmado' || proj.pagos?.saldoEstado === 'verificacion' || proj.portalConfig?.liquidacionReportada || proj.portalConfig?.fase4Liquidada || proj.portalConfig?.liquidacionPagada || proj.portalConfig?.saldoConfirmadoAgencia || Boolean(proj.portalConfig?.comprobanteLiquidacion);
 
       const cleanTitle = (proj.contrato?.alcanceResumen || proj.titulo || 'Desarrollo Digital VIP')
         .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '')
@@ -1014,26 +1154,36 @@ export function reconcileMilestoneInvoices(currentFacturas = [], configuracion =
           const isSaldo = fac.tipoHito === 'saldo' || fac.id.endsWith('-saldo') || fac.concepto?.toLowerCase().includes('saldo') || fac.concepto?.toLowerCase().includes('liquidaci');
           const isAnticipo = fac.tipoHito === 'anticipo' || fac.id.endsWith('-anticipo') || fac.concepto?.toLowerCase().includes('anticipo') || !isSaldo;
 
-          if (isSaldo && isSaldoPaid && fac.estado !== 'cobrada') {
-            facturas[idx] = {
-              ...fac,
-              tipoHito: 'saldo',
-              montoCobrado: Number(fac.total) || saldoMonto,
-              saldoPendiente: 0,
-              estado: 'cobrada',
-              habilitadaCliente: true
-            };
-            modified = true;
-          } else if (isAnticipo && isAnticipoPaid && fac.estado !== 'cobrada') {
-            facturas[idx] = {
-              ...fac,
-              tipoHito: 'anticipo',
-              montoCobrado: Number(fac.total) || anticipoMonto,
-              saldoPendiente: 0,
-              estado: 'cobrada',
-              habilitadaCliente: true
-            };
-            modified = true;
+          if (isSaldo) {
+            const shouldBePaid = isSaldoPaid || fac.estado === 'cobrada' || (Number(fac.montoCobrado) >= saldoMonto);
+            if (fac.subtotal !== saldoMonto || fac.total !== saldoMonto || (shouldBePaid && (fac.estado !== 'cobrada' || fac.saldoPendiente !== 0))) {
+              facturas[idx] = {
+                ...fac,
+                tipoHito: 'saldo',
+                subtotal: saldoMonto,
+                total: saldoMonto,
+                montoCobrado: shouldBePaid ? saldoMonto : Math.min(saldoMonto, Number(fac.montoCobrado) || 0),
+                saldoPendiente: shouldBePaid ? 0 : Math.max(0, saldoMonto - (Number(fac.montoCobrado) || 0)),
+                estado: shouldBePaid ? 'cobrada' : ((Number(fac.montoCobrado) || 0) > 0 ? 'parcial' : 'pendiente'),
+                habilitadaCliente: shouldBePaid || fac.habilitadaCliente === true
+              };
+              modified = true;
+            }
+          } else if (isAnticipo) {
+            const shouldBePaid = isAnticipoPaid || fac.estado === 'cobrada' || (Number(fac.montoCobrado) >= anticipoMonto);
+            if (fac.subtotal !== anticipoMonto || fac.total !== anticipoMonto || (shouldBePaid && (fac.estado !== 'cobrada' || fac.saldoPendiente !== 0))) {
+              facturas[idx] = {
+                ...fac,
+                tipoHito: 'anticipo',
+                subtotal: anticipoMonto,
+                total: anticipoMonto,
+                montoCobrado: shouldBePaid ? anticipoMonto : Math.min(anticipoMonto, Number(fac.montoCobrado) || 0),
+                saldoPendiente: shouldBePaid ? 0 : Math.max(0, anticipoMonto - (Number(fac.montoCobrado) || 0)),
+                estado: shouldBePaid ? 'cobrada' : ((Number(fac.montoCobrado) || 0) > 0 ? 'parcial' : 'pendiente'),
+                habilitadaCliente: shouldBePaid || fac.habilitadaCliente === true
+              };
+              modified = true;
+            }
           }
         });
       }
@@ -1201,16 +1351,20 @@ export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFI
   };
   const pais = invoice.cliente?.pais || 'SV';
 
+  const isSaldo = invoice.tipoHito === 'saldo' || invoice.id?.endsWith('-saldo') || invoice.concepto?.toLowerCase().includes('saldo') || invoice.concepto?.toLowerCase().includes('liquidaci');
+  const isAnticipo = invoice.tipoHito === 'anticipo' || invoice.id?.endsWith('-anticipo') || invoice.concepto?.toLowerCase().includes('anticipo');
+
   const estadoLabel = invoice.estado === 'cobrada'
-    ? 'PAGADA 100%'
+    ? (isSaldo ? 'PAGADA 100% · LIQUIDACIÓN' : (isAnticipo ? 'PAGADA 100% · ANTICIPO' : 'PAGADA 100%'))
     : invoice.estado === 'parcial'
     ? (Number(invoice.montoCobrado) === Math.round(Number(invoice.total) * 0.5)
         ? 'ANTICIPO COBRADO (50%)'
         : `ABONO PARCIAL ($${Number(invoice.montoCobrado || 0).toLocaleString()} USD)`)
-    : 'PENDIENTE DE PAGO';
+    : (isSaldo ? 'PENDIENTE DE LIQUIDACIÓN' : 'PENDIENTE DE PAGO');
 
   const badgeBg = invoice.estado === 'cobrada' ? '#DCFCE7' : '#FFF0E6';
   const badgeColor = invoice.estado === 'cobrada' ? '#15803D' : '#FF6B00';
+  const cobradoLabel = isSaldo ? 'Monto Liquidado / Cobrado:' : (isAnticipo ? 'Monto Anticipo Cobrado:' : 'Monto Cobrado / Anticipo:');
 
   const rowsHtml = (invoice.items || []).map((item, idx) => `
     <tr style="background: ${idx % 2 === 1 ? '#FAFAFA' : '#FFFFFF'};">
@@ -1368,7 +1522,7 @@ export function buildCorporateInvoiceHtml(invoice, configuracion = DEFAULT_CONFI
           <span class="highlight">$${Number(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
         </div>
         <div class="totals-row" style="color: #15803D; font-weight: 700; padding-top: 8px;">
-          <span>Monto Cobrado / Anticipo:</span>
+          <span>${cobradoLabel}</span>
           <span style="font-family: monospace;">$${Number(invoice.montoCobrado || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
         </div>
         <div class="totals-row" style="color: #D97706; font-weight: 800; border-top: 1px solid #E5E7EB; padding-top: 6px;">
@@ -1417,6 +1571,11 @@ export function CorporateInvoiceDocument({ invoice, configuracion = DEFAULT_CONF
     ubicacion: emisorRaw?.ubicacion || configuracion?.ubicacionPrincipal || DEFAULT_CONFIGURACION.emisor.ubicacion
   };
 
+  const isSaldo = invoice.tipoHito === 'saldo' || invoice.id?.endsWith('-saldo') || invoice.concepto?.toLowerCase().includes('saldo') || invoice.concepto?.toLowerCase().includes('liquidaci');
+  const isAnticipo = invoice.tipoHito === 'anticipo' || invoice.id?.endsWith('-anticipo') || invoice.concepto?.toLowerCase().includes('anticipo');
+
+  const cobradoLabel = isSaldo ? 'Monto Liquidado / Cobrado:' : (isAnticipo ? 'Monto Anticipo Cobrado:' : 'Monto Cobrado / Anticipo:');
+
   return (
     <div className="printable-invoice-document bg-white p-6 sm:p-8 rounded-xl border border-[#EBEBEB] shadow-sm space-y-6 text-[#1A1A1A] font-sans print:border-none print:shadow-none print:p-0 print:m-0 print:w-full">
       {/* 1. Header de Factura */}
@@ -1454,12 +1613,12 @@ export function CorporateInvoiceDocument({ invoice, configuracion = DEFAULT_CONF
               : 'bg-[#FFF0E6] text-[#FF6B00]'
           }`}>
             {invoice.estado === 'cobrada'
-              ? 'PAGADA 100%'
+              ? (isSaldo ? 'PAGADA 100% · LIQUIDACIÓN' : (isAnticipo ? 'PAGADA 100% · ANTICIPO' : 'PAGADA 100%'))
               : invoice.estado === 'parcial'
               ? (Number(invoice.montoCobrado) === Math.round(Number(invoice.total) * 0.5)
                   ? 'ANTICIPO COBRADO (50%)'
                   : `ABONO PARCIAL ($${Number(invoice.montoCobrado || 0).toLocaleString()} USD)`)
-              : 'PENDIENTE DE PAGO'}
+              : (isSaldo ? 'PENDIENTE DE LIQUIDACIÓN' : 'PENDIENTE DE PAGO')}
           </span>
         </div>
       </div>
@@ -1531,7 +1690,7 @@ export function CorporateInvoiceDocument({ invoice, configuracion = DEFAULT_CONF
             <span className="font-mono text-[#FF6B00]">${Number(invoice.total).toLocaleString()} USD</span>
           </div>
           <div className="flex justify-between text-emerald-700 font-bold pt-1">
-            <span>Monto Cobrado / Anticipo:</span>
+            <span>{cobradoLabel}</span>
             <span className="font-mono">${Number(invoice.montoCobrado || 0).toLocaleString()} USD</span>
           </div>
           <div className="flex justify-between text-amber-700 font-bold pt-1 border-t border-[#E5E7EB]">

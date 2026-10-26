@@ -59,6 +59,7 @@ import {
   buildCorporateInvoiceHtml, 
   printHtmlViaHiddenIframe, 
   buildInvoiceFromPresupuesto, 
+  buildMilestoneInvoices,
   reconcileInvoiceWithPresupuesto,
   normalizeFacturaItems 
 } from './GestionRentabilidadModule';
@@ -447,43 +448,51 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     // Filtrar estrictamente por el estado confirmado de cada hito
     const valid = matched.filter(f => {
       if (f.tipoHito === 'anticipo' || f.id?.endsWith('-anticipo')) return isAnticipoConfirmed;
-      if (f.tipoHito === 'saldo' || f.id?.endsWith('-saldo')) return isSaldoConfirmed;
-      return isAnticipoConfirmed || isSaldoConfirmed;
+      if (f.tipoHito === 'saldo' || f.id?.endsWith('-saldo')) return isSaldoConfirmed || hasSettlementReceiptSubmitted;
+      return isAnticipoConfirmed || isSaldoConfirmed || hasSettlementReceiptSubmitted;
     }).map(f => {
       let inv = normalizeFacturaItems(f);
       if (data?.presupuesto) {
-        inv = reconcileInvoiceWithPresupuesto(inv, data.presupuesto);
+        inv = reconcileInvoiceWithPresupuesto(inv, data.presupuesto, {
+          isAnticipoPaid: isAnticipoConfirmed,
+          isSaldoPaid: isSaldoConfirmed || hasSettlementReceiptSubmitted,
+          proyecto: data.proyecto,
+          portalConfig: data.portalConfig
+        });
       }
       return inv;
     });
 
     // Si la administración confirmó en el panel pero la factura aún no sincronizó en clientFacturaList
-    if (valid.length === 0 && (isAnticipoConfirmed || isSaldoConfirmed) && data?.presupuesto) {
-      let built = buildInvoiceFromPresupuesto(data.presupuesto);
-      built = reconcileInvoiceWithPresupuesto(built, data.presupuesto);
-      if (isSaldoConfirmed) {
-        built.estado = 'cobrada';
-        built.montoCobrado = built.total;
-        built.saldoPendiente = 0;
-      } else if (isAnticipoConfirmed) {
-        built.estado = 'cobrada';
-        built.montoCobrado = data?.presupuesto?.inversion?.anticipo || Math.round(Number(built.total) * 0.5);
-        built.saldoPendiente = Math.max(0, Number(built.total) - Number(built.montoCobrado));
+    if (valid.length === 0 && (isAnticipoConfirmed || isSaldoConfirmed || hasSettlementReceiptSubmitted) && data?.presupuesto) {
+      const isSettlement = isSaldoConfirmed || hasSettlementReceiptSubmitted;
+      const milestoneInvoices = buildMilestoneInvoices(data.presupuesto, 0);
+      if (milestoneInvoices.length === 2) {
+        const facAnticipo = reconcileInvoiceWithPresupuesto(milestoneInvoices[0], data.presupuesto, { isAnticipoPaid: isAnticipoConfirmed });
+        const facSaldo = reconcileInvoiceWithPresupuesto(milestoneInvoices[1], data.presupuesto, { isSaldoPaid: isSettlement });
+        if (isAnticipoConfirmed) valid.push(normalizeFacturaItems(facAnticipo));
+        if (isSettlement) valid.push(normalizeFacturaItems(facSaldo));
+      } else {
+        let built = buildInvoiceFromPresupuesto(data.presupuesto);
+        built = reconcileInvoiceWithPresupuesto(built, data.presupuesto, {
+          isAnticipoPaid: isAnticipoConfirmed,
+          isSaldoPaid: isSettlement
+        });
+        valid.push(normalizeFacturaItems(built));
       }
-      valid.push(normalizeFacturaItems(built));
     }
 
     return valid;
-  }, [clientFacturaList, data, isAnticipoConfirmed, isSaldoConfirmed]);
+  }, [clientFacturaList, data, isAnticipoConfirmed, isSaldoConfirmed, hasSettlementReceiptSubmitted]);
 
   const matchingFactura = React.useMemo(() => {
-    // Si la agencia no ha confirmado ningún pago, NUNCA mostrar factura en el portal
-    if (!isAnticipoConfirmed && !isSaldoConfirmed) {
+    // Si la agencia no ha confirmado ningún pago ni se ha reportado liquidación, NUNCA mostrar factura en el portal
+    if (!isAnticipoConfirmed && !isSaldoConfirmed && !hasSettlementReceiptSubmitted) {
       return null;
     }
 
     if (clientFacturasDisponibles.length > 0) {
-      if (isSaldoConfirmed) {
+      if (isSaldoConfirmed || hasSettlementReceiptSubmitted) {
         // En liquidación o saldo confirmado, preferir la de saldo si existe
         const saldoInv = clientFacturasDisponibles.find(f => f.tipoHito === 'saldo' || f.id?.endsWith('-saldo'));
         return saldoInv || clientFacturasDisponibles[clientFacturasDisponibles.length - 1];
@@ -492,7 +501,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     }
 
     return null;
-  }, [clientFacturasDisponibles, isAnticipoConfirmed, isSaldoConfirmed]);
+  }, [clientFacturasDisponibles, isAnticipoConfirmed, isSaldoConfirmed, hasSettlementReceiptSubmitted]);
 
   const handlePrintClientInvoicePdf = (fac) => {
     if (!fac) return;
@@ -2285,6 +2294,52 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         }
       } catch (err) {
         console.warn('Error sync settlement with project:', err);
+      }
+
+      try {
+        let storedFacturas = [];
+        const rawFac = localStorage.getItem('goglite_facturas');
+        if (rawFac) storedFacturas = JSON.parse(rawFac);
+        if (Array.isArray(storedFacturas) && storedFacturas.length > 0) {
+          const leadEmp = (data?.lead?.empresa || '').toLowerCase().trim();
+          let facUpdated = false;
+          storedFacturas = storedFacturas.map(f => {
+            const isTargetProject = (data?.proyecto && (f.proyectoId === data.proyecto.id || f.id?.includes(data.proyecto.id))) ||
+              (data?.presupuesto && (f.presupuestoId === data.presupuesto.id || f.codigoPresupuesto === data.presupuesto.codigo)) ||
+              (leadEmp && f.cliente?.empresa && f.cliente.empresa.toLowerCase().trim() === leadEmp);
+            const isSaldo = f.tipoHito === 'saldo' || f.id?.endsWith('-saldo') || f.concepto?.toLowerCase().includes('saldo') || f.concepto?.toLowerCase().includes('liquidaci');
+            
+            if (isTargetProject && isSaldo) {
+              facUpdated = true;
+              const saldoTotal = Number(f.total) || Number(data?.presupuesto?.inversion?.contraEntrega) || 125;
+              return {
+                ...f,
+                tipoHito: 'saldo',
+                subtotal: saldoTotal,
+                total: saldoTotal,
+                montoCobrado: saldoTotal,
+                saldoPendiente: 0,
+                estado: 'cobrada',
+                habilitadaCliente: true
+              };
+            }
+            return f;
+          });
+          if (facUpdated) {
+            localStorage.setItem('goglite_facturas', JSON.stringify(storedFacturas));
+            const rawFin = localStorage.getItem('goglite_finanzas_v1');
+            if (rawFin) {
+              try {
+                const parsedFin = JSON.parse(rawFin);
+                parsedFin.facturas = storedFacturas;
+                localStorage.setItem('goglite_finanzas_v1', JSON.stringify(parsedFin));
+              } catch {}
+            }
+            window.dispatchEvent(new CustomEvent('goglite_facturas_updated'));
+          }
+        }
+      } catch (errFac) {
+        console.warn('Error sync settlement with invoice:', errFac);
       }
 
       await savePortalUpdates({

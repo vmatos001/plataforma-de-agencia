@@ -1187,8 +1187,8 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
 
     if (found) {
       found = { ...normalizeFacturaItems(found) };
-      const isAnticipoConfirmado = proj.pagos?.anticipoEstado === 'confirmado';
-      const isSaldoConfirmado = proj.pagos?.saldoEstado === 'confirmado';
+      const isAnticipoConfirmado = proj.pagos?.anticipoEstado === 'confirmado' || proj.portalConfig?.anticipoConfirmadoAgencia || proj.portalConfig?.facturaAnticipoHabilitada;
+      const isSaldoConfirmado = proj.pagos?.saldoEstado === 'confirmado' || proj.pagos?.saldoEstado === 'verificacion' || proj.portalConfig?.fase4Liquidada || proj.portalConfig?.liquidacionPagada || proj.portalConfig?.saldoConfirmadoAgencia || proj.portalConfig?.liquidacionReportada || Boolean(proj.portalConfig?.comprobanteLiquidacion);
 
       if (found.tipoHito === 'anticipo' || tipoVista === 'anticipo') {
         found.montoCobrado = isAnticipoConfirmado ? Number(found.total) : 0;
@@ -1199,14 +1199,14 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
         found.saldoPendiente = isSaldoConfirmado ? 0 : Number(found.total);
         found.estado = isSaldoConfirmado ? 'cobrada' : 'pendiente';
       } else {
-        if (proj.pagos?.saldoEstado === 'confirmado') {
+        if (isSaldoConfirmado) {
           found.montoCobrado = Number(found.total);
           found.saldoPendiente = 0;
           found.estado = 'cobrada';
-        } else if (proj.pagos?.anticipoEstado === 'confirmado') {
-          found.montoCobrado = Number(found.total);
-          found.saldoPendiente = 0;
-          found.estado = 'cobrada';
+        } else if (isAnticipoConfirmado) {
+          found.montoCobrado = Math.round(Number(found.total) * 0.5);
+          found.saldoPendiente = Math.max(0, Number(found.total) - Number(found.montoCobrado));
+          found.estado = 'parcial';
         }
       }
     }
