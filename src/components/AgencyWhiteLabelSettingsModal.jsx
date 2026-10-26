@@ -33,10 +33,98 @@ import {
   Zap,
   Bot,
   Copy,
-  Key
+  Key,
+  Package,
+  Plus,
+  Edit
 } from 'lucide-react';
 import { apiClient } from '../services/apiClient';
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
+
+export const DEFAULT_SERVICES = [
+  {
+    id: 'web-antigravity-vip',
+    nombre: 'Plataforma Web Antigravity VIP con StoryBrand',
+    categoria: 'Desarrollo Web & StoryBrand',
+    precioUSD: 650,
+    precioDOP: 39000,
+    tipoCobro: 'proyecto',
+    anticipoPorcentaje: 50,
+    descripcion: 'Plataforma web de ultra-alta conversión, arquitectura de carga <1s y copywriting StoryBrand.',
+    entregables: [
+      'Diseño UI/UX de alta conversión',
+      'Velocidad de carga <1s y Core Web Vitals verdes',
+      'Integración WhatsApp Direct & Lead Capture',
+      'Copywriting StoryBrand (Guion de Marca)',
+      'Panel CMS autogestionable'
+    ]
+  },
+  {
+    id: 'lead-machine-pro',
+    nombre: 'Sistema de Aceleración y Captación de Leads B2B',
+    categoria: 'Crecimiento Comercial & CRM',
+    precioUSD: 950,
+    precioDOP: 57000,
+    tipoCobro: 'proyecto',
+    anticipoPorcentaje: 50,
+    descripcion: 'Sistema completo con sitio web de alto impacto, CRM multicanal y automatización.',
+    entregables: [
+      'Sitio Web Antigravity VIP',
+      'Configuración CRM WhatsApp multi-línea',
+      'Automatización de seguimiento y bitácora',
+      'Portal Privado de Cliente 360°',
+      'Integración Google Site Kit & Search Console'
+    ]
+  },
+  {
+    id: 'landing-express',
+    nombre: 'Landing Page de Alta Conversión Express',
+    categoria: 'Conversión Rápida',
+    precioUSD: 250,
+    precioDOP: 15000,
+    tipoCobro: 'proyecto',
+    anticipoPorcentaje: 50,
+    descripcion: 'Página única optimizada para campañas publicitarias y tráfico de Google Ads o Meta.',
+    entregables: [
+      'Diseño 1 página de alto impacto visual',
+      'Optimización móvil y botón WhatsApp Flotante',
+      'Despliegue en dominio personalizado con SSL',
+      'Formulario de cotización directa'
+    ]
+  },
+  {
+    id: 'mantenimiento-seo-soporte',
+    nombre: 'Mantenimiento Web Continuo, SEO Local & Soporte',
+    categoria: 'Mantenimiento & Retainer',
+    precioUSD: 120,
+    precioDOP: 7000,
+    tipoCobro: 'mensual',
+    anticipoPorcentaje: 100,
+    descripcion: 'Suscripción mensual de mantenimiento, actualizaciones, hosting seguro y optimización SEO.',
+    entregables: [
+      'Alojamiento cloud de alta disponibilidad y certificado SSL',
+      'Monitoreo continuo y copias de seguridad semanales',
+      'Optimización mensual de SEO local y Google Business',
+      'Soporte técnico prioritario y cambios menores de contenido'
+    ]
+  },
+  {
+    id: 'ecommerce-pro',
+    nombre: 'Tienda Online / E-commerce de Alto Rendimiento',
+    categoria: 'Comercio Electrónico',
+    precioUSD: 1200,
+    precioDOP: 72000,
+    tipoCobro: 'proyecto',
+    anticipoPorcentaje: 50,
+    descripcion: 'Tienda virtual con pasarelas de pago, catálogo de productos y checkout optimizado.',
+    entregables: [
+      'Catálogo ilimitado y configuración de categorías',
+      'Integración con pasarelas de pago (Stripe, Pagadito, Azul, PayPal)',
+      'Notificaciones de pedidos por WhatsApp y Correo',
+      'Panel administrativo de inventario y pedidos'
+    ]
+  }
+];
 
 export default function AgencyWhiteLabelSettingsModal({
   isOpen,
@@ -67,6 +155,7 @@ export default function AgencyWhiteLabelSettingsModal({
     tasaCambioDop: 58.50,
     tasaCambioEur: 0.92,
     mcpAgentKey: DEFAULT_AGENCY_BRANDING.mcpAgentKey || 'gog_agent_live_d92cd28fb0ce6cd0139bf8127427bd39',
+    serviciosOficiales: DEFAULT_SERVICES,
     apisIntegraciones: {
       googleSiteKitConnected: true,
       googleDriveVault: 'Goglite Agency Drive Vault',
@@ -78,7 +167,22 @@ export default function AgencyWhiteLabelSettingsModal({
   });
 
   const [activeTab, setActiveTab] = useState('branding'); 
-  // 'branding' | 'colaboradores' | 'contacto' | 'paises' | 'apis'
+  // 'branding' | 'colaboradores' | 'contacto' | 'paises' | 'apis' | 'servicios'
+
+  // Estados para Catálogo de Servicios
+  const [editingServiceIndex, setEditingServiceIndex] = useState(null);
+  const [showServiceForm, setShowServiceForm] = useState(false);
+  const [serviceForm, setServiceForm] = useState({
+    id: '',
+    nombre: '',
+    categoria: 'Desarrollo Web & StoryBrand',
+    precioUSD: 650,
+    precioDOP: 39000,
+    tipoCobro: 'proyecto',
+    anticipoPorcentaje: 50,
+    descripcion: '',
+    entregablesText: ''
+  });
   
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -291,6 +395,9 @@ export default function AgencyWhiteLabelSettingsModal({
         logoUrl: agencySettings.logoUrl || storedLogo || prev.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl,
         logoDocumentosUrl: agencySettings.logoDocumentosUrl || storedLogoDocs || prev.logoDocumentosUrl || '',
         mcpAgentKey: agencySettings.mcpAgentKey || prev.mcpAgentKey || DEFAULT_AGENCY_BRANDING.mcpAgentKey || 'gog_agent_live_3554881d91556ec76d8734f10fda7366',
+        serviciosOficiales: (agencySettings.serviciosOficiales && agencySettings.serviciosOficiales.length > 0)
+          ? agencySettings.serviciosOficiales
+          : (prev.serviciosOficiales || DEFAULT_SERVICES),
         apisIntegraciones: {
           ...prev.apisIntegraciones,
           ...(agencySettings.apisIntegraciones || {})
@@ -298,6 +405,85 @@ export default function AgencyWhiteLabelSettingsModal({
       }));
     }
   }, [agencySettings, isOpen]);
+
+  // Handlers para administración del Catálogo de Servicios
+  const handleOpenAddService = () => {
+    setEditingServiceIndex(null);
+    setServiceForm({
+      id: 'srv-' + Date.now(),
+      nombre: '',
+      categoria: 'Desarrollo Web & StoryBrand',
+      precioUSD: 500,
+      precioDOP: Math.round(500 * (form.tasaCambioDop || 58.5)),
+      tipoCobro: 'proyecto',
+      anticipoPorcentaje: 50,
+      descripcion: '',
+      entregablesText: 'Diseño UI/UX de alta conversión\nVelocidad de carga <1s\nIntegración WhatsApp Direct'
+    });
+    setShowServiceForm(true);
+  };
+
+  const handleOpenEditService = (srv, index) => {
+    setEditingServiceIndex(index);
+    setServiceForm({
+      id: srv.id || 'srv-' + Date.now(),
+      nombre: srv.nombre || '',
+      categoria: srv.categoria || 'Desarrollo Web',
+      precioUSD: srv.precioUSD || 0,
+      precioDOP: srv.precioDOP || Math.round((srv.precioUSD || 0) * (form.tasaCambioDop || 58.5)),
+      tipoCobro: srv.tipoCobro || 'proyecto',
+      anticipoPorcentaje: srv.anticipoPorcentaje || 50,
+      descripcion: srv.descripcion || '',
+      entregablesText: Array.isArray(srv.entregables) ? srv.entregables.join('\n') : (srv.entregables || '')
+    });
+    setShowServiceForm(true);
+  };
+
+  const handleSaveServiceItem = (e) => {
+    e.preventDefault();
+    if (!serviceForm.nombre.trim()) {
+      alert('Por favor ingresa un nombre para el servicio');
+      return;
+    }
+    const entregablesArray = serviceForm.entregablesText
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    const newServiceObj = {
+      id: serviceForm.id || 'srv-' + Date.now(),
+      nombre: serviceForm.nombre.trim(),
+      categoria: serviceForm.categoria.trim() || 'Servicios Generales',
+      precioUSD: Number(serviceForm.precioUSD) || 0,
+      precioDOP: Number(serviceForm.precioDOP) || Math.round((Number(serviceForm.precioUSD) || 0) * (form.tasaCambioDop || 58.5)),
+      tipoCobro: serviceForm.tipoCobro || 'proyecto',
+      anticipoPorcentaje: Number(serviceForm.anticipoPorcentaje) || 50,
+      descripcion: serviceForm.descripcion.trim(),
+      entregables: entregablesArray
+    };
+
+    setForm(prev => {
+      const list = Array.isArray(prev.serviciosOficiales) ? [...prev.serviciosOficiales] : [];
+      if (editingServiceIndex !== null && editingServiceIndex >= 0) {
+        list[editingServiceIndex] = newServiceObj;
+      } else {
+        list.push(newServiceObj);
+      }
+      return { ...prev, serviciosOficiales: list };
+    });
+
+    setShowServiceForm(false);
+    setEditingServiceIndex(null);
+  };
+
+  const handleDeleteServiceItem = (index) => {
+    if (!confirm('¿Deseas eliminar este servicio del catálogo oficial?')) return;
+    setForm(prev => {
+      const list = [...(prev.serviciosOficiales || [])];
+      list.splice(index, 1);
+      return { ...prev, serviciosOficiales: list };
+    });
+  };
 
   const handleCopyMcpKey = () => {
     if (!form.mcpAgentKey) return;
@@ -671,6 +857,22 @@ export default function AgencyWhiteLabelSettingsModal({
           >
             <Cpu className="w-3.5 h-3.5" />
             <span>5. APIs & Conexiones</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('servicios')}
+            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
+              activeTab === 'servicios'
+                ? 'border-orange-500 text-orange-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Package className="w-3.5 h-3.5" />
+            <span>6. Catálogo de Servicios</span>
+            <span className="text-[10px] bg-orange-500/20 text-orange-400 border border-orange-500/30 px-1.5 py-0.2 rounded-full font-mono font-bold">
+              {(form.serviciosOficiales || []).length}
+            </span>
           </button>
         </div>
 
@@ -1739,6 +1941,240 @@ export default function AgencyWhiteLabelSettingsModal({
                   <p>3. Pulsa el botón <strong className="text-slate-200">"Probar Conexión en Vivo"</strong> en esta pantalla para verificar la respuesta HTTP 200 en tiempo real.</p>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB 6: CATÁLOGO DE SERVICIOS & TARIFARIO OFICIAL */}
+          {activeTab === 'servicios' && (
+            <div className="space-y-4">
+              
+              {/* Header de la sección */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-[#121826] border border-slate-800">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Package className="w-4 h-4 text-orange-400" />
+                    <h3 className="font-bold text-sm text-white">Catálogo de Servicios & Tarifario Oficial</h3>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Este catálogo es consultado en tiempo real por los Agentes de IA (MCP) y alimenta las opciones en el Módulo de Presupuestos.
+                  </p>
+                </div>
+
+                {!showServiceForm && (
+                  <button
+                    type="button"
+                    onClick={handleOpenAddService}
+                    className="px-3.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md shadow-orange-950/40 transition-all shrink-0 self-start sm:self-auto"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Agregar Servicio</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Formulario de Creación / Edición de Servicio */}
+              {showServiceForm && (
+                <form onSubmit={handleSaveServiceItem} className="p-4 rounded-xl bg-[#121826] border border-orange-500/40 space-y-3 animate-fade-in shadow-xl">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="text-xs font-bold text-orange-400 flex items-center gap-1.5 font-mono uppercase">
+                      {editingServiceIndex !== null ? '✏️ Editar Servicio del Catálogo' : '✨ Nuevo Servicio Oficial'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowServiceForm(false)}
+                      className="p-1 rounded text-slate-400 hover:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">Nombre del Servicio:</label>
+                      <input
+                        type="text"
+                        required
+                        value={serviceForm.nombre}
+                        onChange={(e) => setServiceForm(prev => ({ ...prev, nombre: e.target.value }))}
+                        className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                        placeholder="Ej. Tienda Online Avanzada Shopify / WooCommerce"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">Categoría / Rubro:</label>
+                      <input
+                        type="text"
+                        value={serviceForm.categoria}
+                        onChange={(e) => setServiceForm(prev => ({ ...prev, categoria: e.target.value }))}
+                        className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                        placeholder="Ej. E-commerce / Desarrollo Web / SEO"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">Precio Oficial ($ USD):</label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        value={serviceForm.precioUSD}
+                        onChange={(e) => {
+                          const usd = Number(e.target.value) || 0;
+                          const dop = Math.round(usd * (form.tasaCambioDop || 58.5));
+                          setServiceForm(prev => ({ ...prev, precioUSD: usd, precioDOP: dop }));
+                        }}
+                        className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-orange-500"
+                        placeholder="650"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">Equivalente Estimado ($ DOP):</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={serviceForm.precioDOP}
+                        onChange={(e) => setServiceForm(prev => ({ ...prev, precioDOP: Number(e.target.value) || 0 }))}
+                        className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300 font-mono focus:outline-none focus:border-orange-500"
+                        placeholder="39000"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">Modalidad de Cobro:</label>
+                      <select
+                        value={serviceForm.tipoCobro}
+                        onChange={(e) => setServiceForm(prev => ({ ...prev, tipoCobro: e.target.value }))}
+                        className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                      >
+                        <option value="proyecto">Por Proyecto (50% Anticipo / 50% Entrega)</option>
+                        <option value="mensual">Suscripción Mensual Recurrente</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">Descripción o Propuesta de Valor:</label>
+                    <input
+                      type="text"
+                      value={serviceForm.descripcion}
+                      onChange={(e) => setServiceForm(prev => ({ ...prev, descripcion: e.target.value }))}
+                      className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                      placeholder="Breve resumen del alcance y beneficios principales"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-300">Entregables Oficiales (uno por línea):</label>
+                      <span className="text-[10px] text-slate-500 font-mono">Separa cada característica con Enter</span>
+                    </div>
+                    <textarea
+                      rows={4}
+                      value={serviceForm.entregablesText}
+                      onChange={(e) => setServiceForm(prev => ({ ...prev, entregablesText: e.target.value }))}
+                      className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500 font-mono"
+                      placeholder="Diseño UI/UX de alta conversión&#10;Velocidad de carga <1s&#10;Integración WhatsApp Direct&#10;Panel CMS autogestionable"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setShowServiceForm(false)}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>{editingServiceIndex !== null ? 'Actualizar Servicio' : 'Guardar en Catálogo'}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Grid de Servicios Registrados */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {(form.serviciosOficiales || []).map((srv, idx) => (
+                  <div
+                    key={srv.id || idx}
+                    className="p-4 rounded-xl bg-[#121826] border border-slate-800 hover:border-slate-700/80 transition-all flex flex-col justify-between shadow-sm relative group"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20 font-bold uppercase">
+                            {srv.categoria || 'Servicio'}
+                          </span>
+                          <h4 className="font-bold text-sm text-white mt-1.5 leading-snug">{srv.nombre}</h4>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditService(srv, idx)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-orange-400 transition-colors"
+                            title="Editar Servicio"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteServiceItem(idx)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 transition-colors"
+                            title="Eliminar Servicio"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {srv.descripcion && (
+                        <p className="text-xs text-slate-400 leading-relaxed">{srv.descripcion}</p>
+                      )}
+
+                      <div className="flex items-baseline gap-2 pt-1">
+                        <span className="text-base font-black font-mono text-emerald-400">
+                          ${Number(srv.precioUSD || 0).toLocaleString()} USD
+                        </span>
+                        {srv.precioDOP > 0 && (
+                          <span className="text-xs font-mono text-slate-400">
+                            (RD$ {Number(srv.precioDOP).toLocaleString()} DOP)
+                          </span>
+                        )}
+                        <span className="text-[10px] font-mono text-slate-500 ml-auto uppercase">
+                          {srv.tipoCobro === 'mensual' ? '📅 Mensual' : '⚡ 50/50'}
+                        </span>
+                      </div>
+
+                      {/* Lista de Entregables */}
+                      {Array.isArray(srv.entregables) && srv.entregables.length > 0 && (
+                        <div className="space-y-1 pt-2 border-t border-slate-800/80">
+                          <span className="text-[10px] font-mono text-slate-500 block uppercase font-bold">Entregables:</span>
+                          <ul className="space-y-1">
+                            {srv.entregables.map((item, eIdx) => (
+                              <li key={eIdx} className="text-[11px] text-slate-300 flex items-start gap-1.5">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400 mt-0.5 shrink-0" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {(!form.serviciosOficiales || form.serviciosOficiales.length === 0) && (
+                <div className="p-8 text-center rounded-xl bg-slate-900/30 border border-dashed border-slate-800 text-slate-400 text-xs">
+                  No hay servicios registrados en el catálogo. Pulsa <strong>"+ Agregar Servicio"</strong> para comenzar.
+                </div>
+              )}
+
             </div>
           )}
 

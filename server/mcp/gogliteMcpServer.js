@@ -936,31 +936,43 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // 3. PRESUPUESTOS Y COTIZACIONES
     // ----------------------------------------------------
     if (name === 'get_service_catalog') {
-      const catalog = {
-        agencia: 'Goglite Digital Hub',
-        serviciosOficiales: [
+      const settings = getAgencySettings();
+      const servicios = (settings && Array.isArray(settings.serviciosOficiales) && settings.serviciosOficiales.length > 0)
+        ? settings.serviciosOficiales
+        : [
           {
             id: 'web-antigravity-vip',
             nombre: 'Plataforma Web Antigravity VIP con StoryBrand',
+            categoria: 'Desarrollo Web & StoryBrand',
             precioUSD: 650,
             precioDOP: 39000,
+            tipoCobro: 'proyecto',
             entregables: ['Diseño UI/UX de alta conversión', 'Velocidad de carga <1s', 'Integración WhatsApp Direct', 'Copywriting StoryBrand', 'CMS autogestionable']
           },
           {
             id: 'lead-machine-pro',
             nombre: 'Sistema de Aceleración y Captación de Leads B2B',
+            categoria: 'Crecimiento Comercial & CRM',
             precioUSD: 950,
             precioDOP: 57000,
+            tipoCobro: 'proyecto',
             entregables: ['Sitio Web Antigravity', 'Configuración CRM WhatsApp', 'Automatización de seguimiento', 'Portal Privado de Cliente']
           },
           {
             id: 'landing-express',
             nombre: 'Landing Page de Alta Conversión Express',
+            categoria: 'Conversión Rápida',
             precioUSD: 250,
             precioDOP: 15000,
+            tipoCobro: 'proyecto',
             entregables: ['Diseño 1 página de alto impacto', 'Optimización móvil y WhatsApp', 'Despliegue en dominio personalizado']
           }
-        ],
+        ];
+
+      const catalog = {
+        agencia: settings?.nombreAgencia || 'Goglite Digital Hub',
+        tasaCambioDop: settings?.tasaCambioDop || 58.5,
+        serviciosOficiales: servicios,
         politicaPagos: '50% de anticipo para reserva de sprint de desarrollo, 50% contra entrega y satisfacción final.'
       };
 

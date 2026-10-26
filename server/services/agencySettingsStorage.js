@@ -54,6 +54,90 @@ const defaultAgencySettings = {
       swift: 'AGRISVSX'
     }
   },
+  serviciosOficiales: [
+    {
+      id: 'web-antigravity-vip',
+      nombre: 'Plataforma Web Antigravity VIP con StoryBrand',
+      categoria: 'Desarrollo Web & StoryBrand',
+      precioUSD: 650,
+      precioDOP: 39000,
+      tipoCobro: 'proyecto',
+      anticipoPorcentaje: 50,
+      descripcion: 'Plataforma web de ultra-alta conversión, arquitectura de carga <1s y copywriting StoryBrand.',
+      entregables: [
+        'Diseño UI/UX de alta conversión',
+        'Velocidad de carga <1s y Core Web Vitals verdes',
+        'Integración WhatsApp Direct & Lead Capture',
+        'Copywriting StoryBrand (Guion de Marca)',
+        'Panel CMS autogestionable'
+      ]
+    },
+    {
+      id: 'lead-machine-pro',
+      nombre: 'Sistema de Aceleración y Captación de Leads B2B',
+      categoria: 'Crecimiento Comercial & CRM',
+      precioUSD: 950,
+      precioDOP: 57000,
+      tipoCobro: 'proyecto',
+      anticipoPorcentaje: 50,
+      descripcion: 'Sistema completo con sitio web de alto impacto, CRM multicanal y automatización.',
+      entregables: [
+        'Sitio Web Antigravity VIP',
+        'Configuración CRM WhatsApp multi-línea',
+        'Automatización de seguimiento y bitácora',
+        'Portal Privado de Cliente 360°',
+        'Integración Google Site Kit & Search Console'
+      ]
+    },
+    {
+      id: 'landing-express',
+      nombre: 'Landing Page de Alta Conversión Express',
+      categoria: 'Conversión Rápida',
+      precioUSD: 250,
+      precioDOP: 15000,
+      tipoCobro: 'proyecto',
+      anticipoPorcentaje: 50,
+      descripcion: 'Página única optimizada para campañas publicitarias y tráfico de Google Ads o Meta.',
+      entregables: [
+        'Diseño 1 página de alto impacto visual',
+        'Optimización móvil y botón WhatsApp Flotante',
+        'Despliegue en dominio personalizado con SSL',
+        'Formulario de cotización directa'
+      ]
+    },
+    {
+      id: 'mantenimiento-seo-soporte',
+      nombre: 'Mantenimiento Web Continuo, SEO Local & Soporte',
+      categoria: 'Mantenimiento & Retainer',
+      precioUSD: 120,
+      precioDOP: 7000,
+      tipoCobro: 'mensual',
+      anticipoPorcentaje: 100,
+      descripcion: 'Suscripción mensual de mantenimiento, actualizaciones, hosting seguro y optimización SEO.',
+      entregables: [
+        'Alojamiento cloud de alta disponibilidad y certificado SSL',
+        'Monitoreo continuo y copias de seguridad semanales',
+        'Optimización mensual de SEO local y Google Business',
+        'Soporte técnico prioritario y cambios menores de contenido'
+      ]
+    },
+    {
+      id: 'ecommerce-pro',
+      nombre: 'Tienda Online / E-commerce de Alto Rendimiento',
+      categoria: 'Comercio Electrónico',
+      precioUSD: 1200,
+      precioDOP: 72000,
+      tipoCobro: 'proyecto',
+      anticipoPorcentaje: 50,
+      descripcion: 'Tienda virtual con pasarelas de pago, catálogo de productos y checkout optimizado.',
+      entregables: [
+        'Catálogo ilimitado y configuración de categorías',
+        'Integración con pasarelas de pago (Stripe, Pagadito, Azul, PayPal)',
+        'Notificaciones de pedidos por WhatsApp y Correo',
+        'Panel administrativo de inventario y pedidos'
+      ]
+    }
+  ],
   actualizadoEn: new Date().toISOString()
 };
 
@@ -79,7 +163,11 @@ export function saveAgencySettings(newSettings) {
       ...newSettings,
       actualizadoEn: new Date().toISOString()
     };
-    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(updated, null, 2), 'utf8');
+    try {
+      fs.writeFileSync(SETTINGS_PATH, JSON.stringify(updated, null, 2), 'utf8');
+    } catch (fsErr) {
+      console.warn('[AgencySettings] Entorno read-only, guardando en memoria:', fsErr.message);
+    }
     return updated;
   } catch (err) {
     console.error('Error guardando agency_settings.json:', err);

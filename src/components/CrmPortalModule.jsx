@@ -425,6 +425,21 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   
   // Modal for lead details & interactions
   const [activeLeadModal, setActiveLeadModal] = useState(null);
+  const [isEditingLeadModal, setIsEditingLeadModal] = useState(false);
+  const [isSavingLeadEdit, setIsSavingLeadEdit] = useState(false);
+  const [leadEditForm, setLeadEditForm] = useState({
+    empresa: '',
+    contacto: '',
+    cargo: '',
+    email: '',
+    telefono: '',
+    pais: 'SV',
+    dominio: '',
+    sinWeb: false,
+    valorEstimado: 650,
+    probabilidad: 35
+  });
+
   const [interactionForm, setInteractionForm] = useState({
     tipo: 'whatsapp',
     titulo: '',
@@ -1127,6 +1142,80 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       }
     } catch (err) {
       console.warn('Etapa guardada localmente (backend offline):', err);
+    }
+  };
+
+  // Iniciar modo edición en la Ficha 360°
+  const startEditingLead = (lead) => {
+    if (!lead) return;
+    setLeadEditForm({
+      empresa: lead.empresa || '',
+      contacto: lead.contacto || '',
+      cargo: lead.cargo || 'Representante / Propietario',
+      email: lead.email || '',
+      telefono: lead.telefono || lead.whatsappData?.telefono || '',
+      pais: lead.pais || 'SV',
+      dominio: (lead.sinWeb || lead.origenMaps || lead.dominio?.startsWith('maps-')) ? '' : (lead.dominio || ''),
+      sinWeb: Boolean(lead.sinWeb || lead.origenMaps || lead.dominio?.startsWith('maps-')),
+      valorEstimado: lead.valorEstimado || 650,
+      probabilidad: lead.probabilidad || 35
+    });
+    setIsEditingLeadModal(true);
+  };
+
+  // Guardar cambios editados en la Ficha 360° y sincronizar con Firestore y Neon
+  const handleSaveLeadEdit = async () => {
+    if (!activeLeadModal) return;
+    setIsSavingLeadEdit(true);
+    try {
+      const cleanDominio = leadEditForm.sinWeb ? '' : leadEditForm.dominio.trim().replace(/^https?:\/\//i, '').replace(/\/$/, '');
+      const updatedFields = {
+        empresa: leadEditForm.empresa.trim() || activeLeadModal.empresa,
+        contacto: leadEditForm.contacto.trim(),
+        cargo: leadEditForm.cargo.trim(),
+        email: leadEditForm.email.trim(),
+        telefono: leadEditForm.telefono.trim(),
+        pais: leadEditForm.pais,
+        dominio: cleanDominio,
+        sinWeb: leadEditForm.sinWeb,
+        valorEstimado: Number(leadEditForm.valorEstimado) || 0,
+        probabilidad: Number(leadEditForm.probabilidad) || 35,
+        actualizadoEn: new Date().toISOString()
+      };
+
+      const updatedLead = {
+        ...activeLeadModal,
+        ...updatedFields
+      };
+
+      // 1. Actualizar estado local
+      setActiveLeadModal(updatedLead);
+      updateAndPersistLeads(prev => prev.map(l => l.id === activeLeadModal.id ? updatedLead : l));
+
+      // 2. Persistir en Firestore (Nube)
+      await saveCrmLeadCloud(updatedLead).catch(err => {
+        console.warn('[CRM] Error guardando en Firestore:', err.message);
+      });
+
+      // 3. Persistir en backend API (Neon / Vercel)
+      try {
+        await fetch(getBackendEndpoint(`/api/crm/leads/${activeLeadModal.id}`), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedFields)
+        });
+      } catch (apiErr) {
+        console.warn('[CRM] Error actualizando lead en API:', apiErr.message);
+      }
+
+      setWaNotice('✓ Ficha 360° actualizada exitosamente en la nube');
+      setTimeout(() => setWaNotice(null), 4000);
+      setIsEditingLeadModal(false);
+    } catch (err) {
+      console.error('Error guardando edición de lead:', err);
+      alert('Error guardando los cambios del lead: ' + err.message);
+    } finally {
+      setIsSavingLeadEdit(false);
     }
   };
 
@@ -2600,7 +2689,27 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isEditingLeadModal) {
+                      setIsEditingLeadModal(false);
+                    } else {
+                      startEditingLead(activeLeadModal);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
+                    isEditingLeadModal
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border-slate-700'
+                  }`}
+                  title={isEditingLeadModal ? 'Cancelar edición' : 'Editar datos del cliente'}
+                >
+                  <Edit className="w-3.5 h-3.5 text-orange-400" />
+                  <span>{isEditingLeadModal ? 'Cancelar Edición' : 'Editar Ficha'}</span>
+                </button>
+
                 <div className="flex items-center gap-1.5 bg-[#090d15] px-3 py-1.5 rounded-xl border border-slate-700/80">
                   <span className="text-[10px] font-mono text-slate-400 uppercase">Etapa:</span>
                   <select
@@ -2619,7 +2728,10 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                 </div>
 
                 <button
-                  onClick={() => setActiveLeadModal(null)}
+                  onClick={() => {
+                    setActiveLeadModal(null);
+                    setIsEditingLeadModal(false);
+                  }}
                   className="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
                 >
                   <X className="w-4 h-4" />
@@ -2664,68 +2776,227 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
               {/* COLUMNA 1: EXPEDIENTE, ACCIONES DEL FLUJO Y PORTAL */}
               <div className="space-y-4">
                 
-                {/* 1. Datos de Contacto Directo */}
-                <div className="p-4 rounded-xl bg-[#121826] border border-slate-800 space-y-2.5">
-                  <div className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-orange-400" />
-                    <span>Datos de Contacto & Canales</span>
+                {/* 1. Datos de Contacto Directo / Modo Edición */}
+                <div className="p-4 rounded-xl bg-[#121826] border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-orange-400" />
+                      <span>{isEditingLeadModal ? 'Editar Datos de Contacto & Negocio' : 'Datos de Contacto & Canales'}</span>
+                    </div>
+                    {isEditingLeadModal && (
+                      <span className="text-[10px] font-mono bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded font-bold border border-orange-500/30">
+                        Modo Edición Activo
+                      </span>
+                    )}
                   </div>
 
-                  <div className="space-y-2 text-xs">
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-[#0c1017] border border-slate-800/60">
-                      <span className="text-slate-400 font-medium">WhatsApp / Teléfono:</span>
-                      {activeLeadModal.telefono ? (
-                        <a
-                          href={`https://wa.me/${(activeLeadModal.whatsappData?.telefono || activeLeadModal.telefono || '').replace(/[^\d]/g, '')}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-mono font-bold text-emerald-400 hover:underline flex items-center gap-1"
-                        >
-                          <Phone className="w-3 h-3" />
-                          <span>{activeLeadModal.telefono}</span>
-                        </a>
-                      ) : (
-                        <span className="text-slate-500 italic">No registrado</span>
-                      )}
-                    </div>
+                  {isEditingLeadModal ? (
+                    <div className="space-y-3 pt-1">
+                      <div>
+                        <label className="text-[11px] font-medium text-slate-400 block mb-1">Nombre de Empresa / Negocio:</label>
+                        <input
+                          type="text"
+                          value={leadEditForm.empresa}
+                          onChange={(e) => setLeadEditForm(prev => ({ ...prev, empresa: e.target.value }))}
+                          className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                          placeholder="Nombre comercial de la empresa"
+                        />
+                      </div>
 
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-[#0c1017] border border-slate-800/60">
-                      <span className="text-slate-400 font-medium">Correo Electrónico:</span>
-                      {activeLeadModal.email ? (
-                        <a
-                          href={`mailto:${activeLeadModal.email}`}
-                          className="font-mono text-sky-400 hover:underline flex items-center gap-1 truncate max-w-[200px]"
-                        >
-                          <Mail className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{activeLeadModal.email}</span>
-                        </a>
-                      ) : (
-                        <span className="text-slate-500 italic">No registrado</span>
-                      )}
-                    </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[11px] font-medium text-slate-400 block mb-1">Contacto / Decisor:</label>
+                          <input
+                            type="text"
+                            value={leadEditForm.contacto}
+                            onChange={(e) => setLeadEditForm(prev => ({ ...prev, contacto: e.target.value }))}
+                            className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                            placeholder="Nombre del decisor"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-medium text-slate-400 block mb-1">Cargo:</label>
+                          <input
+                            type="text"
+                            value={leadEditForm.cargo}
+                            onChange={(e) => setLeadEditForm(prev => ({ ...prev, cargo: e.target.value }))}
+                            className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                            placeholder="Cargo o rol"
+                          />
+                        </div>
+                      </div>
 
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-[#0c1017] border border-slate-800/60">
-                      <span className="text-slate-400 font-medium">Sitio Web / Presencia:</span>
-                      {activeLeadModal.sinWeb || activeLeadModal.origenMaps || activeLeadModal.dominio?.startsWith('maps-') ? (
-                        <span className="text-amber-400 font-mono text-[11px] flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          <span>Google Maps (Sin Web)</span>
-                        </span>
-                      ) : activeLeadModal.dominio ? (
-                        <a
-                          href={`https://${activeLeadModal.dominio}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-mono text-slate-300 hover:text-orange-400 flex items-center gap-1 hover:underline"
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[11px] font-medium text-slate-400 block mb-1">WhatsApp / Teléfono:</label>
+                          <input
+                            type="text"
+                            value={leadEditForm.telefono}
+                            onChange={(e) => setLeadEditForm(prev => ({ ...prev, telefono: e.target.value }))}
+                            className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500 font-mono"
+                            placeholder="+1 (809)... o +503..."
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-medium text-slate-400 block mb-1">País:</label>
+                          <select
+                            value={leadEditForm.pais}
+                            onChange={(e) => setLeadEditForm(prev => ({ ...prev, pais: e.target.value }))}
+                            className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                          >
+                            <option value="SV">🇸🇻 El Salvador</option>
+                            <option value="DO">🇩🇴 República Dominicana</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-medium text-slate-400 block mb-1">Correo Electrónico:</label>
+                        <input
+                          type="email"
+                          value={leadEditForm.email}
+                          onChange={(e) => setLeadEditForm(prev => ({ ...prev, email: e.target.value }))}
+                          className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500 font-mono"
+                          placeholder="contacto@empresa.com"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] font-medium text-slate-400">Sitio Web / Dominio:</label>
+                          <label className="flex items-center gap-1.5 text-[11px] text-amber-400 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={leadEditForm.sinWeb}
+                              onChange={(e) => setLeadEditForm(prev => ({ ...prev, sinWeb: e.target.checked }))}
+                              className="rounded border-slate-700 text-orange-500 focus:ring-0"
+                            />
+                            <span>Sin sitio web (Oportunidad Web)</span>
+                          </label>
+                        </div>
+                        <input
+                          type="text"
+                          value={leadEditForm.dominio}
+                          disabled={leadEditForm.sinWeb}
+                          onChange={(e) => setLeadEditForm(prev => ({ ...prev, dominio: e.target.value }))}
+                          className={`w-full bg-[#0a0e17] border rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none font-mono ${
+                            leadEditForm.sinWeb
+                              ? 'border-slate-800 opacity-50 cursor-not-allowed text-slate-500'
+                              : 'border-slate-700 focus:border-orange-500'
+                          }`}
+                          placeholder="empresa.com"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[11px] font-medium text-slate-400 block mb-1">Monto Estimado ($ USD):</label>
+                          <input
+                            type="number"
+                            value={leadEditForm.valorEstimado}
+                            onChange={(e) => setLeadEditForm(prev => ({ ...prev, valorEstimado: e.target.value }))}
+                            className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-orange-500"
+                            placeholder="650"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-medium text-slate-400 block mb-1">Probabilidad de Cierre (%):</label>
+                          <input
+                            type="number"
+                            value={leadEditForm.probabilidad}
+                            onChange={(e) => setLeadEditForm(prev => ({ ...prev, probabilidad: e.target.value }))}
+                            className="w-full bg-[#0a0e17] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-sky-400 font-mono font-bold focus:outline-none focus:border-orange-500"
+                            placeholder="40"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSaveLeadEdit}
+                          disabled={isSavingLeadEdit}
+                          className="flex-1 py-2 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-orange-950/40 transition-all disabled:opacity-50"
                         >
-                          <Globe className="w-3 h-3" />
-                          <span>{activeLeadModal.dominio}</span>
-                        </a>
-                      ) : (
-                        <span className="text-slate-500 italic">Sin sitio web</span>
-                      )}
+                          {isSavingLeadEdit ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Guardando en la Nube...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Guardar Cambios</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingLeadModal(false)}
+                          disabled={isSavingLeadEdit}
+                          className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-[#0c1017] border border-slate-800/60">
+                        <span className="text-slate-400 font-medium">WhatsApp / Teléfono:</span>
+                        {activeLeadModal.telefono ? (
+                          <a
+                            href={`https://wa.me/${(activeLeadModal.whatsappData?.telefono || activeLeadModal.telefono || '').replace(/[^\d]/g, '')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-mono font-bold text-emerald-400 hover:underline flex items-center gap-1"
+                          >
+                            <Phone className="w-3 h-3" />
+                            <span>{activeLeadModal.telefono}</span>
+                          </a>
+                        ) : (
+                          <span className="text-slate-500 italic">No registrado</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-[#0c1017] border border-slate-800/60">
+                        <span className="text-slate-400 font-medium">Correo Electrónico:</span>
+                        {activeLeadModal.email ? (
+                          <a
+                            href={`mailto:${activeLeadModal.email}`}
+                            className="font-mono text-sky-400 hover:underline flex items-center gap-1 truncate max-w-[200px]"
+                          >
+                            <Mail className="w-3 h-3 shrink-0" />
+                            <span className="truncate">{activeLeadModal.email}</span>
+                          </a>
+                        ) : (
+                          <span className="text-slate-500 italic">No registrado</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-[#0c1017] border border-slate-800/60">
+                        <span className="text-slate-400 font-medium">Sitio Web / Presencia:</span>
+                        {activeLeadModal.sinWeb || activeLeadModal.origenMaps || activeLeadModal.dominio?.startsWith('maps-') ? (
+                          <span className="text-amber-400 font-mono text-[11px] flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            <span>Google Maps (Sin Web)</span>
+                          </span>
+                        ) : activeLeadModal.dominio ? (
+                          <a
+                            href={`https://${activeLeadModal.dominio}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-mono text-slate-300 hover:text-orange-400 flex items-center gap-1 hover:underline"
+                          >
+                            <Globe className="w-3 h-3" />
+                            <span>{activeLeadModal.dominio}</span>
+                          </a>
+                        ) : (
+                          <span className="text-slate-500 italic">Sin sitio web</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. Conexiones Directas del Flujo Goglite Suite */}

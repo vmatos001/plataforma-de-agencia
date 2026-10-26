@@ -28,7 +28,8 @@ import {
   Sliders,
   TrendingDown,
   X,
-  MessageSquare
+  MessageSquare,
+  Package
 } from 'lucide-react';
 import {
   getStoredCrmLeads,
@@ -144,6 +145,66 @@ export default function PresupuestosModule({
   const [showSavedModal, setShowSavedModal] = useState(false);
   const [savedPortalUrl, setSavedPortalUrl] = useState('');
   const [savedClientPhone, setSavedClientPhone] = useState('');
+
+  // Servicios Oficiales del Catálogo de la Agencia
+  const [catalogServices, setCatalogServices] = useState([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('goglite_agency_settings');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.serviciosOficiales) && parsed.serviciosOficiales.length > 0) {
+          setCatalogServices(parsed.serviciosOficiales);
+        }
+      }
+    } catch {}
+
+    const handleSettingsUpdated = (e) => {
+      if (e.detail?.serviciosOficiales) {
+        setCatalogServices(e.detail.serviciosOficiales);
+      }
+    };
+    window.addEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
+    return () => window.removeEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
+  }, []);
+
+  const handleApplyCatalogService = (serviceId) => {
+    if (!serviceId) return;
+    const selected = catalogServices.find(s => s.id === serviceId);
+    if (!selected || !activePresupuesto) return;
+
+    if (!confirm(`¿Deseas aplicar el servicio "${selected.nombre}"? Esto actualizará el título, entregables y precio ($${selected.precioUSD} USD) de esta propuesta.`)) {
+      return;
+    }
+
+    const precioTotal = Number(selected.precioUSD) || 0;
+    const anticipo = Math.round(precioTotal * (selected.anticipoPorcentaje || 50) / 100);
+    const contraEntrega = precioTotal - anticipo;
+
+    const newModulos = (selected.entregables || []).map((ent, idx) => ({
+      id: `mod-${idx + 1}`,
+      fase: idx + 1,
+      titulo: ent,
+      descripcion: `Implementación y configuración profesional de ${ent.toLowerCase()} cumpliendo con los estándares de calidad de Goglite.`,
+      entregables: [ent],
+      activo: true
+    }));
+
+    setActivePresupuesto(prev => ({
+      ...prev,
+      titulo: selected.nombre.toUpperCase(),
+      subtitulo: selected.descripcion ? `(${selected.descripcion.toUpperCase()})` : prev.subtitulo,
+      inversion: {
+        ...prev.inversion,
+        precioTotal,
+        anticipo,
+        contraEntrega,
+        precioMercadoReferencial: Math.round(precioTotal * 1.6)
+      },
+      modulos: newModulos.length > 0 ? newModulos : prev.modulos
+    }));
+  };
 
   const CLOUD_API_URL = import.meta.env.VITE_API_URL || 'https://goglite-agency.vercel.app';
   const getBackendEndpoint = (endpoint) => {
@@ -1041,6 +1102,31 @@ export default function PresupuestosModule({
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Selector de Servicio del Catálogo Oficial */}
+              {catalogServices.length > 0 && (
+                <div className="flex items-center gap-1.5 bg-[#0e1424] px-2.5 py-1 rounded-lg border border-orange-500/30">
+                  <Package className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                  <span className="text-[11px] font-mono text-slate-300 font-semibold whitespace-nowrap hidden sm:inline">
+                    Cargar Servicio:
+                  </span>
+                  <select
+                    defaultValue=""
+                    onChange={(e) => {
+                      handleApplyCatalogService(e.target.value);
+                      e.target.value = '';
+                    }}
+                    className="bg-[#141b2d] text-orange-300 text-xs font-semibold rounded px-2 py-0.5 border border-slate-700 focus:outline-none focus:border-orange-500 cursor-pointer"
+                  >
+                    <option value="" disabled>Seleccionar del Catálogo...</option>
+                    {catalogServices.map(srv => (
+                      <option key={srv.id} value={srv.id}>
+                        {srv.nombre} (${srv.precioUSD} USD)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Indicador dinámico de estado del enlace */}
               <div className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono font-semibold flex items-center gap-1.5 ${
                 activePresupuesto.estado === 'aceptado'
