@@ -98,6 +98,10 @@ Durante esta jornada se ejecutaron pruebas directas en navegadores reales vía *
   - Carga limpia en iPhone y escritorio sin errores de script ni pantallas negras.
   - Detección de procedencia de cliente (`DO`): Emisor asignado a *Goglite Digital Hub* en Plaza Herasme con teléfono `+1 (829) 528-4713`.
   - Botón de WhatsApp de soporte configurado dinámicamente con destino a `+1 (829) 528-4713`.
+- **Resolución de Error de Enlace de Portal al Copiar Presupuesto (347 KB Payload):**
+  - **Causa raíz diagnosticada:** Al copiar el enlace desde el módulo de presupuestos, el generador serializaba `portalConfig` y `pagos` del proyecto formal, los cuales contenían la imagen de comprobante bancario (`comprobanteAnticipoImagen`) en base64 (>340.000 caracteres). Al pegarse en WhatsApp o navegadores, la URL se truncaba, provocando fallo de parseo JSON (`Unterminated string in JSON at position 18152`) o error `414 Request-URI Too Large` en servidores HTTP.
+  - **Solución implementada:** Se transformó la generación de enlaces en una URL canónica limpia (`https://agencia.goglite.com/portal/:token`) que auto-sincroniza en Firestore Cloud en segundo plano antes de copiarse. Se blindó `PublicClientPortal.jsx` con manejo tolerante de errores y auto-limpieza del historial (`window.history.replaceState`), junto con `ensureAuth()` para lecturas autorizadas en la nube.
+  - **Prueba en vivo con BrowserOS Neo:** Validado con éxito tanto con enlace limpio como con enlace con parámetro `?d=` malformado, cargando al 100% todos los módulos, fases y datos de contacto de República Dominicana.
 
 ---
 
@@ -134,6 +138,8 @@ Al reanudar la sesión mañana, continuaremos con los siguientes puntos estraté
 
 - **Rama Activa:** `main`
 - **Últimos Commits:**
+  - `b2936b7`: *fix(portal): sanear enlaces publicos de portal y prevenir desbordamiento por comprobantes en base64*
+  - `9dc571f`: *docs: agregar documento maestro de progreso y estado tecnico de la plataforma*
   - `0aa075c`: *fix: corregir referencia en llamada backend al guardar ajustes*
   - `24099d1`: *fix: pass agencySettings prop to PresupuestosContratosModule and wrap root in ErrorBoundary*
   - `47df937`: *feat: perfiles de empresa independientes por pais como fuente de verdad y purga total de mockups*
