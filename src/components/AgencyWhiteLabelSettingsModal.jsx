@@ -96,19 +96,20 @@ export const DEFAULT_SERVICES = [
     ]
   },
   {
-    id: 'mantenimiento-seo-soporte',
-    nombre: 'Mantenimiento Web Continuo, SEO Local & Soporte',
+    id: 'goglite-care',
+    nombre: 'Goglite Care · Mantenimiento Continuo & CMS',
     categoria: 'Mantenimiento & Retainer',
-    precioUSD: 120,
-    precioDOP: 7000,
+    precioUSD: 99,
+    precioDOP: 5940,
     tipoCobro: 'mensual',
     anticipoPorcentaje: 100,
-    descripcion: 'Suscripción mensual de mantenimiento, actualizaciones, hosting seguro y optimización SEO.',
+    descripcion: 'Suscripción mensual de mantenimiento preventivo, hosting cloud de alta disponibilidad, copias de seguridad y acceso permanente al Panel CMS.',
     entregables: [
       'Alojamiento cloud de alta disponibilidad y certificado SSL',
-      'Monitoreo continuo y copias de seguridad semanales',
-      'Optimización mensual de SEO local y Google Business',
-      'Soporte técnico prioritario y cambios menores de contenido'
+      'Acceso ilimitado al Panel CMS para autogestión de textos y promociones',
+      'Monitoreo continuo y copias de seguridad diarias en la nube',
+      '2 horas mensuales de cambios y ajustes técnicos',
+      'Soporte técnico prioritario por WhatsApp'
     ]
   },
   {

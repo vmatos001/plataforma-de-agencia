@@ -68,6 +68,8 @@ import { apiClient } from '../services/apiClient';
 import { auth } from '../services/firebase';
 import { getPortalCloud, savePortalCloud, subscribePortalCloud, saveProyectoCloud, uploadReceiptToCloudStorage } from '../services/firestoreSyncService';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import WarrantyCountdownTimer from './portal/WarrantyCountdownTimer';
+import GogliteCareCard from './portal/GogliteCareCard';
 
 function GoogleProtectedCard({
   title,
@@ -2355,15 +2357,48 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     }, 1200);
   };
 
+  const careService = React.useMemo(() => {
+    let list = agencyBranding?.serviciosOficiales;
+    if (!Array.isArray(list) || list.length === 0) {
+      try {
+        const raw = localStorage.getItem('goglite_agency_settings');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed?.serviciosOficiales) && parsed.serviciosOficiales.length > 0) {
+            list = parsed.serviciosOficiales;
+          }
+        }
+      } catch {}
+    }
+    const found = (list || []).find(s => s.id === 'goglite-care' || s.id === 'mantenimiento-seo-soporte' || s.nombre?.toLowerCase().includes('care') || s.nombre?.toLowerCase().includes('mantenimiento'));
+    return found || {
+      id: 'goglite-care',
+      nombre: 'Goglite Care · Mantenimiento Continuo & CMS',
+      precioUSD: 99,
+      precioDOP: 5940
+    };
+  }, [agencyBranding]);
+
   const handleActivarGogliteCare = async () => {
+    const now = Date.now();
+    let baseMs = now;
+    if (portalConfig?.careVenceAt) {
+      const curMs = new Date(portalConfig.careVenceAt).getTime();
+      if (!isNaN(curMs) && curMs > now) baseMs = curMs;
+    }
+    const newVenceIso = new Date(baseMs + 30 * 86400000).toISOString();
+    const nowStr = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+
     await savePortalUpdates({
       fase5CareActivo: true,
-      fechaActivacionCare: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
+      careVenceAt: newVenceIso,
+      fechaActivacionCare: portalConfig?.fechaActivacionCare || nowStr,
       progresoPorcentaje: 100,
       faseActual: 5
     });
     setCarePlanActive(true);
-    showNotification('👑 ¡Plan Goglite Care ($99/mes) activado! Tu plataforma cuenta con soporte prioritario.');
+    const precioDisplay = currentPais === 'DO' ? `RD$ ${(Number(careService.precioDOP) || 5940).toLocaleString()}` : `$${Number(careService.precioUSD) || 99}`;
+    showNotification(`👑 ¡Plan Goglite Care (${precioDisplay}/mes) activado! Tu plataforma cuenta con soporte prioritario.`);
   };
 
   if (loading) {
@@ -4929,26 +4964,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       Durante los primeros 30 días posteriores al lanzamiento oficial, cuentas con cobertura técnica completa sin ningún costo adicional para asegurar la estabilidad absoluta de tu sitio:
                     </p>
 
-                    {/* Countdown Display Card */}
-                    <div className="p-4 rounded-xl bg-[#141b2a] border border-slate-700/80 text-center space-y-2">
-                      <span className="text-[11px] font-mono text-slate-400 uppercase">Tiempo Restante de Soporte Gratuito</span>
-                      <div className="flex items-center justify-center gap-4 text-white font-mono">
-                        <div>
-                          <span className="text-2xl font-black text-orange-400">28</span>
-                          <span className="text-[10px] text-slate-500 block">DÍAS</span>
-                        </div>
-                        <span className="text-xl text-slate-600">:</span>
-                        <div>
-                          <span className="text-2xl font-black text-orange-400">14</span>
-                          <span className="text-[10px] text-slate-500 block">HORAS</span>
-                        </div>
-                        <span className="text-xl text-slate-600">:</span>
-                        <div>
-                          <span className="text-2xl font-black text-orange-400">35</span>
-                          <span className="text-[10px] text-slate-500 block">MIN</span>
-                        </div>
-                      </div>
-                    </div>
+                    {/* Countdown Display Card en Vivo con Segundos */}
+                    <WarrantyCountdownTimer
+                      fechaInicio={portalConfig?.fechaLiquidacion || portalConfig?.fechaInicioGarantia || data?.proyecto?.pagos?.saldoFecha || portalConfig?.fechaReporteLiquidacion}
+                      diasGarantia={30}
+                    />
 
                     <div className="space-y-2 pt-2">
                       <div className="flex items-center gap-2 text-xs text-slate-300">
@@ -4978,74 +4998,17 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 </div>
               </div>
 
-              {/* Right Column: Goglite Care Conversion ($99/mo) */}
+              {/* Right Column: Goglite Care Conversion */}
               <div className="lg:col-span-6 space-y-6">
-                <div className="rounded-2xl bg-gradient-to-br from-[#121829] via-[#0e1322] to-[#0a0d16] border-2 border-orange-500/50 p-6 space-y-5 shadow-2xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-48 h-48 bg-orange-500/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
-
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-800 relative z-10">
-                    <div>
-                      <span className="text-[11px] font-mono uppercase text-orange-400 font-bold tracking-wider">
-                        Mantenimiento Continuo
-                      </span>
-                      <h2 className="text-xl font-bold text-white">Plan Goglite Care</h2>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-2xl font-black text-white font-mono">$99</span>
-                      <span className="text-xs text-slate-400 font-mono"> / mes</span>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-slate-300 leading-relaxed relative z-10">
-                    Mantén tu plataforma blindada, rápida y actualizada sin preocuparte por caídas de servidor, vencimientos de dominio ni cuellos de botella técnicos:
-                  </p>
-
-                  <div className="space-y-2.5 relative z-10">
-                    <div className="p-2.5 rounded-lg bg-[#141b2a] border border-slate-800 flex items-start gap-2.5 text-xs text-slate-200">
-                      <Star className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
-                      <div>
-                        <strong className="text-white">Cloud Hosting & CDN Enterprise:</strong> Servidores ultrarrápidos, renovación de SSL y protección anti-DDoS.
-                      </div>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-[#141b2a] border border-slate-800 flex items-start gap-2.5 text-xs text-slate-200">
-                      <Star className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
-                      <div>
-                        <strong className="text-white">2 Horas Mensuales de Cambios:</strong> Actualización de textos, nuevos banners, fotos de productos y promociones.
-                      </div>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-[#141b2a] border border-slate-800 flex items-start gap-2.5 text-xs text-slate-200">
-                      <Star className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
-                      <div>
-                        <strong className="text-white">Copias de Seguridad Diarias:</strong> Respaldos automáticos en la nube para restauración en 1 clic ante cualquier eventualidad.
-                      </div>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-[#141b2a] border border-slate-800 flex items-start gap-2.5 text-xs text-slate-200">
-                      <Star className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
-                      <div>
-                        <strong className="text-white">Soporte WhatsApp Prioritario:</strong> Respuestas en menos de 1 hora directamente con el equipo técnico.
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 relative z-10">
-                    {carePlanActive ? (
-                      <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-center space-y-1">
-                        <div className="text-xs font-bold text-emerald-400 flex items-center justify-center gap-1.5">
-                          <CheckCheck className="w-4 h-4" /> Plan Goglite Care Activo ($99/mes)
-                        </div>
-                        <p className="text-[11px] text-slate-300">Tu empresa cuenta con protección permanente y soporte prioritario.</p>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={handleActivarGogliteCare}
-                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-2xl shadow-orange-950 transition-all transform hover:scale-[1.01]"
-                      >
-                        <Shield className="w-4 h-4" />
-                        <span>Activar Plan Goglite Care ($99/mes)</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
+                <GogliteCareCard
+                  careService={careService}
+                  carePlanActive={carePlanActive}
+                  careVenceAt={portalConfig?.careVenceAt}
+                  onActivarCare={handleActivarGogliteCare}
+                  lead={lead}
+                  resolvedAgencyContact={resolvedAgencyContact}
+                  moneda={currentPais === 'DO' ? 'DOP' : 'USD'}
+                />
               </div>
 
             </div>

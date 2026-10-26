@@ -314,14 +314,23 @@ export default function ClientCmsPortal({ token }) {
   const isCmsAuthenticated = Boolean(portalConfig.cmsClienteAutenticado && portalConfig.cuentaCmsSitioRegistrada);
 
   // Verificar si el plan de mantenimiento o los 30 días iniciales están activos
-  const fechaBaseStr = portalConfig.fechaLiquidacion || portalData?.proyecto?.pagos?.saldoFecha || null;
+  const fechaBaseStr = portalConfig.fechaLiquidacion || portalData?.proyecto?.pagos?.saldoFecha || portalConfig.fechaInicioGarantia || null;
   let diasTranscurridos = 1;
-  if (fechaBaseStr && /^\d{4}-\d{2}-\d{2}/.test(fechaBaseStr)) {
-    const diff = Date.now() - new Date(fechaBaseStr).getTime();
-    diasTranscurridos = Math.max(1, Math.floor(diff / (1000 * 60 * 60 * 24)));
+  if (fechaBaseStr) {
+    const startMs = new Date(fechaBaseStr).getTime();
+    if (!isNaN(startMs)) {
+      const diff = Date.now() - startMs;
+      diasTranscurridos = Math.max(1, Math.floor(diff / (1000 * 60 * 60 * 24)));
+    }
   }
   const isWithin30DaysWarranty = diasTranscurridos <= 30;
-  const isSubscriptionActive = Boolean(portalConfig.fase5CareActivo || isWithin30DaysWarranty);
+  const isCareTimeActive = portalConfig.careVenceAt
+    ? new Date(portalConfig.careVenceAt).getTime() > Date.now()
+    : Boolean(portalConfig.fase5CareActivo);
+  const isSubscriptionActive = Boolean(isCareTimeActive || isWithin30DaysWarranty);
+
+  const clientPais = portalData?.lead?.pais || portalData?.proyecto?.cliente?.pais || 'DO';
+  const whatsappSoporte = clientPais === 'DO' ? '18295284713' : '50377569828';
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100 font-sans pb-16">
@@ -411,13 +420,13 @@ export default function ClientCmsPortal({ token }) {
             </p>
             <div className="pt-2">
               <a
-                href={`https://wa.me/50377569828?text=${encodeURIComponent(`Hola Goglite, deseo activar el Plan de Mantenimiento Continuo para el CMS de ${empresaNombre} (${dominioCliente}).`)}`}
+                href={`https://wa.me/${whatsappSoporte}?text=${encodeURIComponent(`Hola Goglite, deseo activar el Plan de Mantenimiento Continuo para el CMS de ${empresaNombre} (${dominioCliente}).`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs shadow-xl shadow-orange-950/50 transition-all"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>Solicitar Activación de Mantenimiento ($50 USD/mes)</span>
+                <span>Solicitar Activación de Mantenimiento Continuo</span>
               </a>
             </div>
           </div>

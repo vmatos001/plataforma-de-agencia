@@ -65,6 +65,7 @@ import {
   savePortalCloud 
 } from '../services/firestoreSyncService';
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
+import AdminCmsSubscriptionManager from './admin/AdminCmsSubscriptionManager';
 import {
   buildInvoiceFromPresupuesto,
   buildMilestoneInvoices,
@@ -3076,6 +3077,15 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                     </div>
                   );
                 })()}
+
+                {/* Gestor Administrativo de Membresía Goglite Care & CMS */}
+                <div className="pt-2">
+                  <AdminCmsSubscriptionManager
+                    proyecto={activeProyecto}
+                    portalToken={activeProyecto.portalToken || activeProyecto.presupuestoId || activeProyecto.id}
+                    onUpdate={(updated) => setActiveProyecto(updated)}
+                  />
+                </div>
               </div>
             </div>
           )}
