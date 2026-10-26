@@ -54,6 +54,41 @@ function ModuleLoadingFallback({ label = 'Cargando módulo...' }) {
   );
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('[ErrorBoundary caught error]:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#080b11] text-slate-200 flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mb-4 text-rose-500">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">No se pudo cargar la vista</h2>
+          <p className="text-xs text-slate-400 max-w-md mb-4 font-mono">
+            {this.state.error?.message || 'Error inesperado al renderizar el componente.'}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-medium text-xs transition-all shadow-lg shadow-orange-500/20"
+          >
+            Recargar Página
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [clientPortalToken, setClientPortalToken] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -467,24 +502,28 @@ export default function App() {
 
   if (clientCmsToken) {
     return (
-      <Suspense fallback={<ModuleLoadingFallback label="Cargando Panel CMS del Sitio Web..." />}>
-        <ClientCmsPortal token={clientCmsToken} />
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<ModuleLoadingFallback label="Cargando Panel CMS del Sitio Web..." />}>
+          <ClientCmsPortal token={clientCmsToken} />
+        </Suspense>
+      </ErrorBoundary>
     );
   }
 
   if (clientPortalToken) {
     return (
-      <Suspense fallback={<ModuleLoadingFallback label="Cargando Portal del Cliente..." />}>
-        <PublicClientPortal
-          token={clientPortalToken}
-          agencySettings={agencySettings}
-          onBackToAdmin={() => {
-            window.history.pushState({}, '', '/');
-            setClientPortalToken(null);
-          }}
-        />
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<ModuleLoadingFallback label="Cargando Portal del Cliente..." />}>
+          <PublicClientPortal
+            token={clientPortalToken}
+            agencySettings={agencySettings}
+            onBackToAdmin={() => {
+              window.history.pushState({}, '', '/');
+              setClientPortalToken(null);
+            }}
+          />
+        </Suspense>
+      </ErrorBoundary>
     );
   }
 

@@ -293,6 +293,26 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const [selectedClientInvoiceModal, setSelectedClientInvoiceModal] = useState(null);
   const [clientFacturaList, setClientFacturaList] = useState([]);
 
+  // Fase 3 - Assets intake states
+  const [assetName, setAssetName] = useState('');
+  const [assetCategory, setAssetCategory] = useState('Logotipo Vectorial');
+  const [assetNotes, setAssetNotes] = useState('');
+  const fileInputRef = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+
+  // Fase 4 - Settlement states
+  const [settlementReceiptRef, setSettlementReceiptRef] = useState('');
+  const [settlementReceiptImage, setSettlementReceiptImage] = useState('');
+  const [settlementReceiptFileName, setSettlementReceiptFileName] = useState('');
+  const settlementReceiptInputRef = useRef(null);
+  const [unlockAnimating, setUnlockAnimating] = useState(false);
+  const [showResubmitSettlementForm, setShowResubmitSettlementForm] = useState(false);
+
+  // Fase 5 - Maintenance state
+  const [carePlanActive, setCarePlanActive] = useState(false);
+  const [syncingDrive, setSyncingDrive] = useState(false);
+  const [subiendoInsumo, setSubiendoInsumo] = useState(false);
+
   useEffect(() => {
     const loadFacturas = () => {
       try {
@@ -523,12 +543,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     reader.readAsDataURL(file);
   };
 
-  // Fase 3 - Assets intake states
-  const [assetName, setAssetName] = useState('');
-  const [assetCategory, setAssetCategory] = useState('Logotipo Vectorial');
-  const [assetNotes, setAssetNotes] = useState('');
-  const fileInputRef = useRef(null);
-  const [selectedFile, setSelectedFile] = useState(null);
+
 
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
@@ -584,19 +599,6 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     }));
     showNotification('Cuenta de cliente desvinculada. El portal está listo para registrar una nueva cuenta de Google.');
   };
-
-  // Fase 4 - Settlement states
-  const [settlementReceiptRef, setSettlementReceiptRef] = useState('');
-  const [settlementReceiptImage, setSettlementReceiptImage] = useState('');
-  const [settlementReceiptFileName, setSettlementReceiptFileName] = useState('');
-  const settlementReceiptInputRef = useRef(null);
-  const [unlockAnimating, setUnlockAnimating] = useState(false);
-  const [showResubmitSettlementForm, setShowResubmitSettlementForm] = useState(false);
-
-  // Fase 5 - Maintenance state
-  const [carePlanActive, setCarePlanActive] = useState(false);
-  const [syncingDrive, setSyncingDrive] = useState(false);
-  const [subiendoInsumo, setSubiendoInsumo] = useState(false);
 
   const handleSyncDriveVault = async (options = { openWindow: false, silent: false }) => {
     const shouldOpen = options?.openWindow === true;
