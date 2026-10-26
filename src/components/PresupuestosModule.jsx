@@ -43,6 +43,7 @@ import {
   savePortalCloud
 } from '../services/firestoreSyncService';
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
+import { DEFAULT_SERVICES } from './AgencyWhiteLabelSettingsModal';
 
 const DEFAULT_VIP_TEMPLATE = {
   titulo: "PROPUESTA DE DESARROLLO DIGITAL VIP",
@@ -147,7 +148,7 @@ export default function PresupuestosModule({
   const [savedClientPhone, setSavedClientPhone] = useState('');
 
   // Servicios Oficiales del Catálogo de la Agencia
-  const [catalogServices, setCatalogServices] = useState([]);
+  const [catalogServices, setCatalogServices] = useState(DEFAULT_SERVICES || []);
 
   useEffect(() => {
     try {
@@ -159,6 +160,16 @@ export default function PresupuestosModule({
         }
       }
     } catch {}
+
+    // Sincronizar también con la API de ajustes en la nube para tener el catálogo más reciente
+    fetch('/api/agency/settings')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (Array.isArray(data?.serviciosOficiales) && data.serviciosOficiales.length > 0) {
+          setCatalogServices(data.serviciosOficiales);
+        }
+      })
+      .catch(() => {});
 
     const handleSettingsUpdated = (e) => {
       if (e.detail?.serviciosOficiales) {
