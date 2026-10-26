@@ -63,6 +63,7 @@ import {
   normalizeFacturaItems 
 } from './GestionRentabilidadModule';
 import { DEFAULT_AGENCY_BRANDING, getAgencyContactForCountry } from '../constants/defaultAgencyBranding';
+import { apiClient } from '../services/apiClient';
 import { auth } from '../services/firebase';
 import { getPortalCloud, savePortalCloud, subscribePortalCloud, saveProyectoCloud, uploadReceiptToCloudStorage } from '../services/firestoreSyncService';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
@@ -265,6 +266,52 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     return fallback;
   });
 
+  // Sincronización en vivo con ajustes remotos y eventos globales de marca blanca
+  useEffect(() => {
+    if (initialAgencySettings && typeof initialAgencySettings === 'object') {
+      setAgencyBranding(prev => ({
+        ...prev,
+        ...initialAgencySettings
+      }));
+    }
+  }, [initialAgencySettings]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchRemoteSettings = async () => {
+      try {
+        const res = await apiClient.get('/api/agency/settings');
+        const cType = res.headers?.get?.('content-type') || '';
+        if (res.ok && cType.includes('application/json')) {
+          const data = await res.json();
+          if (data && typeof data === 'object' && isMounted) {
+            setAgencyBranding(prev => ({
+              ...prev,
+              ...data
+            }));
+          }
+        }
+      } catch (e) {}
+    };
+
+    fetchRemoteSettings();
+
+    const handleSettingsUpdated = (e) => {
+      if (e?.detail && typeof e.detail === 'object' && isMounted) {
+        setAgencyBranding(prev => ({
+          ...prev,
+          ...e.detail
+        }));
+      }
+    };
+
+    window.addEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
+    };
+  }, []);
+
   // Dedicated Document Logo (Texto Negro / Fondo Blanco para Impresión)
   const documentBrandLogo = agencyBranding?.logoDocumentosUrl 
     || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null)
@@ -450,12 +497,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     const invEmisor = getAgencyContactForCountry(invPais, agencyBranding);
     const invoiceConfig = {
       emisor: {
-        empresa: agencyBranding?.nombreAgencia || 'Goglite Digital Hub',
+        empresa: invEmisor.empresa || agencyBranding?.nombreAgencia || 'Goglite Digital Hub',
         subtitulo: agencyBranding?.eslogan || 'Suite Integral de Crecimiento Digital & Desarrollo Web Antigravity',
         logoUrl: documentBrandLogo,
         logoDocumentosUrl: documentBrandLogo,
-        identificacion: agencyBranding?.identificacion || (invPais === 'DO' ? 'RNC: 1-32-45678-9' : 'NIT: 0614-290390-102-1'),
-        email: agencyBranding?.emailContacto || 'contacto@goglite.com',
+        identificacion: invEmisor.identificacion || agencyBranding?.identificacion || (invPais === 'DO' ? 'RNC: 1-32-45678-9' : 'NIT: 0614-290390-102-1'),
+        email: invEmisor.email || agencyBranding?.emailContacto || 'contacto@goglite.com',
         telefono: invEmisor.telefonoWhatsapp || invEmisor.telefono || agencyBranding?.telefonoWhatsapp,
         ubicacion: invEmisor.ubicacion || agencyBranding?.ubicacionPrincipal
       },
@@ -2284,14 +2331,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const currentPais = (presupuesto?.pais === 'DO' || data.proyecto?.pais === 'DO' || lead.pais === 'DO' || rawUbicacion.includes('dominicana') || rawUbicacion.includes('santo domingo') || isDominicanPhone) ? 'DO' : 'SV';
   const resolvedAgencyContact = getAgencyContactForCountry(currentPais, agencyBranding);
   const displayPresupuestoEmisor = {
-    ...resolvedAgencyContact,
-    ...(presupuesto?.emisor || {})
+    ...(presupuesto?.emisor || {}),
+    ...resolvedAgencyContact
   };
-  if (currentPais === 'DO') {
-    displayPresupuestoEmisor.telefono = resolvedAgencyContact.telefono;
-    displayPresupuestoEmisor.telefonoWhatsapp = resolvedAgencyContact.telefonoWhatsapp;
-    displayPresupuestoEmisor.ubicacion = resolvedAgencyContact.ubicacion;
-  }
   const isSV = currentPais === 'SV';
   const activeBankTab = selectedBankTab === 'US' ? 'US' : currentPais;
   const totalInversion = Number(presupuesto?.inversion?.precioTotal || lead.presupuestoMonto) || 650;
@@ -2440,7 +2482,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               </button>
             )}
             <a
-              href={`https://wa.me/${(resolvedAgencyContact.telefonoWhatsapp || resolvedAgencyContact.telefono || agencyBranding.telefonoWhatsapp || '+18094088070').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola, te escribo desde el Portal de Cliente de ${clientEmpresa}.`)}`}
+              href={`https://wa.me/${(resolvedAgencyContact.telefonoWhatsapp || resolvedAgencyContact.telefono || agencyBranding.telefonoWhatsapp || '+18295284713').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola, te escribo desde el Portal de Cliente de ${clientEmpresa}.`)}`}
               target="_blank"
               rel="noreferrer"
               className="flex-1 sm:flex-none px-3.5 py-2 sm:py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950 transition-all"
@@ -3224,7 +3266,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   {/* Parties Section */}
                   <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs mb-4 space-y-1.5 avoid-break">
                     <p className="leading-relaxed">
-                      <strong>DE UNA PARTE:</strong> <strong>GOGLITE DIGITAL</strong>, representada por su Director General <strong>Víctor Matos</strong>, con facultades suficientes para celebrar este acto en calidad de <strong>EL PRESTADOR</strong>.
+                      <strong>DE UNA PARTE:</strong> <strong>{(resolvedAgencyContact.empresa || agencyBranding?.nombreAgencia || 'GOGLITE DIGITAL').toUpperCase()}</strong>, representada por su {resolvedAgencyContact.cargo || 'Director General'} <strong>{resolvedAgencyContact.responsable || 'Víctor Matos'}</strong>, con facultades suficientes para celebrar este acto en calidad de <strong>EL PRESTADOR</strong>.
                     </p>
                     <p className="leading-relaxed">
                       <strong>DE OTRA PARTE:</strong> <strong>{clientContacto}</strong>, en representación legal de <strong>{clientEmpresa}</strong>, con domicilio en {clientUbicacion}, en adelante <strong>EL CLIENTE</strong>.
@@ -3321,15 +3363,15 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     {/* Agency Signature */}
                     <div className="border border-slate-200 rounded-xl p-3.5 bg-slate-50 flex flex-col justify-between">
                       <div>
-                        <div className="text-[9.5px] uppercase font-bold text-slate-500 mb-1.5">Por Goglite Digital:</div>
+                        <div className="text-[9.5px] uppercase font-bold text-slate-500 mb-1.5">Por {resolvedAgencyContact.empresa || agencyBranding?.nombreAgencia || 'Goglite Digital'}:</div>
                         <div className="h-14 flex items-center justify-center border-b border-slate-300 pb-1.5">
-                          <span className="font-serif italic text-base text-slate-800">Victor Matos</span>
+                          <span className="font-serif italic text-base text-slate-800">{resolvedAgencyContact.responsable || 'Víctor Matos'}</span>
                         </div>
                       </div>
                       <div className="mt-1.5 text-center text-[10px] text-slate-600">
-                        <div className="font-bold text-slate-900 text-[11px]">Víctor Matos</div>
-                        <div>Director General · Goglite Digital</div>
-                        <div className="text-emerald-700 font-mono font-bold text-[9.5px] mt-0.5">Certificado por Goglite Digital</div>
+                        <div className="font-bold text-slate-900 text-[11px]">{resolvedAgencyContact.responsable || 'Víctor Matos'}</div>
+                        <div>{resolvedAgencyContact.cargo || 'Director General'} · {resolvedAgencyContact.empresa || agencyBranding?.nombreAgencia || 'Goglite Digital'}</div>
+                        <div className="text-emerald-700 font-mono font-bold text-[9.5px] mt-0.5">Certificado por {resolvedAgencyContact.empresa || agencyBranding?.nombreAgencia || 'Goglite Digital'}</div>
                       </div>
                     </div>
 
@@ -4811,7 +4853,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   </div>
 
                   <a
-                    href={`https://wa.me/50370001122?text=${encodeURIComponent(`Hola Víctor, necesito solicitar un ajuste bajo la garantía de 30 días para ${lead.empresa}.`)}`}
+                    href={`https://wa.me/${(resolvedAgencyContact.telefonoWhatsapp || agencyBranding.telefonoWhatsapp || '+18295284713').replace(/\D/g, '')}?text=${encodeURIComponent(`Hola Víctor, necesito solicitar un ajuste bajo la garantía de 30 días para ${lead.empresa}.`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 border border-slate-700 mt-4 transition-colors"
@@ -5040,12 +5082,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 configuracion={{
                   ...(portalConfig || {}),
                   emisor: {
-                    empresa: agencyBranding?.nombreAgencia || 'Goglite Digital Hub',
+                    empresa: resolvedAgencyContact.empresa || agencyBranding?.nombreAgencia || 'Goglite Digital Hub',
                     subtitulo: agencyBranding?.eslogan,
                     logoUrl: documentBrandLogo,
                     logoDocumentosUrl: documentBrandLogo,
-                    identificacion: agencyBranding?.identificacion || (currentPais === 'DO' ? 'RNC: 1-32-45678-9' : 'NIT: 0614-290390-102-1'),
-                    email: agencyBranding?.emailContacto || 'contacto@goglite.com',
+                    identificacion: resolvedAgencyContact.identificacion || agencyBranding?.identificacion || (currentPais === 'DO' ? 'RNC: 1-32-45678-9' : 'NIT: 0614-290390-102-1'),
+                    email: resolvedAgencyContact.email || agencyBranding?.emailContacto || 'contacto@goglite.com',
                     telefono: resolvedAgencyContact.telefonoWhatsapp || resolvedAgencyContact.telefono || agencyBranding?.telefonoWhatsapp,
                     ubicacion: resolvedAgencyContact.ubicacion || agencyBranding?.ubicacionPrincipal || 'San Salvador, SV · Santo Domingo, DO'
                   }

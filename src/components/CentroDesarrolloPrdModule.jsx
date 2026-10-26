@@ -46,7 +46,7 @@ export function generatePrdForProyecto(proyecto, defaultCountry = 'DO') {
   const empresa = proyecto?.cliente?.empresa || (defaultCountry === 'DO' ? 'L&M Tours Punta Cana' : 'Grúas Andrea San Salvador');
   const nombreContacto = proyecto?.cliente?.nombre || 'Víctor Matos';
   const actividad = proyecto?.cliente?.actividad || (defaultCountry === 'DO' ? 'Transporte Turístico & Excursiones Punta Cana' : 'Grúas Plataforma y Auxilio Vial 24 Horas');
-  const telefono = proyecto?.cliente?.telefono || (defaultCountry === 'DO' ? '+1 (809) 408-8070' : '+503 7756-9828');
+  const telefono = proyecto?.cliente?.telefono || (defaultCountry === 'DO' ? '+1 (829) 528-4713' : '+503 7756-9828');
   const ubicacion = proyecto?.cliente?.ubicacion || (defaultCountry === 'DO' ? 'Punta Cana, República Dominicana' : 'San Salvador, El Salvador');
   const codigo = proyecto?.codigo || 'PRD-2026-001';
   const totalInversion = proyecto?.contrato?.totalInversion || 300;

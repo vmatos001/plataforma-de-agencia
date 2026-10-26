@@ -1128,7 +1128,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
         logoDocumentosUrl: documentBrandLogo,
         identificacion: baseConfig.emisor?.identificacion || 'NIT / RNC: 0614-290390-102-1',
         email: baseConfig.emisor?.email || DEFAULT_AGENCY_BRANDING.emailContacto || 'contacto@goglite.com',
-        telefono: baseConfig.emisor?.telefono || DEFAULT_AGENCY_BRANDING.telefonoWhatsapp || '+503 7000-1122',
+        telefono: baseConfig.emisor?.telefono || DEFAULT_AGENCY_BRANDING.telefonoWhatsapp || '+503 7756-9828',
         ubicacion: baseConfig.emisor?.ubicacion || DEFAULT_AGENCY_BRANDING.ubicacionPrincipal || 'San Salvador, SV · Santo Domingo, DO'
       }
     };

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
+  Building,
   Building2, 
   Image, 
   FileText,
@@ -11,9 +12,11 @@ import {
   Check, 
   X, 
   Sparkles, 
+  Shield,
   ShieldCheck, 
   Upload, 
   RefreshCw,
+  User,
   Users,
   UserPlus,
   Trash2,
@@ -39,7 +42,7 @@ import {
   Edit
 } from 'lucide-react';
 import { apiClient } from '../services/apiClient';
-import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
+import { DEFAULT_AGENCY_BRANDING, DEFAULT_COUNTRY_PROFILES } from '../constants/defaultAgencyBranding';
 
 export const DEFAULT_SERVICES = [
   {
@@ -144,21 +147,22 @@ export default function AgencyWhiteLabelSettingsModal({
     colorSecundario: '#1E293B',
     dominioWeb: 'goglite.com',
     emailContacto: 'contacto@goglite.com',
-    telefonoWhatsapp: '+503 7000-1122',
-    telefonoFijo: '+503 2200-3344',
-    telefonoWhatsappDO: DEFAULT_AGENCY_BRANDING.telefonoWhatsappDO || '+1 (809) 408-8070',
-    telefonoFijoDO: DEFAULT_AGENCY_BRANDING.telefonoFijoDO || '+1 (809) 408-8070',
-    ubicacionDO: DEFAULT_AGENCY_BRANDING.ubicacionDO || 'Av. Winston Churchill, Piantini, Santo Domingo, República Dominicana',
-    telefonoWhatsappSV: DEFAULT_AGENCY_BRANDING.telefonoWhatsappSV || '+503 7756-9828',
-    telefonoFijoSV: DEFAULT_AGENCY_BRANDING.telefonoFijoSV || '+503 2200-3344',
-    ubicacionSV: DEFAULT_AGENCY_BRANDING.ubicacionSV || 'Torre Millenium, Piso 9, San Salvador, El Salvador',
+    telefonoWhatsapp: '+503 7756-9828',
+    telefonoFijo: '+1 (829) 528-4713',
+    perfilesPais: DEFAULT_COUNTRY_PROFILES,
+    telefonoWhatsappDO: DEFAULT_COUNTRY_PROFILES.DO.telefonoWhatsapp,
+    telefonoFijoDO: DEFAULT_COUNTRY_PROFILES.DO.telefonoFijo,
+    ubicacionDO: DEFAULT_COUNTRY_PROFILES.DO.direccion,
+    telefonoWhatsappSV: DEFAULT_COUNTRY_PROFILES.SV.telefonoWhatsapp,
+    telefonoFijoSV: DEFAULT_COUNTRY_PROFILES.SV.telefonoFijo,
+    ubicacionSV: DEFAULT_COUNTRY_PROFILES.SV.direccion,
     emailFacturacion: 'billing@goglite.com',
-    direccionFisica: 'Torre Millenium, Piso 9, San Salvador / Av. Winston Churchill, Piantini, Sto. Dgo.',
+    direccionFisica: 'Santa Ana, San Salvador / Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana',
     ubicacionPrincipal: 'San Salvador (SV) & Santo Domingo (DO)',
     marcaBlancaActiva: true,
-    paisesOperacion: ['SV', 'DO', 'US', 'ES', 'MX', 'CO'],
+    paisesOperacion: ['SV', 'DO', 'US'],
     monedaDefecto: 'USD',
-    tasaCambioDop: 58.50,
+    tasaCambioDop: 60.00,
     tasaCambioEur: 0.92,
     mcpAgentKey: DEFAULT_AGENCY_BRANDING.mcpAgentKey || 'gog_agent_live_d92cd28fb0ce6cd0139bf8127427bd39',
     serviciosOficiales: DEFAULT_SERVICES,
@@ -174,6 +178,9 @@ export default function AgencyWhiteLabelSettingsModal({
 
   const [activeTab, setActiveTab] = useState('branding'); 
   // 'branding' | 'colaboradores' | 'contacto' | 'paises' | 'apis' | 'servicios'
+
+  // Pestaña de país seleccionada dentro del Gestor de Perfiles por País
+  const [selectedCountryProfileTab, setSelectedCountryProfileTab] = useState('DO');
 
   // Estados para Catálogo de Servicios
   const [editingServiceIndex, setEditingServiceIndex] = useState(null);
@@ -395,15 +402,39 @@ export default function AgencyWhiteLabelSettingsModal({
     if (agencySettings) {
       const storedLogo = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null;
       const storedLogoDocs = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null;
+
+      const rawProfiles = agencySettings.perfilesPais || DEFAULT_COUNTRY_PROFILES;
+      const mergedProfiles = {
+        DO: {
+          ...DEFAULT_COUNTRY_PROFILES.DO,
+          ...(rawProfiles.DO || {}),
+          telefonoWhatsapp: rawProfiles.DO?.telefonoWhatsapp || agencySettings.telefonoWhatsappDO || (agencySettings.telefonoFijo && agencySettings.telefonoFijo.includes('829') ? agencySettings.telefonoFijo : null) || DEFAULT_COUNTRY_PROFILES.DO.telefonoWhatsapp,
+          telefonoFijo: rawProfiles.DO?.telefonoFijo || agencySettings.telefonoFijoDO || (agencySettings.telefonoFijo && agencySettings.telefonoFijo.includes('829') ? agencySettings.telefonoFijo : null) || DEFAULT_COUNTRY_PROFILES.DO.telefonoFijo,
+          direccion: rawProfiles.DO?.direccion || agencySettings.ubicacionDO || (agencySettings.direccionFisica && agencySettings.direccionFisica.includes('Mirabal') ? 'Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana' : null) || DEFAULT_COUNTRY_PROFILES.DO.direccion
+        },
+        SV: {
+          ...DEFAULT_COUNTRY_PROFILES.SV,
+          ...(rawProfiles.SV || {}),
+          telefonoWhatsapp: rawProfiles.SV?.telefonoWhatsapp || agencySettings.telefonoWhatsappSV || agencySettings.telefonoWhatsapp || DEFAULT_COUNTRY_PROFILES.SV.telefonoWhatsapp,
+          telefonoFijo: rawProfiles.SV?.telefonoFijo || agencySettings.telefonoFijoSV || DEFAULT_COUNTRY_PROFILES.SV.telefonoFijo,
+          direccion: rawProfiles.SV?.direccion || agencySettings.ubicacionSV || (agencySettings.direccionFisica && agencySettings.direccionFisica.includes('Santa Ana') ? 'Santa Ana / San Salvador, El Salvador' : null) || DEFAULT_COUNTRY_PROFILES.SV.direccion
+        },
+        US: {
+          ...DEFAULT_COUNTRY_PROFILES.US,
+          ...(rawProfiles.US || {})
+        }
+      };
+
       setForm(prev => ({
         ...prev,
         ...agencySettings,
-        telefonoWhatsappDO: agencySettings.telefonoWhatsappDO || prev.telefonoWhatsappDO || DEFAULT_AGENCY_BRANDING.telefonoWhatsappDO,
-        telefonoFijoDO: agencySettings.telefonoFijoDO || prev.telefonoFijoDO || DEFAULT_AGENCY_BRANDING.telefonoFijoDO,
-        ubicacionDO: agencySettings.ubicacionDO || prev.ubicacionDO || DEFAULT_AGENCY_BRANDING.ubicacionDO,
-        telefonoWhatsappSV: agencySettings.telefonoWhatsappSV || prev.telefonoWhatsappSV || DEFAULT_AGENCY_BRANDING.telefonoWhatsappSV,
-        telefonoFijoSV: agencySettings.telefonoFijoSV || prev.telefonoFijoSV || DEFAULT_AGENCY_BRANDING.telefonoFijoSV,
-        ubicacionSV: agencySettings.ubicacionSV || prev.ubicacionSV || DEFAULT_AGENCY_BRANDING.ubicacionSV,
+        perfilesPais: mergedProfiles,
+        telefonoWhatsappDO: mergedProfiles.DO.telefonoWhatsapp,
+        telefonoFijoDO: mergedProfiles.DO.telefonoFijo,
+        ubicacionDO: mergedProfiles.DO.direccion,
+        telefonoWhatsappSV: mergedProfiles.SV.telefonoWhatsapp,
+        telefonoFijoSV: mergedProfiles.SV.telefonoFijo,
+        ubicacionSV: mergedProfiles.SV.direccion,
         logoUrl: agencySettings.logoUrl || storedLogo || prev.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl,
         logoDocumentosUrl: agencySettings.logoDocumentosUrl || storedLogoDocs || prev.logoDocumentosUrl || '',
         mcpAgentKey: agencySettings.mcpAgentKey || prev.mcpAgentKey || DEFAULT_AGENCY_BRANDING.mcpAgentKey || 'gog_agent_live_3554881d91556ec76d8734f10fda7366',
@@ -417,6 +448,51 @@ export default function AgencyWhiteLabelSettingsModal({
       }));
     }
   }, [agencySettings, isOpen]);
+
+  // Handlers para administración de Perfiles de Empresa por País (Fuente de Verdad)
+  const updateCountryProfile = (countryCode, field, value) => {
+    setForm(prev => {
+      const existingProfiles = prev.perfilesPais || DEFAULT_COUNTRY_PROFILES;
+      const currentProfile = existingProfiles[countryCode] || DEFAULT_COUNTRY_PROFILES[countryCode] || {
+        paisCodigo: countryCode,
+        paisNombre: countriesCatalog.find(c => c.code === countryCode)?.name || countryCode,
+        bandera: countriesCatalog.find(c => c.code === countryCode)?.flag || '🌐',
+        nombreFiscal: prev.nombreAgencia || 'Goglite Digital Hub',
+        identificacion: '',
+        direccion: '',
+        telefonoWhatsapp: '',
+        telefonoFijo: '',
+        emailContacto: prev.emailContacto || 'contacto@goglite.com',
+        directorResponsable: 'Víctor Matos',
+        cargoDirector: 'Director & Estratega Digital'
+      };
+
+      const updatedProfile = {
+        ...currentProfile,
+        [field]: value
+      };
+
+      const updatedProfiles = {
+        ...existingProfiles,
+        [countryCode]: updatedProfile
+      };
+
+      return {
+        ...prev,
+        perfilesPais: updatedProfiles,
+        ...(countryCode === 'DO' ? {
+          telefonoWhatsappDO: field === 'telefonoWhatsapp' ? value : (prev.telefonoWhatsappDO || value),
+          telefonoFijoDO: field === 'telefonoFijo' ? value : (prev.telefonoFijoDO || value),
+          ubicacionDO: field === 'direccion' ? value : (prev.ubicacionDO || value)
+        } : {}),
+        ...(countryCode === 'SV' ? {
+          telefonoWhatsappSV: field === 'telefonoWhatsapp' ? value : (prev.telefonoWhatsappSV || value),
+          telefonoFijoSV: field === 'telefonoFijo' ? value : (prev.telefonoFijoSV || value),
+          ubicacionSV: field === 'direccion' ? value : (prev.ubicacionSV || value)
+        } : {})
+      };
+    });
+  };
 
   // Handlers para administración del Catálogo de Servicios
   const handleOpenAddService = () => {
@@ -841,8 +917,8 @@ export default function AgencyWhiteLabelSettingsModal({
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Phone className="w-3.5 h-3.5" />
-            <span>3. Contacto & Soporte</span>
+            <Building2 className="w-3.5 h-3.5" />
+            <span>3. Perfiles por País & Sedes</span>
           </button>
 
           <button
@@ -1305,210 +1381,287 @@ export default function AgencyWhiteLabelSettingsModal({
             </div>
           )}
 
-          {/* TAB 3: CONTACTO & SOPORTE MULTI-SEDE DE LA EMPRESA */}
-          {activeTab === 'contacto' && (
-            <div className="space-y-6">
-              {/* Sección: Sede República Dominicana */}
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-950/20 to-slate-900/60 border border-blue-500/30 space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-blue-500/20">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">🇩🇴</span>
+          {/* TAB 3: PERFILES DE EMPRESA Y SEDES POR PAÍS (FUENTE DE VERDAD) */}
+          {activeTab === 'contacto' && (() => {
+            const activePaisesList = form.paisesOperacion && form.paisesOperacion.length > 0 
+              ? form.paisesOperacion 
+              : ['DO', 'SV', 'US'];
+            const currentTabCode = activePaisesList.includes(selectedCountryProfileTab) 
+              ? selectedCountryProfileTab 
+              : activePaisesList[0];
+            const currentCatalogCountry = countriesCatalog.find(c => c.code === currentTabCode) || { 
+              code: currentTabCode, 
+              flag: '🌐', 
+              name: currentTabCode 
+            };
+            const curProfile = (form.perfilesPais && form.perfilesPais[currentTabCode]) || DEFAULT_COUNTRY_PROFILES[currentTabCode] || {
+              paisCodigo: currentTabCode,
+              paisNombre: currentCatalogCountry.name,
+              bandera: currentCatalogCountry.flag,
+              nombreFiscal: form.nombreAgencia || 'Goglite Digital Hub',
+              identificacion: '',
+              direccion: '',
+              telefonoWhatsapp: '',
+              telefonoFijo: '',
+              emailContacto: form.emailContacto || 'contacto@goglite.com',
+              directorResponsable: 'Víctor Matos',
+              cargoDirector: 'Director & Estratega Digital'
+            };
+
+            return (
+              <div className="space-y-5">
+                {/* Cabecera explicativa */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-500/10 via-slate-900/60 to-slate-900/40 border border-orange-500/20">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 border border-orange-500/30">
+                      <Building2 className="w-5 h-5" />
+                    </div>
                     <div>
-                      <h4 className="text-xs font-bold text-white font-mono">Sede República Dominicana (DO)</h4>
-                      <p className="text-[10px] text-blue-300">Datos vinculados automáticamente a clientes y propuestas dominicanas</p>
+                      <h3 className="text-xs font-bold text-white font-mono flex items-center gap-2">
+                        Perfiles de Empresa y Sedes por País (Fuente de Verdad)
+                        <span className="text-[10px] px-2 py-0.2 rounded-full bg-orange-500/20 text-orange-300 font-normal">
+                          Multi-Sede Oficial
+                        </span>
+                      </h3>
+                      <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                        Configura un perfil completo e independiente por cada país de operación. Cada propuesta comercial, portal de cliente, contrato formal SOW y factura tomará como fuente de verdad los datos del país de procedencia del cliente.
+                      </p>
                     </div>
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-mono font-semibold">RD / Santo Domingo</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
-                      WhatsApp Oficial República Dominicana *
-                    </label>
-                    <input
-                      type="text"
-                      value={form.telefonoWhatsappDO || ''}
-                      onChange={(e) => setForm({ ...form, telefonoWhatsappDO: e.target.value })}
-                      placeholder="+1 (809) 408-8070"
-                      className="w-full bg-[#141b2a] border border-blue-500/30 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-400"
-                    />
-                    <p className="text-[10px] text-slate-500 mt-1">Botón de soporte y contacto para clientes de RD.</p>
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
-                      Teléfono Fijo / PBX RD
-                    </label>
-                    <input
-                      type="text"
-                      value={form.telefonoFijoDO || ''}
-                      onChange={(e) => setForm({ ...form, telefonoFijoDO: e.target.value })}
-                      placeholder="+1 (809) 408-8070"
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-400"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
-                      Ubicación / Dirección Física Sede Dominicana
-                    </label>
-                    <input
-                      type="text"
-                      value={form.ubicacionDO || ''}
-                      onChange={(e) => setForm({ ...form, ubicacionDO: e.target.value })}
-                      placeholder="Av. Winston Churchill, Piantini, Santo Domingo, República Dominicana"
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-400"
-                    />
+                {/* Selector de Pestaña de País */}
+                <div className="space-y-1.5">
+                  <label className="text-[10.5px] font-mono text-slate-400 block font-semibold uppercase tracking-wider">
+                    Seleccionar Sede / País a Configurar:
+                  </label>
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                    {activePaisesList.map((code) => {
+                      const item = countriesCatalog.find(c => c.code === code) || { code, flag: '🌐', name: code };
+                      const isSelected = currentTabCode === code;
+                      return (
+                        <button
+                          key={code}
+                          type="button"
+                          onClick={() => setSelectedCountryProfileTab(code)}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all border shrink-0 ${
+                            isSelected
+                              ? 'bg-orange-500/20 text-orange-300 border-orange-500/60 shadow-lg shadow-orange-950/40 font-bold'
+                              : 'bg-[#121724] text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200'
+                          }`}
+                        >
+                          <span className="text-base">{item.flag}</span>
+                          <span>{item.name}</span>
+                          <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
+                            isSelected ? 'bg-orange-500/30 text-orange-200' : 'bg-slate-900 text-slate-500'
+                          }`}>
+                            {code}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-              </div>
 
-              {/* Sección: Sede El Salvador */}
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/20 to-slate-900/60 border border-indigo-500/30 space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-indigo-500/20">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">🇸🇻</span>
+                {/* Tarjeta de Edición del Perfil de País Seleccionado */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900/90 via-[#101625] to-[#0c101a] border border-orange-500/30 space-y-4 shadow-xl">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-2xl">{currentCatalogCountry.flag}</span>
+                      <div>
+                        <h4 className="text-xs font-bold text-white font-mono flex items-center gap-2">
+                          Perfil de Empresa: {currentCatalogCountry.name} ({currentTabCode})
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-sans font-semibold">
+                            Sede Activa
+                          </span>
+                        </h4>
+                        <p className="text-[10.5px] text-slate-400">
+                          Presupuestos, contratos y botones de WhatsApp de clientes en {currentCatalogCountry.name} usarán estos datos.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-1 rounded-lg self-start sm:self-auto">
+                      Fuente Oficial {currentTabCode}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Razón Social */}
                     <div>
-                      <h4 className="text-xs font-bold text-white font-mono">Sede El Salvador (SV)</h4>
-                      <p className="text-[10px] text-indigo-300">Datos vinculados a clientes y propuestas salvadoreñas</p>
+                      <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold flex items-center gap-1.5">
+                        <Building className="w-3.5 h-3.5 text-orange-400" />
+                        Razón Social / Empresa ({currentTabCode}) *
+                      </label>
+                      <input
+                        type="text"
+                        value={curProfile.nombreFiscal || ''}
+                        onChange={(e) => updateCountryProfile(currentTabCode, 'nombreFiscal', e.target.value)}
+                        placeholder="Goglite Digital Hub"
+                        className="w-full bg-[#141b2a] border border-slate-700 focus:border-orange-500 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none transition-colors"
+                      />
+                    </div>
+
+                    {/* Identificación Fiscal */}
+                    <div>
+                      <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold flex items-center gap-1.5">
+                        <Shield className="w-3.5 h-3.5 text-orange-400" />
+                        Identificación Fiscal ({currentTabCode === 'DO' ? 'RNC' : currentTabCode === 'SV' ? 'NIT' : 'Tax ID / EIN'}) *
+                      </label>
+                      <input
+                        type="text"
+                        value={curProfile.identificacion || ''}
+                        onChange={(e) => updateCountryProfile(currentTabCode, 'identificacion', e.target.value)}
+                        placeholder={currentTabCode === 'DO' ? 'RNC: 1-32-45678-9' : currentTabCode === 'SV' ? 'NIT: 0614-290390-102-1' : 'EIN: XX-XXXXXXX'}
+                        className="w-full bg-[#141b2a] border border-slate-700 focus:border-orange-500 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none transition-colors"
+                      />
+                    </div>
+
+                    {/* WhatsApp Oficial del País */}
+                    <div>
+                      <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                        WhatsApp Oficial de Contacto ({currentTabCode}) *
+                      </label>
+                      <input
+                        type="text"
+                        value={curProfile.telefonoWhatsapp || ''}
+                        onChange={(e) => updateCountryProfile(currentTabCode, 'telefonoWhatsapp', e.target.value)}
+                        placeholder={currentTabCode === 'DO' ? '+1 (829) 528-4713' : '+503 7756-9828'}
+                        className="w-full bg-[#141b2a] border border-emerald-500/40 focus:border-emerald-400 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none transition-colors font-mono"
+                      />
+                      <p className="text-[10px] text-emerald-400/80 mt-1 font-mono">
+                        Enlace directo de soporte en el Portal y cabecera de propuestas para clientes de {currentCatalogCountry.name}.
+                      </p>
+                    </div>
+
+                    {/* Teléfono Fijo / PBX */}
+                    <div>
+                      <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-slate-400" />
+                        Teléfono Fijo / PBX Sede ({currentTabCode})
+                      </label>
+                      <input
+                        type="text"
+                        value={curProfile.telefonoFijo || ''}
+                        onChange={(e) => updateCountryProfile(currentTabCode, 'telefonoFijo', e.target.value)}
+                        placeholder={currentTabCode === 'DO' ? '+1 (829) 528-4713' : '+503 2200-3344'}
+                        className="w-full bg-[#141b2a] border border-slate-700 focus:border-orange-500 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none transition-colors font-mono"
+                      />
+                    </div>
+
+                    {/* Dirección Física Local */}
+                    <div className="sm:col-span-2">
+                      <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-orange-400" />
+                        Dirección Física / Sede Local ({currentTabCode}) *
+                      </label>
+                      <input
+                        type="text"
+                        value={curProfile.direccion || ''}
+                        onChange={(e) => updateCountryProfile(currentTabCode, 'direccion', e.target.value)}
+                        placeholder={currentTabCode === 'DO' ? 'Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana' : 'Santa Ana / San Salvador, El Salvador'}
+                        className="w-full bg-[#141b2a] border border-slate-700 focus:border-orange-500 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none transition-colors"
+                      />
+                    </div>
+
+                    {/* Correo Directo */}
+                    <div>
+                      <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold flex items-center gap-1.5">
+                        <Mail className="w-3.5 h-3.5 text-orange-400" />
+                        Correo de Contacto Directo ({currentTabCode}) *
+                      </label>
+                      <input
+                        type="email"
+                        value={curProfile.emailContacto || ''}
+                        onChange={(e) => updateCountryProfile(currentTabCode, 'emailContacto', e.target.value)}
+                        placeholder="contacto@goglite.com"
+                        className="w-full bg-[#141b2a] border border-slate-700 focus:border-orange-500 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none transition-colors"
+                      />
+                    </div>
+
+                    {/* Director Responsable */}
+                    <div>
+                      <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-orange-400" />
+                        Director / Representante Responsable ({currentTabCode})
+                      </label>
+                      <input
+                        type="text"
+                        value={curProfile.directorResponsable || ''}
+                        onChange={(e) => updateCountryProfile(currentTabCode, 'directorResponsable', e.target.value)}
+                        placeholder="Víctor Matos"
+                        className="w-full bg-[#141b2a] border border-slate-700 focus:border-orange-500 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none transition-colors"
+                      />
                     </div>
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono font-semibold">SV / San Salvador</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
-                      WhatsApp Oficial El Salvador *
-                    </label>
-                    <input
-                      type="text"
-                      value={form.telefonoWhatsappSV || ''}
-                      onChange={(e) => setForm({ ...form, telefonoWhatsappSV: e.target.value })}
-                      placeholder="+503 7756-9828"
-                      className="w-full bg-[#141b2a] border border-indigo-500/30 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-400"
-                    />
+                {/* Canales Corporativos Centrales & Globales */}
+                <div className="p-4 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <h4 className="text-xs font-bold text-white font-mono flex items-center gap-2">
+                      <Globe className="w-3.5 h-3.5 text-orange-400" /> Canales Corporativos Centrales & Facturación
+                    </h4>
+                    <span className="text-[10px] text-slate-500 font-mono">Configuración Global</span>
                   </div>
 
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
-                      Teléfono Fijo / PBX SV
-                    </label>
-                    <input
-                      type="text"
-                      value={form.telefonoFijoSV || ''}
-                      onChange={(e) => setForm({ ...form, telefonoFijoSV: e.target.value })}
-                      placeholder="+503 2200-3344"
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-400"
-                    />
-                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div>
+                      <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                        Correo de Facturación & Cobranzas
+                      </label>
+                      <input
+                        type="email"
+                        value={form.emailFacturacion || ''}
+                        onChange={(e) => setForm({ ...form, emailFacturacion: e.target.value })}
+                        placeholder="billing@goglite.com"
+                        className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
-                      Ubicación / Dirección Física Sede El Salvador
-                    </label>
-                    <input
-                      type="text"
-                      value={form.ubicacionSV || ''}
-                      onChange={(e) => setForm({ ...form, ubicacionSV: e.target.value })}
-                      placeholder="Torre Millenium, Piso 9, San Salvador, El Salvador"
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-400"
-                    />
-                  </div>
-                </div>
-              </div>
+                    <div>
+                      <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                        Dominio Web Oficial
+                      </label>
+                      <input
+                        type="text"
+                        value={form.dominioWeb || ''}
+                        onChange={(e) => setForm({ ...form, dominioWeb: e.target.value })}
+                        placeholder="goglite.com"
+                        className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
 
-              {/* Canales Generales y Corporativos */}
-              <div className="p-4 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-3">
-                <h4 className="text-xs font-bold text-white font-mono flex items-center gap-2">
-                  <Globe className="w-3.5 h-3.5 text-orange-400" /> Canales Corporativos Centrales
-                </h4>
+                    <div>
+                      <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                        WhatsApp Central de Respaldo
+                      </label>
+                      <input
+                        type="text"
+                        value={form.telefonoWhatsapp || ''}
+                        onChange={(e) => setForm({ ...form, telefonoWhatsapp: e.target.value })}
+                        placeholder="+1 (829) 528-4713"
+                        className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
-                      WhatsApp Central / Fallback *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={form.telefonoWhatsapp || ''}
-                      onChange={(e) => setForm({ ...form, telefonoWhatsapp: e.target.value })}
-                      placeholder="+503 7000-1122"
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
-                      Teléfono Fijo Central
-                    </label>
-                    <input
-                      type="text"
-                      value={form.telefonoFijo || ''}
-                      onChange={(e) => setForm({ ...form, telefonoFijo: e.target.value })}
-                      placeholder="+503 2200-3344"
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
-                      Correo Electrónico de Contacto General *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={form.emailContacto || ''}
-                      onChange={(e) => setForm({ ...form, emailContacto: e.target.value })}
-                      placeholder="contacto@goglite.com"
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
-                      Correo de Facturación & Cobranzas
-                    </label>
-                    <input
-                      type="email"
-                      value={form.emailFacturacion || ''}
-                      onChange={(e) => setForm({ ...form, emailFacturacion: e.target.value })}
-                      placeholder="billing@goglite.com"
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
-                      Dominio Web Oficial
-                    </label>
-                    <input
-                      type="text"
-                      value={form.dominioWeb || ''}
-                      onChange={(e) => setForm({ ...form, dominioWeb: e.target.value })}
-                      placeholder="goglite.com"
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
-                      Dirección Global Multisede
-                    </label>
-                    <input
-                      type="text"
-                      value={form.direccionFisica || ''}
-                      onChange={(e) => setForm({ ...form, direccionFisica: e.target.value })}
-                      placeholder="Torre Millenium, San Salvador / Av. Winston Churchill, Santo Domingo"
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
-                    />
+                    <div className="sm:col-span-3">
+                      <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                        Dirección Global Multisede (Resumen Corporativo)
+                      </label>
+                      <input
+                        type="text"
+                        value={form.direccionFisica || ''}
+                        onChange={(e) => setForm({ ...form, direccionFisica: e.target.value })}
+                        placeholder="Santa Ana, San Salvador / Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana"
+                        className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* TAB 4: PAÍSES DE OPERACIÓN & MONEDAS */}
           {activeTab === 'paises' && (

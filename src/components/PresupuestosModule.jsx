@@ -1350,7 +1350,7 @@ export default function PresupuestosModule({
                           {(activePresupuesto.pais || '').toUpperCase() === 'DO' ? '🇩🇴 Santo Domingo (DO)' : '🇸🇻 San Salvador (SV)'}
                         </span>
                         <span className="text-[10px] text-orange-400">
-                          {(activePresupuesto.pais || '').toUpperCase() === 'DO' ? (agencySettings?.telefonoWhatsappDO || '+1 809 408-8070') : (agencySettings?.telefonoWhatsappSV || '+503 7756-9828')}
+                          {getAgencyContactForCountry(activePresupuesto.pais, agencySettings)?.telefonoWhatsapp}
                         </span>
                       </div>
                     </div>
