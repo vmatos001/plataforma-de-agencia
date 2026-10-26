@@ -551,7 +551,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080b11] text-slate-100 flex flex-col selection:bg-orange-600 selection:text-white">
+    <ErrorBoundary>
+      <div className="min-h-screen bg-[#080b11] text-slate-100 flex flex-col selection:bg-orange-600 selection:text-white">
       {/* 1. TOP NAVIGATION BAR */}
       <header className="no-print h-16 border-b border-slate-800/80 bg-[#0c1017]/90 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-4">
@@ -885,6 +886,7 @@ export default function App() {
                 leadToConvert={leadForPresupuesto}
                 onClearLeadConvert={() => setLeadForPresupuesto(null)}
                 initialTab={presupuestosInitialTab}
+                agencySettings={agencySettings}
                 onConvertToFactura={(presupuesto) => {
                   setPresupuestoForFactura(presupuesto);
                   setActiveModule('gestion_rentabilidad');
@@ -992,5 +994,6 @@ export default function App() {
         onLogout={handleLogout}
       />
     </div>
+  </ErrorBoundary>
   );
 }

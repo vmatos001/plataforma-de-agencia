@@ -9,7 +9,8 @@ export default function PresupuestosContratosModule({
   onClearLeadConvert,
   onNavigateToRentabilidad,
   onConvertToFactura,
-  initialTab = 'presupuestos'
+  initialTab = 'presupuestos',
+  agencySettings
 }) {
   const [activeSubTab, setActiveSubTab] = useState(initialTab);
   const handleNavigateToRentabilidad = onNavigateToRentabilidad || onConvertToFactura;
@@ -70,6 +71,7 @@ export default function PresupuestosContratosModule({
           onClearLeadConvert={onClearLeadConvert}
           onNavigateToContratos={() => setActiveSubTab('contratos')}
           onNavigateToRentabilidad={handleNavigateToRentabilidad}
+          agencySettings={agencySettings}
         />
       ) : (
         <ContratosOnboardingModule

@@ -129,8 +129,32 @@ export default function PresupuestosModule({
   leadToConvert,
   onClearLeadConvert,
   onNavigateToContratos,
-  onNavigateToRentabilidad
+  onNavigateToRentabilidad,
+  agencySettings: propAgencySettings
 }) {
+  const [agencySettings, setAgencySettings] = useState(() => {
+    if (propAgencySettings && typeof propAgencySettings === 'object') return propAgencySettings;
+    try {
+      const raw = localStorage.getItem('goglite_agency_settings');
+      return raw ? JSON.parse(raw) : DEFAULT_AGENCY_BRANDING;
+    } catch {
+      return DEFAULT_AGENCY_BRANDING;
+    }
+  });
+
+  useEffect(() => {
+    if (propAgencySettings && typeof propAgencySettings === 'object') {
+      setAgencySettings(propAgencySettings);
+    }
+  }, [propAgencySettings]);
+
+  useEffect(() => {
+    const handleSettingsUpdated = (e) => {
+      if (e?.detail) setAgencySettings(e.detail);
+    };
+    window.addEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
+    return () => window.removeEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
+  }, []);
   const [presupuestos, setPresupuestos] = useState([]);
   const [plantillas, setPlantillas] = useState([]);
   const [loading, setLoading] = useState(true);
