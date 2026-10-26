@@ -60,7 +60,8 @@ import {
   getCrmLeadsCloud,
   saveCrmLeadCloud,
   deleteCrmLeadCloud,
-  subscribeCrmLeadsCloud
+  subscribeCrmLeadsCloud,
+  savePortalCloud
 } from '../services/firestoreSyncService';
 
 const PIPELINE_STAGES = [
@@ -1334,58 +1335,20 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     }
   };
 
-  // Copy portal link with complete project & proposal payload
+  // Copy clean portal link and sync to Firestore
   const handleCopyPortalLink = (token, leadObj = null) => {
-    let payloadQuery = '';
-    try {
-      const targetLead = leadObj || activeLeadModal;
-      const rawP = typeof window !== 'undefined' ? localStorage.getItem('goglite_presupuestos') : null;
-      const rawProjs = typeof window !== 'undefined' ? localStorage.getItem('goglite_proyectos') : null;
-      let matchedProp = null;
-      let matchedProj = null;
-
-      if (rawP && targetLead) {
-        const ps = JSON.parse(rawP);
-        const lEmp = (targetLead.empresa || '').toLowerCase().trim();
-        matchedProp = ps.find(p => p.leadId === targetLead.id || p.portalToken === token || (lEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === lEmp));
-      }
-      if (rawProjs && targetLead) {
-        const projs = JSON.parse(rawProjs);
-        const lEmp = (targetLead.empresa || '').toLowerCase().trim();
-        matchedProj = projs.find(p => (matchedProp && p.presupuestoId === matchedProp.id) || (lEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === lEmp));
-      }
-
-      if (matchedProp) {
-        const compactPayload = {
-          id: matchedProp.id,
-          codigo: matchedProp.codigo,
-          cliente: matchedProp.cliente || { empresa: targetLead.empresa, nombre: targetLead.contacto, telefono: targetLead.telefono, email: targetLead.email },
-          titulo: matchedProp.titulo,
-          pais: matchedProp.pais || targetLead.pais,
-          inversion: matchedProp.inversion,
-          modulos: matchedProp.modulos || [],
-          fases: matchedProp.fases || [],
-          vigenciaDias: matchedProp.vigenciaDias || 15,
-          estado: matchedProp.estado || 'aceptado'
-        };
-        if (matchedProj) {
-          compactPayload.proyecto = {
-            id: matchedProj.id,
-            faseActual: matchedProj.faseActual || (matchedProj.pagos?.saldoEstado === 'confirmado' ? 5 : (matchedProj.onboarding?.insumosValidados100 ? 4 : 1)),
-            portalConfig: matchedProj.portalConfig || {},
-            pagos: matchedProj.pagos || {},
-            onboarding: matchedProj.onboarding || {},
-            contrato: matchedProj.contrato || {},
-            estado: matchedProj.estado || 'activo'
-          };
-        }
-        const jsonStr = JSON.stringify(compactPayload);
-        const encoded = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (m, p) => String.fromCharCode('0x' + p)));
-        payloadQuery = `?d=${encodeURIComponent(encoded)}`;
-      }
-    } catch (e) {}
-
-    const url = `${window.location.origin}/portal/${token}${payloadQuery}`;
+    const cleanToken = token || leadObj?.portalToken || (leadObj ? `portal-${leadObj.id}` : 'portal-vip');
+    const targetLead = leadObj || activeLeadModal;
+    if (targetLead) {
+      try {
+        savePortalCloud(cleanToken, {
+          token: cleanToken,
+          lead: targetLead,
+          portalConfig: targetLead.portalConfig || {}
+        }).catch(() => {});
+      } catch (e) {}
+    }
+    const url = `${window.location.origin}/portal/${cleanToken}`;
     navigator.clipboard.writeText(url);
     setPortalCopied(true);
     setTimeout(() => setPortalCopied(false), 2000);

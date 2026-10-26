@@ -1030,133 +1030,142 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       }
       let loadedData = null;
 
-      // 0. Prioridad Absoluta: Payload autosuficiente transmitido en la URL (?d=...)
+      // 0. Prioridad Absoluta: Payload transmitido en la URL (?d=...)
       if (typeof window !== 'undefined') {
         try {
           const searchParams = new URLSearchParams(window.location.search);
           const encodedData = searchParams.get('d');
           if (encodedData) {
-            const binaryStr = atob(encodedData);
-            const bytes = Uint8Array.from(binaryStr, ch => ch.charCodeAt(0));
-            let decodedJson;
             try {
-              decodedJson = decodeURIComponent(new TextDecoder('utf-8').decode(bytes));
-            } catch {
-              decodedJson = new TextDecoder('utf-8').decode(bytes);
-            }
-            const parsedProp = JSON.parse(decodedJson);
-            const hasValidIdOrCode = Boolean(parsedProp && (parsedProp.id || parsedProp.codigo));
-            if (hasValidIdOrCode && (parsedProp.cliente || parsedProp.empresa || parsedProp.titulo)) {
-              const clientEmpresa = parsedProp.cliente?.empresa || parsedProp.empresa || 'Cliente VIP';
-              const clientContacto = parsedProp.cliente?.nombre || parsedProp.contacto || 'Representante Legal';
-              const clientPais = parsedProp.pais || parsedProp.cliente?.pais || 'SV';
-              const totalMonto = Number(parsedProp.inversion?.precioTotal || parsedProp.precioTotal) || 0;
-
-              const resolvedLead = {
-                id: parsedProp.leadId || parsedProp.id || token,
-                empresa: clientEmpresa,
-                contacto: clientContacto,
-                telefono: parsedProp.cliente?.telefono || parsedProp.telefono || '',
-                email: parsedProp.cliente?.email || parsedProp.email || '',
-                pais: clientPais,
-                presupuestoMonto: totalMonto,
-                presupuestoCodigo: parsedProp.codigo || 'P-2026',
-                portalToken: token
-              };
-
-              let storedPortalConfig = {};
+              const binaryStr = atob(encodedData);
+              const bytes = Uint8Array.from(binaryStr, ch => ch.charCodeAt(0));
+              let decodedJson;
               try {
-                const c = localStorage.getItem('goglite_portal_' + token) || localStorage.getItem('goglite_portal_' + (parsedProp.leadId || parsedProp.id));
-                if (c) storedPortalConfig = JSON.parse(c);
-              } catch (e) {}
+                decodedJson = decodeURIComponent(new TextDecoder('utf-8').decode(bytes));
+              } catch {
+                decodedJson = new TextDecoder('utf-8').decode(bytes);
+              }
+              const parsedProp = JSON.parse(decodedJson);
+              const hasValidIdOrCode = Boolean(parsedProp && (parsedProp.id || parsedProp.codigo));
+              if (hasValidIdOrCode && (parsedProp.cliente || parsedProp.empresa || parsedProp.titulo)) {
+                const clientEmpresa = parsedProp.cliente?.empresa || parsedProp.empresa || 'Cliente VIP';
+                const clientContacto = parsedProp.cliente?.nombre || parsedProp.contacto || 'Representante Legal';
+                const clientPais = parsedProp.pais || parsedProp.cliente?.pais || 'SV';
+                const totalMonto = Number(parsedProp.inversion?.precioTotal || parsedProp.precioTotal) || 0;
 
-              // Vincular o generar contrato/proyecto para este cliente
-              let matchedProj = null;
-              try {
-                const projs = getStoredProyectos();
-                const targetEmp = clientEmpresa.toLowerCase().trim();
-                matchedProj = projs.find(p => 
-                  (p.presupuestoId && (p.presupuestoId === parsedProp.id || p.presupuestoId === parsedProp.leadId)) ||
-                  (p.presupuestoCodigo && p.presupuestoCodigo === parsedProp.codigo) ||
-                  (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
-                );
-                if (matchedProj) {
-                  matchedProj = reconcileProyectoWithPresupuesto(matchedProj, parsedProp);
-                  if (parsedProp.proyecto) {
+                const resolvedLead = {
+                  id: parsedProp.leadId || parsedProp.id || token,
+                  empresa: clientEmpresa,
+                  contacto: clientContacto,
+                  telefono: parsedProp.cliente?.telefono || parsedProp.telefono || '',
+                  email: parsedProp.cliente?.email || parsedProp.email || '',
+                  pais: clientPais,
+                  presupuestoMonto: totalMonto,
+                  presupuestoCodigo: parsedProp.codigo || 'P-2026',
+                  portalToken: token
+                };
+
+                let storedPortalConfig = {};
+                try {
+                  const c = localStorage.getItem('goglite_portal_' + token) || localStorage.getItem('goglite_portal_' + (parsedProp.leadId || parsedProp.id));
+                  if (c) storedPortalConfig = JSON.parse(c);
+                } catch (e) {}
+
+                // Vincular o generar contrato/proyecto para este cliente
+                let matchedProj = null;
+                try {
+                  const projs = getStoredProyectos();
+                  const targetEmp = clientEmpresa.toLowerCase().trim();
+                  matchedProj = projs.find(p => 
+                    (p.presupuestoId && (p.presupuestoId === parsedProp.id || p.presupuestoId === parsedProp.leadId)) ||
+                    (p.presupuestoCodigo && p.presupuestoCodigo === parsedProp.codigo) ||
+                    (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
+                  );
+                  if (matchedProj) {
+                    matchedProj = reconcileProyectoWithPresupuesto(matchedProj, parsedProp);
+                    if (parsedProp.proyecto) {
+                      matchedProj = {
+                        ...matchedProj,
+                        ...parsedProp.proyecto,
+                        portalConfig: {
+                          ...(matchedProj.portalConfig || {}),
+                          ...(parsedProp.proyecto.portalConfig || {})
+                        },
+                        pagos: {
+                          ...(matchedProj.pagos || {}),
+                          ...(parsedProp.proyecto.pagos || {})
+                        },
+                        onboarding: {
+                          ...(matchedProj.onboarding || {}),
+                          ...(parsedProp.proyecto.onboarding || {})
+                        }
+                      };
+                    }
+                  } else if (parsedProp.proyecto) {
                     matchedProj = {
-                      ...matchedProj,
-                      ...parsedProp.proyecto,
-                      portalConfig: {
-                        ...(matchedProj.portalConfig || {}),
-                        ...(parsedProp.proyecto.portalConfig || {})
-                      },
-                      pagos: {
-                        ...(matchedProj.pagos || {}),
-                        ...(parsedProp.proyecto.pagos || {})
-                      },
-                      onboarding: {
-                        ...(matchedProj.onboarding || {}),
-                        ...(parsedProp.proyecto.onboarding || {})
-                      }
+                      ...buildProyectoFromPresupuesto(parsedProp, projs),
+                      ...parsedProp.proyecto
                     };
+                    saveStoredProyectos([matchedProj, ...projs]);
+                  } else if (storedPortalConfig.fase1Aprobada || parsedProp.estado === 'aceptado') {
+                    matchedProj = buildProyectoFromPresupuesto(parsedProp, projs);
+                    saveStoredProyectos([matchedProj, ...projs]);
                   }
-                } else if (parsedProp.proyecto) {
-                  matchedProj = {
-                    ...buildProyectoFromPresupuesto(parsedProp, projs),
-                    ...parsedProp.proyecto
-                  };
-                  saveStoredProyectos([matchedProj, ...projs]);
-                } else if (storedPortalConfig.fase1Aprobada || parsedProp.estado === 'aceptado') {
-                  matchedProj = buildProyectoFromPresupuesto(parsedProp, projs);
-                  saveStoredProyectos([matchedProj, ...projs]);
-                }
-              } catch (e) {}
+                } catch (e) {}
 
-              loadedData = {
-                lead: resolvedLead,
-                portalConfig: { 
-                  ...(parsedProp.portalConfig || {}), 
-                  ...(parsedProp.proyecto?.portalConfig || {}), 
-                  ...storedPortalConfig 
-                },
-                presupuesto: parsedProp,
-                proyecto: matchedProj || parsedProp.proyecto
-              };
+                loadedData = {
+                  lead: resolvedLead,
+                  portalConfig: { 
+                    ...(parsedProp.portalConfig || {}), 
+                    ...(parsedProp.proyecto?.portalConfig || {}), 
+                    ...storedPortalConfig 
+                  },
+                  presupuesto: parsedProp,
+                  proyecto: matchedProj || parsedProp.proyecto
+                };
 
-              // Actualizar únicamente la propuesta existente sin duplicar registros
-              try {
-                const rawP = localStorage.getItem('goglite_presupuestos');
-                let curP = rawP ? JSON.parse(rawP) : [];
-                const targetEmp = clientEmpresa.toLowerCase().trim();
-                const existIdx = curP.findIndex(p =>
-                  (parsedProp.id && p.id === parsedProp.id) ||
-                  (parsedProp.codigo && p.codigo === parsedProp.codigo) ||
-                  (token && p.portalToken === token) ||
-                  (parsedProp.leadId && p.leadId === parsedProp.leadId) ||
-                  (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
-                );
-                if (existIdx !== -1) {
-                  const prevEstado = curP[existIdx].estado;
-                  const finalEstado = (prevEstado === 'aceptado' || prevEstado === 'rechazado') ? prevEstado : 'visto';
-                  curP[existIdx] = {
-                    ...curP[existIdx],
-                    estado: finalEstado,
-                    abiertoEn: curP[existIdx].abiertoEn || new Date().toISOString()
-                  };
-                  parsedProp.estado = finalEstado;
-                } else if (curP.length === 0 && parsedProp.id && parsedProp.codigo) {
-                  // Solo insertar en caché si el navegador del cliente externo no tenía ninguna propuesta local
-                  const finalEstado = (parsedProp.estado === 'aceptado' || parsedProp.estado === 'rechazado') ? parsedProp.estado : 'visto';
-                  parsedProp.estado = finalEstado;
-                  parsedProp.abiertoEn = new Date().toISOString();
-                  curP.push(parsedProp);
-                }
-                localStorage.setItem('goglite_presupuestos', JSON.stringify(curP));
-              } catch (e) {}
+                // Actualizar únicamente la propuesta existente sin duplicar registros
+                try {
+                  const rawP = localStorage.getItem('goglite_presupuestos');
+                  let curP = rawP ? JSON.parse(rawP) : [];
+                  const targetEmp = clientEmpresa.toLowerCase().trim();
+                  const existIdx = curP.findIndex(p =>
+                    (parsedProp.id && p.id === parsedProp.id) ||
+                    (parsedProp.codigo && p.codigo === parsedProp.codigo) ||
+                    (token && p.portalToken === token) ||
+                    (parsedProp.leadId && p.leadId === parsedProp.leadId) ||
+                    (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
+                  );
+                  if (existIdx !== -1) {
+                    const prevEstado = curP[existIdx].estado;
+                    const finalEstado = (prevEstado === 'aceptado' || prevEstado === 'rechazado') ? prevEstado : 'visto';
+                    curP[existIdx] = {
+                      ...curP[existIdx],
+                      estado: finalEstado,
+                      abiertoEn: curP[existIdx].abiertoEn || new Date().toISOString()
+                    };
+                    parsedProp.estado = finalEstado;
+                  } else if (curP.length === 0 && parsedProp.id && parsedProp.codigo) {
+                    // Solo insertar en caché si el navegador del cliente externo no tenía ninguna propuesta local
+                    const finalEstado = (parsedProp.estado === 'aceptado' || parsedProp.estado === 'rechazado') ? parsedProp.estado : 'visto';
+                    parsedProp.estado = finalEstado;
+                    parsedProp.abiertoEn = new Date().toISOString();
+                    curP.push(parsedProp);
+                  }
+                  localStorage.setItem('goglite_presupuestos', JSON.stringify(curP));
+                } catch (e) {}
+              }
+            } catch (innerDecodeErr) {
+              console.warn('[Portal] Ignorando payload de URL malformado o truncado:', innerDecodeErr);
             }
+
+            // Limpiar la barra del navegador para mantener la URL corta y limpia
+            try {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            } catch (histErr) {}
           }
         } catch (urlDecodeErr) {
-          console.warn('[Portal] Error decodificando payload de URL:', urlDecodeErr);
+          console.warn('[Portal] Error leyendo parámetros de URL:', urlDecodeErr);
         }
       }
 

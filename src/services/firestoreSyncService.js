@@ -63,6 +63,7 @@ function isExcludedTestRecord(empresaOrName) {
 export async function getPortalCloud(token) {
   if (!token) return null;
   try {
+    await ensureAuth();
     const cleanToken = String(token).trim();
     const portalRef = doc(db, 'portales', cleanToken);
     const snap = await getDoc(portalRef);

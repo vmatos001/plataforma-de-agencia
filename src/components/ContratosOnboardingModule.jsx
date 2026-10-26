@@ -1340,37 +1340,27 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       (target.cliente?.empresa && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === target.cliente.empresa.toLowerCase().trim())
     );
     const token = target.portalToken || prop?.portalToken || target.codigo || target.id;
-    let payloadQuery = '';
-    if (prop) {
-      try {
-        const compactPayload = {
-          id: prop.id,
-          codigo: prop.codigo,
-          cliente: prop.cliente || target.cliente,
-          titulo: prop.titulo || target.titulo,
-          pais: prop.pais || target.pais,
-          inversion: prop.inversion,
-          modulos: prop.modulos || [],
-          fases: prop.fases || [],
-          vigenciaDias: prop.vigenciaDias || 15,
-          estado: prop.estado || 'aceptado',
-          // Incluir el estado completo y verificado del proyecto para sincronizar cualquier dispositivo externo
-          proyecto: {
-            id: target.id,
-            faseActual: target.faseActual || (target.pagos?.saldoEstado === 'confirmado' ? 5 : (target.onboarding?.insumosValidados100 ? 4 : 1)),
-            portalConfig: target.portalConfig || {},
-            pagos: target.pagos || {},
-            onboarding: target.onboarding || {},
-            contrato: target.contrato || {},
-            estado: target.estado || 'activo'
-          }
-        };
-        const jsonStr = JSON.stringify(compactPayload);
-        const encoded = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (m, p) => String.fromCharCode('0x' + p)));
-        payloadQuery = `?d=${encodeURIComponent(encoded)}`;
-      } catch (e) {}
-    }
-    return `${window.location.origin}/portal/${token}${payloadQuery}`;
+    
+    // Auto-sincronizar con Firestore en segundo plano
+    try {
+      savePortalCloud(token, {
+        token,
+        proyecto: target,
+        presupuesto: prop || null,
+        lead: target.cliente ? {
+          id: target.leadId || target.id,
+          empresa: target.cliente.empresa,
+          contacto: target.cliente.nombre,
+          telefono: target.cliente.telefono,
+          email: target.cliente.email,
+          pais: target.pais || 'SV',
+          portalToken: token
+        } : null,
+        portalConfig: target.portalConfig || {}
+      }).catch(() => {});
+    } catch (e) {}
+
+    return `${window.location.origin}/portal/${token}`;
   };
 
   const copyPortalLink = () => {

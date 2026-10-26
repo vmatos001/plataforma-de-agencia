@@ -853,66 +853,34 @@ export default function PresupuestosModule({
       }
     } catch (e) {}
 
-    // Payload autosuficiente para garantizar que la vista de cliente siempre coincida
-    // al 100% en cualquier dispositivo, móvil o WhatsApp sin depender de bases de datos locales
-    let payloadQuery = '';
+    if (!portalToken) portalToken = `portal-${target.id}`;
+
+    // Sincronización en segundo plano con Firestore para garantizar persistencia sin inflar la URL
     try {
-      const compactPayload = {
-        id: target.id,
-        leadId: target.leadId || matchedLead?.id || null,
-        portalToken: portalToken,
-        codigo: target.codigo,
-        fecha: target.fecha,
-        pais: target.pais || matchedLead?.pais || 'SV',
-        cliente: target.cliente || {
-          nombre: matchedLead?.contacto || 'Cliente VIP',
-          empresa: matchedLead?.empresa || 'Empresa',
-          telefono: matchedLead?.telefono || '',
-          email: matchedLead?.email || ''
-        },
-        emisor: target.emisor,
-        titulo: target.titulo,
-        subtitulo: target.subtitulo,
-        portada: target.portada,
-        inversion: target.inversion,
-        modulos: target.modulos || [],
-        fases: target.fases || [],
-        vigenciaDias: target.vigenciaDias || 15,
-        estado: (!target.estado || target.estado === 'borrador') ? 'sin_abrir' : target.estado
-      };
+      savePortalCloud(portalToken, {
+        token: portalToken,
+        presupuesto: target,
+        lead: target.cliente ? {
+          id: target.leadId || target.id,
+          empresa: target.cliente.empresa || matchedLead?.empresa,
+          contacto: target.cliente.nombre || matchedLead?.contacto,
+          telefono: target.cliente.telefono || matchedLead?.telefono,
+          email: target.cliente.email || matchedLead?.email,
+          pais: target.pais || matchedLead?.pais || 'SV',
+          portalToken: portalToken
+        } : (matchedLead ? {
+          id: matchedLead.id,
+          empresa: matchedLead.empresa,
+          contacto: matchedLead.contacto,
+          telefono: matchedLead.telefono,
+          email: matchedLead.email,
+          pais: matchedLead.pais || 'SV',
+          portalToken: portalToken
+        } : null)
+      }).catch(err => console.warn('[Presupuestos] Error auto-sincronizando portal:', err));
+    } catch (e) {}
 
-      // Si existe un proyecto formal asociado, adjuntar su estado sincronizado
-      try {
-        const rawProjs = localStorage.getItem('goglite_proyectos');
-        if (rawProjs) {
-          const projs = JSON.parse(rawProjs);
-          const matchedProj = projs.find(p => 
-            p.presupuestoId === target.id || 
-            p.presupuestoCodigo === target.codigo ||
-            (target.cliente?.empresa && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === target.cliente.empresa.toLowerCase().trim())
-          );
-          if (matchedProj) {
-            compactPayload.proyecto = {
-              id: matchedProj.id,
-              faseActual: matchedProj.faseActual || (matchedProj.pagos?.saldoEstado === 'confirmado' ? 5 : (matchedProj.onboarding?.insumosValidados100 ? 4 : 1)),
-              portalConfig: matchedProj.portalConfig || {},
-              pagos: matchedProj.pagos || {},
-              onboarding: matchedProj.onboarding || {},
-              contrato: matchedProj.contrato || {},
-              estado: matchedProj.estado || 'activo'
-            };
-          }
-        }
-      } catch (e) {}
-
-      const jsonStr = JSON.stringify(compactPayload);
-      const encoded = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (m, p) => String.fromCharCode('0x' + p)));
-      payloadQuery = `?d=${encodeURIComponent(encoded)}`;
-    } catch (encErr) {
-      console.warn('Error encoding proposal payload:', encErr);
-    }
-
-    return `${window.location.origin}/portal/${portalToken}${payloadQuery}`;
+    return `${window.location.origin}/portal/${portalToken}`;
   };
 
   // Copy link
