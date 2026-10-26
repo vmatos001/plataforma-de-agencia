@@ -414,12 +414,15 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   );
 
   const hasSettlementReceiptSubmitted = Boolean(
-    settlementReceiptImage || 
-    settlementReceiptRef || 
-    data?.portalConfig?.comprobanteLiquidacion || 
-    data?.portalConfig?.comprobanteLiquidacionImagen || 
-    data?.proyecto?.pagos?.saldoComprobante || 
-    data?.proyecto?.pagos?.saldoComprobanteImagen
+    data?.portalConfig?.liquidacionReportada === true ||
+    data?.portalConfig?.fechaReporteLiquidacion ||
+    data?.proyecto?.pagos?.saldoEstado === 'verificacion' ||
+    data?.proyecto?.pagos?.saldoEstado === 'confirmado' ||
+    data?.portalConfig?.fase4Liquidada === true ||
+    data?.portalConfig?.liquidacionPagada === true ||
+    data?.portalConfig?.saldoConfirmadoAgencia === true ||
+    (data?.portalConfig?.comprobanteLiquidacion && data?.portalConfig?.liquidacionReportada) ||
+    (data?.proyecto?.pagos?.saldoComprobante && data?.proyecto?.pagos?.saldoEstado === 'verificacion')
   );
 
   // Lista de facturas oficiales formalmente confirmadas por administración
@@ -522,7 +525,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       setAdvanceReceiptImage(finalUrl);
       setAdvanceReceiptFileName(fileName);
     }
-    showNotification(`✓ Captura del comprobante "${fileName}" cargada y sincronizando en la nube...`);
+    if (target === 'settlement') {
+      showNotification(`✓ Captura "${fileName}" cargada. Haz clic en "Ya hice el pago" para notificar a administración.`);
+    } else {
+      showNotification(`✓ Captura del comprobante "${fileName}" cargada y sincronizando en la nube...`);
+    }
 
     const cloudUrl = await uploadReceiptToCloudStorage(finalUrl, fileName, activeToken, target);
     const persistedUrl = cloudUrl || finalUrl;
@@ -4628,28 +4635,60 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                         <label className="text-[11px] text-slate-300 font-mono block mb-1">
                           1. Captura del Comprobante Bancario (50% Final):
                         </label>
-                        <div className="flex items-center gap-2">
+                        {(settlementReceiptImage || data?.portalConfig?.comprobanteLiquidacionImagen || data?.proyecto?.pagos?.saldoComprobanteImagen) ? (
+                          <div className="p-3 rounded-xl bg-[#141b2b] border border-emerald-500/40 space-y-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                <span className="text-xs font-bold text-emerald-300 truncate">
+                                  {settlementReceiptFileName || data?.portalConfig?.comprobanteLiquidacionNombre || data?.proyecto?.pagos?.saldoComprobanteNombre || 'Comprobante_Liquidacion.jpg'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewReceiptModalUrl(settlementReceiptImage || data?.portalConfig?.comprobanteLiquidacionImagen || data?.proyecto?.pagos?.saldoComprobanteImagen)}
+                                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-orange-400 text-[11px] font-bold flex items-center gap-1 border border-slate-700 transition-colors"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Ver</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => settlementReceiptInputRef.current?.click()}
+                                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold border border-slate-700 transition-colors"
+                                >
+                                  Cambiar
+                                </button>
+                              </div>
+                            </div>
+
+                            <div
+                              onClick={() => setPreviewReceiptModalUrl(settlementReceiptImage || data?.portalConfig?.comprobanteLiquidacionImagen || data?.proyecto?.pagos?.saldoComprobanteImagen)}
+                              className="relative rounded-lg overflow-hidden border border-slate-700/80 bg-[#090d16] max-h-36 flex items-center justify-center cursor-pointer group"
+                            >
+                              <img
+                                src={settlementReceiptImage || data?.portalConfig?.comprobanteLiquidacionImagen || data?.proyecto?.pagos?.saldoComprobanteImagen}
+                                alt="Comprobante de Liquidación"
+                                className="max-h-32 w-auto object-contain group-hover:scale-105 transition-transform"
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[11px] font-bold text-white gap-1">
+                                <Eye className="w-3.5 h-3.5" /> Ampliar Comprobante
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
                           <button
                             type="button"
                             onClick={() => settlementReceiptInputRef.current?.click()}
-                            className="flex-1 py-2.5 px-3 rounded-xl bg-[#141b2b] hover:bg-slate-800 border border-orange-500/40 text-xs text-orange-300 font-bold flex items-center justify-center gap-2 transition-colors"
+                            className="w-full py-3.5 px-3 rounded-xl bg-[#141b2b] hover:bg-slate-800 border-2 border-dashed border-orange-500/40 hover:border-orange-500 text-xs text-orange-300 font-bold flex items-center justify-center gap-2 transition-all cursor-pointer min-h-[46px]"
                           >
                             <FileUp className="w-4 h-4 text-orange-400 shrink-0" />
                             <span className="truncate">
-                              {settlementReceiptFileName || 'Subir Captura Bancaria'}
+                              Subir Captura de la Transferencia Bancaria
                             </span>
                           </button>
-                          {settlementReceiptImage && (
-                            <button
-                              type="button"
-                              onClick={() => setPreviewReceiptModalUrl(settlementReceiptImage)}
-                              className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold border border-emerald-500/30 flex items-center gap-1 shrink-0"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>Ver</span>
-                            </button>
-                          )}
-                        </div>
+                        )}
                       </div>
 
                       <div>
@@ -4666,21 +4705,21 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 pt-1">
+                    <div className="flex items-center gap-2 pt-2">
                       <button
                         type="submit"
                         disabled={unlockAnimating}
-                        className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-orange-950 transition-all"
+                        className="flex-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-orange-600 via-orange-500 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl shadow-orange-950/50 border border-orange-400/40 transition-all cursor-pointer"
                       >
                         {unlockAnimating ? (
                           <>
                             <RefreshCw className="w-4 h-4 animate-spin" />
-                            <span>Enviando Comprobante a Administración...</span>
+                            <span>Notificando Pago a Administración...</span>
                           </>
                         ) : (
                           <>
-                            <Upload className="w-4 h-4" />
-                            <span>Reportar Comprobante de Liquidación</span>
+                            <CheckCircle2 className="w-4 h-4 text-white" />
+                            <span>✓ Ya hice el pago · Notificar Liquidación Final (${liquidacionMonto} USD)</span>
                           </>
                         )}
                       </button>
@@ -4689,7 +4728,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                         <button
                           type="button"
                           onClick={() => setShowResubmitSettlementForm(false)}
-                          className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors"
+                          className="px-4 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors"
                         >
                           Cancelar
                         </button>
