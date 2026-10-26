@@ -34,19 +34,20 @@ import {
   saveLeads 
 } from '../services/storage.js';
 
-const BACKEND_URL = process.env.GOGLITE_BACKEND_URL || 'http://localhost:3001';
+export function createGogliteMcpServer() {
+  const BACKEND_URL = process.env.GOGLITE_BACKEND_URL || 'http://localhost:3001';
 
-const server = new Server(
-  {
-    name: 'goglite-agency-mcp',
-    version: '2.0.0',
-  },
-  {
-    capabilities: {
-      tools: {},
+  const server = new Server(
+    {
+      name: 'goglite-agency-mcp',
+      version: '2.0.0',
     },
-  }
-);
+    {
+      capabilities: {
+        tools: {},
+      },
+    }
+  );
 
 /**
  * Catálogo Completo de Herramientas del Protocolo MCP de Goglite Digital Hub
@@ -1367,13 +1368,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
+  return server;
+}
+
+export const defaultServer = createGogliteMcpServer();
+
 async function main() {
   const transport = new StdioServerTransport();
-  await server.connect(transport);
+  await defaultServer.connect(transport);
   console.error('Goglite Agency MCP Server v2.0.0 iniciado exitosamente en stdio.');
 }
 
-main().catch((err) => {
-  console.error('Fallo iniciando el servidor MCP:', err);
-  process.exit(1);
-});
+import { fileURLToPath } from 'url';
+if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error('Fallo iniciando el servidor MCP:', err);
+    process.exit(1);
+  });
+}

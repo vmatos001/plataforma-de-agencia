@@ -145,16 +145,15 @@ export default function PresupuestosModule({
   const [savedPortalUrl, setSavedPortalUrl] = useState('');
   const [savedClientPhone, setSavedClientPhone] = useState('');
 
+  const CLOUD_API_URL = import.meta.env.VITE_API_URL || 'https://goglite-agency.vercel.app';
   const getBackendEndpoint = (endpoint) => {
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     if (typeof window !== 'undefined') {
-      if (window.location.protocol === 'https:') {
-        return endpoint;
-      }
-      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        return `http://localhost:3001${endpoint}`;
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return `http://localhost:3001${cleanEndpoint}`;
       }
     }
-    return endpoint;
+    return `${CLOUD_API_URL}${cleanEndpoint}`;
   };
 
   // Deduplica presupuestos, limpia registros fantasma sin código y conserva el estado más avanzado de la propuesta única

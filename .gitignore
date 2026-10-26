@@ -58,3 +58,4 @@ client_secret*.json
 *.dump
 
 *.mp3
+.vercel

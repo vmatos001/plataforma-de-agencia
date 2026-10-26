@@ -160,7 +160,11 @@ export const getPresupuestos = () => {
 };
 
 export const savePresupuestos = (list) => {
-  fs.writeFileSync(presupuestosFile, JSON.stringify(list, null, 2));
+  try {
+    fs.writeFileSync(presupuestosFile, JSON.stringify(list, null, 2));
+  } catch (err) {
+    console.warn('[Presupuestos Storage] Entorno Serverless/Read-only, persistiendo directo a la nube:', err.message);
+  }
   if (Array.isArray(list)) {
     list.forEach(p => {
       syncPresupuestoToCloud(p).catch(err => {

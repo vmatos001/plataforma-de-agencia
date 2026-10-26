@@ -1749,16 +1749,15 @@ export default function GestionRentabilidadModule({
     } catch {}
   }, [activeTimer]);
 
+  const CLOUD_API_URL = import.meta.env.VITE_API_URL || 'https://goglite-agency.vercel.app';
   const getBackendEndpoint = (endpoint) => {
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     if (typeof window !== 'undefined') {
-      if (window.location.protocol === 'https:') {
-        return endpoint;
-      }
-      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        return `http://localhost:3001${endpoint}`;
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return `http://localhost:3001${cleanEndpoint}`;
       }
     }
-    return endpoint;
+    return `${CLOUD_API_URL}${cleanEndpoint}`;
   };
 
   const showToast = (msg) => {

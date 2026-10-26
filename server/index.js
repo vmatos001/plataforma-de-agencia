@@ -51,6 +51,7 @@ import {
   archiveContractInDrive, 
   uploadTextFile 
 } from './services/googleDriveService.js';
+import { setupMcpRoutes } from './mcp/sseHandler.js';
 import { getAgencySettings, saveAgencySettings } from './services/agencySettingsStorage.js';
 import { getUsers, saveUsers, createCollaborator, registerOrUpdateClientAuth, getUserById, updateUser, deleteCollaborator } from './services/usersStorage.js';
 import { verifyTOTP, generateTOTP, buildOtpAuthUri, generateQrCodeDataUrl } from './services/totpService.js';
@@ -80,6 +81,9 @@ const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+
+// Montaje de rutas del protocolo MCP (Server-Sent Events y mensajería en la nube)
+setupMcpRoutes(app);
 
 // ==========================================
 // CANAL SERVER-SENT EVENTS (SSE) EN VIVO
@@ -1838,7 +1842,7 @@ app.use(express.static(distPath));
 
 // Catch-all route for SPA (Express 5 syntax)
 app.use((req, res) => {
-  if (req.path.startsWith('/api')) {
+  if (req.path.startsWith('/api') || req.path.startsWith('/mcp')) {
     return res.status(404).json({ error: 'Endpoint no encontrado' });
   }
   const indexPath = path.join(distPath, 'index.html');
@@ -1849,6 +1853,10 @@ app.use((req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 [GOGLITE TOOLS API] Servidor activo en http://localhost:${PORT}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 [GOGLITE TOOLS API] Servidor activo en http://localhost:${PORT}`);
+  });
+}
+
+export default app;

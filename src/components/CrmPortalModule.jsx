@@ -564,17 +564,17 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
 
   const [backendOfflineNotice, setBackendOfflineNotice] = useState(null);
 
-  // Helper para resolver URL del backend (local o producción)
+  const CLOUD_API_URL = import.meta.env.VITE_API_URL || 'https://goglite-agency.vercel.app';
+
+  // Helper para resolver URL del backend (local o producción en la nube)
   const getBackendEndpoint = (endpoint) => {
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     if (typeof window !== 'undefined') {
-      if (window.location.protocol === 'https:') {
-        return endpoint;
-      }
-      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        return `http://localhost:3001${endpoint}`;
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return `http://localhost:3001${cleanEndpoint}`;
       }
     }
-    return endpoint;
+    return `${CLOUD_API_URL}${cleanEndpoint}`;
   };
 
   // Polling de sesiones de WhatsApp (cada 5s normal, cada 2s con modal abierto)
@@ -584,8 +584,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       try {
         let res;
         try {
-          res = await fetch('/api/whatsapp/sessions');
-          if (!res.ok && res.status === 404) throw new Error('404');
+          res = await fetch(getBackendEndpoint('/api/whatsapp/sessions'));
         } catch (localErr) {
           res = await fetch('http://localhost:3001/api/whatsapp/sessions');
         }
