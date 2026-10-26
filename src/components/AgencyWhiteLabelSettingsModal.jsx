@@ -755,9 +755,13 @@ export default function AgencyWhiteLabelSettingsModal({
       // 2. Persistir en almacenamiento institucional y notificar a App
       await onSaveAgencySettings(form);
 
-      // Persistir APIs en el servidor backend (Railway)
+      // Persistir configuraciones seguras en el servidor backend
       try {
-        await apiClient.post('/api/settings', apiSettings);
+        const backendPayload = {
+          defaultCountry: form.monedaDefecto === 'USD' ? 'SV' : 'DO',
+          resendFromEmail: form.emailContacto || undefined
+        };
+        await apiClient.post('/api/settings', backendPayload);
       } catch (apiErr) {
         console.warn('[APIs] No se pudo guardar configuración en backend remoto:', apiErr);
       }
