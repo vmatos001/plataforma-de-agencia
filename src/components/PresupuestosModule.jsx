@@ -42,7 +42,7 @@ import {
   subscribePresupuestosCloud,
   savePortalCloud
 } from '../services/firestoreSyncService';
-import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
+import { DEFAULT_AGENCY_BRANDING, getAgencyContactForCountry } from '../constants/defaultAgencyBranding';
 import { DEFAULT_SERVICES } from './AgencyWhiteLabelSettingsModal';
 
 const DEFAULT_VIP_TEMPLATE = {
@@ -179,6 +179,18 @@ export default function PresupuestosModule({
     window.addEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
     return () => window.removeEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
   }, []);
+
+  const currentActivePais = (activePresupuesto?.pais || selectedCountry || 'SV').toUpperCase();
+  const sedeAgencyContact = getAgencyContactForCountry(currentActivePais, agencySettings);
+  const displayEmisor = {
+    ...sedeAgencyContact,
+    ...(activePresupuesto?.emisor || {})
+  };
+  if (currentActivePais === 'DO') {
+    displayEmisor.telefono = sedeAgencyContact.telefono;
+    displayEmisor.telefonoWhatsapp = sedeAgencyContact.telefonoWhatsapp;
+    displayEmisor.ubicacion = sedeAgencyContact.ubicacion;
+  }
 
   const handleApplyCatalogService = (serviceId) => {
     if (!serviceId) return;
@@ -386,6 +398,8 @@ export default function PresupuestosModule({
 
       // Si no existe, crear la primera propuesta
       const base = plantillas[0]?.datos || DEFAULT_VIP_TEMPLATE;
+      const clientPais = ((leadToConvert.pais || selectedCountry || 'SV')).toUpperCase();
+      const resolvedEmisor = getAgencyContactForCountry(clientPais, agencySettings);
       const precioAcordado = Number(leadToConvert.valorEstimado) > 0 ? Number(leadToConvert.valorEstimado) : (base.inversion?.precioTotal || 250);
       const anticipoMitad = Math.round(precioAcordado * 0.5);
       const nextNum = currentList.length + 1;
@@ -396,14 +410,18 @@ export default function PresupuestosModule({
         codigo: `P-2026-${String(nextNum).padStart(3, '0')}`,
         fecha: new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
         estado: 'borrador',
-        pais: leadToConvert.pais || selectedCountry || 'SV',
+        pais: clientPais,
+        emisor: {
+          ...(base.emisor || {}),
+          ...resolvedEmisor
+        },
         cliente: {
           nombre: leadToConvert.responsable || 'Director / Propietario',
           empresa: leadToConvert.nombreEmpresa || leadToConvert.empresa || 'Empresa Cliente',
-          telefono: leadToConvert.telefono || (leadToConvert.pais === 'DO' ? '+1 809 ' : '+503 '),
+          telefono: leadToConvert.telefono || (clientPais === 'DO' ? '+1 809 ' : '+503 '),
           email: leadToConvert.email || '',
           actividad: leadToConvert.dominio ? `Presencia Digital (${leadToConvert.dominio})` : 'Servicios Comerciales',
-          ubicacion: leadToConvert.pais === 'DO' ? 'Santo Domingo / República Dominicana' : 'San Salvador / El Salvador'
+          ubicacion: clientPais === 'DO' ? 'Santo Domingo, República Dominicana' : 'San Salvador, El Salvador'
         },
         inversion: {
           ...(base.inversion || DEFAULT_VIP_TEMPLATE.inversion),
@@ -499,20 +517,26 @@ export default function PresupuestosModule({
   const handleCreateNew = (templateData = null) => {
     const base = templateData || plantillas[0]?.datos || DEFAULT_VIP_TEMPLATE;
     const nextNum = presupuestos.length + 1;
+    const activePais = ((templateData?.pais || selectedCountry || 'SV')).toUpperCase();
+    const resolvedEmisor = getAgencyContactForCountry(activePais, agencySettings);
     const newProp = {
       ...JSON.parse(JSON.stringify(base)),
       id: 'prop-' + Date.now(),
       codigo: `P-2026-${String(nextNum).padStart(3, '0')}`,
       fecha: new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
       estado: 'borrador',
-      pais: selectedCountry || 'SV',
+      pais: activePais,
+      emisor: {
+        ...(base.emisor || {}),
+        ...resolvedEmisor
+      },
       cliente: {
         nombre: 'Nuevo Cliente',
         empresa: 'Empresa / Negocio',
-        telefono: selectedCountry === 'DO' ? '+1 809 ' : '+503 ',
+        telefono: activePais === 'DO' ? '+1 809 ' : '+503 ',
         email: '',
         actividad: 'Servicios Comerciales',
-        ubicacion: selectedCountry === 'DO' ? 'Santo Domingo / Rep. Dominicana' : 'San Salvador / El Salvador'
+        ubicacion: activePais === 'DO' ? 'Santo Domingo, República Dominicana' : 'San Salvador, El Salvador'
       }
     };
     setActivePresupuesto(newProp);
@@ -723,6 +747,27 @@ export default function PresupuestosModule({
       const copy = { ...prev };
       copy.modulos = [...copy.modulos];
       copy.modulos[index] = { ...copy.modulos[index], [field]: value };
+      return copy;
+    });
+  };
+
+  const handlePropCountryChange = (newCountry) => {
+    const activeCountry = (newCountry || 'SV').toUpperCase();
+    const resolvedContact = getAgencyContactForCountry(activeCountry, agencySettings);
+    setActivePresupuesto(prev => {
+      if (!prev) return prev;
+      const copy = JSON.parse(JSON.stringify(prev));
+      copy.pais = activeCountry;
+      copy.emisor = {
+        ...(copy.emisor || {}),
+        ...resolvedContact
+      };
+      if (!copy.cliente?.ubicacion || copy.cliente.ubicacion.includes('Salvador') || copy.cliente.ubicacion.includes('Dominicana') || copy.cliente.ubicacion.includes('Santo Domingo')) {
+        copy.cliente = {
+          ...(copy.cliente || {}),
+          ubicacion: activeCountry === 'DO' ? 'Santo Domingo, República Dominicana' : 'San Salvador, El Salvador'
+        };
+      }
       return copy;
     });
   };
@@ -1280,6 +1325,37 @@ export default function PresupuestosModule({
                     Datos del Cliente & Proyecto
                   </div>
 
+                  {/* Selector de País y Sede Emisora */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2.5 rounded-lg bg-[#080b11] border border-slate-800/80">
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1 font-mono font-semibold">
+                        País del Cliente / Procedencia
+                      </label>
+                      <select
+                        value={activePresupuesto.pais || 'SV'}
+                        onChange={(e) => handlePropCountryChange(e.target.value)}
+                        className="w-full bg-[#121826] border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-mono text-xs focus:outline-none focus:border-orange-500"
+                      >
+                        <option value="DO">🇩🇴 República Dominicana (DO)</option>
+                        <option value="SV">🇸🇻 El Salvador (SV)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1 font-mono font-semibold">
+                        Sede Emisora Vinculada
+                      </label>
+                      <div className="px-2.5 py-1.5 rounded-lg bg-[#141b2a] border border-slate-700/60 text-slate-300 text-[11px] font-mono flex items-center justify-between">
+                        <span className="font-semibold text-white">
+                          {(activePresupuesto.pais || '').toUpperCase() === 'DO' ? '🇩🇴 Santo Domingo (DO)' : '🇸🇻 San Salvador (SV)'}
+                        </span>
+                        <span className="text-[10px] text-orange-400">
+                          {(activePresupuesto.pais || '').toUpperCase() === 'DO' ? (agencySettings?.telefonoWhatsappDO || '+1 809 408-8070') : (agencySettings?.telefonoWhatsappSV || '+503 7756-9828')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="text-[11px] text-slate-400 block mb-1">Empresa / Negocio</label>
                     <input
@@ -1551,14 +1627,14 @@ export default function PresupuestosModule({
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
                           <img 
-                            src={(typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null) || activePresupuesto?.emisor?.logoDocumentosUrl || activePresupuesto?.emisor?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
-                            alt={activePresupuesto.emisor?.empresa || 'Agencia'} 
+                            src={(typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null) || displayEmisor?.logoDocumentosUrl || displayEmisor?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                            alt={displayEmisor?.empresa || 'Agencia'} 
                             className="h-10 w-auto object-contain"
                           />
                           <div className="text-[10px] text-slate-600 font-medium space-y-0.5 border-l border-slate-300 pl-3">
-                            <div><strong>Ubicación:</strong> {activePresupuesto.emisor?.ubicacion}</div>
-                            <div><strong>Contacto:</strong> {activePresupuesto.emisor?.telefono} | {activePresupuesto.emisor?.email}</div>
-                            <div><strong>Director:</strong> {activePresupuesto.emisor?.responsable}</div>
+                            <div><strong>Ubicación:</strong> {displayEmisor?.ubicacion}</div>
+                            <div><strong>Contacto:</strong> {displayEmisor?.telefono} | {displayEmisor?.email}</div>
+                            <div><strong>Director:</strong> {displayEmisor?.responsable}</div>
                           </div>
                         </div>
 
@@ -1680,11 +1756,11 @@ export default function PresupuestosModule({
                     <div className="border-b border-slate-200 pb-2.5 mb-4 flex items-center justify-between avoid-break">
                       <div className="flex items-center gap-2">
                         <img 
-                          src={(typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null) || activePresupuesto?.emisor?.logoDocumentosUrl || activePresupuesto?.emisor?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
-                          alt={activePresupuesto.emisor?.empresa || 'Agencia'} 
+                          src={(typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null) || displayEmisor?.logoDocumentosUrl || displayEmisor?.logoUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                          alt={displayEmisor?.empresa || 'Agencia'} 
                           className="h-6 w-auto object-contain"
                         />
-                        <span className="font-bold text-slate-900 text-xs">{activePresupuesto.emisor?.empresa || 'Goglite Digital Hub'}</span>
+                        <span className="font-bold text-slate-900 text-xs">{displayEmisor?.empresa || 'Goglite Digital Hub'}</span>
                       </div>
                       <div className="text-[10px] font-mono text-slate-500">
                         {activePresupuesto.codigo} · {activePresupuesto.cliente?.empresa}
@@ -1741,9 +1817,9 @@ export default function PresupuestosModule({
                     {/* 4. FIRMA OFICIAL GOGLITE */}
                     <div className="pt-3 border-t border-slate-300 flex items-center justify-between text-[10.5px] text-slate-600 avoid-break">
                       <div>
-                        <div className="font-extrabold text-slate-900 text-xs">{activePresupuesto.emisor?.responsable}</div>
-                        <div className="text-orange-600 font-bold">{activePresupuesto.emisor?.empresa}</div>
-                        <div className="text-[10px] text-slate-500">{activePresupuesto.emisor?.telefono} | {activePresupuesto.emisor?.email}</div>
+                        <div className="font-extrabold text-slate-900 text-xs">{displayEmisor?.responsable}</div>
+                        <div className="text-orange-600 font-bold">{displayEmisor?.empresa}</div>
+                        <div className="text-[10px] text-slate-500">{displayEmisor?.telefono} | {displayEmisor?.email}</div>
                       </div>
 
                       <div className="text-right">

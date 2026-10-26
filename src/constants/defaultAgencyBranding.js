@@ -7,7 +7,52 @@ export const DEFAULT_AGENCY_BRANDING = {
   colorSecundario: "#1E293B",
   dominioWeb: "goglite.com",
   emailContacto: "contacto@goglite.com",
+  emailFacturacion: "billing@goglite.com",
   telefonoWhatsapp: "+503 7000-1122",
+  telefonoFijo: "+503 2200-3344",
+
+  // Sedes y Contacto Local por País
+  telefonoWhatsappDO: "+1 (809) 408-8070",
+  telefonoFijoDO: "+1 (809) 408-8070",
+  ubicacionDO: "Av. Winston Churchill, Piantini, Santo Domingo, República Dominicana",
+
+  telefonoWhatsappSV: "+503 7756-9828",
+  telefonoFijoSV: "+503 2200-3344",
+  ubicacionSV: "Torre Millenium, Piso 9, San Salvador, El Salvador",
+
   ubicacionPrincipal: "San Salvador (SV) & Santo Domingo (DO)",
   mcpAgentKey: "gog_agent_live_d92cd28fb0ce6cd0139bf8127427bd39"
 };
+
+export function getAgencyContactForCountry(countryCode = 'SV', settings = null) {
+  const isDO = (countryCode || '').toUpperCase() === 'DO';
+  const agencyName = settings?.nombreAgencia || DEFAULT_AGENCY_BRANDING.nombreAgencia;
+  const email = settings?.emailContacto || DEFAULT_AGENCY_BRANDING.emailContacto;
+  const director = 'Víctor Matos';
+
+  if (isDO) {
+    const phoneDO = settings?.telefonoWhatsappDO || settings?.telefonoDO || settings?.telefonoFijoDO || DEFAULT_AGENCY_BRANDING.telefonoWhatsappDO;
+    const locationDO = settings?.ubicacionDO || DEFAULT_AGENCY_BRANDING.ubicacionDO;
+    return {
+      empresa: agencyName,
+      ubicacion: locationDO,
+      telefono: phoneDO,
+      telefonoWhatsapp: phoneDO,
+      email: email,
+      responsable: director,
+      cargo: 'Director & Estratega Digital'
+    };
+  }
+
+  const phoneSV = settings?.telefonoWhatsappSV || settings?.telefonoSV || settings?.telefonoWhatsapp || DEFAULT_AGENCY_BRANDING.telefonoWhatsappSV;
+  const locationSV = settings?.ubicacionSV || DEFAULT_AGENCY_BRANDING.ubicacionSV;
+  return {
+    empresa: agencyName,
+    ubicacion: locationSV,
+    telefono: phoneSV,
+    telefonoWhatsapp: phoneSV,
+    email: email,
+    responsable: director,
+    cargo: 'Director & Estratega Digital'
+  };
+}

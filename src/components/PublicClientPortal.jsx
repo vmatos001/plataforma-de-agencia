@@ -62,7 +62,7 @@ import {
   reconcileInvoiceWithPresupuesto,
   normalizeFacturaItems 
 } from './GestionRentabilidadModule';
-import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
+import { DEFAULT_AGENCY_BRANDING, getAgencyContactForCountry } from '../constants/defaultAgencyBranding';
 import { auth } from '../services/firebase';
 import { getPortalCloud, savePortalCloud, subscribePortalCloud, saveProyectoCloud, uploadReceiptToCloudStorage } from '../services/firestoreSyncService';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
@@ -446,16 +446,18 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   const handlePrintClientInvoicePdf = (fac) => {
     if (!fac) return;
+    const invPais = (fac.pais || data?.presupuesto?.pais || data?.lead?.pais || (fac.cliente?.ubicacion || '').toLowerCase().includes('dominicana') ? 'DO' : 'SV');
+    const invEmisor = getAgencyContactForCountry(invPais, agencyBranding);
     const invoiceConfig = {
       emisor: {
         empresa: agencyBranding?.nombreAgencia || 'Goglite Digital Hub',
         subtitulo: agencyBranding?.eslogan || 'Suite Integral de Crecimiento Digital & Desarrollo Web Antigravity',
         logoUrl: documentBrandLogo,
         logoDocumentosUrl: documentBrandLogo,
-        identificacion: agencyBranding?.identificacion || 'NIT / RNC: 0614-290390-102-1',
+        identificacion: agencyBranding?.identificacion || (invPais === 'DO' ? 'RNC: 1-32-45678-9' : 'NIT: 0614-290390-102-1'),
         email: agencyBranding?.emailContacto || 'contacto@goglite.com',
-        telefono: agencyBranding?.telefonoWhatsapp || '+503 7000-1122',
-        ubicacion: agencyBranding?.ubicacionPrincipal || 'San Salvador, SV · Santo Domingo, DO'
+        telefono: invEmisor.telefonoWhatsapp || invEmisor.telefono || agencyBranding?.telefonoWhatsapp,
+        ubicacion: invEmisor.ubicacion || agencyBranding?.ubicacionPrincipal
       },
       cuentasBancarias: data?.portalConfig?.cuentasBancarias
     };
@@ -2277,7 +2279,19 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   const { lead, portalConfig, presupuesto } = data;
   const rawUbicacion = (presupuesto?.cliente?.ubicacion || data.proyecto?.cliente?.ubicacion || lead.ubicacion || '').toLowerCase();
-  const currentPais = (presupuesto?.pais === 'DO' || data.proyecto?.pais === 'DO' || lead.pais === 'DO' || rawUbicacion.includes('dominicana') || rawUbicacion.includes('santo domingo')) ? 'DO' : 'SV';
+  const rawTelefono = (presupuesto?.cliente?.telefono || lead.telefono || '').replace(/\D/g, '');
+  const isDominicanPhone = rawTelefono.startsWith('1809') || rawTelefono.startsWith('1829') || rawTelefono.startsWith('1849') || (rawTelefono.length === 10 && (rawTelefono.startsWith('809') || rawTelefono.startsWith('829') || rawTelefono.startsWith('849')));
+  const currentPais = (presupuesto?.pais === 'DO' || data.proyecto?.pais === 'DO' || lead.pais === 'DO' || rawUbicacion.includes('dominicana') || rawUbicacion.includes('santo domingo') || isDominicanPhone) ? 'DO' : 'SV';
+  const resolvedAgencyContact = getAgencyContactForCountry(currentPais, agencyBranding);
+  const displayPresupuestoEmisor = {
+    ...resolvedAgencyContact,
+    ...(presupuesto?.emisor || {})
+  };
+  if (currentPais === 'DO') {
+    displayPresupuestoEmisor.telefono = resolvedAgencyContact.telefono;
+    displayPresupuestoEmisor.telefonoWhatsapp = resolvedAgencyContact.telefonoWhatsapp;
+    displayPresupuestoEmisor.ubicacion = resolvedAgencyContact.ubicacion;
+  }
   const isSV = currentPais === 'SV';
   const activeBankTab = selectedBankTab === 'US' ? 'US' : currentPais;
   const totalInversion = Number(presupuesto?.inversion?.precioTotal || lead.presupuestoMonto) || 650;
@@ -2426,7 +2440,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               </button>
             )}
             <a
-              href={`https://wa.me/${(agencyBranding.telefonoWhatsapp || '+503 7000-1122').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola, te escribo desde el Portal de Cliente de ${clientEmpresa}.`)}`}
+              href={`https://wa.me/${(resolvedAgencyContact.telefonoWhatsapp || resolvedAgencyContact.telefono || agencyBranding.telefonoWhatsapp || '+18094088070').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola, te escribo desde el Portal de Cliente de ${clientEmpresa}.`)}`}
               target="_blank"
               rel="noreferrer"
               className="flex-1 sm:flex-none px-3.5 py-2 sm:py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950 transition-all"
@@ -2746,14 +2760,14 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <img 
-                          src={documentBrandLogo} 
-                          alt={agencyBranding?.nombreAgencia || presupuesto?.emisor?.empresa || 'Agencia'} 
+                          src={documentBrandLogo || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null) || displayPresupuestoEmisor?.logoDocumentosUrl || displayPresupuestoEmisor?.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                          alt={agencyBranding?.nombreAgencia || displayPresupuestoEmisor?.empresa || 'Agencia'} 
                           className="h-8 sm:h-9 w-auto object-contain shrink-0"
                         />
                         <div className="text-[10px] text-slate-600 font-medium space-y-0.5 border-l border-slate-300 pl-2.5 sm:pl-3">
-                          <div><strong>Ubicación:</strong> {presupuesto?.emisor?.ubicacion || 'Santa Ana, El Salvador · Santo Domingo, RD'}</div>
-                          <div><strong>Contacto:</strong> {presupuesto?.emisor?.telefono || '(503) 7756-9828'} | {presupuesto?.emisor?.email || 'info@goglite.com'}</div>
-                          <div><strong>Director:</strong> {presupuesto?.emisor?.responsable || 'Víctor Matos'}</div>
+                          <div><strong>Ubicación:</strong> {displayPresupuestoEmisor?.ubicacion}</div>
+                          <div><strong>Contacto:</strong> {displayPresupuestoEmisor?.telefono} | {displayPresupuestoEmisor?.email}</div>
+                          <div><strong>Director:</strong> {displayPresupuestoEmisor?.responsable || 'Víctor Matos'}</div>
                         </div>
                       </div>
 
@@ -2871,11 +2885,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   <div className="border-b border-slate-200 pb-2.5 mb-4 flex items-center justify-between avoid-break">
                     <div className="flex items-center gap-2">
                       <img 
-                        src={documentBrandLogo} 
-                        alt={agencyBranding?.nombreAgencia || presupuesto?.emisor?.empresa || 'Agencia'} 
+                        src={documentBrandLogo || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null) || displayPresupuestoEmisor?.logoDocumentosUrl || displayPresupuestoEmisor?.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl} 
+                        alt={agencyBranding?.nombreAgencia || displayPresupuestoEmisor?.empresa || 'Agencia'} 
                         className="h-6 w-auto object-contain"
                       />
-                      <span className="font-bold text-slate-900 text-xs">{agencyBranding?.nombreAgencia || presupuesto?.emisor?.empresa || 'Goglite Digital Hub'}</span>
+                      <span className="font-bold text-slate-900 text-xs">{agencyBranding?.nombreAgencia || displayPresupuestoEmisor?.empresa || 'Goglite Digital Hub'}</span>
                     </div>
                     <div className="text-[10px] font-mono text-slate-500">
                       {presupuesto?.codigo || 'P-2026-001'} · {clientEmpresa}
@@ -2936,9 +2950,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   {/* 4. FIRMA OFICIAL GOGLITE */}
                   <div className="pt-3 border-t border-slate-300 flex items-center justify-between text-[10.5px] text-slate-600 avoid-break">
                     <div>
-                      <div className="font-extrabold text-slate-900 text-xs">{presupuesto?.emisor?.responsable || 'Víctor Matos'}</div>
-                      <div className="text-orange-600 font-bold">{presupuesto?.emisor?.empresa || 'Goglite'}</div>
-                      <div className="text-[10px] text-slate-500">{presupuesto?.emisor?.telefono || '(503) 7756-9828'} | {presupuesto?.emisor?.email || 'info@goglite.com'}</div>
+                      <div className="font-extrabold text-slate-900 text-xs">{displayPresupuestoEmisor?.responsable || 'Víctor Matos'}</div>
+                      <div className="text-orange-600 font-bold">{displayPresupuestoEmisor?.empresa || agencyBranding?.nombreAgencia || 'Goglite'}</div>
+                      <div className="text-[10px] text-slate-500">{displayPresupuestoEmisor?.telefono} | {displayPresupuestoEmisor?.email}</div>
                     </div>
 
                     <div className="text-right">
@@ -5029,11 +5043,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     empresa: agencyBranding?.nombreAgencia || 'Goglite Digital Hub',
                     subtitulo: agencyBranding?.eslogan,
                     logoUrl: documentBrandLogo,
-        logoDocumentosUrl: documentBrandLogo,
-                    identificacion: agencyBranding?.identificacion || 'NIT / RNC: 0614-290390-102-1',
+                    logoDocumentosUrl: documentBrandLogo,
+                    identificacion: agencyBranding?.identificacion || (currentPais === 'DO' ? 'RNC: 1-32-45678-9' : 'NIT: 0614-290390-102-1'),
                     email: agencyBranding?.emailContacto || 'contacto@goglite.com',
-                    telefono: agencyBranding?.telefonoWhatsapp || '+503 7000-1122',
-                    ubicacion: agencyBranding?.ubicacionPrincipal || 'San Salvador, SV · Santo Domingo, DO'
+                    telefono: resolvedAgencyContact.telefonoWhatsapp || resolvedAgencyContact.telefono || agencyBranding?.telefonoWhatsapp,
+                    ubicacion: resolvedAgencyContact.ubicacion || agencyBranding?.ubicacionPrincipal || 'San Salvador, SV · Santo Domingo, DO'
                   }
                 }} 
               />

@@ -146,6 +146,12 @@ export default function AgencyWhiteLabelSettingsModal({
     emailContacto: 'contacto@goglite.com',
     telefonoWhatsapp: '+503 7000-1122',
     telefonoFijo: '+503 2200-3344',
+    telefonoWhatsappDO: DEFAULT_AGENCY_BRANDING.telefonoWhatsappDO || '+1 (809) 408-8070',
+    telefonoFijoDO: DEFAULT_AGENCY_BRANDING.telefonoFijoDO || '+1 (809) 408-8070',
+    ubicacionDO: DEFAULT_AGENCY_BRANDING.ubicacionDO || 'Av. Winston Churchill, Piantini, Santo Domingo, República Dominicana',
+    telefonoWhatsappSV: DEFAULT_AGENCY_BRANDING.telefonoWhatsappSV || '+503 7756-9828',
+    telefonoFijoSV: DEFAULT_AGENCY_BRANDING.telefonoFijoSV || '+503 2200-3344',
+    ubicacionSV: DEFAULT_AGENCY_BRANDING.ubicacionSV || 'Torre Millenium, Piso 9, San Salvador, El Salvador',
     emailFacturacion: 'billing@goglite.com',
     direccionFisica: 'Torre Millenium, Piso 9, San Salvador / Av. Winston Churchill, Piantini, Sto. Dgo.',
     ubicacionPrincipal: 'San Salvador (SV) & Santo Domingo (DO)',
@@ -392,6 +398,12 @@ export default function AgencyWhiteLabelSettingsModal({
       setForm(prev => ({
         ...prev,
         ...agencySettings,
+        telefonoWhatsappDO: agencySettings.telefonoWhatsappDO || prev.telefonoWhatsappDO || DEFAULT_AGENCY_BRANDING.telefonoWhatsappDO,
+        telefonoFijoDO: agencySettings.telefonoFijoDO || prev.telefonoFijoDO || DEFAULT_AGENCY_BRANDING.telefonoFijoDO,
+        ubicacionDO: agencySettings.ubicacionDO || prev.ubicacionDO || DEFAULT_AGENCY_BRANDING.ubicacionDO,
+        telefonoWhatsappSV: agencySettings.telefonoWhatsappSV || prev.telefonoWhatsappSV || DEFAULT_AGENCY_BRANDING.telefonoWhatsappSV,
+        telefonoFijoSV: agencySettings.telefonoFijoSV || prev.telefonoFijoSV || DEFAULT_AGENCY_BRANDING.telefonoFijoSV,
+        ubicacionSV: agencySettings.ubicacionSV || prev.ubicacionSV || DEFAULT_AGENCY_BRANDING.ubicacionSV,
         logoUrl: agencySettings.logoUrl || storedLogo || prev.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl,
         logoDocumentosUrl: agencySettings.logoDocumentosUrl || storedLogoDocs || prev.logoDocumentosUrl || '',
         mcpAgentKey: agencySettings.mcpAgentKey || prev.mcpAgentKey || DEFAULT_AGENCY_BRANDING.mcpAgentKey || 'gog_agent_live_3554881d91556ec76d8734f10fda7366',
@@ -1293,91 +1305,206 @@ export default function AgencyWhiteLabelSettingsModal({
             </div>
           )}
 
-          {/* TAB 3: CONTACTO & SOPORTE DE LA EMPRESA */}
+          {/* TAB 3: CONTACTO & SOPORTE MULTI-SEDE DE LA EMPRESA */}
           {activeTab === 'contacto' && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-mono text-slate-300 block mb-1.5 font-semibold">
-                    WhatsApp Comercial Oficial *
-                  </label>
-                  <div className="relative">
+            <div className="space-y-6">
+              {/* Sección: Sede República Dominicana */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-950/20 to-slate-900/60 border border-blue-500/30 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-blue-500/20">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🇩🇴</span>
+                    <div>
+                      <h4 className="text-xs font-bold text-white font-mono">Sede República Dominicana (DO)</h4>
+                      <p className="text-[10px] text-blue-300">Datos vinculados automáticamente a clientes y propuestas dominicanas</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-mono font-semibold">RD / Santo Domingo</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                      WhatsApp Oficial República Dominicana *
+                    </label>
+                    <input
+                      type="text"
+                      value={form.telefonoWhatsappDO || ''}
+                      onChange={(e) => setForm({ ...form, telefonoWhatsappDO: e.target.value })}
+                      placeholder="+1 (809) 408-8070"
+                      className="w-full bg-[#141b2a] border border-blue-500/30 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-400"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">Botón de soporte y contacto para clientes de RD.</p>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                      Teléfono Fijo / PBX RD
+                    </label>
+                    <input
+                      type="text"
+                      value={form.telefonoFijoDO || ''}
+                      onChange={(e) => setForm({ ...form, telefonoFijoDO: e.target.value })}
+                      placeholder="+1 (809) 408-8070"
+                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                      Ubicación / Dirección Física Sede Dominicana
+                    </label>
+                    <input
+                      type="text"
+                      value={form.ubicacionDO || ''}
+                      onChange={(e) => setForm({ ...form, ubicacionDO: e.target.value })}
+                      placeholder="Av. Winston Churchill, Piantini, Santo Domingo, República Dominicana"
+                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Sección: Sede El Salvador */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/20 to-slate-900/60 border border-indigo-500/30 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-indigo-500/20">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🇸🇻</span>
+                    <div>
+                      <h4 className="text-xs font-bold text-white font-mono">Sede El Salvador (SV)</h4>
+                      <p className="text-[10px] text-indigo-300">Datos vinculados a clientes y propuestas salvadoreñas</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono font-semibold">SV / San Salvador</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                      WhatsApp Oficial El Salvador *
+                    </label>
+                    <input
+                      type="text"
+                      value={form.telefonoWhatsappSV || ''}
+                      onChange={(e) => setForm({ ...form, telefonoWhatsappSV: e.target.value })}
+                      placeholder="+503 7756-9828"
+                      className="w-full bg-[#141b2a] border border-indigo-500/30 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                      Teléfono Fijo / PBX SV
+                    </label>
+                    <input
+                      type="text"
+                      value={form.telefonoFijoSV || ''}
+                      onChange={(e) => setForm({ ...form, telefonoFijoSV: e.target.value })}
+                      placeholder="+503 2200-3344"
+                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-400"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                      Ubicación / Dirección Física Sede El Salvador
+                    </label>
+                    <input
+                      type="text"
+                      value={form.ubicacionSV || ''}
+                      onChange={(e) => setForm({ ...form, ubicacionSV: e.target.value })}
+                      placeholder="Torre Millenium, Piso 9, San Salvador, El Salvador"
+                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Canales Generales y Corporativos */}
+              <div className="p-4 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-3">
+                <h4 className="text-xs font-bold text-white font-mono flex items-center gap-2">
+                  <Globe className="w-3.5 h-3.5 text-orange-400" /> Canales Corporativos Centrales
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                      WhatsApp Central / Fallback *
+                    </label>
                     <input
                       type="text"
                       required
-                      value={form.telefonoWhatsapp}
+                      value={form.telefonoWhatsapp || ''}
                       onChange={(e) => setForm({ ...form, telefonoWhatsapp: e.target.value })}
                       placeholder="+503 7000-1122"
-                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
                     />
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-1">Se utiliza para los botones de contacto y soporte del portal de clientes.</p>
-                </div>
 
-                <div>
-                  <label className="text-xs font-mono text-slate-300 block mb-1.5 font-semibold">
-                    Teléfono Fijo / PBX de Soporte
-                  </label>
-                  <input
-                    type="text"
-                    value={form.telefonoFijo}
-                    onChange={(e) => setForm({ ...form, telefonoFijo: e.target.value })}
-                    placeholder="+503 2200-3344"
-                    className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500"
-                  />
-                </div>
+                  <div>
+                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                      Teléfono Fijo Central
+                    </label>
+                    <input
+                      type="text"
+                      value={form.telefonoFijo || ''}
+                      onChange={(e) => setForm({ ...form, telefonoFijo: e.target.value })}
+                      placeholder="+503 2200-3344"
+                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
 
-                <div>
-                  <label className="text-xs font-mono text-slate-300 block mb-1.5 font-semibold">
-                    Correo Electrónico de Contacto General *
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={form.emailContacto}
-                    onChange={(e) => setForm({ ...form, emailContacto: e.target.value })}
-                    placeholder="contacto@goglite.com"
-                    className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500"
-                  />
-                </div>
+                  <div>
+                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                      Correo Electrónico de Contacto General *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={form.emailContacto || ''}
+                      onChange={(e) => setForm({ ...form, emailContacto: e.target.value })}
+                      placeholder="contacto@goglite.com"
+                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
 
-                <div>
-                  <label className="text-xs font-mono text-slate-300 block mb-1.5 font-semibold">
-                    Correo de Facturación & Cobranzas
-                  </label>
-                  <input
-                    type="email"
-                    value={form.emailFacturacion}
-                    onChange={(e) => setForm({ ...form, emailFacturacion: e.target.value })}
-                    placeholder="billing@goglite.com"
-                    className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500"
-                  />
-                </div>
+                  <div>
+                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                      Correo de Facturación & Cobranzas
+                    </label>
+                    <input
+                      type="email"
+                      value={form.emailFacturacion || ''}
+                      onChange={(e) => setForm({ ...form, emailFacturacion: e.target.value })}
+                      placeholder="billing@goglite.com"
+                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
 
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-mono text-slate-300 block mb-1.5 font-semibold">
-                    Dirección Física y Fiscal de la Empresa
-                  </label>
-                  <input
-                    type="text"
-                    value={form.direccionFisica}
-                    onChange={(e) => setForm({ ...form, direccionFisica: e.target.value })}
-                    placeholder="Torre Millenium, Piso 9, San Salvador / Av. Winston Churchill, Piantini, Sto. Dgo."
-                    className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500"
-                  />
-                </div>
+                  <div>
+                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                      Dominio Web Oficial
+                    </label>
+                    <input
+                      type="text"
+                      value={form.dominioWeb || ''}
+                      onChange={(e) => setForm({ ...form, dominioWeb: e.target.value })}
+                      placeholder="goglite.com"
+                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
 
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-mono text-slate-300 block mb-1.5 font-semibold">
-                    Dominio Web Oficial
-                  </label>
-                  <input
-                    type="text"
-                    value={form.dominioWeb}
-                    onChange={(e) => setForm({ ...form, dominioWeb: e.target.value })}
-                    placeholder="goglite.com"
-                    className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-orange-500"
-                  />
+                  <div>
+                    <label className="text-[11px] font-mono text-slate-300 block mb-1 font-semibold">
+                      Dirección Global Multisede
+                    </label>
+                    <input
+                      type="text"
+                      value={form.direccionFisica || ''}
+                      onChange={(e) => setForm({ ...form, direccionFisica: e.target.value })}
+                      placeholder="Torre Millenium, San Salvador / Av. Winston Churchill, Santo Domingo"
+                      className="w-full bg-[#141b2a] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
