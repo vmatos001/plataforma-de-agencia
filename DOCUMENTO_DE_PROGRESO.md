@@ -2,7 +2,7 @@
 
 **Plataforma:** Goglite Digital Hub (`agencia.goglite.com`)  
 **Fecha de corte:** 25 de Octubre de 2026  
-**Hora de actualización:** 22:20 (Hora local)  
+**Hora de actualización:** 22:50 (Hora local)  
 **Propósito:** Consolidar el estado de avance, las funcionalidades implementadas, la arquitectura en la nube y la hoja de ruta exacta para continuar la sesión de mañana.
 
 ---
@@ -18,6 +18,8 @@ Durante esta sesión se completó la transición hacia una arquitectura **100% C
 5. **Purga Total de Mockups de Desarrollo:** Eliminación completa de números ficticios (`809-408-8070`, `50370001122`) y direcciones simuladas en Piantini.
 6. **Resolución Automática por Procedencia de Cliente:** Las propuestas y portales asignan automáticamente los datos de contacto y facturación del país correspondiente al cliente (ej. República Dominicana para *TurisRan*).
 7. **Estabilidad del Portal y Prevención de Pantallas Negras:** Corrección de dependencias circulares, orden de inicialización de hooks y contenedor `<ErrorBoundary>` global y modular.
+8. **Saneamiento de Enlaces del Portal de Cliente:** Diagnóstico y corrección del error de desbordamiento de URL (URLs de 347 KB generadas por adjuntar comprobantes bancarios en base64). Se implementó la estructura de enlace canónico limpio (`/portal/:token`) con sincronización automática en Firestore.
+9. **Corrección de Formulario y Botón de Pago en Fase 4 (Liquidación):** Solución al problema donde, al subir la captura bancaria, la interfaz eliminaba prematuramente los controles de carga y ocultaba el botón "Ya hice el pago". Se rediseñó el flujo para retener la botonera con estado del comprobante (`[Ver]` y `[Cambiar]`) y el botón de acción principal activo (`"✓ Ya hice el pago · Notificar Liquidación Final ($... USD)"`), transitando a verificación únicamente tras el envío explícito del cliente. Además, se desacoplaron las dependencias del stepper para permitir navegación fluida en fases ya completadas.
 
 ---
 
@@ -70,21 +72,6 @@ flowchart TD
     UI_CMS --> Database
 ```
 
-### Detalle por Módulos:
-
-| Módulo | Estado | Descripción & Últimas Actualizaciones |
-| :--- | :---: | :--- |
-| **1. Lead Scrapper & Prospección** | ✅ 100% | Scrapper multi-país (SV, DO, US) con enriquecimiento de datos y guardado automático en CRM. |
-| **2. CRM & WhatsApp Portal** | ✅ 100% | Ficha 360 con edición manual completa de datos de contacto y notas. Filtro anti-mockups. |
-| **3. Presupuestos & Propuestas VIP** | ✅ 100% | Catálogo oficial de servicios inyectado, resolución automática de sede por país de cliente y ErrorBoundary. |
-| **4. Contratos SOW & Onboarding** | ✅ 100% | Sincronización exacta de montos propuesta-contrato, firma digital nítida y sanitizador de precios individuales. |
-| **5. Portal del Cliente (5 Fases)** | ✅ 100% | Aprobación 1-clic, Firma SOW, Entrega Drive con reloj de 10 días, Wireframes/PRD y Liquidación final. Mobile-First comprobado en iPhone. |
-| **6. Centro de Desarrollo & PRD** | ✅ 100% | Generación dinámica de especificaciones según el cliente activo, arquitectura StoryBrand 7 partes. |
-| **7. Launch QA & Calidad SEO** | ✅ 100% | Checklists interactivos de pre-lanzamiento, auditoría de velocidad Core Web Vitals y metaetiquetas. |
-| **8. Headless CMS Hub & Portal Cliente**| ✅ 100% | Pantalla aislada `/cms-cliente/:token` con Google Auth empresarial del cliente y 3 herramientas básicas sin QR. |
-| **9. Rentabilidad, P&L & Facturación** | ✅ 100% | Conciliación de anticipo y liquidación, descarga PDF de facturas comerciales unificadas. |
-| **10. Ajustes Globales & Marca Blanca** | ✅ 100% | Gestor de sedes por país, catálogo oficial de servicios, 2FA TOTP y APIs con arquitectura Zero-Exposure. |
-
 ---
 
 ## 🔍 4. Verificaciones Realizadas en Vivo
@@ -102,35 +89,23 @@ Durante esta jornada se ejecutaron pruebas directas en navegadores reales vía *
   - **Causa raíz diagnosticada:** Al copiar el enlace desde el módulo de presupuestos, el generador serializaba `portalConfig` y `pagos` del proyecto formal, los cuales contenían la imagen de comprobante bancario (`comprobanteAnticipoImagen`) en base64 (>340.000 caracteres). Al pegarse en WhatsApp o navegadores, la URL se truncaba, provocando fallo de parseo JSON (`Unterminated string in JSON at position 18152`) o error `414 Request-URI Too Large` en servidores HTTP.
   - **Solución implementada:** Se transformó la generación de enlaces en una URL canónica limpia (`https://agencia.goglite.com/portal/:token`) que auto-sincroniza en Firestore Cloud en segundo plano antes de copiarse. Se blindó `PublicClientPortal.jsx` con manejo tolerante de errores y auto-limpieza del historial (`window.history.replaceState`), junto con `ensureAuth()` para lecturas autorizadas en la nube.
   - **Prueba en vivo con BrowserOS Neo:** Validado con éxito tanto con enlace limpio como con enlace con parámetro `?d=` malformado, cargando al 100% todos los módulos, fases y datos de contacto de República Dominicana.
+- **Resolución de Flujo de Liquidación en Fase 4:**
+  - **Causa raíz diagnosticada:** La variable `hasSettlementReceiptSubmitted` evaluaba la mera presencia en memoria de `settlementReceiptImage` o `comprobanteLiquidacionImagen`. Al seleccionar la imagen bancaria, la condición se cumplía de inmediato, desmontando el formulario antes de que el cliente pudiera confirmar su pago.
+  - **Solución implementada:** Se redefinió la condición para depender estrictamente del reporte formal (`liquidacionReportada === true` o `saldoEstado === 'verificacion'`). La interfaz retiene la botonera con `[Ver]` y `[Cambiar]`, thumbnail de comprobante y el botón de acción principal `"✓ Ya hice el pago · Notificar Liquidación Final ($... USD)"`. Tras hacer clic, transiciona al estado oficial de verificación administrativa.
+  - **Prueba en vivo con BrowserOS Neo:** Ejecutado y validado de extremo a extremo en vivo en `agencia.goglite.com`.
 
 ---
 
 ## 📋 5. Hoja de Ruta para la Sesión de Mañana
 
-Al reanudar la sesión mañana, continuaremos con los siguientes puntos estratégicos:
-
-### Prioridad 1: Prueba de Flujo Comercial E2E Completo
-1. Crear un presupuesto con un servicio del nuevo catálogo (ej. *Plataforma Web Antigravity VIP con StoryBrand*).
-2. Abrir el portal generado en el dispositivo móvil:
-   - Aprobar propuesta en Fase 1 (1-clic).
-   - Firmar contrato SOW en Fase 2 en la pantalla táctil.
-   - Enviar enlace de Google Drive en Fase 3 y validar el inicio del reloj de 10 días desde el panel de la agencia.
-   - Subir comprobante de liquidación en Fase 5.
-3. Activar y abrir el **Portal CMS del Cliente** (`/cms-cliente/:token`) para comprobar la edición de textos y la lectura de métricas con la cuenta de Google del cliente.
-
-### Prioridad 2: Respaldo Completo en Firestore de Módulos Restantes
-- Migrar el almacenamiento de los módulos secundarios que aún guardan en `localStorage` hacia colecciones de Firestore:
-  - `finanzas` (registros de ingresos/egresos del módulo de Rentabilidad).
-  - `qa_audits` (historial de auditorías QA).
-  - `storybrand_specs` (guiones de marca por cliente).
-- Esto completará el 100% de persistencia en la nube para trabajar desde cualquier equipo de forma indistinta.
-
-### Prioridad 3: Planificación de Despliegue en VPS Hetzner (Autohospedado)
-- Definir la configuración `docker-compose.yml` para unificar:
-  - Frontend SPA (Vite / Nginx).
-  - Backend Node/Express + Servidor MCP.
-  - Base de datos / almacenamiento local si se desea prescindir de servicios externos en el mediano plazo.
-  - Certificados SSL automáticos con Caddy / Let's Encrypt.
+1. **Prueba de Flujo Comercial E2E Completo:**
+   - Crear presupuesto desde el catálogo oficial.
+   - Probar flujo completo de 5 fases en iPhone/Android.
+   - Apertura y validación del CMS de Cliente (`/cms-cliente/:token`).
+2. **Respaldo Completo en Firestore de Módulos Restantes:**
+   - Migrar `finanzas`, `qa_audits` y `storybrand_specs` a Firestore.
+3. **Planificación de VPS Hetzner:**
+   - Arquitectura `docker-compose.yml` para centralizar frontend, backend, servidor MCP y proxy reverso con SSL automático.
 
 ---
 
@@ -138,12 +113,11 @@ Al reanudar la sesión mañana, continuaremos con los siguientes puntos estraté
 
 - **Rama Activa:** `main`
 - **Últimos Commits:**
+  - `0d4592f`: *fix(portal): unlock completed stepper phases and decouple phase dependencies*
+  - `896614c`: *fix(portal): keep settlement upload controls and 'Ya hice el pago' button visible after file upload*
+  - `6306cf5`: *docs: registrar diagnostico y resolucion de error en enlaces de portal*
   - `b2936b7`: *fix(portal): sanear enlaces publicos de portal y prevenir desbordamiento por comprobantes en base64*
   - `9dc571f`: *docs: agregar documento maestro de progreso y estado tecnico de la plataforma*
-  - `0aa075c`: *fix: corregir referencia en llamada backend al guardar ajustes*
-  - `24099d1`: *fix: pass agencySettings prop to PresupuestosContratosModule and wrap root in ErrorBoundary*
-  - `47df937`: *feat: perfiles de empresa independientes por pais como fuente de verdad y purga total de mockups*
-  - `1b7e99d`: *feat: resolucion dinamica multisede de emisor y contacto (DO y SV) en presupuestos y portal*
 - **URLs de Producción:**
   - Panel y Portales: [https://agencia.goglite.com](https://agencia.goglite.com)
   - Backend API & MCP Cloud: [https://goglite-agency.vercel.app](https://goglite-agency.vercel.app)
