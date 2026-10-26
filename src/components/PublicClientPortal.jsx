@@ -2377,8 +2377,19 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   const contrato = activeProyecto?.contrato;
 
-  const isFase1Done = Boolean(portalConfig?.fase1Aprobada);
-  const isFase2Done = Boolean(portalConfig?.fase2Firmada);
+  const isFase1Done = Boolean(
+    portalConfig?.fase1Aprobada ||
+    portalConfig?.fase2Firmada ||
+    portalConfig?.fase3InsumosCompletos ||
+    portalConfig?.fase4Liquidada ||
+    presupuesto?.estado === 'aceptado'
+  );
+  const isFase2Done = Boolean(
+    portalConfig?.fase2Firmada ||
+    portalConfig?.anticipoPagado ||
+    portalConfig?.fase3InsumosCompletos ||
+    portalConfig?.fase4Liquidada
+  );
   const isFase3Done = Boolean(
     portalConfig?.fase3InsumosCompletos ||
     activeProyecto?.onboarding?.insumosValidados100 ||
@@ -2417,7 +2428,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       title: 'Contrato SOW', 
       label: isDocumentosAnterioresProtegidos ? '🔒 Protegido Google' : 'Anticipo 50%', 
       done: isFase2Done, 
-      unlocked: isFase1Done,
+      unlocked: isFase1Done || isFase2Done,
       isGoogleProtected: isDocumentosAnterioresProtegidos
     },
     { 
@@ -2425,10 +2436,10 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       title: 'Intake Insumos', 
       label: portalConfig?.fase3InsumosCompletos ? '✓ Validados' : portalConfig?.clienteConfirmoInsumos ? '⏳ En Revisión' : 'Garantía 10 Días', 
       done: isFase3Done, 
-      unlocked: isFase1Done && isFase2Done 
+      unlocked: isFase2Done || isFase3Done || (isFase1Done && isFase2Done)
     },
-    { num: 4, title: 'Liquidación', label: 'Candado de Accesos', done: isFase4Done, unlocked: isFase1Done && isFase2Done && isFase3Done },
-    { num: 5, title: 'Garantía 30 Días', label: 'Plan CMS $99/mes', done: isFase5Done, unlocked: isFase1Done && isFase2Done && isFase3Done && isFase4Done }
+    { num: 4, title: 'Liquidación', label: 'Candado de Accesos', done: isFase4Done, unlocked: isFase3Done || isFase4Done || (isFase1Done && isFase2Done && isFase3Done) },
+    { num: 5, title: 'Garantía 30 Días', label: 'Plan CMS $99/mes', done: isFase5Done, unlocked: isFase4Done || isFase5Done || (isFase1Done && isFase2Done && isFase3Done && isFase4Done) }
   ];
 
   const handleSelectTab = (st) => {
@@ -2644,7 +2655,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
           {steps.map((st) => {
             const isCurrent = activeTab === st.num;
             const isCompleted = st.done;
-            const isLocked = !st.unlocked;
+            const isLocked = !st.unlocked && !isCompleted;
 
             const isGoogleProtected = st.isGoogleProtected;
 
