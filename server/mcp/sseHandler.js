@@ -55,7 +55,7 @@ export function setupMcpRoutes(app) {
     }
 
     try {
-      await session.transport.handlePostMessage(req, res);
+      await session.transport.handlePostMessage(req, res, req.body);
     } catch (err) {
       console.error(`[MCP SSE] Error procesando mensaje para sesión ${sessionId}:`, err);
       if (!res.headersSent) {
