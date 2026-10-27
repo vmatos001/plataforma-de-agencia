@@ -854,7 +854,7 @@ export default function AgencyWhiteLabelSettingsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-4xl rounded-2xl bg-[#0d121d] border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="relative w-full max-w-5xl xl:max-w-6xl rounded-2xl bg-[#0d121d] border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         
         {/* Header Modal */}
         <div className="p-5 border-b border-slate-800/80 bg-[#101625] flex items-center justify-between">
@@ -882,12 +882,12 @@ export default function AgencyWhiteLabelSettingsModal({
           </button>
         </div>
 
-        {/* Tab Navigation (6 Tabs) */}
-        <div className="px-5 pt-3 border-b border-slate-800 bg-[#0e1320] flex items-center gap-1.5 overflow-x-auto">
+        {/* Tab Navigation (6 Tabs - Visibles y con auto-wrap para evitar scroll horizontal) */}
+        <div className="px-4 sm:px-6 pt-2.5 sm:pt-3 border-b border-slate-800 bg-[#0e1320] flex flex-wrap items-center gap-1 sm:gap-2">
           <button
             type="button"
             onClick={() => setActiveTab('branding')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
               activeTab === 'branding'
                 ? 'border-orange-500 text-orange-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -900,7 +900,7 @@ export default function AgencyWhiteLabelSettingsModal({
           <button
             type="button"
             onClick={() => setActiveTab('colaboradores')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
               activeTab === 'colaboradores'
                 ? 'border-orange-500 text-orange-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -916,7 +916,7 @@ export default function AgencyWhiteLabelSettingsModal({
           <button
             type="button"
             onClick={() => setActiveTab('contacto')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
               activeTab === 'contacto'
                 ? 'border-orange-500 text-orange-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -929,7 +929,7 @@ export default function AgencyWhiteLabelSettingsModal({
           <button
             type="button"
             onClick={() => setActiveTab('paises')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
               activeTab === 'paises'
                 ? 'border-orange-500 text-orange-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -942,7 +942,7 @@ export default function AgencyWhiteLabelSettingsModal({
           <button
             type="button"
             onClick={() => setActiveTab('apis')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
               activeTab === 'apis'
                 ? 'border-orange-500 text-orange-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -955,7 +955,7 @@ export default function AgencyWhiteLabelSettingsModal({
           <button
             type="button"
             onClick={() => setActiveTab('servicios')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
               activeTab === 'servicios'
                 ? 'border-orange-500 text-orange-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
