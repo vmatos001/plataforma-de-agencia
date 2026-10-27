@@ -921,7 +921,11 @@ export default function App() {
                 initialTab={seoInitialTab}
               />
             ) : activeModule === 'headless_cms' ? (
-              <HeadlessCmsHubModule />
+              <HeadlessCmsHubModule
+                onOpenInvoiceModal={(sub) => {
+                  setActiveModule('gestion_rentabilidad');
+                }}
+              />
             ) : activeModule === 'gestion_rentabilidad' ? (
               currentUser?.rol !== 'admin' ? (
                 <div className="p-8 max-w-2xl mx-auto my-12 text-center rounded-2xl bg-[#0f1422] border border-slate-800 space-y-4 shadow-2xl">

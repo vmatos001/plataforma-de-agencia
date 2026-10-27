@@ -41,7 +41,8 @@ import {
 } from 'lucide-react';
 
 import { getStoredCrmLeads } from '../services/localStore';
-import { getAppStateCloud, saveAppStateCloud } from '../services/firestoreSyncService';
+import { getAppStateCloud, saveAppStateCloud, saveProyectoCloud, savePortalCloud } from '../services/firestoreSyncService';
+import { getStoredProyectos, saveStoredProyectos } from '../services/contractGenerator';
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 
 const STORAGE_KEY_FINANZAS = 'goglite_finanzas_v1';
@@ -1786,13 +1787,16 @@ export default function GestionRentabilidadModule({
   const [customPaymentAmount, setCustomPaymentAmount] = useState('');
   const [isInvoiceFullscreenModalOpen, setIsInvoiceFullscreenModalOpen] = useState(false);
 
-  // New Invoice Modal
+  // New Invoice Modal & Free/CMS Invoicing State
   const [newInvoiceModalOpen, setNewInvoiceModalOpen] = useState(false);
+  const [invoiceMode, setInvoiceMode] = useState('cms_retainer'); // 'cms_retainer' | 'libre' | 'embudo'
+  const [autoExtendCms, setAutoExtendCms] = useState(true);
+  const [selectedCmsPeriod, setSelectedCmsPeriod] = useState(30);
   const [selectedSourceKey, setSelectedSourceKey] = useState('');
   const [newInvoiceForm, setNewInvoiceForm] = useState({
     numeroFactura: '',
     presupuestoId: null,
-    origenModulo: 'Facturación Directa',
+    origenModulo: 'Membresía Headless CMS',
     empresa: '',
     contacto: '',
     email: '',
@@ -1800,18 +1804,82 @@ export default function GestionRentabilidadModule({
     identificacion: '',
     pais: selectedCountry || 'SV',
     cuentaBancariaId: '',
-    concepto: 'Desarrollo Web & GEO IA',
-    subtotal: 1500,
+    concepto: 'Goglite Care · Suscripción Headless CMS & Mantenimiento Web (1 Mes)',
+    subtotal: 99,
     impuestoPorcentaje: 0,
-    total: 1500,
-    montoCobrado: 750,
-    horasInvertidasEstimadas: 18,
+    total: 99,
+    montoCobrado: 99,
+    horasInvertidasEstimadas: 2,
     metodoPago: 'Transferencia Bancaria',
-    itemDescripcion: 'Implementación Web & Posicionamiento IA',
+    itemDescripcion: 'Goglite Care · Suscripción Headless CMS & Mantenimiento Web (1 Mes)',
     itemCantidad: 1,
-    itemPrecio: 1500,
+    itemPrecio: 99,
+    diasVigencia: 30,
     itemsCustom: null
   });
+
+  // Clientes consolidados para selección ágil en Facturas Libres y CMS
+  const cmsClientsList = useMemo(() => {
+    const map = new Map();
+    try {
+      const projs = getStoredProyectos();
+      if (Array.isArray(projs)) {
+        projs.forEach(p => {
+          const emp = p.cliente?.empresa || p.lead?.empresa;
+          if (emp && !map.has(emp.toLowerCase())) {
+            map.set(emp.toLowerCase(), {
+              id: p.id,
+              empresa: emp,
+              contacto: p.cliente?.contacto || p.lead?.contacto || 'Administrador',
+              email: p.cliente?.email || p.lead?.email || '',
+              telefono: p.cliente?.telefono || p.lead?.telefono || '',
+              pais: p.cliente?.pais || p.lead?.pais || p.pais || 'DO',
+              dominio: p.dominio || p.portalConfig?.dominio || ''
+            });
+          }
+        });
+      }
+    } catch (e) {}
+
+    try {
+      const raw = localStorage.getItem('goglite_cms_sites');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(s => {
+            const emp = s.nombre || s.contenido?.branding?.nombreMarca;
+            if (emp && !map.has(emp.toLowerCase())) {
+              map.set(emp.toLowerCase(), {
+                id: s.slug || s.id,
+                empresa: emp,
+                contacto: 'Webmaster',
+                email: '',
+                telefono: s.contenido?.branding?.telefonoWhatsApp || '',
+                pais: s.pais || 'SV',
+                dominio: s.dominio || ''
+              });
+            }
+          });
+        }
+      }
+    } catch (e) {}
+
+    (m2CrmLeads || []).forEach(l => {
+      if (l.empresa && !map.has(l.empresa.toLowerCase())) {
+        map.set(l.empresa.toLowerCase(), {
+          id: l.id,
+          empresa: l.empresa,
+          contacto: l.contacto || 'Director',
+          email: l.email || '',
+          telefono: l.telefono || '',
+          pais: l.pais || 'SV',
+          dominio: l.dominio || ''
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [m2CrmLeads]);
 
   // New Expense Modal
   const [newExpenseModalOpen, setNewExpenseModalOpen] = useState(false);
@@ -2674,11 +2742,18 @@ export default function GestionRentabilidadModule({
   const handleCreateInvoice = async (e) => {
     e.preventDefault();
     const nextNum = String(facturas.length + 1).padStart(3, '0');
-    const subtotal = Number(newInvoiceForm.subtotal) || Number(newInvoiceForm.total) || 250;
+    const subtotal = Number(newInvoiceForm.subtotal) || Number(newInvoiceForm.total) || 99;
     const taxPct = Number(newInvoiceForm.impuestoPorcentaje) || 0;
     const impuestoTotal = Math.round(subtotal * (taxPct / 100) * 100) / 100;
     const total = Math.round((subtotal + impuestoTotal) * 100) / 100;
     const montoCobrado = Number(newInvoiceForm.montoCobrado) || 0;
+
+    const origenModuloFinal =
+      invoiceMode === 'cms_retainer'
+        ? 'Membresía Headless CMS'
+        : invoiceMode === 'libre'
+        ? 'Facturación Libre'
+        : (newInvoiceForm.origenModulo || 'Facturación Directa');
 
     const nuevaFactura = {
       id: 'fac-' + Date.now(),
@@ -2686,7 +2761,8 @@ export default function GestionRentabilidadModule({
       presupuestoId: newInvoiceForm.presupuestoId || null,
       proyectoId: 'proj-' + Date.now(),
       codigoProyecto: `CON-2026-${nextNum}`,
-      origenModulo: newInvoiceForm.origenModulo || 'Facturación Directa',
+      origenModulo: origenModuloFinal,
+      tipoHito: invoiceMode === 'cms_retainer' ? 'recurrente_cms' : 'libre',
       cliente: {
         empresa: newInvoiceForm.empresa,
         contacto: newInvoiceForm.contacto || 'Director',
@@ -2707,12 +2783,12 @@ export default function GestionRentabilidadModule({
       saldoPendiente: Math.max(0, total - montoCobrado),
       metodoPago: newInvoiceForm.metodoPago || 'Transferencia Bancaria',
       cuentaBancariaId: newInvoiceForm.cuentaBancariaId || null,
-      horasInvertidasEstimadas: Number(newInvoiceForm.horasInvertidasEstimadas) || 10,
+      horasInvertidasEstimadas: Number(newInvoiceForm.horasInvertidasEstimadas) || (invoiceMode === 'cms_retainer' ? 2 : 10),
       items: Array.isArray(newInvoiceForm.itemsCustom) && newInvoiceForm.itemsCustom.length > 0
         ? newInvoiceForm.itemsCustom
         : [
             {
-              descripcion: newInvoiceForm.itemDescripcion || 'Implementación Web & Posicionamiento IA',
+              descripcion: newInvoiceForm.itemDescripcion || 'Servicio de Crecimiento Digital & Desarrollo Web',
               cantidad: Number(newInvoiceForm.itemCantidad) || 1,
               precioUnitario: subtotal,
               total: subtotal
@@ -2724,6 +2800,63 @@ export default function GestionRentabilidadModule({
       ...prev,
       facturas: [nuevaFactura, ...(prev.facturas || [])]
     }));
+
+    // Auto-activación o extensión en Headless CMS si es suscripción
+    if (invoiceMode === 'cms_retainer' && autoExtendCms && newInvoiceForm.empresa) {
+      try {
+        const diasASumar = Number(newInvoiceForm.diasVigencia) || (subtotal >= 1000 ? 365 : subtotal >= 500 ? 180 : subtotal >= 250 ? 90 : 30);
+        const labelPeriodo = diasASumar >= 365 ? '1 Año' : diasASumar >= 180 ? '6 Meses' : diasASumar >= 90 ? '3 Meses' : '1 Mes';
+        const now = Date.now();
+        const nowStr = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+
+        const projs = getStoredProyectos();
+        const targetProj = projs.find(p =>
+          (p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === newInvoiceForm.empresa.toLowerCase().trim()) ||
+          (p.lead?.empresa && p.lead.empresa.toLowerCase().trim() === newInvoiceForm.empresa.toLowerCase().trim())
+        );
+
+        if (targetProj) {
+          const curConfig = targetProj.portalConfig || {};
+          let baseMs = now;
+          if (curConfig.careVenceAt) {
+            const curEnd = new Date(curConfig.careVenceAt).getTime();
+            if (!isNaN(curEnd) && curEnd > now) baseMs = curEnd;
+          }
+          const newEndMs = baseMs + (diasASumar * 86400000);
+          const newVenceIso = new Date(newEndMs).toISOString();
+
+          const updatedConfig = {
+            ...curConfig,
+            fase5CareActivo: true,
+            careVenceAt: newVenceIso,
+            ultimaRecargaPeriodo: labelPeriodo,
+            fechaUltimaRecarga: nowStr,
+            historialRecargas: [
+              {
+                fecha: nowStr,
+                periodo: labelPeriodo,
+                dias: diasASumar,
+                facturaId: nuevaFactura.id,
+                numeroFactura: nuevaFactura.numeroFactura,
+                timestamp: now
+              },
+              ...(curConfig.historialRecargas || [])
+            ]
+          };
+
+          const updatedProj = { ...targetProj, portalConfig: updatedConfig };
+          const nextProjs = projs.map(p => p.id === targetProj.id ? updatedProj : p);
+          saveStoredProyectos(nextProjs);
+
+          if (targetProj.id) saveProyectoCloud(targetProj.id, updatedProj).catch(() => {});
+          const token = targetProj.portalToken || targetProj.presupuestoId || targetProj.id;
+          if (token) savePortalCloud(token, { token, portalConfig: updatedConfig }).catch(() => {});
+          window.dispatchEvent(new CustomEvent('goglite_proyectos_synced'));
+        }
+      } catch (err) {
+        console.warn('Error extendiendo suscripción CMS desde factura:', err);
+      }
+    }
 
     setNewInvoiceModalOpen(false);
     setSelectedSourceKey('');
@@ -5319,57 +5452,232 @@ export default function GestionRentabilidadModule({
 
             <form onSubmit={handleCreateInvoice} className="p-5 space-y-3.5 text-xs overflow-y-auto">
               
-              {/* Selector Retrospectivo de Módulos 1, 2 y 3 */}
-              <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 space-y-1.5">
-                <label className="text-orange-300 font-bold flex items-center gap-1.5 text-[11px]">
-                  <Link2 className="w-3.5 h-3.5" />
-                  <span>Autocompletar desde Módulos 1, 2 o 3 (Retrospectivo):</span>
-                </label>
-                <select
-                  value={selectedSourceKey}
-                  onChange={(e) => handleSelectImportSource(e.target.value)}
-                  className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-orange-500"
+              {/* Selector de Modo de Factura (Suscripción CMS, Factura Libre, Embudo M1-M3) */}
+              <div className="flex items-center gap-1.5 p-1 bg-[#090d16] rounded-xl border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInvoiceMode('cms_retainer');
+                    setSelectedCmsPeriod(30);
+                    setNewInvoiceForm(prev => ({
+                      ...prev,
+                      origenModulo: 'Membresía Headless CMS',
+                      concepto: 'Goglite Care · Suscripción Headless CMS & Mantenimiento Web (1 Mes)',
+                      itemDescripcion: 'Goglite Care · Suscripción Headless CMS & Mantenimiento Web (1 Mes)',
+                      subtotal: 99,
+                      total: 99,
+                      montoCobrado: 99,
+                      diasVigencia: 30
+                    }));
+                  }}
+                  className={`flex-1 py-2 px-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                    invoiceMode === 'cms_retainer'
+                      ? 'bg-purple-600 text-white shadow-md shadow-purple-950/40'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
                 >
-                  <option value="">-- Seleccionar Presupuesto (M3), Cliente CRM (M2) o Lead (M1) --</option>
-                  {m3Presupuestos.length > 0 && (
-                    <optgroup label="Módulo 3 · Presupuestos VIP">
-                      {m3Presupuestos.map(p => (
-                        <option key={p.id} value={`M3::${p.id}`}>
-                          [M3 {p.codigo}] {p.cliente?.empresa} — ${p.inversion?.precioTotal} USD ({p.estado})
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {m2CrmLeads.length > 0 && (
-                    <optgroup label="Módulo 2 · CRM & WhatsApp">
-                      {m2CrmLeads.map(l => (
-                        <option key={l.id} value={`M2::${l.id}`}>
-                          [M2 CRM] {l.empresa} ({l.contacto}) — ${l.valorEstimado || 650} USD
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {m1ScrapperLeads.length > 0 && (
-                    <optgroup label="Módulo 1 · Lead Scrapper">
-                      {m1ScrapperLeads.slice(0, 15).map(l => (
-                        <option key={l.id} value={`M1::${l.id}`}>
-                          [M1 Scrapper] {l.nombreEmpresa} ({l.dominio})
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
+                  <Sparkles className="w-3.5 h-3.5 text-purple-300" />
+                  <span>💎 Suscripción CMS</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInvoiceMode('libre');
+                    setNewInvoiceForm(prev => ({
+                      ...prev,
+                      origenModulo: 'Facturación Libre',
+                      concepto: 'Servicio de Desarrollo Web & Crecimiento Digital',
+                      itemDescripcion: 'Servicio de Desarrollo Web & Crecimiento Digital',
+                      subtotal: 650,
+                      total: 650,
+                      montoCobrado: 325,
+                      diasVigencia: null
+                    }));
+                  }}
+                  className={`flex-1 py-2 px-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                    invoiceMode === 'libre'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/40'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>📄 Factura Libre</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setInvoiceMode('embudo')}
+                  className={`flex-1 py-2 px-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                    invoiceMode === 'embudo'
+                      ? 'bg-orange-600 text-white shadow-md shadow-orange-950/40'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Link2 className="w-3.5 h-3.5 text-orange-300" />
+                  <span>🔗 Embudo (M1-M3)</span>
+                </button>
               </div>
+
+              {/* MODO A: SUSCRIPCIÓN / RETAINER CMS */}
+              {invoiceMode === 'cms_retainer' && (
+                <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/30 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-purple-300 font-bold flex items-center gap-1.5 text-[11px]">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Elegir Período de Suscripción (1-Clic):</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-purple-400 bg-purple-500/20 px-2 py-0.5 rounded">
+                      Goglite Care Oficial
+                    </span>
+                  </div>
+
+                  {/* 4 Botones de Período Rápido */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { dias: 30, label: '1 Mes', precio: 99, desc: '+30 días' },
+                      { dias: 90, label: '3 Meses', precio: 297, desc: '+90 días' },
+                      { dias: 180, label: '6 Meses', precio: 594, desc: '+180 días' },
+                      { dias: 365, label: '1 Año', precio: 1089, desc: '1 Mes Gratis' }
+                    ].map(p => (
+                      <button
+                        key={p.dias}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCmsPeriod(p.dias);
+                          setNewInvoiceForm(prev => ({
+                            ...prev,
+                            subtotal: p.precio,
+                            total: p.precio,
+                            montoCobrado: p.precio,
+                            diasVigencia: p.dias,
+                            itemDescripcion: `Goglite Care · Suscripción Headless CMS & Mantenimiento Web (${p.label})`,
+                            concepto: `Goglite Care · Suscripción Headless CMS & Mantenimiento Web (${p.label})`
+                          }));
+                        }}
+                        className={`p-2 rounded-xl text-center border transition-all ${
+                          selectedCmsPeriod === p.dias
+                            ? 'bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-950/50'
+                            : 'bg-[#121828] text-slate-300 border-slate-700/80 hover:border-purple-500/50'
+                        }`}
+                      >
+                        <div className="font-bold text-xs">{p.label}</div>
+                        <div className="font-mono text-[11px] font-bold text-amber-300">${p.precio} USD</div>
+                        <div className="text-[9px] text-slate-400 font-mono">{p.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Checkbox Auto-Extender CMS */}
+                  <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoExtendCms}
+                      onChange={(e) => setAutoExtendCms(e.target.checked)}
+                      className="rounded border-slate-700 text-purple-600 focus:ring-purple-500"
+                    />
+                    <span className="text-[11px] text-slate-300">
+                      ✓ <strong>Activar / Extender automáticamente</strong> la vigencia del cliente en Headless CMS al emitir esta factura (+{selectedCmsPeriod} días)
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              {/* SELECTOR RÁPIDO DE CLIENTE (DISPONIBLE EN TODOS LOS MODOS) */}
+              {invoiceMode !== 'embudo' && cmsClientsList.length > 0 && (
+                <div className="space-y-1">
+                  <label className="text-slate-400 text-[11px] block flex items-center justify-between">
+                    <span>Seleccionar Cliente Registrado (CMS o CRM):</span>
+                    <span className="text-[10px] text-purple-400 font-mono font-bold">{cmsClientsList.length} clientes disponibles</span>
+                  </label>
+                  <select
+                    value={selectedClientPick}
+                    onChange={(e) => {
+                      const empVal = e.target.value;
+                      setSelectedClientPick(empVal);
+                      const found = cmsClientsList.find(c => c.empresa === empVal);
+                      if (found) {
+                        const cuentas = normalizeCuentasBancarias(configuracion.cuentasBancarias);
+                        const defaultAcc = cuentas.find(c => c.pais === found.pais && c.activa && c.predeterminada)
+                          || cuentas.find(c => c.pais === found.pais && c.activa);
+
+                        setNewInvoiceForm(prev => ({
+                          ...prev,
+                          empresa: found.empresa,
+                          contacto: found.contacto || prev.contacto,
+                          email: found.email || prev.email,
+                          telefono: found.telefono || prev.telefono,
+                          pais: found.pais || prev.pais,
+                          cuentaBancariaId: defaultAcc ? defaultAcc.id : prev.cuentaBancariaId,
+                          metodoPago: defaultAcc ? defaultAcc.banco : prev.metodoPago
+                        }));
+                      }
+                    }}
+                    className="w-full bg-[#131926] border border-slate-700/80 rounded-lg p-2 text-white text-xs"
+                  >
+                    <option value="">-- Elegir cliente o escribir datos manualmente abajo --</option>
+                    {cmsClientsList.map(c => (
+                      <option key={c.id || c.empresa} value={c.empresa}>
+                        {c.pais === 'DO' ? '🇩🇴' : c.pais === 'US' ? '🇺🇸' : '🇸🇻'} {c.empresa} ({c.contacto}) {c.dominio ? `— ${c.dominio}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* MODO C: SELECTOR RETROSPECTIVO TRADICIONAL DE EMBUDO */}
+              {invoiceMode === 'embudo' && (
+                <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 space-y-1.5">
+                  <label className="text-orange-300 font-bold flex items-center gap-1.5 text-[11px]">
+                    <Link2 className="w-3.5 h-3.5" />
+                    <span>Autocompletar desde Módulos 1, 2 o 3 (Retrospectivo):</span>
+                  </label>
+                  <select
+                    value={selectedSourceKey}
+                    onChange={(e) => handleSelectImportSource(e.target.value)}
+                    className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-orange-500"
+                  >
+                    <option value="">-- Seleccionar Presupuesto (M3), Cliente CRM (M2) o Lead (M1) --</option>
+                    {m3Presupuestos.length > 0 && (
+                      <optgroup label="Módulo 3 · Presupuestos VIP">
+                        {m3Presupuestos.map(p => (
+                          <option key={p.id} value={`M3::${p.id}`}>
+                            [M3 {p.codigo}] {p.cliente?.empresa} — ${p.inversion?.precioTotal} USD ({p.estado})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {m2CrmLeads.length > 0 && (
+                      <optgroup label="Módulo 2 · CRM & WhatsApp">
+                        {m2CrmLeads.map(l => (
+                          <option key={l.id} value={`M2::${l.id}`}>
+                            [M2 CRM] {l.empresa} ({l.contacto}) — ${l.valorEstimado || 650} USD
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {m1ScrapperLeads.length > 0 && (
+                      <optgroup label="Módulo 1 · Lead Scrapper">
+                        {m1ScrapperLeads.slice(0, 15).map(l => (
+                          <option key={l.id} value={`M1::${l.id}`}>
+                            [M1 Scrapper] {l.nombreEmpresa} ({l.dominio})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-slate-400 block mb-1">Nombre de la Empresa</label>
+                  <label className="text-slate-400 block mb-1">Nombre de la Empresa *</label>
                   <input
                     type="text"
                     required
                     value={newInvoiceForm.empresa}
                     onChange={(e) => setNewInvoiceForm({ ...newInvoiceForm, empresa: e.target.value })}
-                    placeholder="ej: Grúas Andrea / Caribes Tours"
+                    placeholder="ej: TurisRan / Clientes VIP"
                     className="w-full bg-[#131926] border border-slate-700 rounded-lg p-2 text-white"
                   />
                 </div>

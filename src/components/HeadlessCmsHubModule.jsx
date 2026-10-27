@@ -3,6 +3,7 @@ import apiClient from '../services/apiClient';
 import { saveCmsSiteToFirestore, getCmsSiteFromFirestore } from '../services/firebase';
 import GoogleBusinessProfileView from './GoogleBusinessProfileView';
 import GoogleSiteKitView from './GoogleSiteKitView';
+import AdminCmsSubscriptionsHubView from './admin/AdminCmsSubscriptionsHubView';
 import {
   Globe,
   Layout,
@@ -27,7 +28,8 @@ import {
   Sliders,
   MapPin,
   Star,
-  Activity
+  Activity,
+  ShieldCheck
 } from 'lucide-react';
 
 const GOGLITE_DEFAULT_SITE = {
@@ -69,7 +71,7 @@ const GOGLITE_DEFAULT_SITE = {
   }
 };
 
-export default function HeadlessCmsHubModule() {
+export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
   const [sites, setSites] = useState([GOGLITE_DEFAULT_SITE]);
   const [selectedSlug, setSelectedSlug] = useState('goglite');
   const [loading, setLoading] = useState(true);
@@ -494,6 +496,18 @@ Reglas técnicas de cumplimiento obligatorio:
           <Activity className="w-4 h-4 text-emerald-300" />
           <span>⚡ Google Site Kit</span>
         </button>
+
+        <button
+          onClick={() => setActiveView('suscripciones')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
+            activeView === 'suscripciones'
+              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-950/50'
+              : 'bg-[#0e1320] text-slate-400 hover:text-white'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4 text-purple-300" />
+          <span>💎 Suscripciones & Clientes Activos</span>
+        </button>
       </div>
 
       {/* 3. VISTA A: PANTALLA OFICIAL DE GOOGLE BUSINESS & RESEÑAS CON IA */}
@@ -504,6 +518,14 @@ Reglas técnicas de cumplimiento obligatorio:
       {/* 3. VISTA B: PANTALLA GOOGLE SITE KIT (SEARCH CONSOLE, GA4, ADS & PAGESPEED) */}
       {activeView === 'site_kit' && (
         <GoogleSiteKitView currentSite={currentSite} />
+      )}
+
+      {/* 3. VISTA C: GESTIÓN DE SUSCRIPCIONES Y CLIENTES ACTIVOS DEL CMS */}
+      {activeView === 'suscripciones' && (
+        <AdminCmsSubscriptionsHubView
+          sites={sites}
+          onOpenInvoiceModal={onOpenInvoiceModal}
+        />
       )}
 
       {/* 3. VISTA B: PANTALLA DE EDITOR VISUAL EN VIVO (CLICK-TO-EDIT CANVAS) */}
