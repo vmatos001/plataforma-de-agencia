@@ -2585,24 +2585,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
           </div>
 
           {/* Fila 2 en móvil / Derecha en Desktop: Botones de Acción */}
-          <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
-            {matchingFactura && (
-              <button
-                type="button"
-                onClick={() => setSelectedClientInvoiceModal(matchingFactura)}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold shadow-lg shadow-orange-950/40 border border-orange-500/30 transition-all transform hover:scale-[1.02]"
-                title="Consultar e Imprimir Factura Oficial"
-              >
-                <FileText className="w-3.5 h-3.5 text-orange-200" />
-                <span className="hidden sm:inline">Factura Oficial</span>
-                <span className="sm:hidden">Factura</span>
-              </button>
-            )}
+          <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto justify-end">
             <a
               href={`https://wa.me/${(resolvedAgencyContact.telefonoWhatsapp || resolvedAgencyContact.telefono || agencyBranding.telefonoWhatsapp || '+18295284713').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola, te escribo desde el Portal de Cliente de ${clientEmpresa}.`)}`}
               target="_blank"
               rel="noreferrer"
-              className="flex-1 sm:flex-none px-3.5 py-2 sm:py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950 transition-all"
+              className="w-full sm:w-auto px-3.5 py-2 sm:py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950 transition-all"
             >
               <MessageSquare className="w-3.5 h-3.5" />
               <span>WhatsApp de Soporte</span>

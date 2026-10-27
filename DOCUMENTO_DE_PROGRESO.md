@@ -20,6 +20,8 @@ Durante esta sesión se completó la transición hacia una arquitectura **100% C
 7. **Estabilidad del Portal y Prevención de Pantallas Negras:** Corrección de dependencias circulares, orden de inicialización de hooks y contenedor `<ErrorBoundary>` global y modular.
 8. **Saneamiento de Enlaces del Portal de Cliente:** Diagnóstico y corrección del error de desbordamiento de URL (URLs de 347 KB generadas por adjuntar comprobantes bancarios en base64). Se implementó la estructura de enlace canónico limpio (`/portal/:token`) con sincronización automática en Firestore.
 9. **Corrección de Formulario y Botón de Pago en Fase 4 (Liquidación):** Solución al problema donde, al subir la captura bancaria, la interfaz eliminaba prematuramente los controles de carga y ocultaba el botón "Ya hice el pago". Se rediseñó el flujo para retener la botonera con estado del comprobante (`[Ver]` y `[Cambiar]`) y el botón de acción principal activo (`"✓ Ya hice el pago · Notificar Liquidación Final ($... USD)"`), transitando a verificación únicamente tras el envío explícito del cliente. Además, se desacoplaron las dependencias del stepper para permitir navegación fluida en fases ya completadas.
+10. **Remoción de Botón Redundante de Factura en Cabecera de Portal:** Eliminado el botón flotante superior de factura en el portal de cliente, consolidando el acceso a facturas oficiales exclusivamente en las fases correspondientes (Fase 2, Fase 4 y sección dedicada en Fase 5).
+11. **Actualización de Título de Pestaña Institucional:** Modificado `<title>` en `index.html` para mostrar limpiamente `Goglite Digital Hub`.
 
 ---
 
