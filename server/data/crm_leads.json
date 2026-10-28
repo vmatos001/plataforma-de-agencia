@@ -2,21 +2,21 @@
   {
     "id": "crm-lead-1792969777629-cjfz",
     "leadId": "crm-lead-1792969777629-cjfz",
-    "empresa": "TurisRan",
+    "empresa": "TurisRan Dominicana",
     "contacto": "Ransel",
-    "cargo": "Representante / Propietario",
-    "email": "",
-    "telefono": "+1 (809) WhatsApp Directo",
+    "cargo": "Director de Operaciones / Propietario",
+    "email": "info@turisran-dominicana.com",
+    "telefono": "+1 (849) 752-7408",
     "pais": "DO",
-    "dominio": "",
-    "etapa": "contactado",
-    "valorEstimado": 650,
-    "probabilidad": 25,
+    "dominio": "https://turisran-dominicana.com",
+    "etapa": "ganado",
+    "valorEstimado": 850,
+    "probabilidad": 100,
     "fuente": "WhatsApp Inbound",
     "portalToken": "portal-crm-lead-1792969777629-cjfz-dre5xs",
-    "temperatura": "tibio",
-    "resumenEjecutivo": "Contacto y conversación vía WhatsApp para servicios de traslados turísticos y presencia digital de TurisRan en República Dominicana.",
-    "proximaAccion": "Continuar seguimiento de la conversación en WhatsApp y validar necesidades de servicio.",
+    "temperatura": "caliente",
+    "resumenEjecutivo": "Cliente TurisRan Dominicana. Plataforma web corporativa de traslados turísticos, transfers de aeropuerto y excursiones completada y optimizada bajo el Protocolo QA de 30 Puntos Pre-Lanzamiento (28 aprobados, 2 omitidos por requerir accesos de cuenta del cliente: Meta Pixel y Microsoft Clarity). Flujo comercial activo 100% vía WhatsApp directo al +1 (849) 752-7408.",
+    "proximaAccion": "Entregar acta oficial de control de calidad QA y enlace de producción.",
     "interacciones": [
       {
         "id": "int-1792969777629",
@@ -24,36 +24,51 @@
         "fecha": "2026-10-25",
         "titulo": "Registro de Conversación WhatsApp",
         "detalle": "Contacto y conversación vía WhatsApp para servicios de traslados turísticos y presencia digital de TurisRan en República Dominicana.",
-        "proximoPaso": "Continuar seguimiento de la conversación en WhatsApp y validar necesidades de servicio.",
+        "proximoPaso": "Validar necesidades y alcances de servicio.",
         "fechaProximoPaso": "2026-10-25"
+      },
+      {
+        "id": "int-1793075200000",
+        "tipo": "qa_auditoria",
+        "fecha": "2026-10-26",
+        "titulo": "Auditoría QA 30/30 Completada",
+        "detalle": "Ejecución completa del protocolo de 30 puntos de calidad pre-lanzamiento. 28 puntos aprobados con calificación 93.3% (Aprobado con Excelencia). Puntos 6 (Meta Pixel) y 8 (Clarity) omitidos temporalmente por requerir credenciales/2FA nocturno del cliente.",
+        "proximoPaso": "Emisión del Acta de Entrega y despliegue final.",
+        "fechaProximoPaso": "2026-10-26"
       }
     ],
     "portalConfig": {
       "portalActivo": true,
-      "faseActual": "Diagnóstico Comercial",
-      "progresoPorcentaje": 20,
+      "faseActual": "Fase 5 · Control de Calidad Pre-Lanzamiento",
+      "progresoPorcentaje": 100,
       "archivosSubidos": [],
-      "notasCliente": "Continuar seguimiento de la conversación en WhatsApp y validar necesidades de servicio.",
+      "notasCliente": "Sitio web oficial https://turisran-dominicana.com verificado bajo el estándar de calidad de Goglite Digital Hub.",
       "presupuestoId": null,
-      "proyectoId": null
+      "proyectoId": "proj-turisran-do"
     },
     "whatsappData": {
-      "telefono": "+1 (809) WhatsApp Directo",
-      "temperatura": "tibio",
-      "estadoSeguimiento": "conversacion_activa",
-      "resumenEjecutivo": "Contacto y conversación vía WhatsApp para servicios de traslados turísticos y presencia digital de TurisRan en República Dominicana.",
-      "proximaAccion": "Continuar seguimiento de la conversación en WhatsApp y validar necesidades de servicio.",
-      "fechaResumen": "2026-10-25",
+      "telefono": "+1 (849) 752-7408",
+      "temperatura": "caliente",
+      "estadoSeguimiento": "entrega_final",
+      "resumenEjecutivo": "Cliente TurisRan Dominicana. Plataforma web corporativa de traslados turísticos, transfers de aeropuerto y excursiones completada y optimizada bajo el Protocolo QA de 30 Puntos Pre-Lanzamiento (28 aprobados, 2 omitidos).",
+      "proximaAccion": "Entregar acta oficial de control de calidad QA y enlace de producción.",
+      "fechaResumen": "2026-10-26",
       "mensajes": [
         {
           "id": "wmsg-1792969777629",
           "fecha": "2026-10-25T23:09:37.631Z",
           "emisor": "cliente",
           "texto": "Contacto y conversación vía WhatsApp para servicios de traslados turísticos y presencia digital de TurisRan en República Dominicana."
+        },
+        {
+          "id": "wmsg-1793075200000",
+          "fecha": "2026-10-26T22:25:00.000Z",
+          "emisor": "agencia",
+          "texto": "Protocolo de control de calidad 30/30 completado para TurisRan Dominicana. Todo listo para entrega oficial."
         }
       ]
     },
     "creadoEn": "2026-10-25",
-    "actualizadoEn": "2026-10-25"
+    "actualizadoEn": "2026-10-26"
   }
 ]

@@ -32,8 +32,9 @@ import {
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 
 /**
- * PROTOCOLO MAESTRO DE 30 CHEQUEOS DE PRE-ENTREGA
+ * PROTOCOLO MAESTRO DE 38 CHEQUEOS DE PRE-ENTREGA & CONTROL DE CALIDAD
  * Auditoría rigurosa y obligatoria de la agencia antes de liberar cualquier sitio web a un cliente.
+ * Integra las 12 Fases de Construcción: SEO On-Page, SEO Local, Google Maps, Presencia IA (GEO), i18n, Seguridad y Conversión.
  */
 export const DEFAULT_CHECKLIST_ITEMS = [
   // 1. Analítica, Métricas & Tracking
@@ -56,8 +57,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'search_console'
   },
   {
-    id: 'chk-06-meta-pixel',
-    numero: 6,
+    id: 'chk-03-meta-pixel',
+    numero: 3,
     categoria: '1. Analítica, Métricas & Tracking',
     item: 'Meta Pixel + eventos',
     descripcion: 'Pixel de Meta (Facebook/Instagram) instalado disparando eventos estándar (Lead, Contact, ViewContent) al pulsar en WhatsApp o llamada.',
@@ -65,8 +66,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'meta_pixel'
   },
   {
-    id: 'chk-08-hotjar-clarity',
-    numero: 8,
+    id: 'chk-04-hotjar-clarity',
+    numero: 4,
     categoria: '1. Analítica, Métricas & Tracking',
     item: 'Hotjar / Clarity',
     descripcion: 'Herramienta de mapas de calor y grabaciones anónimas de sesión (Microsoft Clarity o Hotjar) activa para auditar fricción y comportamiento real.',
@@ -76,8 +77,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
 
   // 2. SEO On-Page, Indexación & Contenido
   {
-    id: 'chk-03-sitemap',
-    numero: 3,
+    id: 'chk-05-sitemap',
+    numero: 5,
     categoria: '2. SEO On-Page, Indexación & Contenido',
     item: 'Sitemap.xml enviado',
     descripcion: 'Archivo /sitemap.xml generado con URLs canónicas, codificación UTF-8 y enviado formalmente a Search Console para indexación rápida.',
@@ -85,8 +86,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'sitemap'
   },
   {
-    id: 'chk-04-robots',
-    numero: 4,
+    id: 'chk-06-robots',
+    numero: 6,
     categoria: '2. SEO On-Page, Indexación & Contenido',
     item: 'Robots.txt revisado',
     descripcion: 'Archivo /robots.txt configurado en la raíz sin bloqueos involuntarios a Googlebot, permitiendo el rastreo de bots de IA y enlazando al sitemap.',
@@ -94,8 +95,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'robots'
   },
   {
-    id: 'chk-05-seo-metas',
-    numero: 5,
+    id: 'chk-07-seo-metas',
+    numero: 7,
     categoria: '2. SEO On-Page, Indexación & Contenido',
     item: 'SEO: H1, títulos, metas',
     descripcion: 'Estructura semántica con un único H1 descriptivo por página, Meta Titles (< 60 caracteres) y Meta Descriptions persuasivas con keywords locales.',
@@ -103,8 +104,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'serp_preview'
   },
   {
-    id: 'chk-07-open-graph',
-    numero: 7,
+    id: 'chk-08-open-graph',
+    numero: 8,
     categoria: '2. SEO On-Page, Indexación & Contenido',
     item: 'Imagen Open Graph',
     descripcion: 'Etiquetas Open Graph (og:title, og:description, og:image 1200x630px) y Twitter Cards configuradas para vista previa atractiva en WhatsApp y redes.',
@@ -112,206 +113,280 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'open_graph'
   },
   {
-    id: 'chk-14-alt-imagenes',
-    numero: 14,
+    id: 'chk-09-alt-imagenes',
+    numero: 9,
     categoria: '2. SEO On-Page, Indexación & Contenido',
     item: 'Texto alt en imágenes',
     descripcion: 'Atributos "alt" descriptivos y semánticos en el 100% de las imágenes para accesibilidad (lectores de pantalla) y posicionamiento en Google Imágenes.',
     critico: true,
     toolType: null
   },
-
-  // 3. Legal, Privacidad & Cumplimiento
   {
-    id: 'chk-09-cookies-banner',
-    numero: 9,
-    categoria: '3. Legal, Privacidad & Cumplimiento',
+    id: 'chk-10-i18n-hreflang',
+    numero: 10,
+    categoria: '2. SEO On-Page, Indexación & Contenido',
+    item: 'Hreflang & Rutas Multilingües i18n',
+    descripcion: 'Arquitectura multilingüe internacional con rutas espejo (/ y /en/), etiquetas hreflang y canónicas cruzadas para captar clientes en español e inglés sin contenido duplicado.',
+    critico: false,
+    toolType: null
+  },
+
+  // 3. SEO Local, Google Maps & Presencia IA (GEO)
+  {
+    id: 'chk-11-google-business-maps',
+    numero: 11,
+    categoria: '3. SEO Local, Google Maps & Presencia IA (GEO)',
+    item: 'Google Business Profile & Maps',
+    descripcion: 'Ficha de Google Business Profile reclamada y vinculada al sitio con mapa interactivo o botón de cómo llegar apuntando a la dirección física de la empresa.',
+    critico: true,
+    toolType: 'google_maps'
+  },
+  {
+    id: 'chk-12-consistencia-nap',
+    numero: 12,
+    categoria: '3. SEO Local, Google Maps & Presencia IA (GEO)',
+    item: 'Consistencia NAP (Nombre, Dirección, Teléfono)',
+    descripcion: 'Datos NAP (Name, Address, Phone) 100% idénticos en footer, página de contacto, schema markup y Google Maps para máxima autoridad y ranking en el pack local.',
+    critico: true,
+    toolType: null
+  },
+  {
+    id: 'chk-13-resenas-google-maps',
+    numero: 13,
+    categoria: '3. SEO Local, Google Maps & Presencia IA (GEO)',
+    item: 'Enlace a Reseñas Google (writereview)',
+    descripcion: 'CTA o botón directo para dejar reseñas en Google Maps con parámetro writereview activo y carrusel de testimonios reales verificados.',
+    critico: true,
+    toolType: 'google_reviews'
+  },
+  {
+    id: 'chk-14-schema-localbusiness-geo',
+    numero: 14,
+    categoria: '3. SEO Local, Google Maps & Presencia IA (GEO)',
+    item: 'Schema JSON-LD LocalBusiness & Geo',
+    descripcion: 'Datos estructurados Schema.org tipo LocalBusiness/ProfessionalService con GeoCoordinates (lat/long), horario comercial, teléfono oficial y municipio.',
+    critico: true,
+    toolType: 'rich_results'
+  },
+  {
+    id: 'chk-15-geo-trust-anchors-ia',
+    numero: 15,
+    categoria: '3. SEO Local, Google Maps & Presencia IA (GEO)',
+    item: 'GEO & Trust Anchors para IA',
+    descripcion: 'Optimización para motores de respuesta de IA (ChatGPT, Perplexity, Gemini) con 3 anclas de confianza (/about, /contact, /privacy >500 chars), perfil del fundador y citas factuales.',
+    critico: true,
+    toolType: null
+  },
+
+  // 4. Legal, Privacidad & Cumplimiento
+  {
+    id: 'chk-16-cookies-banner',
+    numero: 16,
+    categoria: '4. Legal, Privacidad & Cumplimiento',
     item: 'Banner de cookies',
     descripcion: 'Aviso de consentimiento de cookies conforme a normativas de privacidad que permite al usuario aceptar o configurar cookies analíticas.',
     critico: false,
     toolType: null
   },
   {
-    id: 'chk-12-terminos-condiciones',
-    numero: 12,
-    categoria: '3. Legal, Privacidad & Cumplimiento',
+    id: 'chk-17-terminos-condiciones',
+    numero: 17,
+    categoria: '4. Legal, Privacidad & Cumplimiento',
     item: 'Términos y condiciones',
     descripcion: 'Páginas legales públicas enlazadas en el footer: Términos & Condiciones de Uso y Política de Privacidad y Protección de Datos Personales.',
     critico: true,
     toolType: null
   },
   {
-    id: 'chk-22-correos-smtp',
-    numero: 22,
-    categoria: '3. Legal, Privacidad & Cumplimiento',
+    id: 'chk-18-correos-smtp',
+    numero: 18,
+    categoria: '4. Legal, Privacidad & Cumplimiento',
     item: 'Correos + SMTP',
     descripcion: 'Servicio de correo transaccional (SMTP/Resend/SendGrid) con registros SPF, DKIM y DMARC validados para que las alertas del formulario no caigan en spam.',
     critico: true,
     toolType: null
   },
-
-  // 4. Seguridad, Infraestructura & Código
   {
-    id: 'chk-10-ssl-https',
-    numero: 10,
-    categoria: '4. Seguridad, Infraestructura & Código',
+    id: 'chk-19-datos-fiscales-b2b',
+    numero: 19,
+    categoria: '4. Legal, Privacidad & Cumplimiento',
+    item: 'Datos Fiscales B2B (RNC / DGII / NIT)',
+    descripcion: 'Identificación tributaria corporativa (RNC/DGII en Rep. Dominicana o NIT/NRC en El Salvador) visible en el footer o contacto para clientes que requieran factura fiscal.',
+    critico: true,
+    toolType: null
+  },
+
+  // 5. Seguridad, Infraestructura & Código
+  {
+    id: 'chk-20-ssl-https',
+    numero: 20,
+    categoria: '5. Seguridad, Infraestructura & Código',
     item: 'SSL + HTTPS forzado',
     descripcion: 'Certificado SSL TLS 1.3 activo con candado verde, redirección forzada de HTTP a HTTPS y sin advertencias de contenido mixto (Mixed Content).',
     critico: true,
     toolType: 'ssl'
   },
   {
-    id: 'chk-11-datos-sesiones',
-    numero: 11,
-    categoria: '4. Seguridad, Infraestructura & Código',
+    id: 'chk-21-datos-sesiones',
+    numero: 21,
+    categoria: '5. Seguridad, Infraestructura & Código',
     item: 'Datos ocultos en sesiones',
     descripcion: 'Verificación de que no se almacenen datos confidenciales, contraseñas ni números de tarjeta en texto plano en localStorage, sessionStorage o cookies.',
     critico: true,
     toolType: null
   },
   {
-    id: 'chk-25-sin-tokens-js',
-    numero: 25,
-    categoria: '4. Seguridad, Infraestructura & Código',
+    id: 'chk-22-sin-tokens-js',
+    numero: 22,
+    categoria: '5. Seguridad, Infraestructura & Código',
     item: 'Sin tokens en JS',
     descripcion: 'Inspección de bundles JavaScript para asegurar que no contengan API Keys maestras, tokens de GitHub, credenciales de base de datos ni secretos de pago.',
     critico: true,
     toolType: null
   },
   {
-    id: 'chk-26-vulnerabilidades',
-    numero: 26,
-    categoria: '4. Seguridad, Infraestructura & Código',
-    item: 'Vulnerabilidades',
+    id: 'chk-23-vulnerabilidades',
+    numero: 23,
+    categoria: '5. Seguridad, Infraestructura & Código',
+    item: 'Vulnerabilidades y cabeceras',
     descripcion: 'Auditoría de cabeceras de seguridad HTTP (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, HSTS) y dependencias frontend sin exploits conocidos.',
     critico: true,
     toolType: 'security_headers'
   },
-
-  // 5. Rendimiento, UX & Conversión Mobile
   {
-    id: 'chk-13-favicon',
-    numero: 13,
-    categoria: '5. Rendimiento, UX & Conversión Mobile',
+    id: 'chk-24-honeypot-antispam',
+    numero: 24,
+    categoria: '5. Seguridad, Infraestructura & Código',
+    item: 'Blindaje Anti-Spam Honeypot en Formularios',
+    descripcion: 'Trampa invisible honeypot (_hp_security_check o campo oculto con CSS) en el 100% de los formularios para neutralizar bots sin mermar la conversión con captchas tediosos.',
+    critico: true,
+    toolType: null
+  },
+
+  // 6. Rendimiento, UX & Conversión Mobile
+  {
+    id: 'chk-25-favicon',
+    numero: 25,
+    categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Favicon',
     descripcion: 'Icono de pestaña /favicon.ico, PNG en alta resolución (192x192 y 512x512) y apple-touch-icon para accesos directos en iOS y Android.',
     critico: false,
     toolType: null
   },
   {
-    id: 'chk-15-pagina-404',
-    numero: 15,
-    categoria: '5. Rendimiento, UX & Conversión Mobile',
+    id: 'chk-26-pagina-404',
+    numero: 26,
+    categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Página 404 propia',
     descripcion: 'Página de error 404 personalizada con diseño corporativo, mensaje empático y botón visible para volver al inicio sin perder al usuario.',
     critico: false,
     toolType: 'page_404'
   },
   {
-    id: 'chk-16-pagespeed',
-    numero: 16,
-    categoria: '5. Rendimiento, UX & Conversión Mobile',
+    id: 'chk-27-pagespeed',
+    numero: 27,
+    categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'PageSpeed Insights',
     descripcion: 'Prueba en Google PageSpeed Insights con calificación móvil ≥ 85-90 puntos, garantizando fluidez y aprobación del algoritmo de Google.',
     critico: true,
     toolType: 'pagespeed'
   },
   {
-    id: 'chk-17-core-web-vitals',
-    numero: 17,
-    categoria: '5. Rendimiento, UX & Conversión Mobile',
+    id: 'chk-28-core-web-vitals',
+    numero: 28,
+    categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Core Web Vitals',
     descripcion: 'Métricas de experiencia en rango verde: LCP (renderizado principal) < 2.5s, CLS (estabilidad visual) < 0.1 e INP/FID (interactividad) < 100ms.',
     critico: true,
     toolType: 'pagespeed'
   },
   {
-    id: 'chk-18-optimizar-recursos',
-    numero: 18,
-    categoria: '5. Rendimiento, UX & Conversión Mobile',
+    id: 'chk-29-optimizar-recursos',
+    numero: 29,
+    categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Optimizar imágenes y JS',
     descripcion: 'Imágenes comprimidas en formatos WebP/AVIF con dimensiones fijas; JavaScript minificado y scripts no esenciales diferidos con defer o async.',
     critico: true,
     toolType: null
   },
   {
-    id: 'chk-19-test-celulares',
-    numero: 19,
-    categoria: '5. Rendimiento, UX & Conversión Mobile',
+    id: 'chk-30-test-celulares',
+    numero: 30,
+    categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Test en celulares reales',
     descripcion: 'Prueba física en dispositivos móviles reales (iPhone y Android) verificando que no existan barras de scroll horizontal ni tipografías ilegibles.',
     critico: true,
     toolType: null
   },
   {
-    id: 'chk-20-accesibilidad',
-    numero: 20,
-    categoria: '5. Rendimiento, UX & Conversión Mobile',
+    id: 'chk-31-accesibilidad',
+    numero: 31,
+    categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Accesibilidad y contraste',
     descripcion: 'Contraste cromático de textos superior a 4.5:1 (norma WCAG AA), navegación clara por teclado y áreas táctiles de botones superiores a 44x44px.',
     critico: false,
     toolType: 'contrast_checker'
   },
   {
-    id: 'chk-21-test-formularios',
-    numero: 21,
-    categoria: '5. Rendimiento, UX & Conversión Mobile',
-    item: 'Test de formularios',
-    descripcion: 'Prueba de envío completa de todos los formularios de contacto, cotización o suscripción, validando campos requeridos y mensaje de éxito visual.',
+    id: 'chk-32-test-formularios',
+    numero: 32,
+    categoria: '6. Rendimiento, UX & Conversión Mobile',
+    item: 'Test de formularios y cotizador',
+    descripcion: 'Prueba de envío completa de todos los formularios de contacto y del Cotizador Dinámico a WhatsApp, validando validaciones requeridas y evento de conversión.',
     critico: true,
     toolType: null
   },
   {
-    id: 'chk-23-botones-whatsapp',
-    numero: 23,
-    categoria: '5. Rendimiento, UX & Conversión Mobile',
+    id: 'chk-33-botones-whatsapp',
+    numero: 33,
+    categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Botones, links, WhatsApp',
     descripcion: 'Verificación de que ningún botón o enlace esté roto (cero 404). Botón de WhatsApp abre la app con mensaje comercial predefinido y enlace tel: funcional.',
     critico: true,
     toolType: null
   },
 
-  // 6. DevOps, Infraestructura & Respaldo
+  // 7. DevOps, Infraestructura & Respaldo
   {
-    id: 'chk-24-dns-configurados',
-    numero: 24,
-    categoria: '6. DevOps, Infraestructura & Respaldo',
+    id: 'chk-34-dns-configurados',
+    numero: 34,
+    categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'DNS configurados',
     descripcion: 'Registros DNS A, CNAME, www y verificación de propagación global completada; dominio principal y www apuntan al mismo servidor sin bucles.',
     critico: true,
     toolType: 'dns_checker'
   },
   {
-    id: 'chk-27-backups-automaticos',
-    numero: 27,
-    categoria: '6. DevOps, Infraestructura & Respaldo',
+    id: 'chk-35-backups-automaticos',
+    numero: 35,
+    categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'Backups automáticos',
     descripcion: 'Sistema de respaldo periódico automatizado del repositorio de código, archivos multimedia y base de datos con retención mínima de 30 días.',
     critico: true,
     toolType: null
   },
   {
-    id: 'chk-28-test-restauracion',
-    numero: 28,
-    categoria: '6. DevOps, Infraestructura & Respaldo',
+    id: 'chk-36-test-restauracion',
+    numero: 36,
+    categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'Test de restauración',
     descripcion: 'Procedimiento de restauración de respaldo probado y documentado para garantizar que la web puede recuperarse en menos de 1 hora ante un fallo.',
     critico: false,
     toolType: null
   },
   {
-    id: 'chk-29-alertas-caida',
-    numero: 29,
-    categoria: '6. DevOps, Infraestructura & Respaldo',
+    id: 'chk-37-alertas-caida',
+    numero: 37,
+    categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'Alertas de caída',
     descripcion: 'Servicio de monitoreo de disponibilidad 24/7 (Uptime Robot o Pingdom) configurado con chequeos cada 5 minutos y alertas por correo o WhatsApp.',
     critico: false,
     toolType: 'uptime_monitor'
   },
   {
-    id: 'chk-30-monitoreo-errores',
-    numero: 30,
-    categoria: '6. DevOps, Infraestructura & Respaldo',
+    id: 'chk-38-monitoreo-errores',
+    numero: 38,
+    categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'Monitoreo de errores',
     descripcion: 'Rastreador de excepciones en producción activo o consola de desarrollador limpia de errores JS que puedan interrumpir la experiencia del visitante.',
     critico: true,
@@ -322,10 +397,11 @@ export const DEFAULT_CHECKLIST_ITEMS = [
 export const QA_CATEGORIES = [
   '1. Analítica, Métricas & Tracking',
   '2. SEO On-Page, Indexación & Contenido',
-  '3. Legal, Privacidad & Cumplimiento',
-  '4. Seguridad, Infraestructura & Código',
-  '5. Rendimiento, UX & Conversión Mobile',
-  '6. DevOps, Infraestructura & Respaldo'
+  '3. SEO Local, Google Maps & Presencia IA (GEO)',
+  '4. Legal, Privacidad & Cumplimiento',
+  '5. Seguridad, Infraestructura & Código',
+  '6. Rendimiento, UX & Conversión Mobile',
+  '7. DevOps, Infraestructura & Respaldo'
 ];
 
 export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
@@ -461,7 +537,7 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
   };
 
   const handleResetChecklist = () => {
-    if (!window.confirm('¿Deseas reiniciar todas las 30 casillas de verificación de este proyecto?')) return;
+    if (!window.confirm(`¿Deseas reiniciar todas las casillas de verificación de este proyecto (${DEFAULT_CHECKLIST_ITEMS.length} puntos)?`)) return;
     const resetList = DEFAULT_CHECKLIST_ITEMS.map(item => ({ ...item, completado: false }));
     setChecklist(resetList);
     saveChecklistState(resetList, siteUrl);
@@ -531,6 +607,10 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
         return `https://pagespeed.web.dev/analysis?url=${encodedUrl}`;
       case 'rich_results':
         return `https://search.google.com/test/rich-results?url=${encodedUrl}`;
+      case 'google_maps':
+        return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(currentProject?.cliente?.empresa || cleanDomain || 'empresa')}`;
+      case 'google_reviews':
+        return `https://www.google.com/search?q=${encodeURIComponent(currentProject?.cliente?.empresa || cleanDomain || 'empresa')}+reviews`;
       case 'ssl':
         return `https://www.sslshopper.com/ssl-checker.html#hostname=${host}`;
       case 'robots':
@@ -631,13 +711,13 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
               <span>Fase 5 · Control de Calidad Pre-Lanzamiento (Pre-Launch QA)</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5">
-              <span>Protocolo de 30 Chequeos de Pre-Entrega al Cliente</span>
+              <span>Protocolo de {totalItems} Chequeos de Pre-Entrega al Cliente</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30 font-mono font-bold">
                 Cero Error Humano
               </span>
             </h1>
             <p className="text-xs text-slate-400 max-w-3xl mt-1 leading-relaxed">
-              Verificación técnica y operativa obligatoria de la agencia antes de entregar el producto y las credenciales al cliente. Audita tracking, SEO, velocidad, seguridad, DNS, backups y conversión móvil sin omisiones.
+              Verificación técnica y operativa obligatoria de la agencia antes de entregar el producto y las credenciales al cliente. Audita tracking, SEO On-Page, SEO Local, Google Maps, velocidad, seguridad, DNS, backups y conversión móvil sin omisiones.
             </p>
           </div>
 
@@ -659,7 +739,7 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
               type="button"
               onClick={() => window.print()}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-orange-950/40 transition-all transform hover:scale-[1.02]"
-              title="Generar Certificado Oficial de Calidad 30/30 en PDF"
+              title={`Generar Certificado Oficial de Calidad ${totalItems}/${totalItems} en PDF`}
             >
               <Printer className="w-4 h-4" />
               <span>Imprimir Acta de Entrega (PDF)</span>
@@ -691,7 +771,7 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
               className="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-bold border border-emerald-500/30 transition-colors flex items-center gap-1.5"
             >
               <CheckSquare className="w-3.5 h-3.5" />
-              <span>Marcar Todos (30)</span>
+              <span>Marcar Todos ({totalItems})</span>
             </button>
             <button
               type="button"
@@ -746,7 +826,7 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
               {currentProject?.cliente?.empresa || 'Cliente Oficial'}
             </div>
             <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-              Protocolo Goglite Standard 30
+              Protocolo Goglite Standard {totalItems}
             </div>
           </div>
         </div>
@@ -778,6 +858,28 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
             >
               <Search className="w-3 h-3 text-blue-400" />
               <span>Search Console</span>
+              <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+            </a>
+
+            <a
+              href={getToolUrl('rich_results')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[11px] font-semibold transition-colors"
+            >
+              <FileText className="w-3 h-3 text-teal-400" />
+              <span>Schema LocalBusiness</span>
+              <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+            </a>
+
+            <a
+              href={getToolUrl('google_maps')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold transition-colors"
+            >
+              <MapPin className="w-3 h-3 text-amber-400" />
+              <span>Google Maps & Local</span>
               <ExternalLink className="w-2.5 h-2.5 opacity-70" />
             </a>
 
@@ -1076,7 +1178,7 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
                 ACTA OFICIAL DE CONTROL DE CALIDAD
               </div>
               <div className="text-[9.5px] text-slate-700 font-bold mt-0.5">
-                Protocolo Estándar de 30 Puntos Pre-Lanzamiento
+                Protocolo Estándar de {totalItems} Puntos Pre-Lanzamiento
               </div>
               <div className="text-[9px] text-slate-500 mt-0.5">
                 Fecha de Emisión: {new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}
@@ -1101,80 +1203,81 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
             <div>
               <span className="text-slate-500 font-mono block text-[8.5px] uppercase">Dictamen Global:</span>
               <strong className="text-emerald-700 font-bold text-[10.5px] block">
-                {completadosCount} / 30 Puntos ({scoreSalud}%)
+                {completadosCount} / {totalItems} Puntos ({scoreSalud}%)
               </strong>
             </div>
           </div>
 
           {/* 3. Declaración de Garantía y Certificación Técnica */}
           <div className="mb-2.5 p-2 rounded-lg bg-orange-50/80 border border-orange-200 text-slate-800 text-[9.5px] leading-snug avoid-break">
-            <strong>Certificación de Calidad Técnica:</strong> Por medio de la presente acta, el equipo técnico de <strong>{activeAgencyName}</strong> certifica que el sitio web y sus activos digitales han superado la auditoría exhaustiva de <strong>30 puntos de control de calidad</strong> previo a su entrega oficial, garantizando el cumplimiento de estándares de velocidad Core Web Vitals, indexabilidad en buscadores, posicionamiento IA (GEO), seguridad TLS/HTTPS, analítica de conversiones y adaptabilidad responsive en dispositivos móviles.
+            <strong>Certificación de Calidad Técnica:</strong> Por medio de la presente acta, el equipo técnico de <strong>{activeAgencyName}</strong> certifica que el sitio web y sus activos digitales han superado la auditoría exhaustiva de <strong>{totalItems} puntos de control de calidad</strong> previo a su entrega oficial, garantizando el cumplimiento de estándares de velocidad Core Web Vitals, indexabilidad en buscadores, SEO Local (Google Maps & NAP), presencia en motores de IA (GEO), seguridad TLS/HTTPS, analítica de conversiones y adaptabilidad responsive en dispositivos móviles.
           </div>
 
-          {/* 4. Tabla de los 30 Chequeos Verificados en 2 Columnas Limpias (15 Izq + 15 Der) */}
-          <div className="grid grid-cols-2 gap-3 mb-2 avoid-break">
-            {/* Columna Izquierda: Chequeos 1 al 15 */}
-            <div className="border border-slate-300 rounded-lg overflow-hidden">
-              <div className="bg-slate-100 border-b border-slate-300 px-2 py-1 flex items-center justify-between text-[9px] font-mono font-bold text-slate-800">
-                <span># REQUISITO DE CALIDAD (01 - 15)</span>
-                <span>ESTADO</span>
-              </div>
-              <div className="divide-y divide-slate-200 text-[8.5px] leading-tight">
-                {DEFAULT_CHECKLIST_ITEMS.slice(0, 15).map((item) => {
-                  const isDone = checklist.find(c => c.id === item.id)?.completado;
-                  return (
-                    <div key={item.id} className="px-2 py-[2.5px] flex items-center justify-between gap-1 hover:bg-slate-50">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="font-mono font-bold text-slate-500 shrink-0 text-[8px]">
-                          {String(item.numero).padStart(2, '0')}
-                        </span>
-                        <span className="font-medium text-slate-900 truncate">
-                          {item.item}
-                          {item.critico && <span className="text-rose-600 font-bold ml-1 text-[7.5px] font-mono">[Crítico]</span>}
+          {/* 4. Tabla de los Chequeos Verificados en 2 Columnas Limpias */}
+          {(() => {
+            const mitad = Math.ceil(checklist.length / 2);
+            const col1 = checklist.slice(0, mitad);
+            const col2 = checklist.slice(mitad);
+            return (
+              <div className="grid grid-cols-2 gap-3 mb-2 avoid-break">
+                {/* Columna Izquierda */}
+                <div className="border border-slate-300 rounded-lg overflow-hidden">
+                  <div className="bg-slate-100 border-b border-slate-300 px-2 py-0.5 flex items-center justify-between text-[8.5px] font-mono font-bold text-slate-800">
+                    <span># REQUISITO DE CALIDAD (01 - {String(mitad).padStart(2, '0')})</span>
+                    <span>ESTADO</span>
+                  </div>
+                  <div className="divide-y divide-slate-200 text-[8px] leading-tight">
+                    {col1.map((item) => (
+                      <div key={item.id} className="px-2 py-[1.5px] flex items-center justify-between gap-1 hover:bg-slate-50">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-mono font-bold text-slate-500 shrink-0 text-[7.5px]">
+                            {String(item.numero).padStart(2, '0')}
+                          </span>
+                          <span className="font-medium text-slate-900 truncate">
+                            {item.item}
+                            {item.critico && <span className="text-rose-600 font-bold ml-1 text-[7px] font-mono">[Crítico]</span>}
+                          </span>
+                        </div>
+                        <span className={`shrink-0 font-mono font-bold text-[7px] px-1 py-0.2 rounded ${
+                          item.completado ? 'text-emerald-800 bg-emerald-100' : 'text-amber-800 bg-amber-100'
+                        }`}>
+                          {item.completado ? '✓ OK' : 'PENDIENTE'}
                         </span>
                       </div>
-                      <span className={`shrink-0 font-mono font-bold text-[7.5px] px-1 py-0.2 rounded ${
-                        isDone ? 'text-emerald-800 bg-emerald-100' : 'text-amber-800 bg-amber-100'
-                      }`}>
-                        {isDone ? '✓ OK' : 'PENDIENTE'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+                    ))}
+                  </div>
+                </div>
 
-            {/* Columna Derecha: Chequeos 16 al 30 */}
-            <div className="border border-slate-300 rounded-lg overflow-hidden">
-              <div className="bg-slate-100 border-b border-slate-300 px-2 py-1 flex items-center justify-between text-[9px] font-mono font-bold text-slate-800">
-                <span># REQUISITO DE CALIDAD (16 - 30)</span>
-                <span>ESTADO</span>
-              </div>
-              <div className="divide-y divide-slate-200 text-[8.5px] leading-tight">
-                {DEFAULT_CHECKLIST_ITEMS.slice(15, 30).map((item) => {
-                  const isDone = checklist.find(c => c.id === item.id)?.completado;
-                  return (
-                    <div key={item.id} className="px-2 py-[2.5px] flex items-center justify-between gap-1 hover:bg-slate-50">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="font-mono font-bold text-slate-500 shrink-0 text-[8px]">
-                          {String(item.numero).padStart(2, '0')}
-                        </span>
-                        <span className="font-medium text-slate-900 truncate">
-                          {item.item}
-                          {item.critico && <span className="text-rose-600 font-bold ml-1 text-[7.5px] font-mono">[Crítico]</span>}
+                {/* Columna Derecha */}
+                <div className="border border-slate-300 rounded-lg overflow-hidden">
+                  <div className="bg-slate-100 border-b border-slate-300 px-2 py-0.5 flex items-center justify-between text-[8.5px] font-mono font-bold text-slate-800">
+                    <span># REQUISITO DE CALIDAD ({String(mitad + 1).padStart(2, '0')} - {String(checklist.length).padStart(2, '0')})</span>
+                    <span>ESTADO</span>
+                  </div>
+                  <div className="divide-y divide-slate-200 text-[8px] leading-tight">
+                    {col2.map((item) => (
+                      <div key={item.id} className="px-2 py-[1.5px] flex items-center justify-between gap-1 hover:bg-slate-50">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-mono font-bold text-slate-500 shrink-0 text-[7.5px]">
+                            {String(item.numero).padStart(2, '0')}
+                          </span>
+                          <span className="font-medium text-slate-900 truncate">
+                            {item.item}
+                            {item.critico && <span className="text-rose-600 font-bold ml-1 text-[7px] font-mono">[Crítico]</span>}
+                          </span>
+                        </div>
+                        <span className={`shrink-0 font-mono font-bold text-[7px] px-1 py-0.2 rounded ${
+                          item.completado ? 'text-emerald-800 bg-emerald-100' : 'text-amber-800 bg-amber-100'
+                        }`}>
+                          {item.completado ? '✓ OK' : 'PENDIENTE'}
                         </span>
                       </div>
-                      <span className={`shrink-0 font-mono font-bold text-[7.5px] px-1 py-0.2 rounded ${
-                        isDone ? 'text-emerald-800 bg-emerald-100' : 'text-amber-800 bg-amber-100'
-                      }`}>
-                        {isDone ? '✓ OK' : 'PENDIENTE'}
-                      </span>
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
         </div>
 
         {/* 5. Firmas de Autorización y Sello Oficial */}
