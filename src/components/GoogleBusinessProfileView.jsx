@@ -27,7 +27,9 @@ import {
   UserCheck,
   X,
   HelpCircle,
-  Calendar
+  Calendar,
+  Plus,
+  Trash2
 } from 'lucide-react';
 
 // DATOS 100% REALES EXTRAÍDOS DIRECTAMENTE DE LA FICHA OFICIAL DE GOGLITE EN GOOGLE MAPS
@@ -93,14 +95,64 @@ const REAL_GOGLITE_PROFILE_DATA = {
 export default function GoogleBusinessProfileView({ currentSite }) {
   const isGoglite = currentSite.slug === 'goglite';
 
-  // Reseñas sincronizadas
-  const [reviews, setReviews] = useState(() => {
+  // Helper para cargar los datos de la ficha GBP del cliente activo
+  const getInitialProfileData = (site) => {
+    const slug = site?.slug || 'goglite';
     try {
-      const saved = localStorage.getItem(`goglite_gbp_reviews_${currentSite.slug}`);
+      const saved = localStorage.getItem(`goglite_gbp_profile_${slug}`);
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return isGoglite ? REAL_GOGLITE_PROFILE_DATA.resenas : [];
-  });
+    if (site?.gbpData) return site.gbpData;
+    if (slug === 'goglite') {
+      return {
+        nombre: REAL_GOGLITE_PROFILE_DATA.nombre,
+        categoria: 'Diseñador de sitios web · Agencia de marketing',
+        direccion: REAL_GOGLITE_PROFILE_DATA.direccion,
+        telefono: REAL_GOGLITE_PROFILE_DATA.telefono,
+        calificacion: REAL_GOGLITE_PROFILE_DATA.calificacion,
+        periodo: REAL_GOGLITE_PROFILE_DATA.periodo,
+        mapsUrl: 'https://www.google.com/maps/place/Goglite+%7C+Dise%C3%B1o+Web+Profesional+en+Rep%C3%BAblica+Dominicana./@18.5304954,-69.9104647,17z/data=!4m8!3m7!1s0x8eaf8979c74962f9:0xdb861c27130c04a1!8m2!3d18.5304903!4d-69.9078898!9m1!1b1!16s%2Fg%2F11xfjb46jv?entry=ttu&g_ep=EgoyMDI2MTAyMC4wIKXMDSoASAFQAw%3D%3D',
+        metricas: { ...REAL_GOGLITE_PROFILE_DATA.metricas }
+      };
+    }
+    return {
+      nombre: site?.nombre || 'Empresa Verificada',
+      categoria: site?.actividad || 'Servicios Profesionales & Atención Local',
+      direccion: site?.ubicacion || `${site?.pais === 'DO' ? 'Santo Domingo, República Dominicana' : 'San Salvador, El Salvador'}`,
+      telefono: site?.telefono || site?.contenido?.branding?.telefonoWhatsApp || '+1 829-528-4713',
+      calificacion: 5.0,
+      periodo: 'octubre 2026',
+      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(site?.nombre || 'empresa')}`,
+      metricas: {
+        interaccionesTotales: 0,
+        direcciones: 0,
+        clicsSitioWeb: 0,
+        llamadas: 0,
+        clicsChat: 0,
+        reservas: 0
+      }
+    };
+  };
+
+  const getInitialReviews = (site) => {
+    const slug = site?.slug || 'goglite';
+    try {
+      const saved = localStorage.getItem(`goglite_gbp_reviews_${slug}`);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    if (Array.isArray(site?.reseñasCliente) && site.reseñasCliente.length > 0) return site.reseñasCliente;
+    return slug === 'goglite' ? REAL_GOGLITE_PROFILE_DATA.resenas : [];
+  };
+
+  const [profileData, setProfileData] = useState(() => getInitialProfileData(currentSite));
+  const [reviews, setReviews] = useState(() => getInitialReviews(currentSite));
+
+  // Recargar datos cuando el usuario cambie de cliente en el selector superior
+  useEffect(() => {
+    setProfileData(getInitialProfileData(currentSite));
+    setReviews(getInitialReviews(currentSite));
+    setActiveReplyReviewId(null);
+  }, [currentSite.slug]);
 
   const [activeFilter, setActiveFilter] = useState('todas'); // 'todas' | 'pendientes' | '5estrellas' | 'respondidas'
   
@@ -114,9 +166,21 @@ export default function GoogleBusinessProfileView({ currentSite }) {
   const [generatingAi, setGeneratingAi] = useState(false);
   const [publishingReply, setPublishingReply] = useState(false);
 
-  // Modales
+  // Modales de Delegación e Inyección de Datos
   const [showDelegationModal, setShowDelegationModal] = useState(false);
   const [copiedDelegationText, setCopiedDelegationText] = useState(false);
+  const [showInjectProfileModal, setShowInjectProfileModal] = useState(false);
+  const [profileForm, setProfileForm] = useState(profileData);
+  const [showInjectReviewModal, setShowInjectReviewModal] = useState(false);
+  const [newReviewForm, setNewReviewForm] = useState({
+    autor: '',
+    detalles: 'Cliente Verificado · Google Maps',
+    estrellas: 5,
+    fecha: 'Hace 1 día',
+    servicio: 'Servicio Principal',
+    texto: '',
+    estado: 'pendiente'
+  });
 
   // Estado de autenticación con Google Business Profile
   const [googleConnected, setGoogleConnected] = useState(true);
@@ -130,6 +194,61 @@ export default function GoogleBusinessProfileView({ currentSite }) {
       localStorage.setItem(`goglite_gbp_reviews_${currentSite.slug}`, JSON.stringify(reviews));
     } catch (e) {}
   }, [reviews, currentSite.slug]);
+
+  const handleSaveInjectedProfile = (e) => {
+    e.preventDefault();
+    const updated = {
+      ...profileForm,
+      calificacion: Number(profileForm.calificacion) || 5.0,
+      metricas: {
+        interaccionesTotales: Number(profileForm.metricas?.interaccionesTotales) || 0,
+        direcciones: Number(profileForm.metricas?.direcciones) || 0,
+        clicsSitioWeb: Number(profileForm.metricas?.clicsSitioWeb) || 0,
+        llamadas: Number(profileForm.metricas?.llamadas) || 0,
+        clicsChat: Number(profileForm.metricas?.clicsChat) || 0,
+        reservas: Number(profileForm.metricas?.reservas) || 0
+      }
+    };
+    setProfileData(updated);
+    try {
+      localStorage.setItem(`goglite_gbp_profile_${currentSite.slug}`, JSON.stringify(updated));
+    } catch (err) {}
+    setShowInjectProfileModal(false);
+    setLastSyncTime('Datos inyectados ahora');
+  };
+
+  const handleAddInjectedReview = (e) => {
+    e.preventDefault();
+    if (!newReviewForm.autor.trim() || !newReviewForm.texto.trim()) return;
+    const newRev = {
+      id: 'rev-' + Date.now(),
+      autor: newReviewForm.autor.trim(),
+      detalles: newReviewForm.detalles || 'Cliente Verificado',
+      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(newReviewForm.autor.trim())}&background=1e293b&color=60a5fa&bold=true`,
+      estrellas: Number(newReviewForm.estrellas) || 5,
+      fecha: newReviewForm.fecha || 'Reciente',
+      texto: newReviewForm.texto.trim(),
+      servicio: newReviewForm.servicio || currentSite.nombre || 'Servicios Profesionales',
+      estado: 'pendiente',
+      respuesta: '',
+      fechaRespuesta: ''
+    };
+    setReviews(prev => [newRev, ...prev]);
+    setNewReviewForm({
+      autor: '',
+      detalles: 'Cliente Verificado · Google Maps',
+      estrellas: 5,
+      fecha: 'Hace 1 día',
+      servicio: 'Servicio Principal',
+      texto: '',
+      estado: 'pendiente'
+    });
+    setShowInjectReviewModal(false);
+  };
+
+  const handleDeleteReview = (revId) => {
+    setReviews(prev => prev.filter(r => r.id !== revId));
+  };
 
   // Conexión real mediante Google OAuth 2.0 (Firebase Auth Google Provider)
   const handleConnectGoogleOAuth = async () => {
@@ -172,8 +291,8 @@ export default function GoogleBusinessProfileView({ currentSite }) {
   const handleGenerateAiResponse = async (review) => {
     setGeneratingAi(true);
 
-    const siteName = isGoglite ? REAL_GOGLITE_PROFILE_DATA.nombre : (currentSite.nombre || 'Goglite Agency');
-    const city = currentSite.pais === 'DO' ? 'Santo Domingo y República Dominicana' : 'San Salvador y El Salvador';
+    const siteName = profileData.nombre || currentSite.nombre || 'Nuestra Empresa';
+    const city = profileData.direccion || (currentSite.pais === 'DO' ? 'Santo Domingo y República Dominicana' : 'San Salvador y El Salvador');
     
     let toneDescription = 'Agradecimiento empático, posicionando al cliente como el héroe y a la empresa como su guía.';
     if (replyConfig.tono === 'profesional') {
@@ -185,7 +304,7 @@ export default function GoogleBusinessProfileView({ currentSite }) {
     }
 
     const keywords = replyConfig.seoLocal
-      ? `Menciona con naturalidad términos de SEO local como "${review.servicio}", "${city}" y "diseño web profesional".`
+      ? `Menciona con naturalidad términos de SEO local como "${review.servicio}" y "${city}".`
       : 'No incluyas términos forzados de SEO.';
 
     // Lectura de clave de Gemini de entorno o localStorage
@@ -233,19 +352,19 @@ INSTRUCCIONES CLAVE:
       }
     }
 
-    // Fallback inteligente determinista basado en el tono seleccionado
+    // Fallback inteligente determinista basado en el tono seleccionado y en el nombre del cliente activo
     if (!generatedText) {
       const nombrePila = review.autor.split(' ')[0];
-      if (review.estrellas === 5) {
+      if (review.estrellas >= 4) {
         if (replyConfig.tono === 'storybrand') {
-          generatedText = `¡Muchísimas gracias por tu recomendación, ${nombrePila}! En Goglite nos apasiona entregar soluciones de diseño web profesional que realmente impulsen a nuestros clientes en República Dominicana. ¡Un placer haber trabajado contigo!`;
+          generatedText = `¡Muchísimas gracias por tu recomendación, ${nombrePila}! En ${siteName} nos apasiona brindar un servicio de ${review.servicio} de primera calidad en ${city}. ¡Un verdadero placer atenderte!`;
         } else if (replyConfig.tono === 'profesional') {
-          generatedText = `Estimado(a) ${review.autor}, agradecemos su valoración sobre nuestro servicio de ${review.servicio}. En Goglite mantenemos los más altos estándares técnicos y de soporte para asegurar el éxito digital de su proyecto. A sus órdenes continuas.`;
+          generatedText = `Estimado(a) ${review.autor}, agradecemos su valoración sobre nuestro servicio de ${review.servicio}. En ${siteName} mantenemos los más altos estándares de calidad en ${city}. A sus órdenes siempre.`;
         } else {
-          generatedText = `¡Qué alegría leer tu reseña, ${nombrePila}! Todo el equipo de Goglite te manda un fuerte abrazo. Nos llena de orgullo saber que tu experiencia fue 10/10. ¡Cuenta con nosotros siempre!`;
+          generatedText = `¡Qué alegría leer tu reseña, ${nombrePila}! Todo el equipo de ${siteName} te envía un cordial saludo. Nos llena de orgullo saber que tu experiencia fue 10/10. ¡Cuenta con nosotros siempre!`;
         }
       } else {
-        generatedText = `Hola ${nombrePila}, agradecemos tus comentarios. En Goglite la satisfacción del cliente es primordial. Nos comunicaremos directamente vía WhatsApp contigo para garantizar que todo funcione con la máxima excelencia.`;
+        generatedText = `Hola ${nombrePila}, agradecemos tus comentarios. En ${siteName} la satisfacción de nuestros clientes es prioridad absoluta. Nos comunicaremos directamente vía WhatsApp contigo para resolver cualquier detalle de inmediato.`;
       }
     }
 
@@ -301,8 +420,7 @@ Con esto, tu ficha quedará enlazada automáticamente a tu panel en tiempo real 
 
   const pendingCount = reviews.filter(r => r.estado === 'pendiente').length;
 
-  // Métricas reales de la ficha de Goglite (mayo-octubre)
-  const metricsData = isGoglite ? REAL_GOGLITE_PROFILE_DATA.metricas : {
+  const metricsData = profileData.metricas || {
     interaccionesTotales: 0,
     direcciones: 0,
     clicsSitioWeb: 0,
@@ -311,11 +429,14 @@ Con esto, tu ficha quedará enlazada automáticamente a tu panel en tiempo real 
     reservas: 0
   };
 
-  const officialProfileName = isGoglite ? REAL_GOGLITE_PROFILE_DATA.nombre : currentSite.nombre;
-  const officialAddress = isGoglite ? REAL_GOGLITE_PROFILE_DATA.direccion : `${currentSite.pais === 'DO' ? 'Santo Domingo, República Dominicana' : 'San Salvador, El Salvador'}`;
-  const officialPhone = isGoglite ? REAL_GOGLITE_PROFILE_DATA.telefono : (currentSite.contenido?.branding?.telefonoWhatsApp || '+1 829-528-4713');
-  const officialRating = isGoglite ? REAL_GOGLITE_PROFILE_DATA.calificacion : 5.0;
-  const totalReviewsCount = isGoglite ? reviews.length : reviews.length;
+  const officialProfileName = profileData.nombre || currentSite.nombre;
+  const officialCategory = profileData.categoria || 'Servicios Profesionales';
+  const officialAddress = profileData.direccion || `${currentSite.pais === 'DO' ? 'Santo Domingo, República Dominicana' : 'San Salvador, El Salvador'}`;
+  const officialPhone = profileData.telefono || (currentSite.contenido?.branding?.telefonoWhatsApp || '+1 829-528-4713');
+  const officialRating = Number(profileData.calificacion) || 5.0;
+  const officialPeriodo = profileData.periodo || 'octubre 2026';
+  const officialMapsUrl = profileData.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(officialProfileName)}`;
+  const totalReviewsCount = reviews.length;
 
   return (
     <div className="flex-1 flex flex-col gap-6 text-slate-100">
@@ -406,7 +527,7 @@ Con esto, tu ficha quedará enlazada automáticamente a tu panel en tiempo real 
             <p className="text-xs text-slate-300 mt-1 flex flex-wrap items-center gap-3">
               <span className="flex items-center gap-1 text-slate-400">
                 <Building2 className="w-3.5 h-3.5 text-blue-400" />
-                <span>Diseñador de sitios web · Agencia de marketing</span>
+                <span>{officialCategory}</span>
               </span>
               <span className="text-slate-600">•</span>
               <span className="flex items-center gap-1 text-slate-400">
@@ -432,16 +553,29 @@ Con esto, tu ficha quedará enlazada automáticamente a tu panel en tiempo real 
               </div>
               <span className="text-slate-600">•</span>
               <span className="text-xs text-slate-400 font-mono flex items-center gap-1">
-                <Calendar className="w-3 h-3 text-blue-400" /> Período oficial: {REAL_GOGLITE_PROFILE_DATA.periodo}
+                <Calendar className="w-3 h-3 text-blue-400" /> Período oficial: {officialPeriodo}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Acciones Rápidas de la Ficha */}
+        {/* Acciones Rápidas de la Ficha & Inyección de Datos */}
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              setProfileForm(profileData);
+              setShowInjectProfileModal(true);
+            }}
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition-all"
+            title="Inyectar o actualizar los datos reales y métricas de la Ficha de Google Business de este cliente"
+          >
+            <Sliders className="w-3.5 h-3.5 text-amber-400" />
+            <span>Inyectar / Editar Datos Maps</span>
+          </button>
+
           <a
-            href="https://www.google.com/maps/place/Goglite+%7C+Dise%C3%B1o+Web+Profesional+en+Rep%C3%BAblica+Dominicana./@18.5304954,-69.9104647,17z/data=!4m8!3m7!1s0x8eaf8979c74962f9:0xdb861c27130c04a1!8m2!3d18.5304903!4d-69.9078898!9m1!1b1!16s%2Fg%2F11xfjb46jv?entry=ttu&g_ep=EgoyMDI2MTAyMC4wIKXMDSoASAFQAw%3D%3D"
+            href={officialMapsUrl}
             target="_blank"
             rel="noreferrer"
             className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-blue-950 transition-all"
@@ -465,7 +599,7 @@ Con esto, tu ficha quedará enlazada automáticamente a tu panel en tiempo real 
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black text-white">{metricsData.interaccionesTotales}</span>
-            <span className="text-xs font-mono text-slate-400">may – oct 2026</span>
+            <span className="text-xs font-mono text-slate-400">{officialPeriodo}</span>
           </div>
           <p className="text-[11px] text-slate-500">Métricas oficiales de búsqueda y mapas</p>
         </div>
@@ -520,7 +654,7 @@ Con esto, tu ficha quedará enlazada automáticamente a tu panel en tiempo real 
       {/* 4. BANDEJA DE RESEÑAS REALES & RESPUESTAS INTELIGENTES CON IA */}
       <div className="space-y-4">
         
-        {/* Barra de Filtros */}
+        {/* Barra de Filtros & Inyección de Reseñas */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-[#0e1320] border border-slate-800">
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -566,9 +700,21 @@ Con esto, tu ficha quedará enlazada automáticamente a tu panel en tiempo real 
             </button>
           </div>
 
-          <div className="text-xs text-slate-400 flex items-center gap-2 font-mono">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>{lastSyncTime}</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowInjectReviewModal(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5 transition-all"
+              title="Inyectar una reseña recibida por este cliente para responderla con IA"
+            >
+              <Plus className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Inyectar Reseña del Cliente</span>
+            </button>
+
+            <div className="text-xs text-slate-400 flex items-center gap-2 font-mono">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>{lastSyncTime}</span>
+            </div>
           </div>
         </div>
 
@@ -890,6 +1036,318 @@ Con esto, tu ficha quedará enlazada automáticamente a tu panel en tiempo real 
                 Cerrar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: INYECTAR / EDITAR DATOS Y MÉTRICAS DE FICHA GOOGLE BUSINESS */}
+      {showInjectProfileModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e1320] border border-amber-500/40 rounded-2xl p-6 max-w-2xl w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Inyectar Datos de Ficha Google Business Profile</h3>
+                  <p className="text-xs text-slate-400">Cliente activo: <strong className="text-white">{currentSite.nombre}</strong> ({currentSite.dominio})</p>
+                </div>
+              </div>
+              <button onClick={() => setShowInjectProfileModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveInjectedProfile} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Nombre Oficial en Google Maps *</label>
+                  <input
+                    type="text"
+                    required
+                    value={profileForm.nombre || ''}
+                    onChange={(e) => setProfileForm({ ...profileForm, nombre: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Categoría Principal en Maps</label>
+                  <input
+                    type="text"
+                    value={profileForm.categoria || ''}
+                    onChange={(e) => setProfileForm({ ...profileForm, categoria: e.target.value })}
+                    placeholder="Ej. Agencia de Excursiones · Transporte Turístico"
+                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Dirección Física (NAP)</label>
+                  <input
+                    type="text"
+                    value={profileForm.direccion || ''}
+                    onChange={(e) => setProfileForm({ ...profileForm, direccion: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Teléfono Oficial en Ficha</label>
+                  <input
+                    type="text"
+                    value={profileForm.telefono || ''}
+                    onChange={(e) => setProfileForm({ ...profileForm, telefono: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="text-slate-400 block mb-1">Enlace Oficial a Ficha de Google Maps</label>
+                  <input
+                    type="text"
+                    value={profileForm.mapsUrl || ''}
+                    onChange={(e) => setProfileForm({ ...profileForm, mapsUrl: e.target.value })}
+                    placeholder="https://maps.google.com/..."
+                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-slate-400 block mb-1">Rating ★</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      max="5"
+                      value={profileForm.calificacion || 5.0}
+                      onChange={(e) => setProfileForm({ ...profileForm, calificacion: e.target.value })}
+                      className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Período</label>
+                    <input
+                      type="text"
+                      value={profileForm.periodo || ''}
+                      onChange={(e) => setProfileForm({ ...profileForm, periodo: e.target.value })}
+                      placeholder="oct 2026"
+                      className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#131926] border border-slate-800 space-y-3">
+                <span className="font-bold text-amber-300 block uppercase font-mono text-[10px]">
+                  Métricas de Rendimiento del Período (Google Business Insights)
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-slate-400 block mb-1">Interacciones Totales</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={profileForm.metricas?.interaccionesTotales ?? 0}
+                      onChange={(e) => setProfileForm({
+                        ...profileForm,
+                        metricas: { ...(profileForm.metricas || {}), interaccionesTotales: e.target.value }
+                      })}
+                      className="w-full bg-[#0a0e17] border border-slate-700 rounded-xl p-2 text-white font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Cómo Llegar (Rutas GPS)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={profileForm.metricas?.direcciones ?? 0}
+                      onChange={(e) => setProfileForm({
+                        ...profileForm,
+                        metricas: { ...(profileForm.metricas || {}), direcciones: e.target.value }
+                      })}
+                      className="w-full bg-[#0a0e17] border border-slate-700 rounded-xl p-2 text-white font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Clics al Sitio Web</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={profileForm.metricas?.clicsSitioWeb ?? 0}
+                      onChange={(e) => setProfileForm({
+                        ...profileForm,
+                        metricas: { ...(profileForm.metricas || {}), clicsSitioWeb: e.target.value }
+                      })}
+                      className="w-full bg-[#0a0e17] border border-slate-700 rounded-xl p-2 text-white font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Llamadas Directas</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={profileForm.metricas?.llamadas ?? 0}
+                      onChange={(e) => setProfileForm({
+                        ...profileForm,
+                        metricas: { ...(profileForm.metricas || {}), llamadas: e.target.value }
+                      })}
+                      className="w-full bg-[#0a0e17] border border-slate-700 rounded-xl p-2 text-white font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Clics en Chat / Mensajes</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={profileForm.metricas?.clicsChat ?? 0}
+                      onChange={(e) => setProfileForm({
+                        ...profileForm,
+                        metricas: { ...(profileForm.metricas || {}), clicsChat: e.target.value }
+                      })}
+                      className="w-full bg-[#0a0e17] border border-slate-700 rounded-xl p-2 text-white font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Reservas / Citas</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={profileForm.metricas?.reservas ?? 0}
+                      onChange={(e) => setProfileForm({
+                        ...profileForm,
+                        metricas: { ...(profileForm.metricas || {}), reservas: e.target.value }
+                      })}
+                      className="w-full bg-[#0a0e17] border border-slate-700 rounded-xl p-2 text-white font-mono font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowInjectProfileModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold flex items-center gap-1.5 shadow-lg"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Guardar e Inyectar en Ficha</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: INYECTAR NUEVA RESEÑA DEL CLIENTE */}
+      {showInjectReviewModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0e1320] border border-emerald-500/40 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Inyectar Reseña de Google Maps</h3>
+                  <p className="text-xs text-slate-400">Registra una opinión del cliente para responderla con IA</p>
+                </div>
+              </div>
+              <button onClick={() => setShowInjectReviewModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddInjectedReview} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Nombre del Autor *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Roberto Méndez"
+                    value={newReviewForm.autor}
+                    onChange={(e) => setNewReviewForm({ ...newReviewForm, autor: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Calificación (Estrellas)</label>
+                  <select
+                    value={newReviewForm.estrellas}
+                    onChange={(e) => setNewReviewForm({ ...newReviewForm, estrellas: Number(e.target.value) })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white"
+                  >
+                    <option value={5}>★★★★★ (5 Estrellas)</option>
+                    <option value={4}>★★★★☆ (4 Estrellas)</option>
+                    <option value={3}>★★★☆☆ (3 Estrellas)</option>
+                    <option value={2}>★★☆☆☆ (2 Estrellas)</option>
+                    <option value={1}>★☆☆☆☆ (1 Estrella)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Servicio Contratado (SEO Local)</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Transporte VIP Aeropuerto"
+                    value={newReviewForm.servicio}
+                    onChange={(e) => setNewReviewForm({ ...newReviewForm, servicio: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Fecha de la Reseña</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Hace 2 horas"
+                    value={newReviewForm.fecha}
+                    onChange={(e) => setNewReviewForm({ ...newReviewForm, fecha: e.target.value })}
+                    className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Texto de la Reseña del Cliente *</label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="Escribe o pega el comentario que dejó el cliente en Google Maps..."
+                  value={newReviewForm.texto}
+                  onChange={(e) => setNewReviewForm({ ...newReviewForm, texto: e.target.value })}
+                  className="w-full bg-[#131926] border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowInjectReviewModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 shadow-lg"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Inyectar Reseña</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
