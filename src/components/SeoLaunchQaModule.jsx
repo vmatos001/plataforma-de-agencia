@@ -27,7 +27,9 @@ import {
   Server,
   Layers,
   CheckSquare,
-  Square
+  Square,
+  MinusCircle,
+  Ban
 } from 'lucide-react';
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 
@@ -484,38 +486,53 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
       if (raw) savedData = JSON.parse(raw);
     } catch (e) {}
 
+    const extractState = (i) => {
+      if (i.estado === 'APROBADO' || i.estado === 'PENDIENTE' || i.estado === 'NO_APLICA') {
+        return i.estado;
+      }
+      if (i.noAplica === true) return 'NO_APLICA';
+      if (i.completado === true) return 'APROBADO';
+      return 'PENDIENTE';
+    };
+
     const savedMap = new Map();
     if (savedData && Array.isArray(savedData.items)) {
       savedData.items.forEach(i => {
-        if (i.id) savedMap.set(i.id, Boolean(i.completado));
-        if (i.numero) savedMap.set(Number(i.numero), Boolean(i.completado));
-        if (i.item) savedMap.set(i.item.toLowerCase().trim(), Boolean(i.completado));
+        const st = extractState(i);
+        if (i.id) savedMap.set(i.id, st);
+        if (i.numero) savedMap.set(Number(i.numero), st);
+        if (i.item) savedMap.set(i.item.toLowerCase().trim(), st);
       });
     } else if (proj.launchQa && Array.isArray(proj.launchQa.items)) {
       proj.launchQa.items.forEach(i => {
-        if (i.id) savedMap.set(i.id, Boolean(i.completado));
-        if (i.numero) savedMap.set(Number(i.numero), Boolean(i.completado));
-        if (i.item) savedMap.set(i.item.toLowerCase().trim(), Boolean(i.completado));
+        const st = extractState(i);
+        if (i.id) savedMap.set(i.id, st);
+        if (i.numero) savedMap.set(Number(i.numero), st);
+        if (i.item) savedMap.set(i.item.toLowerCase().trim(), st);
       });
     }
 
-    // Inicializar o fusionar con los 30 ítems oficiales sin perder progreso previo
+    // Inicializar o fusionar con los ítems oficiales sin perder progreso previo
     const mergedList = DEFAULT_CHECKLIST_ITEMS.map(item => {
-      let isDone = false;
+      let currentEstado = 'PENDIENTE';
       if (savedMap.has(item.id)) {
-        isDone = savedMap.get(item.id);
+        currentEstado = savedMap.get(item.id);
       } else if (savedMap.has(item.numero)) {
-        isDone = savedMap.get(item.numero);
+        currentEstado = savedMap.get(item.numero);
       } else {
         const itemLower = item.item.toLowerCase().trim();
         for (const [key, val] of savedMap.entries()) {
           if (typeof key === 'string' && (key.includes(itemLower) || itemLower.includes(key))) {
-            isDone = val;
+            currentEstado = val;
             break;
           }
         }
       }
-      return { ...item, completado: isDone };
+      return {
+        ...item,
+        estado: currentEstado,
+        completado: currentEstado === 'APROBADO'
+      };
     });
 
     setChecklist(mergedList);
@@ -526,25 +543,50 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
     loadChecklistForProject(projId, proyectos);
   };
 
-  const handleToggleItem = (itemId) => {
+  const handleSetItemStatus = (itemId, nuevoEstado) => {
     setChecklist(prev => {
       const updated = prev.map(item =>
-        item.id === itemId ? { ...item, completado: !item.completado } : item
+        item.id === itemId
+          ? { ...item, estado: nuevoEstado, completado: nuevoEstado === 'APROBADO' }
+          : item
       );
       saveChecklistState(updated, siteUrl);
       return updated;
     });
   };
 
+  const handleToggleItem = (itemId) => {
+    setChecklist(prev => {
+      const updated = prev.map(item => {
+        if (item.id === itemId) {
+          const current = item.estado || (item.completado ? 'APROBADO' : 'PENDIENTE');
+          let next = 'APROBADO';
+          if (current === 'APROBADO') next = 'NO_APLICA';
+          else if (current === 'NO_APLICA') next = 'PENDIENTE';
+          else next = 'APROBADO';
+
+          return { ...item, estado: next, completado: next === 'APROBADO' };
+        }
+        return item;
+      });
+      saveChecklistState(updated, siteUrl);
+      return updated;
+    });
+  };
+
   const handleResetChecklist = () => {
-    if (!window.confirm(`¿Deseas reiniciar todas las casillas de verificación de este proyecto (${DEFAULT_CHECKLIST_ITEMS.length} puntos)?`)) return;
-    const resetList = DEFAULT_CHECKLIST_ITEMS.map(item => ({ ...item, completado: false }));
+    if (!window.confirm(`¿Deseas reiniciar todas las casillas de verificación de este proyecto (${DEFAULT_CHECKLIST_ITEMS.length} puntos) a estado Pendiente?`)) return;
+    const resetList = DEFAULT_CHECKLIST_ITEMS.map(item => ({ ...item, estado: 'PENDIENTE', completado: false }));
     setChecklist(resetList);
     saveChecklistState(resetList, siteUrl);
   };
 
   const handleMarkAll = () => {
-    const allDone = checklist.map(item => ({ ...item, completado: true }));
+    const allDone = checklist.map(item => ({
+      ...item,
+      estado: item.estado === 'NO_APLICA' ? 'NO_APLICA' : 'APROBADO',
+      completado: item.estado !== 'NO_APLICA'
+    }));
     setChecklist(allDone);
     saveChecklistState(allDone, siteUrl);
   };
@@ -584,15 +626,21 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
     setTimeout(() => setSavedNotice(false), 2000);
   };
 
-  // Métricas de Certificación
+  // Métricas de Certificación con Soporte Tri-Estado (Aprobada / Pendiente / No Aplica)
   const totalItems = checklist.length;
-  const completadosCount = checklist.filter(i => i.completado).length;
-  const criticosTotal = checklist.filter(i => i.critico).length;
-  const criticosCompletados = checklist.filter(i => i.critico && i.completado).length;
-  const criticosPendientes = criticosTotal - criticosCompletados;
+  const noAplicaCount = checklist.filter(i => i.estado === 'NO_APLICA').length;
+  const evaluablesCount = totalItems - noAplicaCount;
+  const aprobadosCount = checklist.filter(i => (i.estado === 'APROBADO' || (!i.estado && i.completado)) && i.estado !== 'NO_APLICA').length;
+  const pendientesCount = evaluablesCount - aprobadosCount;
 
-  const scoreSalud = totalItems > 0 ? Math.round((completadosCount / totalItems) * 100) : 0;
-  const isAprobado = completadosCount === totalItems || (scoreSalud >= 90 && criticosPendientes === 0);
+  // Requisitos Críticos
+  const criticosEvaluables = checklist.filter(i => i.critico && i.estado !== 'NO_APLICA');
+  const criticosTotal = criticosEvaluables.length;
+  const criticosAprobados = criticosEvaluables.filter(i => (i.estado === 'APROBADO' || (!i.estado && i.completado))).length;
+  const criticosPendientes = criticosTotal - criticosAprobados;
+
+  const scoreSalud = evaluablesCount > 0 ? Math.round((aprobadosCount / evaluablesCount) * 100) : 100;
+  const isAprobado = evaluablesCount > 0 && (aprobadosCount === evaluablesCount || (scoreSalud >= 90 && criticosPendientes === 0));
 
   // Extraer dominio limpio para validadores
   const cleanDomain = siteUrl.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
@@ -671,10 +719,13 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
   // Filtrado de ítems para el operador
   const filteredChecklist = useMemo(() => {
     return checklist.filter(item => {
+      const st = item.estado || (item.completado ? 'APROBADO' : 'PENDIENTE');
+
       // Filtro de estado
-      if (filterMode === 'PENDING' && item.completado) return false;
-      if (filterMode === 'DONE' && !item.completado) return false;
-      if (filterMode === 'CRITICAL' && !item.critico) return false;
+      if (filterMode === 'PENDING' && st !== 'PENDIENTE') return false;
+      if (filterMode === 'DONE' && st !== 'APROBADO') return false;
+      if (filterMode === 'NO_APLICA' && st !== 'NO_APLICA') return false;
+      if (filterMode === 'CRITICAL' && (!item.critico || st === 'NO_APLICA')) return false;
 
       // Filtro de búsqueda
       if (searchQuery.trim()) {
@@ -809,12 +860,18 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
                   {isAprobado ? '✅ APROBADO PARA ENTREGA OFICIAL (100%)' : '⚠️ AUDITORÍA EN CURSO (AJUSTES PENDIENTES)'}
                 </span>
               </div>
-              <div className="text-xs text-slate-400 mt-1">
-                <strong>{completadosCount} de {totalItems} chequeos completados</strong> · 
+              <div className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-1.5">
+                <strong className="text-white">{aprobadosCount} de {evaluablesCount} evaluables completados</strong>
+                {noAplicaCount > 0 && (
+                  <span className="text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-md text-[11px] font-mono border border-slate-700">
+                    {noAplicaCount} no aplica
+                  </span>
+                )}
+                <span>·</span>
                 {criticosPendientes === 0 ? (
-                  <span className="text-emerald-400 font-semibold ml-1">Todos los requisitos críticos superados</span>
+                  <span className="text-emerald-400 font-semibold">Todos los requisitos críticos superados</span>
                 ) : (
-                  <span className="text-amber-400 font-semibold ml-1">{criticosPendientes} requisito(s) crítico(s) pendientes</span>
+                  <span className="text-amber-400 font-semibold">{criticosPendientes} requisito(s) crítico(s) pendientes</span>
                 )}
               </div>
             </div>
@@ -967,7 +1024,7 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
-            Pendientes ({totalItems - completadosCount})
+            Pendientes ({pendientesCount})
           </button>
 
           <button
@@ -979,7 +1036,19 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
-            Completados ({completadosCount})
+            Aprobadas ({aprobadosCount})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFilterMode('NO_APLICA')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              filterMode === 'NO_APLICA'
+                ? 'bg-slate-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            No aplica ({noAplicaCount})
           </button>
 
           <button
@@ -1023,8 +1092,10 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
           if (catItems.length === 0) return null;
 
           const catAllItems = checklist.filter(item => item.categoria === categoriaName);
-          const catDoneCount = catAllItems.filter(item => item.completado).length;
-          const isCategoryComplete = catDoneCount === catAllItems.length && catAllItems.length > 0;
+          const catAprobados = catAllItems.filter(item => item.estado === 'APROBADO' || (item.estado !== 'NO_APLICA' && item.completado)).length;
+          const catNoAplica = catAllItems.filter(item => item.estado === 'NO_APLICA').length;
+          const catEvaluables = catAllItems.length - catNoAplica;
+          const isCategoryComplete = catEvaluables > 0 ? catAprobados === catEvaluables : true;
 
           return (
             <div
@@ -1046,7 +1117,7 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                       : 'bg-slate-800 text-slate-300 border border-slate-700'
                   }`}>
-                    {catDoneCount} de {catAllItems.length} completados
+                    {catAprobados} de {catEvaluables} evaluables {catNoAplica > 0 ? `(${catNoAplica} N/A)` : ''}
                   </span>
                 </div>
               </div>
@@ -1055,77 +1126,146 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
               <div className="divide-y divide-slate-800/60 p-2 sm:p-3">
                 {catItems.map((item) => {
                   const directToolUrl = item.toolType ? getToolUrl(item.toolType) : null;
+                  const st = item.estado || (item.completado ? 'APROBADO' : 'PENDIENTE');
 
                   return (
                     <div
                       key={item.id}
-                      className={`p-3.5 rounded-xl transition-all flex items-start gap-3.5 my-1 ${
-                        item.completado
-                          ? 'bg-emerald-950/10 border border-emerald-500/20 text-slate-300'
+                      className={`p-3.5 rounded-xl transition-all flex flex-col sm:flex-row sm:items-start justify-between gap-3 my-1 ${
+                        st === 'APROBADO'
+                          ? 'bg-emerald-950/15 border border-emerald-500/25 text-slate-200 shadow-sm'
+                          : st === 'NO_APLICA'
+                          ? 'bg-[#0b0e17]/80 border border-slate-800 text-slate-400 opacity-80'
                           : 'bg-[#101625]/60 hover:bg-[#12192b] border border-slate-800/80 text-white'
                       }`}
                     >
-                      {/* Checkbox Interactivo */}
-                      <button
-                        type="button"
-                        onClick={() => handleToggleItem(item.id)}
-                        className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border transition-all ${
-                          item.completado
-                            ? 'bg-emerald-600 border-emerald-500 text-white shadow-md shadow-emerald-950/50 scale-105'
-                            : 'bg-slate-900 border-slate-700 text-transparent hover:border-orange-500 hover:text-slate-600'
-                        }`}
-                        title={item.completado ? 'Marcar como pendiente' : 'Marcar como verificado'}
-                      >
-                        <Check className="w-4 h-4 stroke-[3]" />
-                      </button>
+                      {/* Icono de Estado / Ciclo Rápido */}
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleItem(item.id)}
+                          className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border transition-all ${
+                            st === 'APROBADO'
+                              ? 'bg-emerald-600 border-emerald-500 text-white shadow-md shadow-emerald-950/50 scale-105'
+                              : st === 'NO_APLICA'
+                              ? 'bg-slate-800 border-slate-600 text-slate-300'
+                              : 'bg-slate-900 border-slate-700 text-transparent hover:border-orange-500 hover:text-slate-600'
+                          }`}
+                          title={`Estado actual: ${st === 'APROBADO' ? 'Aprobada' : st === 'NO_APLICA' ? 'No aplica' : 'Pendiente'}. Haz clic para rotar.`}
+                        >
+                          {st === 'APROBADO' && <Check className="w-4 h-4 stroke-[3]" />}
+                          {st === 'NO_APLICA' && <MinusCircle className="w-4 h-4" />}
+                          {st === 'PENDIENTE' && <Square className="w-3.5 h-3.5 text-slate-600" />}
+                        </button>
 
-                      {/* Contenido del Chequeo */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[10px] font-mono font-black text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">
-                            #{String(item.numero).padStart(2, '0')}
-                          </span>
-
-                          <span
-                            onClick={() => handleToggleItem(item.id)}
-                            className={`text-xs font-bold cursor-pointer select-none ${
-                              item.completado ? 'line-through text-slate-400' : 'text-white'
-                            }`}
-                          >
-                            {item.item}
-                          </span>
-
-                          {item.critico && (
-                            <span className="text-[9px] font-mono uppercase font-bold text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
-                              Crítico
+                        {/* Contenido del Chequeo */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] font-mono font-black text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">
+                              #{String(item.numero).padStart(2, '0')}
                             </span>
-                          )}
 
-                          {item.completado && (
-                            <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1 font-bold">
-                              <Check className="w-3 h-3" /> Verificado
+                            <span
+                              onClick={() => handleToggleItem(item.id)}
+                              className={`text-xs font-bold cursor-pointer select-none ${
+                                st === 'APROBADO'
+                                  ? 'text-emerald-300'
+                                  : st === 'NO_APLICA'
+                                  ? 'line-through text-slate-400 decoration-slate-600'
+                                  : 'text-white'
+                              }`}
+                            >
+                              {item.item}
                             </span>
+
+                            {item.critico && st !== 'NO_APLICA' && (
+                              <span className="text-[9px] font-mono uppercase font-bold text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
+                                Crítico
+                              </span>
+                            )}
+
+                            {st === 'APROBADO' && (
+                              <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1 font-bold">
+                                <Check className="w-3 h-3" /> Aprobada
+                              </span>
+                            )}
+
+                            {st === 'NO_APLICA' && (
+                              <span className="text-[9px] font-mono text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded flex items-center gap-1 font-bold border border-slate-700">
+                                <MinusCircle className="w-3 h-3" /> No aplica
+                              </span>
+                            )}
+
+                            {st === 'PENDIENTE' && (
+                              <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded flex items-center gap-1 font-bold border border-amber-500/20">
+                                Pendiente
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                            {item.descripcion}
+                          </p>
+
+                          {/* Enlace directo a herramienta oficial de prueba */}
+                          {directToolUrl && st !== 'NO_APLICA' && (
+                            <div className="mt-2">
+                              <a
+                                href={directToolUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] text-sky-400 hover:text-sky-300 font-semibold underline underline-offset-2"
+                              >
+                                <span>Abrir Validador Oficial</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            </div>
                           )}
                         </div>
+                      </div>
 
-                        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                          {item.descripcion}
-                        </p>
+                      {/* Lado Derecho: Selector Segmentado de 3 Estados (1-Clic) */}
+                      <div className="flex items-center gap-1 bg-[#080b11] p-1 rounded-xl border border-slate-800 shrink-0 self-start sm:self-center shadow-inner">
+                        <button
+                          type="button"
+                          onClick={() => handleSetItemStatus(item.id, 'PENDIENTE')}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all flex items-center gap-1 ${
+                            st === 'PENDIENTE'
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                          }`}
+                          title="Marcar como Pendiente"
+                        >
+                          Pendiente
+                        </button>
 
-                        {/* Enlace directo a herramienta oficial de prueba */}
-                        {directToolUrl && (
-                          <div className="mt-2">
-                            <a
-                              href={directToolUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[10px] text-sky-400 hover:text-sky-300 font-semibold underline underline-offset-2"
-                            >
-                              <span>Abrir Validador Oficial</span>
-                              <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
-                          </div>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleSetItemStatus(item.id, 'APROBADO')}
+                          className={`px-3 py-1 rounded-lg text-[10px] font-bold font-mono transition-all flex items-center gap-1 ${
+                            st === 'APROBADO'
+                              ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-950/50'
+                              : 'text-slate-400 hover:text-emerald-300 hover:bg-emerald-950/30'
+                          }`}
+                          title="Marcar como Aprobada"
+                        >
+                          <Check className="w-3 h-3 stroke-[3]" />
+                          <span>Aprobada</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSetItemStatus(item.id, 'NO_APLICA')}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all flex items-center gap-1 ${
+                            st === 'NO_APLICA'
+                              ? 'bg-slate-700 text-slate-100 border border-slate-500 shadow-sm'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                          }`}
+                          title="Marcar como No aplica (no resta calidad al sitio)"
+                        >
+                          <MinusCircle className="w-3 h-3" />
+                          <span>No aplica</span>
+                        </button>
                       </div>
                     </div>
                   );
@@ -1203,7 +1343,7 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
             <div>
               <span className="text-slate-500 font-mono block text-[8.5px] uppercase">Dictamen Global:</span>
               <strong className="text-emerald-700 font-bold text-[10.5px] block">
-                {completadosCount} / {totalItems} Puntos ({scoreSalud}%)
+                {aprobadosCount} / {evaluablesCount} Evaluables ({noAplicaCount > 0 ? `${noAplicaCount} N/A · ` : ''}{scoreSalud}%)
               </strong>
             </div>
           </div>
@@ -1227,24 +1367,31 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
                     <span>ESTADO</span>
                   </div>
                   <div className="divide-y divide-slate-200 text-[8px] leading-tight">
-                    {col1.map((item) => (
-                      <div key={item.id} className="px-2 py-[1.5px] flex items-center justify-between gap-1 hover:bg-slate-50">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="font-mono font-bold text-slate-500 shrink-0 text-[7.5px]">
-                            {String(item.numero).padStart(2, '0')}
-                          </span>
-                          <span className="font-medium text-slate-900 truncate">
-                            {item.item}
-                            {item.critico && <span className="text-rose-600 font-bold ml-1 text-[7px] font-mono">[Crítico]</span>}
+                    {col1.map((item) => {
+                      const st = item.estado || (item.completado ? 'APROBADO' : 'PENDIENTE');
+                      return (
+                        <div key={item.id} className="px-2 py-[1.5px] flex items-center justify-between gap-1 hover:bg-slate-50">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-mono font-bold text-slate-500 shrink-0 text-[7.5px]">
+                              {String(item.numero).padStart(2, '0')}
+                            </span>
+                            <span className={`font-medium truncate ${st === 'NO_APLICA' ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
+                              {item.item}
+                              {item.critico && st !== 'NO_APLICA' && <span className="text-rose-600 font-bold ml-1 text-[7px] font-mono">[Crítico]</span>}
+                            </span>
+                          </div>
+                          <span className={`shrink-0 font-mono font-bold text-[7px] px-1 py-0.2 rounded ${
+                            st === 'APROBADO'
+                              ? 'text-emerald-800 bg-emerald-100'
+                              : st === 'NO_APLICA'
+                              ? 'text-slate-600 bg-slate-200'
+                              : 'text-amber-800 bg-amber-100'
+                          }`}>
+                            {st === 'APROBADO' ? '✓ OK' : st === 'NO_APLICA' ? 'N/A' : 'PENDIENTE'}
                           </span>
                         </div>
-                        <span className={`shrink-0 font-mono font-bold text-[7px] px-1 py-0.2 rounded ${
-                          item.completado ? 'text-emerald-800 bg-emerald-100' : 'text-amber-800 bg-amber-100'
-                        }`}>
-                          {item.completado ? '✓ OK' : 'PENDIENTE'}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1255,24 +1402,31 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
                     <span>ESTADO</span>
                   </div>
                   <div className="divide-y divide-slate-200 text-[8px] leading-tight">
-                    {col2.map((item) => (
-                      <div key={item.id} className="px-2 py-[1.5px] flex items-center justify-between gap-1 hover:bg-slate-50">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="font-mono font-bold text-slate-500 shrink-0 text-[7.5px]">
-                            {String(item.numero).padStart(2, '0')}
-                          </span>
-                          <span className="font-medium text-slate-900 truncate">
-                            {item.item}
-                            {item.critico && <span className="text-rose-600 font-bold ml-1 text-[7px] font-mono">[Crítico]</span>}
+                    {col2.map((item) => {
+                      const st = item.estado || (item.completado ? 'APROBADO' : 'PENDIENTE');
+                      return (
+                        <div key={item.id} className="px-2 py-[1.5px] flex items-center justify-between gap-1 hover:bg-slate-50">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-mono font-bold text-slate-500 shrink-0 text-[7.5px]">
+                              {String(item.numero).padStart(2, '0')}
+                            </span>
+                            <span className={`font-medium truncate ${st === 'NO_APLICA' ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
+                              {item.item}
+                              {item.critico && st !== 'NO_APLICA' && <span className="text-rose-600 font-bold ml-1 text-[7px] font-mono">[Crítico]</span>}
+                            </span>
+                          </div>
+                          <span className={`shrink-0 font-mono font-bold text-[7px] px-1 py-0.2 rounded ${
+                            st === 'APROBADO'
+                              ? 'text-emerald-800 bg-emerald-100'
+                              : st === 'NO_APLICA'
+                              ? 'text-slate-600 bg-slate-200'
+                              : 'text-amber-800 bg-amber-100'
+                          }`}>
+                            {st === 'APROBADO' ? '✓ OK' : st === 'NO_APLICA' ? 'N/A' : 'PENDIENTE'}
                           </span>
                         </div>
-                        <span className={`shrink-0 font-mono font-bold text-[7px] px-1 py-0.2 rounded ${
-                          item.completado ? 'text-emerald-800 bg-emerald-100' : 'text-amber-800 bg-amber-100'
-                        }`}>
-                          {item.completado ? '✓ OK' : 'PENDIENTE'}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
