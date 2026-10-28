@@ -34,9 +34,9 @@ import {
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 
 /**
- * PROTOCOLO MAESTRO DE 44 CHEQUEOS DE PRE-ENTREGA & CONTROL DE CALIDAD
+ * PROTOCOLO MAESTRO DE 48 CHEQUEOS DE PRE-ENTREGA, CONTROL DE CALIDAD Y SEO LOCAL RANK & RENT
  * Auditoría rigurosa y obligatoria de la agencia antes de liberar cualquier sitio web a un cliente.
- * Integra las 12 Fases de Construcción: SEO On-Page, SEO Local, Google Business Profile (GBP), Presencia IA (GEO), i18n, Seguridad y Conversión.
+ * Integra las 12 Fases de Construcción: SEO On-Page, SEO Local Rank & Rent, Google Business Profile (GBP), Silos por Municipio, Citaciones Tier 1, Presencia IA (GEO), i18n, Seguridad y Conversión.
  */
 export const DEFAULT_CHECKLIST_ITEMS = [
   // 1. Analítica, Métricas & Tracking
@@ -174,8 +174,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     id: 'chk-15-gbp-galeria-antistock',
     numero: 15,
     categoria: '3. SEO Local & Google Business Profile (GBP)',
-    item: 'Galería de Operación Real (Anti-Stock)',
-    descripcion: 'Al menos 6 a 10 fotografías reales de alta calidad (flota/vehículos, choferes o personal con uniforme, oficinas o puntos de servicio), sin marcas de agua ni fotos de stock genéricas.',
+    item: 'Galería de Operación Real (Anti-Stock & Geoseñales EXIF)',
+    descripcion: 'Al menos 6 a 10 fotografías reales de alta calidad (flota/vehículos, choferes o personal con uniforme, oficinas o puntos de servicio) con metadatos EXIF geolocalizados en la zona operativa, sin marcas de agua ni fotos de stock genéricas.',
     critico: true,
     toolType: null
   },
@@ -211,22 +211,58 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     numero: 19,
     categoria: '3. SEO Local & Google Business Profile (GBP)',
     item: 'Consistencia NAP (Nombre, Dirección, Teléfono)',
-    descripcion: 'Datos NAP (Name, Address, Phone) 100% idénticos en footer, página de contacto, schema markup y Google Maps para máxima autoridad y ranking en el pack local.',
+    descripcion: 'Datos NAP (Name, Address, Phone) 100% idénticos con prefijo local en footer, página de contacto, schema markup y directorios para máxima autoridad en el pack local.',
     critico: true,
     toolType: null
   },
   {
-    id: 'chk-20-schema-localbusiness-geo',
+    id: 'chk-20-mapa-embebido-web',
     numero: 20,
     categoria: '3. SEO Local & Google Business Profile (GBP)',
+    item: 'Mapa Embebido Oficial en la Web (Iframe GBP)',
+    descripcion: 'Inserción del iframe oficial de Google Maps apuntando exactamente a la ficha verificada de GBP en /contacto o footer, transmitiendo geoseñales de entidad y facilitando navegación GPS directa.',
+    critico: true,
+    toolType: 'google_maps'
+  },
+  {
+    id: 'chk-21-silos-locales-zonas',
+    numero: 21,
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
+    item: 'Silos Locales & Landings de Cobertura (/zonas/...)',
+    descripcion: 'Estructura de URLs hijas transaccionales (/zonas/[municipio]/) con contenido único local (precios orientativos, tiempos de respuesta, ordenanzas) y bloque visible de localidades cubiertas.',
+    critico: false,
+    toolType: null
+  },
+  {
+    id: 'chk-22-schema-localbusiness-geo',
+    numero: 22,
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
     item: 'Schema JSON-LD LocalBusiness & Geo',
-    descripcion: 'Datos estructurados Schema.org tipo LocalBusiness/ProfessionalService con GeoCoordinates (lat/long), horario comercial, teléfono oficial y municipio.',
+    descripcion: 'Datos estructurados Schema.org tipo LocalBusiness/ProfessionalService con GeoCoordinates (lat/long), área servida (areaServed), catálogo de servicios (hasOfferCatalog), horario y teléfono.',
     critico: true,
     toolType: 'rich_results'
   },
   {
-    id: 'chk-21-geo-trust-anchors-ia',
-    numero: 21,
+    id: 'chk-23-citaciones-locales-tier1',
+    numero: 23,
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
+    item: 'Citaciones Locales Tier 1 (Apple Maps, Bing, Waze)',
+    descripcion: 'Registro con NAP idéntico canónico en las principales plataformas de geolocalización y directorios de máxima autoridad (Apple Maps, Bing Places, Waze, Páginas Amarillas) para consolidar la autoridad territorial.',
+    critico: false,
+    toolType: 'bing_places'
+  },
+  {
+    id: 'chk-24-protocolo-resenas-semanticas',
+    numero: 24,
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
+    item: 'Protocolo de Reseñas Semánticas & Respuestas (<48h)',
+    descripcion: 'Plantilla y guion entregados al cliente para solicitar reseñas con estructura semántica [Servicio] + [Personal] + [Municipio], y política de respuesta activa en < 24-48 horas reforzando keywords locales.',
+    critico: false,
+    toolType: 'google_reviews'
+  },
+  {
+    id: 'chk-25-geo-trust-anchors-ia',
+    numero: 25,
     categoria: '3. SEO Local & Google Business Profile (GBP)',
     item: 'GEO & Trust Anchors para IA',
     descripcion: 'Optimización para motores de respuesta de IA (ChatGPT, Perplexity, Gemini) con 3 anclas de confianza (/about, /contact, /privacy >500 chars), perfil del fundador y citas factuales.',
@@ -236,8 +272,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
 
   // 4. Legal, Privacidad & Cumplimiento
   {
-    id: 'chk-22-cookies-banner',
-    numero: 22,
+    id: 'chk-26-cookies-banner',
+    numero: 26,
     categoria: '4. Legal, Privacidad & Cumplimiento',
     item: 'Banner de cookies',
     descripcion: 'Aviso de consentimiento de cookies conforme a normativas de privacidad que permite al usuario aceptar o configurar cookies analíticas.',
@@ -245,8 +281,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-23-terminos-condiciones',
-    numero: 23,
+    id: 'chk-27-terminos-condiciones',
+    numero: 27,
     categoria: '4. Legal, Privacidad & Cumplimiento',
     item: 'Términos y condiciones',
     descripcion: 'Páginas legales públicas enlazadas en el footer: Términos & Condiciones de Uso y Política de Privacidad y Protección de Datos Personales.',
@@ -254,8 +290,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-24-correos-smtp',
-    numero: 24,
+    id: 'chk-28-correos-smtp',
+    numero: 28,
     categoria: '4. Legal, Privacidad & Cumplimiento',
     item: 'Correos + SMTP',
     descripcion: 'Servicio de correo transaccional (SMTP/Resend/SendGrid) con registros SPF, DKIM y DMARC validados para que las alertas del formulario no caigan en spam.',
@@ -263,8 +299,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-25-datos-fiscales-b2b',
-    numero: 25,
+    id: 'chk-29-datos-fiscales-b2b',
+    numero: 29,
     categoria: '4. Legal, Privacidad & Cumplimiento',
     item: 'Datos Fiscales B2B (RNC / DGII / NIT)',
     descripcion: 'Identificación tributaria corporativa (RNC/DGII en Rep. Dominicana o NIT/NRC en El Salvador) visible en el footer o contacto para clientes que requieran factura fiscal.',
@@ -274,8 +310,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
 
   // 5. Seguridad, Infraestructura & Código
   {
-    id: 'chk-26-ssl-https',
-    numero: 26,
+    id: 'chk-30-ssl-https',
+    numero: 30,
     categoria: '5. Seguridad, Infraestructura & Código',
     item: 'SSL + HTTPS forzado',
     descripcion: 'Certificado SSL TLS 1.3 activo con candado verde, redirección forzada de HTTP a HTTPS y sin advertencias de contenido mixto (Mixed Content).',
@@ -283,8 +319,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'ssl'
   },
   {
-    id: 'chk-27-datos-sesiones',
-    numero: 27,
+    id: 'chk-31-datos-sesiones',
+    numero: 31,
     categoria: '5. Seguridad, Infraestructura & Código',
     item: 'Datos ocultos en sesiones',
     descripcion: 'Verificación de que no se almacenen datos confidenciales, contraseñas ni números de tarjeta en texto plano en localStorage, sessionStorage o cookies.',
@@ -292,8 +328,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-28-sin-tokens-js',
-    numero: 28,
+    id: 'chk-32-sin-tokens-js',
+    numero: 32,
     categoria: '5. Seguridad, Infraestructura & Código',
     item: 'Sin tokens en JS',
     descripcion: 'Inspección de bundles JavaScript para asegurar que no contengan API Keys maestras, tokens de GitHub, credenciales de base de datos ni secretos de pago.',
@@ -301,8 +337,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-29-vulnerabilidades',
-    numero: 29,
+    id: 'chk-33-vulnerabilidades',
+    numero: 33,
     categoria: '5. Seguridad, Infraestructura & Código',
     item: 'Vulnerabilidades y cabeceras',
     descripcion: 'Auditoría de cabeceras de seguridad HTTP (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, HSTS) y dependencias frontend sin exploits conocidos.',
@@ -310,8 +346,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'security_headers'
   },
   {
-    id: 'chk-30-honeypot-antispam',
-    numero: 30,
+    id: 'chk-34-honeypot-antispam',
+    numero: 34,
     categoria: '5. Seguridad, Infraestructura & Código',
     item: 'Blindaje Anti-Spam Honeypot en Formularios',
     descripcion: 'Trampa invisible honeypot (_hp_security_check o campo oculto con CSS) en el 100% de los formularios para neutralizar bots sin mermar la conversión con captchas tediosos.',
@@ -321,8 +357,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
 
   // 6. Rendimiento, UX & Conversión Mobile
   {
-    id: 'chk-31-favicon',
-    numero: 31,
+    id: 'chk-35-favicon',
+    numero: 35,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Favicon',
     descripcion: 'Icono de pestaña /favicon.ico, PNG en alta resolución (192x192 y 512x512) y apple-touch-icon para accesos directos en iOS y Android.',
@@ -330,8 +366,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-32-pagina-404',
-    numero: 32,
+    id: 'chk-36-pagina-404',
+    numero: 36,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Página 404 propia',
     descripcion: 'Página de error 404 personalizada con diseño corporativo, mensaje empático y botón visible para volver al inicio sin perder al usuario.',
@@ -339,8 +375,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'page_404'
   },
   {
-    id: 'chk-33-pagespeed',
-    numero: 33,
+    id: 'chk-37-pagespeed',
+    numero: 37,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'PageSpeed Insights',
     descripcion: 'Prueba en Google PageSpeed Insights con calificación móvil ≥ 85-90 puntos, garantizando fluidez y aprobación del algoritmo de Google.',
@@ -348,8 +384,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'pagespeed'
   },
   {
-    id: 'chk-34-core-web-vitals',
-    numero: 34,
+    id: 'chk-38-core-web-vitals',
+    numero: 38,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Core Web Vitals',
     descripcion: 'Métricas de experiencia en rango verde: LCP (renderizado principal) < 2.5s, CLS (estabilidad visual) < 0.1 e INP/FID (interactividad) < 100ms.',
@@ -357,8 +393,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'pagespeed'
   },
   {
-    id: 'chk-35-optimizar-recursos',
-    numero: 35,
+    id: 'chk-39-optimizar-recursos',
+    numero: 39,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Optimizar imágenes y JS',
     descripcion: 'Imágenes comprimidas en formatos WebP/AVIF con dimensiones fijas; JavaScript minificado y scripts no esenciales diferidos con defer o async.',
@@ -366,8 +402,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-36-test-celulares',
-    numero: 36,
+    id: 'chk-40-test-celulares',
+    numero: 40,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Test en celulares reales',
     descripcion: 'Prueba física en dispositivos móviles reales (iPhone y Android) verificando que no existan barras de scroll horizontal ni tipografías ilegibles.',
@@ -375,8 +411,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-37-accesibilidad',
-    numero: 37,
+    id: 'chk-41-accesibilidad',
+    numero: 41,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Accesibilidad y contraste',
     descripcion: 'Contraste cromático de textos superior a 4.5:1 (norma WCAG AA), navegación clara por teclado y áreas táctiles de botones superiores a 44x44px.',
@@ -384,8 +420,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'contrast_checker'
   },
   {
-    id: 'chk-38-test-formularios',
-    numero: 38,
+    id: 'chk-42-test-formularios',
+    numero: 42,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Test de formularios y cotizador',
     descripcion: 'Prueba de envío completa de todos los formularios de contacto y del Cotizador Dinámico a WhatsApp, validando validaciones requeridas y evento de conversión.',
@@ -393,8 +429,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-39-botones-whatsapp',
-    numero: 39,
+    id: 'chk-43-botones-whatsapp',
+    numero: 43,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Botones, links, WhatsApp',
     descripcion: 'Verificación de que ningún botón o enlace esté roto (cero 404). Botón de WhatsApp abre la app con mensaje comercial predefinido y enlace tel: funcional.',
@@ -404,8 +440,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
 
   // 7. DevOps, Infraestructura & Respaldo
   {
-    id: 'chk-40-dns-configurados',
-    numero: 40,
+    id: 'chk-44-dns-configurados',
+    numero: 44,
     categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'DNS configurados',
     descripcion: 'Registros DNS A, CNAME, www y verificación de propagación global completada; dominio principal y www apuntan al mismo servidor sin bucles.',
@@ -413,8 +449,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'dns_checker'
   },
   {
-    id: 'chk-41-backups-automaticos',
-    numero: 41,
+    id: 'chk-45-backups-automaticos',
+    numero: 45,
     categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'Backups automáticos',
     descripcion: 'Sistema de respaldo periódico automatizado del repositorio de código, archivos multimedia y base de datos con retención mínima de 30 días.',
@@ -422,8 +458,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-42-test-restauracion',
-    numero: 42,
+    id: 'chk-46-test-restauracion',
+    numero: 46,
     categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'Test de restauración',
     descripcion: 'Procedimiento de restauración de respaldo probado y documentado para garantizar que la web puede recuperarse en menos de 1 hora ante un fallo.',
@@ -431,8 +467,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-43-alertas-caida',
-    numero: 43,
+    id: 'chk-47-alertas-caida',
+    numero: 47,
     categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'Alertas de caída',
     descripcion: 'Servicio de monitoreo de disponibilidad 24/7 (Uptime Robot o Pingdom) configurado con chequeos cada 5 minutos y alertas por correo o WhatsApp.',
@@ -440,8 +476,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'uptime_monitor'
   },
   {
-    id: 'chk-44-monitoreo-errores',
-    numero: 44,
+    id: 'chk-48-monitoreo-errores',
+    numero: 48,
     categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'Monitoreo de errores',
     descripcion: 'Rastreador de excepciones en producción activo o consola de desarrollador limpia de errores JS que puedan interrumpir la experiencia del visitante.',
@@ -549,18 +585,52 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
       return 'PENDIENTE';
     };
 
+    const LEGACY_ID_ALIASES = {
+      'chk-20-schema-localbusiness-geo': 'chk-22-schema-localbusiness-geo',
+      'chk-21-geo-trust-anchors-ia': 'chk-25-geo-trust-anchors-ia',
+      'chk-22-cookies-banner': 'chk-26-cookies-banner',
+      'chk-23-terminos-condiciones': 'chk-27-terminos-condiciones',
+      'chk-24-correos-smtp': 'chk-28-correos-smtp',
+      'chk-25-datos-fiscales-b2b': 'chk-29-datos-fiscales-b2b',
+      'chk-26-ssl-https': 'chk-30-ssl-https',
+      'chk-27-datos-sesiones': 'chk-31-datos-sesiones',
+      'chk-28-sin-tokens-js': 'chk-32-sin-tokens-js',
+      'chk-29-vulnerabilidades': 'chk-33-vulnerabilidades',
+      'chk-30-honeypot-antispam': 'chk-34-honeypot-antispam',
+      'chk-31-favicon': 'chk-35-favicon',
+      'chk-32-pagina-404': 'chk-36-pagina-404',
+      'chk-33-pagespeed': 'chk-37-pagespeed',
+      'chk-34-core-web-vitals': 'chk-38-core-web-vitals',
+      'chk-35-optimizar-recursos': 'chk-39-optimizar-recursos',
+      'chk-36-test-celulares': 'chk-40-test-celulares',
+      'chk-37-accesibilidad': 'chk-41-accesibilidad',
+      'chk-38-test-formularios': 'chk-42-test-formularios',
+      'chk-39-botones-whatsapp': 'chk-43-botones-whatsapp',
+      'chk-40-dns-configurados': 'chk-44-dns-configurados',
+      'chk-41-backups-automaticos': 'chk-45-backups-automaticos',
+      'chk-42-test-restauracion': 'chk-46-test-restauracion',
+      'chk-43-alertas-caida': 'chk-47-alertas-caida',
+      'chk-44-monitoreo-errores': 'chk-48-monitoreo-errores'
+    };
+
     const savedMap = new Map();
     if (savedData && Array.isArray(savedData.items)) {
       savedData.items.forEach(i => {
         const st = extractState(i);
-        if (i.id) savedMap.set(i.id, st);
+        if (i.id) {
+          savedMap.set(i.id, st);
+          if (LEGACY_ID_ALIASES[i.id]) savedMap.set(LEGACY_ID_ALIASES[i.id], st);
+        }
         if (i.numero) savedMap.set(Number(i.numero), st);
         if (i.item) savedMap.set(i.item.toLowerCase().trim(), st);
       });
     } else if (proj.launchQa && Array.isArray(proj.launchQa.items)) {
       proj.launchQa.items.forEach(i => {
         const st = extractState(i);
-        if (i.id) savedMap.set(i.id, st);
+        if (i.id) {
+          savedMap.set(i.id, st);
+          if (LEGACY_ID_ALIASES[i.id]) savedMap.set(LEGACY_ID_ALIASES[i.id], st);
+        }
         if (i.numero) savedMap.set(Number(i.numero), st);
         if (i.item) savedMap.set(i.item.toLowerCase().trim(), st);
       });
@@ -713,6 +783,10 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
         return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(currentProject?.cliente?.empresa || cleanDomain || 'empresa')}`;
       case 'google_reviews':
         return `https://www.google.com/search?q=${encodeURIComponent(currentProject?.cliente?.empresa || cleanDomain || 'empresa')}+reviews`;
+      case 'bing_places':
+        return `https://www.bing.com/maps?q=${encodeURIComponent(currentProject?.cliente?.empresa || cleanDomain || 'empresa')}`;
+      case 'apple_maps':
+        return `https://maps.apple.com/?q=${encodeURIComponent(currentProject?.cliente?.empresa || cleanDomain || 'empresa')}`;
       case 'ssl':
         return `https://www.sslshopper.com/ssl-checker.html#hostname=${host}`;
       case 'robots':
@@ -991,6 +1065,17 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
             >
               <MapPin className="w-3 h-3 text-amber-400" />
               <span>Google Maps & Local</span>
+              <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+            </a>
+
+            <a
+              href={getToolUrl('bing_places')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[11px] font-semibold transition-colors"
+            >
+              <Globe className="w-3 h-3 text-sky-400" />
+              <span>Bing & Citaciones Tier 1</span>
               <ExternalLink className="w-2.5 h-2.5 opacity-70" />
             </a>
 

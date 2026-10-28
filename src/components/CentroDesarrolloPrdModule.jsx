@@ -77,8 +77,9 @@ export function generatePrdForProyecto(proyecto, defaultCountry = 'DO') {
 
   // Páginas estándar de infraestructura y confianza requeridas para auditorías
   paginas.push(
+    { nombre: 'Silos Locales & Landings de Cobertura (/zonas/...)', descripcion: `Landings satélite por municipio/barrio con cobertura geográfica, tiempos y tarifas locales en ${ubicacion}.`, completado: false },
     { nombre: 'Páginas Ancla de Confianza IA (/about, /contact, /privacy)', descripcion: `Las 3 anclas obligatorias auditables por agentes de IA (> 500 caracteres) con datos oficiales de ${empresa}.`, completado: true },
-    { nombre: 'Google Maps Local & Testimonios 5.0★', descripcion: `Integración de ficha local en ${ubicacion} con captación directa de reseñas.`, completado: false },
+    { nombre: 'Google Maps Local, Iframe Embebido & Testimonios 5.0★', descripcion: `Integración de ficha local en ${ubicacion}, mapa embebido oficial y captación de reseñas semánticas.`, completado: false },
     { nombre: 'Rutas Legales & 404 Personalizado', descripcion: '/terminos-de-servicio, /aviso-de-privacidad y 404.astro con retorno seguro.', completado: true }
   );
 
@@ -122,7 +123,8 @@ export function generatePrdForProyecto(proyecto, defaultCountry = 'DO') {
     integraciones: [
       { nombre: `Cotizador a WhatsApp (${telefono})`, detalle: `Flujo interactivo directo al número oficial de ${empresa} en < 2 min.`, activo: true },
       { nombre: 'Botón Flotante WhatsApp Business & Click-to-Call', detalle: 'Llamada telefónica en 1 toque para emergencias y chat comercial.', activo: true },
-      { nombre: `Google Maps Ficha & Schema (${ubicacion})`, detalle: 'Vínculo bidireccional entre la ficha de Google y los datos del sitio.', activo: true },
+      { nombre: `Google Maps Ficha, Iframe Embebido & Schema (${ubicacion})`, detalle: 'Vínculo bidireccional entre la ficha de Google, iframe en la web y schema local.', activo: true },
+      { nombre: 'Citaciones Tier 1 & Consistencia NAP', detalle: 'Presencia canónica en Apple Maps, Bing Places, Waze y directorios de máxima autoridad.', activo: true },
       { nombre: 'Google Tag Manager & GA4', detalle: 'Eventos de clic, cotizaciones y conversiones sin bloquear el hilo principal.', activo: true },
       { nombre: 'Schema.org LocalBusiness JSON-LD con contactPoint', detalle: 'Indexación estructurada para Google y motores agénticos de IA.', activo: true }
     ],
@@ -187,10 +189,10 @@ const PLAYBOOK_12_FASES_TASKS = [
   },
   {
     id: 'fase-6',
-    titulo: 'Fase 6: Páginas Interiores Especializadas, B2B Fiscal & Rutas Legales',
-    descripcion: 'Servicios individuales, sección B2B con RNC/DGII, /terminos-de-servicio, /aviso-de-privacidad y 404.',
+    titulo: 'Fase 6: Páginas Interiores Especializadas, Silos Locales por Municipio (/zonas/...), B2B Fiscal & Rutas Legales',
+    descripcion: 'Servicios individuales, landings transaccionales de cobertura geográfica por municipio (/zonas/[ciudad]/[barrio]/), sección B2B fiscal con RNC/NIT, /terminos y /privacidad.',
     columna: 'backlog',
-    horasEstimadas: 2.0,
+    horasEstimadas: 2.5,
     horasRegistradas: 0.0,
     prioridad: 'alta'
   },
@@ -205,10 +207,10 @@ const PLAYBOOK_12_FASES_TASKS = [
   },
   {
     id: 'fase-8',
-    titulo: 'Fase 8: Testimonios Nativos Google Maps 5.0★ (Cero Widgets Externos)',
-    descripcion: 'Componente ligero que presenta valoraciones de clientes reales y enlace directo para captar nuevas reseñas.',
+    titulo: 'Fase 8: Testimonios Nativos Google Maps 5.0★, Mapa Embebido & Protocolo de Reseñas Semánticas',
+    descripcion: 'Iframe oficial de GBP en la web, testimonios nativos ligeros sin widgets bloqueantes, plantilla de reseñas semánticas ([Servicio]+[Técnico]+[Barrio]) y política de respuestas < 48h.',
     columna: 'backlog',
-    horasEstimadas: 1.0,
+    horasEstimadas: 1.5,
     horasRegistradas: 0.0,
     prioridad: 'media'
   },
@@ -241,8 +243,8 @@ const PLAYBOOK_12_FASES_TASKS = [
   },
   {
     id: 'fase-12',
-    titulo: 'Fase 12: Vinculación con Google Maps, Dominio Oficial & Entrega Ejecutiva',
-    descripcion: 'Comprobar en vivo ficha de Google Maps, dominio definitivo con SSL, código GitHub y entrega al cliente.',
+    titulo: 'Fase 12: Vinculación Google Maps, Citaciones Tier 1 (Apple Maps, Bing, Waze), Dominio Oficial & Entrega',
+    descripcion: 'Verificación en vivo de Google Maps, registro idéntico NAP en directorios Tier 1 (Apple Maps, Bing Places, Waze, Páginas Amarillas), SSL definitivo y entrega ejecutiva.',
     columna: 'backlog',
     horasEstimadas: 1.5,
     horasRegistradas: 0.0,
@@ -291,7 +293,13 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         if (Array.isArray(parsed)) {
           // Detectar si era el antiguo mockup ilustrativo donde las primeras fases estaban completadas
           const isOldMock = parsed.some(t => t.id === 'fase-1' && t.columna === 'completado');
-          if (!isOldMock) return parsed;
+          if (!isOldMock) {
+            const playbookMap = new Map(PLAYBOOK_12_FASES_TASKS.map(p => [p.id, p]));
+            return parsed.map(t => {
+              const official = playbookMap.get(t.id);
+              return official ? { ...t, titulo: official.titulo, descripcion: official.descripcion } : t;
+            });
+          }
         }
       }
     } catch (e) {}
@@ -434,7 +442,21 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
             localStorage.setItem('goglite_sprint_tasks_by_project', JSON.stringify(byProj));
             setSprintTasks(DEFAULT_SPRINT_TASKS);
           } else {
-            setSprintTasks(tasks);
+            const playbookMap = new Map(PLAYBOOK_12_FASES_TASKS.map(p => [p.id, p]));
+            const synced = tasks.map(t => {
+              const official = playbookMap.get(t.id);
+              if (official) {
+                return {
+                  ...t,
+                  titulo: official.titulo,
+                  descripcion: official.descripcion,
+                  horasEstimadas: t.horasEstimadas || official.horasEstimadas,
+                  prioridad: t.prioridad || official.prioridad
+                };
+              }
+              return t;
+            });
+            setSprintTasks(synced);
           }
         } else {
           setSprintTasks(DEFAULT_SPRINT_TASKS);
