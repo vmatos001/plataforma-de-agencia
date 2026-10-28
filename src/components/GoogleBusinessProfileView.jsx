@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { connectGoogleBusinessAccount } from '../services/firebase';
+import { getCmsSiteCloud, saveCmsSiteCloud } from '../services/firestoreSyncService';
 import {
   Star,
   MapPin,
@@ -182,12 +183,45 @@ export default function GoogleBusinessProfileView({ currentSite }) {
     estado: 'pendiente'
   });
 
-  // Estado de autenticación con Google Business Profile
+  // Estado de autenticación con Google Business Profile (Cuenta Administradora Maestra Delegada)
   const [googleConnected, setGoogleConnected] = useState(true);
   const [connectingGoogle, setConnectingGoogle] = useState(false);
-  const [googleAccountEmail, setGoogleAccountEmail] = useState('agencia@goglite.com');
+  const [googleAccountEmail, setGoogleAccountEmail] = useState('sitesgoglite@gmail.com');
   const [syncingApi, setSyncingApi] = useState(false);
-  const [lastSyncTime, setLastSyncTime] = useState('Sincronizado ahora');
+  const [lastSyncTime, setLastSyncTime] = useState('Sincronizado vía sitesgoglite@gmail.com');
+
+  const syncGbpToClientPortalCloud = async (nextProfile, nextReviews) => {
+    const slug = currentSite?.slug;
+    if (!slug) return;
+    try {
+      const existing = (await getCmsSiteCloud(slug)) || {};
+      const normalizedReviews = (nextReviews || []).map(r => ({
+        id: r.id,
+        autor: r.autor,
+        fecha: r.fecha,
+        rating: r.estrellas || r.rating || 5,
+        estrellas: r.estrellas || r.rating || 5,
+        comentario: r.texto || r.comentario || '',
+        texto: r.texto || r.comentario || '',
+        servicio: r.servicio || '',
+        estado: r.respuesta ? 'respondida' : (r.estado || 'pendiente'),
+        respuesta: r.respuesta || '',
+        fechaRespuesta: r.fechaRespuesta || ''
+      }));
+      await saveCmsSiteCloud(slug, {
+        ...existing,
+        slug,
+        nombre: currentSite?.nombre || existing.nombre,
+        dominio: currentSite?.dominio || existing.dominio,
+        adminDelegadoGoogle: googleAccountEmail,
+        gbpProfile: nextProfile,
+        reseñasCliente: normalizedReviews,
+        ultimaActualizacionGbp: new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn('[GBP Sync] Error sincronizando con portal del cliente:', e);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -213,8 +247,9 @@ export default function GoogleBusinessProfileView({ currentSite }) {
     try {
       localStorage.setItem(`goglite_gbp_profile_${currentSite.slug}`, JSON.stringify(updated));
     } catch (err) {}
+    syncGbpToClientPortalCloud(updated, reviews);
     setShowInjectProfileModal(false);
-    setLastSyncTime('Datos inyectados ahora');
+    setLastSyncTime('Sincronizado con el Portal del Cliente');
   };
 
   const handleAddInjectedReview = (e) => {
@@ -233,7 +268,9 @@ export default function GoogleBusinessProfileView({ currentSite }) {
       respuesta: '',
       fechaRespuesta: ''
     };
-    setReviews(prev => [newRev, ...prev]);
+    const nextList = [newRev, ...reviews];
+    setReviews(nextList);
+    syncGbpToClientPortalCloud(profileData, nextList);
     setNewReviewForm({
       autor: '',
       detalles: 'Cliente Verificado · Google Maps',
@@ -378,7 +415,7 @@ INSTRUCCIONES CLAVE:
     setPublishingReply(true);
 
     setTimeout(() => {
-      setReviews(prev => prev.map(r => {
+      const nextList = reviews.map(r => {
         if (r.id === reviewId) {
           return {
             ...r,
@@ -388,7 +425,9 @@ INSTRUCCIONES CLAVE:
           };
         }
         return r;
-      }));
+      });
+      setReviews(nextList);
+      syncGbpToClientPortalCloud(profileData, nextList);
 
       setPublishingReply(false);
       setActiveReplyReviewId(null);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { connectGoogleSiteKitAccount } from '../services/firebase';
+import { getCmsSiteCloud, saveCmsSiteCloud } from '../services/firestoreSyncService';
 import {
   Search,
   TrendingUp,
@@ -110,17 +111,37 @@ export default function GoogleSiteKitView({ currentSite }) {
     };
   };
 
-  // Estado de Autenticación de Google Site Kit
+  // Estado de Autenticación de Google Site Kit (Administrador Delegado: sitesgoglite@gmail.com)
   const [googleUser, setGoogleUser] = useState(() => {
     try {
       const saved = localStorage.getItem('goglite_sitekit_user');
-      return saved ? JSON.parse(saved) : null;
+      return saved ? JSON.parse(saved) : { email: 'sitesgoglite@gmail.com', displayName: 'Goglite Agencia Admin' };
     } catch (e) {
-      return null;
+      return { email: 'sitesgoglite@gmail.com', displayName: 'Goglite Agencia Admin' };
     }
   });
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+
+  const syncSiteKitToClientPortalCloud = async (nextMetrics, nextSpeed = speedAnalysis) => {
+    const slug = currentSite?.slug;
+    if (!slug) return;
+    try {
+      const existing = (await getCmsSiteCloud(slug)) || {};
+      await saveCmsSiteCloud(slug, {
+        ...existing,
+        slug,
+        nombre: currentSite?.nombre || existing.nombre,
+        dominio: currentSite?.dominio || existing.dominio,
+        adminDelegadoGoogle: googleUser?.email || 'sitesgoglite@gmail.com',
+        siteKitMetrics: nextMetrics,
+        speedAnalysis: nextSpeed,
+        ultimaActualizacionSiteKit: new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn('[SiteKit Sync] Error sincronizando con portal del cliente:', e);
+    }
+  };
 
   // Filtro de Rango Temporal
   const [dateRange, setDateRange] = useState('28d');
@@ -183,6 +204,7 @@ export default function GoogleSiteKitView({ currentSite }) {
     try {
       localStorage.setItem(`goglite_sitekit_metrics_${currentSite?.slug}`, JSON.stringify(updated));
     } catch (err) {}
+    syncSiteKitToClientPortalCloud(updated, speedAnalysis);
     setShowInjectModal(false);
   };
 
@@ -258,6 +280,7 @@ export default function GoogleSiteKitView({ currentSite }) {
       try {
         localStorage.setItem(`goglite_pagespeed_${currentSite?.slug}`, JSON.stringify(data));
       } catch (e) {}
+      syncSiteKitToClientPortalCloud(siteKitMetrics, data);
 
       setAnalyzingSpeed(false);
     }, 750);

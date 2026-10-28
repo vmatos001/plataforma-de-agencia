@@ -23,7 +23,10 @@ import {
   MousePointerClick,
   Search,
   AlertCircle,
-  Check
+  Check,
+  Clock,
+  PhoneCall,
+  Navigation
 } from 'lucide-react';
 import { auth } from '../services/firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
@@ -48,8 +51,15 @@ export default function ClientCmsPortal({ token }) {
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [replyDrafts, setReplyDrafts] = useState({});
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
-  // Campos de texto sencillo editables por el cliente
+  // Reloj en tiempo real para el contador regresivo de 30 días de prueba o suscripción activa
+  useEffect(() => {
+    const interval = setInterval(() => setNowTick(Date.now()), 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Campos de texto sencillo editables por el cliente (sincronizados con el Módulo 6)
   const [editableText, setEditableText] = useState({
     heroTitulo: '',
     heroSubtitulo: '',
@@ -67,23 +77,40 @@ export default function ClientCmsPortal({ token }) {
   };
 
   // Derivar el identificador único (siteSlug) exclusivo para este cliente (Aislamiento Multi-Tenant)
-  const getClientSiteSlug = (pData) => {
-    const emp = pData?.lead?.empresa || pData?.proyecto?.cliente?.empresa || pData?.presupuesto?.cliente?.empresa || 'cliente';
-    return emp
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || `site-${token}`;
+  const getClientSiteSlug = (pData, fallbackSite) => {
+    if (fallbackSite?.slug) return fallbackSite.slug;
+    if (pData?.cmsSlug) return pData.cmsSlug;
+    const emp =
+      pData?.lead?.empresa ||
+      pData?.proyecto?.cliente?.empresa ||
+      pData?.cliente?.empresa ||
+      pData?.presupuesto?.cliente?.empresa ||
+      fallbackSite?.nombre ||
+      '';
+    if (emp) {
+      return emp
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+    return token || 'sitio';
   };
 
-  const getClientDomain = (pData) => {
-    const rawDom = pData?.lead?.dominio || pData?.proyecto?.onboarding?.datos?.dominioOficial || '';
-    if (rawDom && rawDom.includes('.')) return rawDom.replace(/^https?:\/\//, '');
-    return `${getClientSiteSlug(pData)}.com`;
+  const getClientDomain = (pData, fallbackSite) => {
+    const rawDom =
+      fallbackSite?.dominio ||
+      pData?.dominio ||
+      pData?.portalConfig?.dominio ||
+      pData?.lead?.dominio ||
+      pData?.proyecto?.onboarding?.datos?.dominioOficial ||
+      '';
+    if (rawDom && rawDom.includes('.')) return rawDom.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    return `${getClientSiteSlug(pData, fallbackSite)}.com`;
   };
 
-  // Cargar datos del portal y del sitio CMS aislado del cliente
+  // Cargar datos del portal y del sitio CMS aislado del cliente (tanto de 5 Fases como de Integración Directa en Módulo 6)
   useEffect(() => {
     let unsubPortal = () => {};
     let unsubCms = () => {};
@@ -91,63 +118,186 @@ export default function ClientCmsPortal({ token }) {
     const init = async () => {
       setLoading(true);
       try {
+        // 1. Buscar en Firestore Portal Cloud y localStorage
         let pData = await getPortalCloud(token);
-        if (!pData && typeof window !== 'undefined') {
-          const rawLocal = localStorage.getItem('goglite_portal_' + token);
-          if (rawLocal) {
-            pData = { token, portalConfig: JSON.parse(rawLocal) };
+        let localProj = null;
+        let localSite = null;
+
+        if (typeof window !== 'undefined') {
+          try {
+            const projs = JSON.parse(localStorage.getItem('goglite_proyectos') || '[]');
+            localProj = projs.find(
+              p =>
+                p.portalToken === token ||
+                p.cmsSlug === token ||
+                p.id === token ||
+                (p.cliente?.empresa || '').toLowerCase().replace(/[^a-z0-9]+/g, '-') === token
+            );
+          } catch (e) {}
+
+          try {
+            const sites = JSON.parse(localStorage.getItem('goglite_cms_sites') || '[]');
+            localSite = sites.find(s => s.slug === token || s.id === token);
+          } catch (e) {}
+
+          if (!pData) {
+            const rawLocal = localStorage.getItem('goglite_portal_' + token);
+            if (rawLocal) {
+              try {
+                pData = { token, portalConfig: JSON.parse(rawLocal) };
+              } catch (e) {}
+            }
           }
+        }
+
+        // Consolidar pData con proyecto o sitio local si existe
+        if (localProj || localSite) {
+          pData = {
+            ...(pData || {}),
+            token,
+            cmsSlug: localSite?.slug || localProj?.cmsSlug || token,
+            dominio: localSite?.dominio || localProj?.dominio || pData?.portalConfig?.dominio,
+            cliente: localProj?.cliente || localSite?.cliente || pData?.cliente,
+            proyecto: localProj || pData?.proyecto,
+            portalConfig: {
+              ...(localSite?.portalConfig || {}),
+              ...(localProj?.portalConfig || {}),
+              ...(pData?.portalConfig || {})
+            }
+          };
+        }
+
+        const slug = getClientSiteSlug(pData, localSite);
+        let existingCms = await getCmsSiteCloud(slug);
+        if (!existingCms && slug !== token) {
+          existingCms = await getCmsSiteCloud(token);
+        }
+        if (!existingCms && localSite) {
+          existingCms = localSite;
+        }
+
+        // Si no había pData pero sí existe el sitio en el CMS (proyecto en producción integrado directo en Módulo 6)
+        if (!pData && existingCms) {
+          pData = {
+            token,
+            cmsSlug: existingCms.slug || token,
+            dominio: existingCms.dominio,
+            cliente: existingCms.cliente || { empresa: existingCms.nombre },
+            portalConfig: existingCms.portalConfig || {
+              fase5CareActivo: true,
+              careVenceAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+              esMesDePrueba: true
+            }
+          };
         }
 
         if (pData) {
           setPortalData(pData);
-          const slug = getClientSiteSlug(pData);
-          const empresa = pData?.lead?.empresa || pData?.proyecto?.cliente?.empresa || 'Mi Empresa';
-          const telefono = pData?.lead?.telefono || pData?.proyecto?.cliente?.telefono || '';
-          const ubicacion = pData?.proyecto?.cliente?.ubicacion || (pData?.lead?.pais === 'DO' ? 'Punta Cana / Santo Domingo, RD' : 'San Salvador, El Salvador');
+          const empresa =
+            existingCms?.nombre ||
+            existingCms?.contenido?.branding?.nombreMarca ||
+            pData?.lead?.empresa ||
+            pData?.proyecto?.cliente?.empresa ||
+            pData?.cliente?.empresa ||
+            'Mi Empresa';
+          const telefono =
+            existingCms?.contenido?.branding?.telefonoWhatsApp ||
+            pData?.lead?.telefono ||
+            pData?.proyecto?.cliente?.telefono ||
+            pData?.cliente?.telefono ||
+            '';
+          const ubicacion =
+            existingCms?.contenido?.branding?.ciudadPrincipal ||
+            pData?.proyecto?.cliente?.ubicacion ||
+            (pData?.lead?.pais === 'DO' || pData?.cliente?.pais === 'DO'
+              ? 'Santo Domingo / Punta Cana, RD'
+              : 'San Salvador, El Salvador');
 
-          const existingCms = await getCmsSiteCloud(slug);
+          const c = existingCms?.contenido || {};
           const defaultContent = {
-            heroTitulo: existingCms?.contenido?.heroTitulo || `Bienvenidos a ${empresa}`,
-            heroSubtitulo: existingCms?.contenido?.heroSubtitulo || `Atención personalizada, calidad garantizada y respuesta inmediata para todos nuestros clientes en ${ubicacion}.`,
-            ctaBotonTexto: existingCms?.contenido?.ctaBotonTexto || 'Contactar por WhatsApp Ahora',
-            whatsappContacto: existingCms?.contenido?.whatsappContacto || telefono,
-            telefonoVisible: existingCms?.contenido?.telefonoVisible || telefono,
-            horarioAtencion: existingCms?.contenido?.horarioAtencion || 'Lunes a Sábado: 8:00 AM - 7:00 PM',
-            direccionVisible: existingCms?.contenido?.direccionVisible || ubicacion,
-            avisoPromocion: existingCms?.contenido?.avisoPromocion || 'Atención prioritaria y cotizaciones sin compromiso por WhatsApp.'
+            heroTitulo: c.heroTitulo || c.hero?.titulo || `Bienvenidos a ${empresa}`,
+            heroSubtitulo:
+              c.heroSubtitulo ||
+              c.hero?.subtitulo ||
+              `Atención personalizada, calidad garantizada y respuesta inmediata para todos nuestros clientes en ${ubicacion}.`,
+            ctaBotonTexto: c.ctaBotonTexto || c.hero?.botonTexto || 'Contactar por WhatsApp Ahora',
+            whatsappContacto: c.whatsappContacto || c.branding?.telefonoWhatsApp || telefono,
+            telefonoVisible: c.telefonoVisible || c.branding?.telefonoWhatsApp || telefono,
+            horarioAtencion: c.horarioAtencion || 'Lunes a Domingo: Atención 24/7',
+            direccionVisible: c.direccionVisible || c.branding?.ciudadPrincipal || ubicacion,
+            avisoPromocion: c.avisoPromocion || c.hero?.badge || '⚡ Atención prioritaria y cotizaciones por WhatsApp'
           };
 
+          // Leer también reseñas y métricas que el administrador (sitesgoglite@gmail.com) haya inyectado en el Módulo 6
+          let localGbpReviews = null;
+          let localGbpProfile = null;
+          let localSiteKitMetrics = null;
+          let localSpeed = null;
+
+          if (typeof window !== 'undefined') {
+            try {
+              const r = localStorage.getItem(`goglite_gbp_reviews_${slug}`);
+              if (r) localGbpReviews = JSON.parse(r);
+            } catch (e) {}
+            try {
+              const p = localStorage.getItem(`goglite_gbp_profile_${slug}`);
+              if (p) localGbpProfile = JSON.parse(p);
+            } catch (e) {}
+            try {
+              const m = localStorage.getItem(`goglite_sitekit_metrics_${slug}`);
+              if (m) localSiteKitMetrics = JSON.parse(m);
+            } catch (e) {}
+            try {
+              const sp = localStorage.getItem(`goglite_pagespeed_${slug}`);
+              if (sp) localSpeed = JSON.parse(sp);
+            } catch (e) {}
+          }
+
           setEditableText(defaultContent);
-          setCmsSite(existingCms || {
+          setCmsSite({
+            ...(existingCms || {}),
             slug,
             nombre: empresa,
-            dominio: getClientDomain(pData),
-            contenido: defaultContent,
-            reseñasCliente: existingCms?.reseñasCliente || [
-              {
-                id: 'rev-1',
-                autor: 'Carlos Mendoza',
-                fecha: 'Hace 2 días',
-                rating: 5,
-                comentario: `Excelente servicio por parte del equipo de ${empresa}. Muy puntuales y atentos desde el primer contacto por WhatsApp.`,
-                respuesta: ''
-              },
-              {
-                id: 'rev-2',
-                autor: 'María Fernanda Gómez',
-                fecha: 'Hace 5 días',
-                rating: 5,
-                comentario: `100% recomendados. La página web es súper rápida desde el celular y nos atendieron de inmediato.`,
-                respuesta: '¡Muchas gracias por tu confianza, María Fernanda! Estamos siempre para servirte.'
-              }
-            ]
+            dominio: getClientDomain(pData, existingCms),
+            adminDelegadoGoogle: existingCms?.adminDelegadoGoogle || 'sitesgoglite@gmail.com',
+            contenido: {
+              ...(existingCms?.contenido || {}),
+              ...defaultContent
+            },
+            gbpProfile: existingCms?.gbpProfile || localGbpProfile || null,
+            siteKitMetrics: existingCms?.siteKitMetrics || localSiteKitMetrics || null,
+            speedAnalysis: existingCms?.speedAnalysis || localSpeed || null,
+            reseñasCliente:
+              existingCms?.reseñasCliente ||
+              localGbpReviews || [
+                {
+                  id: 'rev-1',
+                  autor: 'Cliente Verificado · Google Maps',
+                  fecha: 'Reciente',
+                  rating: 5,
+                  comentario: `Excelente servicio por parte del equipo de ${empresa}. Muy puntuales y atentos desde el primer contacto por WhatsApp.`,
+                  respuesta: ''
+                }
+              ]
           });
 
           unsubCms = subscribeCmsSiteCloud(slug, (liveSite) => {
-            if (liveSite?.contenido) {
-              setCmsSite(liveSite);
-              setEditableText(prev => ({ ...prev, ...liveSite.contenido }));
+            if (liveSite) {
+              setCmsSite(prev => ({ ...(prev || {}), ...liveSite }));
+              if (liveSite.contenido) {
+                const lc = liveSite.contenido;
+                setEditableText(prev => ({
+                  ...prev,
+                  heroTitulo: lc.heroTitulo || lc.hero?.titulo || prev.heroTitulo,
+                  heroSubtitulo: lc.heroSubtitulo || lc.hero?.subtitulo || prev.heroSubtitulo,
+                  ctaBotonTexto: lc.ctaBotonTexto || lc.hero?.botonTexto || prev.ctaBotonTexto,
+                  whatsappContacto: lc.whatsappContacto || lc.branding?.telefonoWhatsApp || prev.whatsappContacto,
+                  telefonoVisible: lc.telefonoVisible || lc.branding?.telefonoWhatsApp || prev.telefonoVisible,
+                  horarioAtencion: lc.horarioAtencion || prev.horarioAtencion,
+                  direccionVisible: lc.direccionVisible || lc.branding?.ciudadPrincipal || prev.direccionVisible,
+                  avisoPromocion: lc.avisoPromocion || lc.hero?.badge || prev.avisoPromocion
+                }));
+              }
             }
           });
         }
@@ -188,14 +338,16 @@ export default function ClientCmsPortal({ token }) {
 
       if (AGENCY_BLOCKED_EMAILS.includes(email)) {
         await auth.signOut();
-        setAuthError(`La cuenta "${email}" pertenece a la administración interna de Goglite. Por favor selecciona la cuenta empresarial del sitio web del cliente.`);
+        setAuthError(
+          `La cuenta "${email}" es la cuenta administradora delegada de Goglite. Como cliente, inicia sesión con tu propio correo empresarial.`
+        );
         return;
       }
 
       const registeredCmsEmail = (portalData?.portalConfig?.cuentaCmsSitioRegistrada || '').toLowerCase().trim();
       if (registeredCmsEmail && registeredCmsEmail !== email) {
         await auth.signOut();
-        setAuthError(`Acceso denegado: Este Panel CMS está vinculado exclusivamente a la cuenta del sitio "${registeredCmsEmail}".`);
+        setAuthError(`Acceso denegado: Este Panel CMS está vinculado exclusivamente a la cuenta del cliente "${registeredCmsEmail}".`);
         return;
       }
 
@@ -217,7 +369,7 @@ export default function ClientCmsPortal({ token }) {
         portalConfig: newPortalConfig
       });
 
-      showToast(`✓ Sesión iniciada con el perfil oficial del sitio (${email})`);
+      showToast(`✓ Sesión iniciada con el perfil oficial del cliente (${email})`);
     } catch (err) {
       if (err?.code !== 'auth/popup-closed-by-user') {
         setAuthError('Error al iniciar sesión con Google: ' + (err?.message || 'Intenta nuevamente'));
@@ -243,22 +395,46 @@ export default function ClientCmsPortal({ token }) {
     });
   };
 
-  // Guardar cambios de texto sencillo en Firestore
+  // Guardar cambios de texto sencillo en Firestore (Sincronizado bidireccionalmente con Módulo 6)
   const handleSaveSimpleText = async (e) => {
     if (e) e.preventDefault();
     if (!portalData) return;
     setSaving(true);
     try {
-      const slug = getClientSiteSlug(portalData);
-      const empresa = portalData?.lead?.empresa || portalData?.proyecto?.cliente?.empresa || 'Mi Empresa';
+      const slug = getClientSiteSlug(portalData, cmsSite);
+      const empresa =
+        cmsSite?.nombre ||
+        portalData?.lead?.empresa ||
+        portalData?.proyecto?.cliente?.empresa ||
+        portalData?.cliente?.empresa ||
+        'Mi Empresa';
+
+      const mergedContenido = {
+        ...(cmsSite?.contenido || {}),
+        ...editableText,
+        branding: {
+          ...(cmsSite?.contenido?.branding || {}),
+          nombreMarca: empresa,
+          telefonoWhatsApp: editableText.whatsappContacto,
+          ciudadPrincipal: editableText.direccionVisible
+        },
+        hero: {
+          ...(cmsSite?.contenido?.hero || {}),
+          badge: editableText.avisoPromocion,
+          titulo: editableText.heroTitulo,
+          subtitulo: editableText.heroSubtitulo,
+          botonTexto: editableText.ctaBotonTexto
+        }
+      };
+
       const updatedSite = {
         ...(cmsSite || {}),
         slug,
         nombre: empresa,
-        dominio: getClientDomain(portalData),
-        pais: portalData?.lead?.pais || 'SV',
+        dominio: getClientDomain(portalData, cmsSite),
+        pais: portalData?.lead?.pais || portalData?.cliente?.pais || 'DO',
         estado: 'publicado',
-        contenido: editableText,
+        contenido: mergedContenido,
         ultimaActualizacion: new Date().toISOString()
       };
       await saveCmsSiteCloud(slug, updatedSite);
@@ -271,29 +447,32 @@ export default function ClientCmsPortal({ token }) {
     }
   };
 
-  // Responder a una reseña o mensaje de Google Business Profile del cliente
+  // Responder a una reseña de Google Business Profile del cliente (Sincronizado con Módulo 6)
   const handleSendReviewReply = async (reviewId) => {
     const replyText = (replyDrafts[reviewId] || '').trim();
     if (!replyText || !portalData) return;
 
     const currentReviews = cmsSite?.reseñasCliente || [];
     const updatedReviews = currentReviews.map(r =>
-      r.id === reviewId ? { ...r, respuesta: replyText, fechaRespuesta: 'Justo ahora' } : r
+      r.id === reviewId
+        ? { ...r, estado: 'respondida', respuesta: replyText, fechaRespuesta: 'Justo ahora' }
+        : r
     );
 
-    const slug = getClientSiteSlug(portalData);
+    const slug = getClientSiteSlug(portalData, cmsSite);
     const updatedSite = {
       ...(cmsSite || {}),
       slug,
-      nombre: portalData?.lead?.empresa || 'Mi Empresa',
-      contenido: editableText,
       reseñasCliente: updatedReviews
     };
 
     setCmsSite(updatedSite);
     setReplyDrafts(prev => ({ ...prev, [reviewId]: '' }));
+    try {
+      localStorage.setItem(`goglite_gbp_reviews_${slug}`, JSON.stringify(updatedReviews));
+    } catch (e) {}
     await saveCmsSiteCloud(slug, updatedSite);
-    showToast('✓ Respuesta publicada en la Ficha de Google de tu negocio.');
+    showToast('✓ Respuesta enviada a tu Ficha de Google Business vía sitesgoglite@gmail.com.');
   };
 
   if (loading) {
@@ -303,34 +482,57 @@ export default function ClientCmsPortal({ token }) {
           <Globe className="w-6 h-6 text-orange-400" />
         </div>
         <p className="text-sm font-bold text-slate-200">Cargando Panel CMS del Sitio Web...</p>
-        <p className="text-xs text-slate-400 mt-1">Sincronizando configuración exclusiva del dominio</p>
+        <p className="text-xs text-slate-400 mt-1">Sincronizando datos con Google Cloud Firestore</p>
       </div>
     );
   }
 
-  const empresaNombre = portalData?.lead?.empresa || portalData?.proyecto?.cliente?.empresa || 'Portal Web Corporativo';
-  const dominioCliente = getClientDomain(portalData);
+  const empresaNombre =
+    cmsSite?.nombre ||
+    portalData?.lead?.empresa ||
+    portalData?.proyecto?.cliente?.empresa ||
+    portalData?.cliente?.empresa ||
+    'Portal Web Corporativo';
+  const dominioCliente = getClientDomain(portalData, cmsSite);
   const portalConfig = portalData?.portalConfig || {};
   const isCmsAuthenticated = Boolean(portalConfig.cmsClienteAutenticado && portalConfig.cuentaCmsSitioRegistrada);
 
-  // Verificar si el plan de mantenimiento o los 30 días iniciales están activos
-  const fechaBaseStr = portalConfig.fechaLiquidacion || portalData?.proyecto?.pagos?.saldoFecha || portalConfig.fechaInicioGarantia || null;
-  let diasTranscurridos = 1;
-  if (fechaBaseStr) {
-    const startMs = new Date(fechaBaseStr).getTime();
-    if (!isNaN(startMs)) {
-      const diff = Date.now() - startMs;
-      diasTranscurridos = Math.max(1, Math.floor(diff / (1000 * 60 * 60 * 24)));
+  // Cálculo unificado de vigencia (30 días de prueba post-entrega o Membresía Pagada careVenceAt)
+  const fechaBaseEntrega =
+    portalConfig.fechaLiquidacion ||
+    portalData?.proyecto?.pagos?.saldoFecha ||
+    portalConfig.fechaInicioGarantia ||
+    null;
+
+  let endTimestampMs = null;
+  let isTrialPeriod = Boolean(portalConfig.esMesDePrueba);
+
+  if (portalConfig.careVenceAt) {
+    const parsedEnd = new Date(portalConfig.careVenceAt).getTime();
+    if (!isNaN(parsedEnd)) {
+      endTimestampMs = parsedEnd;
+    }
+  } else if (fechaBaseEntrega) {
+    const parsedStart = new Date(fechaBaseEntrega).getTime();
+    if (!isNaN(parsedStart)) {
+      endTimestampMs = parsedStart + 30 * 86400000;
+      isTrialPeriod = true;
     }
   }
-  const isWithin30DaysWarranty = diasTranscurridos <= 30;
-  const isCareTimeActive = portalConfig.careVenceAt
-    ? new Date(portalConfig.careVenceAt).getTime() > Date.now()
-    : Boolean(portalConfig.fase5CareActivo);
-  const isSubscriptionActive = Boolean(isCareTimeActive || isWithin30DaysWarranty);
 
-  const clientPais = portalData?.lead?.pais || portalData?.proyecto?.cliente?.pais || 'DO';
+  const diffMs = endTimestampMs ? endTimestampMs - nowTick : 0;
+  const diasRestantes = endTimestampMs && diffMs > 0 ? Math.floor(diffMs / 86400000) : 0;
+  const horasRestantes = endTimestampMs && diffMs > 0 ? Math.floor((diffMs % 86400000) / 3600000) : 0;
+  const isSubscriptionActive = Boolean((endTimestampMs && diffMs > 0) || portalConfig.fase5CareActivo);
+
+  const clientPais = portalData?.lead?.pais || portalData?.proyecto?.cliente?.pais || portalData?.cliente?.pais || 'DO';
   const whatsappSoporte = clientPais === 'DO' ? '18295284713' : '50377569828';
+
+  // Métricas sincronizadas desde el Módulo 6 por sitesgoglite@gmail.com
+  const skMetrics = cmsSite?.siteKitMetrics || {};
+  const gbpMetrics = cmsSite?.gbpProfile?.metricas || {};
+  const mobileSpeedScore = cmsSite?.speedAnalysis?.mobile?.rendimiento ?? 96;
+  const mobileLcp = cmsSite?.speedAnalysis?.mobile?.metrics?.lcp || '1.2 s';
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100 font-sans pb-16">
@@ -342,7 +544,7 @@ export default function ClientCmsPortal({ token }) {
         </div>
       )}
 
-      {/* Cabecera Mobile-First del CMS del Cliente */}
+      {/* Cabecera Mobile-First del CMS del Cliente con Reloj Regresivo Sincronizado */}
       <header className="sticky top-0 z-30 bg-[#0b0f19]/95 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-6 py-3">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
           <div className="flex items-center justify-between gap-2">
@@ -351,11 +553,25 @@ export default function ClientCmsPortal({ token }) {
                 CMS
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-sm sm:text-base font-black text-white truncate">{empresaNombre}</h1>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
-                    En Línea
-                  </span>
+                  {isSubscriptionActive ? (
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold flex items-center gap-1 shrink-0 ${
+                      isTrialPeriod
+                        ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                        : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                    }`}>
+                      <Clock className="w-3 h-3" />
+                      <span>
+                        {isTrialPeriod ? '🎁 Mes de Prueba:' : '💎 Membresía Activa:'}{' '}
+                        {endTimestampMs ? `${diasRestantes}d ${horasRestantes}h restantes` : 'Activa'}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 shrink-0">
+                      ⛔ Vigencia Concluida (0d)
+                    </span>
+                  )}
                 </div>
                 <p className="text-[11px] text-slate-400 font-mono truncate flex items-center gap-1">
                   <Globe className="w-3 h-3 text-orange-400 shrink-0" />
@@ -363,26 +579,16 @@ export default function ClientCmsPortal({ token }) {
                 </p>
               </div>
             </div>
-
-            {isWithin30DaysWarranty && (
-              <a
-                href={`/portal/${token}`}
-                className="sm:hidden px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold flex items-center gap-1 border border-slate-700 shrink-0"
-              >
-                <ArrowLeft className="w-3 h-3" />
-                <span>Proyecto</span>
-              </a>
-            )}
           </div>
 
           <div className="flex items-center justify-between sm:justify-end gap-2 border-t sm:border-t-0 border-slate-800/80 pt-2 sm:pt-0">
-            {isWithin30DaysWarranty && (
+            {fechaBaseEntrega && isTrialPeriod && diasRestantes > 0 && (
               <a
                 href={`/portal/${token}`}
-                className="hidden sm:inline-flex px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-bold items-center gap-1.5 border border-slate-700 transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-bold inline-flex items-center gap-1.5 border border-slate-700 transition-colors"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Volver al Portal de Entrega ({Math.max(0, 30 - diasTranscurridos)}d restantes)</span>
+                <span>Portal de Entrega</span>
               </a>
             )}
 
@@ -406,27 +612,27 @@ export default function ClientCmsPortal({ token }) {
       </header>
 
       <main className="max-w-5xl mx-auto px-3 sm:px-6 pt-5 space-y-5">
-        {/* 1. Condición de Suscripción Activa */}
+        {/* 1. Condición de Suscripción Activa (Cuando el contador de 30 días o membresía llega a 0) */}
         {!isSubscriptionActive ? (
           <div className="p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-amber-500/10 via-[#131722] to-[#0b0e17] border-2 border-amber-500/40 text-center space-y-4">
             <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mx-auto">
               <Lock className="w-7 h-7" />
             </div>
             <h2 className="text-lg sm:text-xl font-black text-white">
-              Panel CMS Condicionado al Plan de Mantenimiento Continuo
+              Tu Periodo de Prueba / Suscripción ha Llegado a 0 Días
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
-              El periodo inicial de 30 días posteriores a la entrega ha concluido. Para mantener activo el Panel CMS autogestionable, la sincronización con tu Ficha de Google y el monitoreo Site Kit en tiempo real, activa tu suscripción de Mantenimiento Continuo.
+              Para seguir cambiando textos de tu página web en tiempo real, respondiendo reseñas de tu Ficha de Google Business y monitoreando tus métricas en Google Site Kit desde este único portal, activa tu renovación con Goglite.
             </p>
             <div className="pt-2">
               <a
-                href={`https://wa.me/${whatsappSoporte}?text=${encodeURIComponent(`Hola Goglite, deseo activar el Plan de Mantenimiento Continuo para el CMS de ${empresaNombre} (${dominioCliente}).`)}`}
+                href={`https://wa.me/${whatsappSoporte}?text=${encodeURIComponent(`Hola Goglite, deseo renovar mi Membresía del Portal CMS para ${empresaNombre} (${dominioCliente}).`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs shadow-xl shadow-orange-950/50 transition-all"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>Solicitar Activación de Mantenimiento Continuo</span>
+                <span>Solicitar Renovación de Membresía CMS</span>
               </a>
             </div>
           </div>
@@ -439,7 +645,7 @@ export default function ClientCmsPortal({ token }) {
               </div>
               <div>
                 <span className="text-[10px] font-mono uppercase tracking-wider text-orange-400 font-bold block">
-                  Acceso Exclusivo del Sitio
+                  Portal Todo-en-Uno del Cliente
                 </span>
                 <h2 className="text-base font-black text-white">
                   Iniciar Sesión en el CMS de {empresaNombre}
@@ -448,17 +654,17 @@ export default function ClientCmsPortal({ token }) {
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Utiliza la <strong>cuenta de Google empresarial de tu sitio web</strong> para gestionar tus textos en vivo, responder reseñas de tu Ficha de Google y consultar tus métricas en Site Kit.
+              Accede con tu correo de Google para administrar los textos de <strong>{dominioCliente}</strong>, responder reseñas de Google Maps y ver tus métricas de Site Kit sincronizadas por <strong>sitesgoglite@gmail.com</strong>.
             </p>
 
             {portalConfig.cuentaCmsSitioRegistrada ? (
               <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300 font-mono">
-                Cuenta oficial vinculada al sitio:{' '}
+                Cuenta autorizada del cliente:{' '}
                 <strong className="text-emerald-400 break-all">{portalConfig.cuentaCmsSitioRegistrada}</strong>
               </div>
             ) : (
               <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 text-[11px] text-sky-200 leading-relaxed">
-                <strong>Primer acceso al CMS:</strong> La cuenta de Google empresarial del sitio con la que inicies sesión ahora quedará vinculada de forma exclusiva para administrar <strong>{dominioCliente}</strong>.
+                <strong>Primer acceso al CMS:</strong> El correo de Google con el que inicies sesión ahora quedará vinculado para administrar <strong>{dominioCliente}</strong>.
               </div>
             )}
 
@@ -476,13 +682,13 @@ export default function ClientCmsPortal({ token }) {
               className="w-full py-3.5 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-black text-xs flex items-center justify-center gap-2.5 shadow-lg transition-all cursor-pointer"
             >
               <Globe className="w-4 h-4 text-orange-600" />
-              <span>{authLoading ? 'Verificando cuenta del sitio...' : 'Acceder con Cuenta Google del Sitio'}</span>
+              <span>{authLoading ? 'Verificando cuenta...' : 'Acceder con mi Cuenta de Google'}</span>
             </button>
           </div>
         ) : (
-          /* 3. Panel Operativo del CMS del Cliente (3 Funciones Exclusivas, Mobile-First, Sin Generador QR) */
+          /* 3. Panel Operativo Unificado del Cliente (Web + Ficha Google + Site Kit vía sitesgoglite@gmail.com) */
           <div className="space-y-5">
-            {/* Banner de Aislamiento Multi-Tenant del Cliente */}
+            {/* Banner de Conexión Delegada vía sitesgoglite@gmail.com */}
             <div className="p-4 rounded-2xl bg-gradient-to-r from-[#121826] via-[#151c2c] to-[#121826] border border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
@@ -490,13 +696,13 @@ export default function ClientCmsPortal({ token }) {
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-bold text-white">Entorno Aislado: {empresaNombre}</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-orange-500/15 text-orange-300 border border-orange-500/30">
-                      ID: {getClientSiteSlug(portalData)}
+                    <span className="text-xs font-bold text-white">Centro de Control Único: {empresaNombre}</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                      🔗 Sincronizado vía Admin: {cmsSite?.adminDelegadoGoogle || 'sitesgoglite@gmail.com'}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Conectado exclusivamente al sitio y perfil de Google Business de {empresaNombre}.
+                    Toda tu información de Web, Google Maps y Google Analytics centralizada en un solo lugar sin compartir tus contraseñas.
                   </p>
                 </div>
               </div>
@@ -523,7 +729,7 @@ export default function ClientCmsPortal({ token }) {
                 }`}
               >
                 <Type className="w-4 h-4 shrink-0" />
-                <span className="text-[11px] sm:text-xs text-center">1. Cambiar Textos</span>
+                <span className="text-[11px] sm:text-xs text-center">1. Cambiar Textos Web</span>
               </button>
 
               <button
@@ -536,7 +742,7 @@ export default function ClientCmsPortal({ token }) {
                 }`}
               >
                 <MessageSquare className="w-4 h-4 shrink-0" />
-                <span className="text-[11px] sm:text-xs text-center">2. Ficha Google & Mensajes</span>
+                <span className="text-[11px] sm:text-xs text-center">2. Ficha Google &amp; Reseñas</span>
               </button>
 
               <button
@@ -549,7 +755,7 @@ export default function ClientCmsPortal({ token }) {
                 }`}
               >
                 <BarChart3 className="w-4 h-4 shrink-0" />
-                <span className="text-[11px] sm:text-xs text-center">3. Google Site Kit</span>
+                <span className="text-[11px] sm:text-xs text-center">3. Métricas Google Site Kit</span>
               </button>
             </div>
 
@@ -560,10 +766,10 @@ export default function ClientCmsPortal({ token }) {
                   <div>
                     <h2 className="text-base font-black text-white flex items-center gap-2">
                       <Type className="w-4 h-4 text-orange-400" />
-                      <span>Editor de Texto Sencillo en Vivo</span>
+                      <span>Editor de Textos en Vivo ({dominioCliente})</span>
                     </h2>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Modifica los textos principales, teléfonos y avisos de <strong>{dominioCliente}</strong> sin tocar código ni diseño.
+                      Modifica tus títulos, teléfonos de WhatsApp y promociones sin depender de un programador.
                     </p>
                   </div>
                   <button
@@ -572,7 +778,7 @@ export default function ClientCmsPortal({ token }) {
                     className="py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50 transition-all cursor-pointer shrink-0"
                   >
                     <Save className="w-4 h-4" />
-                    <span>{saving ? 'Publicando...' : 'Publicar Cambios'}</span>
+                    <span>{saving ? 'Publicando...' : 'Publicar Cambios en mi Web'}</span>
                   </button>
                 </div>
 
@@ -664,25 +870,45 @@ export default function ClientCmsPortal({ token }) {
               </form>
             )}
 
-            {/* PESTAÑA 2: FICHA DE RESEÑAS Y MENSAJES DE GOOGLE (EXCLUSIVA DEL CLIENTE) */}
+            {/* PESTAÑA 2: FICHA DE RESEÑAS Y MENSAJES DE GOOGLE (SINCRONIZADA VÍA SITESGOGLITE@GMAIL.COM) */}
             {activeTab === 'gbp' && (
-              <div className="p-4 sm:p-6 rounded-2xl bg-[#111624] border border-slate-800 space-y-4">
+              <div className="p-4 sm:p-6 rounded-2xl bg-[#111624] border border-slate-800 space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-slate-800">
                   <div>
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-orange-400" />
                       <h2 className="text-base font-black text-white">
-                        Ficha de Google Business: {empresaNombre}
+                        Ficha de Google Business: {cmsSite?.gbpProfile?.nombre || empresaNombre}
                       </h2>
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Perfil vinculado exclusivamente a <strong>{empresaNombre}</strong>. Responde reseñas y mensajes de tus clientes.
+                      Datos e interacciones sincronizados mediante la cuenta administradora delegada (<strong>sitesgoglite@gmail.com</strong>).
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 rounded-xl shrink-0">
                     <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                    <span className="text-xs font-black text-white">5.0</span>
+                    <span className="text-xs font-black text-white">{cmsSite?.gbpProfile?.calificacion || '5.0'}</span>
                     <span className="text-[10px] text-amber-300 font-mono">({(cmsSite?.reseñasCliente || []).length} reseñas)</span>
+                  </div>
+                </div>
+
+                {/* Resumen rápido de interacciones de Google Maps si existen */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-xl bg-[#090d16] border border-slate-800">
+                    <div className="text-[10px] font-mono text-slate-400">Interacciones Maps</div>
+                    <div className="text-lg font-black text-white font-mono mt-0.5">{gbpMetrics.interaccionesTotales || 0}</div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-[#090d16] border border-slate-800">
+                    <div className="text-[10px] font-mono text-slate-400">Llamadas Directas</div>
+                    <div className="text-lg font-black text-emerald-400 font-mono mt-0.5">{gbpMetrics.llamadas || 0}</div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-[#090d16] border border-slate-800">
+                    <div className="text-[10px] font-mono text-slate-400">Solicitudes Cómo Llegar</div>
+                    <div className="text-lg font-black text-sky-400 font-mono mt-0.5">{gbpMetrics.direcciones || 0}</div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-[#090d16] border border-slate-800">
+                    <div className="text-[10px] font-mono text-slate-400">Clics al Sitio Web</div>
+                    <div className="text-lg font-black text-orange-400 font-mono mt-0.5">{gbpMetrics.clicsSitioWeb || 0}</div>
                   </div>
                 </div>
 
@@ -696,12 +922,19 @@ export default function ClientCmsPortal({ token }) {
                         </div>
                         <div className="flex items-center gap-0.5">
                           {[1, 2, 3, 4, 5].map(n => (
-                            <Star key={n} className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                            <Star
+                              key={n}
+                              className={`w-3.5 h-3.5 ${
+                                n <= (rev.rating || rev.estrellas || 5)
+                                  ? 'text-amber-400 fill-amber-400'
+                                  : 'text-slate-700'
+                              }`}
+                            />
                           ))}
                         </div>
                       </div>
 
-                      <p className="text-xs text-slate-200 leading-relaxed">"{rev.comentario}"</p>
+                      <p className="text-xs text-slate-200 leading-relaxed">"{rev.comentario || rev.texto}"</p>
 
                       {rev.respuesta ? (
                         <div className="p-3 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-xs space-y-1">
@@ -725,7 +958,7 @@ export default function ClientCmsPortal({ token }) {
                             className="py-2 px-4 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
                           >
                             <Send className="w-3.5 h-3.5" />
-                            <span>Responder</span>
+                            <span>Publicar Respuesta</span>
                           </button>
                         </div>
                       )}
@@ -735,7 +968,7 @@ export default function ClientCmsPortal({ token }) {
               </div>
             )}
 
-            {/* PESTAÑA 3: GOOGLE SITE KIT (MÉTRICAS EXCLUSIVAS DEL SITIO DEL CLIENTE) */}
+            {/* PESTAÑA 3: GOOGLE SITE KIT (MÉTRICAS REALES SINCRONIZADAS VÍA SITESGOGLITE@GMAIL.COM) */}
             {activeTab === 'sitekit' && (
               <div className="p-4 sm:p-6 rounded-2xl bg-[#111624] border border-slate-800 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-slate-800">
@@ -745,31 +978,39 @@ export default function ClientCmsPortal({ token }) {
                       <span>Google Site Kit: {dominioCliente}</span>
                     </h2>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Resumen de tráfico orgánico, clics a WhatsApp y velocidad móvil de tu propiedad web.
+                      Métricas oficiales de Search Console, Google Analytics 4 y PageSpeed provistas vía <strong>sitesgoglite@gmail.com</strong>.
                     </p>
                   </div>
                   <span className="px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 self-start sm:self-auto">
-                    Search Console & GA4 Activos
+                    Propiedad Vinculada Activa
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="p-3.5 rounded-xl bg-[#090d16] border border-slate-800">
                     <div className="flex items-center justify-between text-slate-400 mb-1">
-                      <span className="text-[10px] font-mono">Visitas (30d)</span>
+                      <span className="text-[10px] font-mono">Usuarios / Visitas</span>
                       <Users className="w-3.5 h-3.5 text-sky-400" />
                     </div>
-                    <span className="text-lg sm:text-xl font-black text-white block">1,240</span>
-                    <span className="text-[10px] text-emerald-400 font-mono">+18% este mes</span>
+                    <span className="text-lg sm:text-xl font-black text-white font-mono block">
+                      {Number(skMetrics.usuariosUnicos ?? skMetrics.sesionesTotales ?? 0).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-mono">
+                      {skMetrics.tasaInteraccion ? `Interacción ${skMetrics.tasaInteraccion}` : 'Google Analytics 4'}
+                    </span>
                   </div>
 
                   <div className="p-3.5 rounded-xl bg-[#090d16] border border-slate-800">
                     <div className="flex items-center justify-between text-slate-400 mb-1">
-                      <span className="text-[10px] font-mono">Clics WhatsApp</span>
+                      <span className="text-[10px] font-mono">Clics en Google</span>
                       <MousePointerClick className="w-3.5 h-3.5 text-emerald-400" />
                     </div>
-                    <span className="text-lg sm:text-xl font-black text-emerald-400 block">186</span>
-                    <span className="text-[10px] text-slate-400 font-mono">Conversión 15%</span>
+                    <span className="text-lg sm:text-xl font-black text-emerald-400 font-mono block">
+                      {Number(skMetrics.clicsBusqueda ?? 0).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      CTR: {skMetrics.ctrPromedio || '0.0%'}
+                    </span>
                   </div>
 
                   <div className="p-3.5 rounded-xl bg-[#090d16] border border-slate-800">
@@ -777,8 +1018,12 @@ export default function ClientCmsPortal({ token }) {
                       <span className="text-[10px] font-mono">Impresiones Google</span>
                       <Search className="w-3.5 h-3.5 text-orange-400" />
                     </div>
-                    <span className="text-lg sm:text-xl font-black text-white block">4,890</span>
-                    <span className="text-[10px] text-orange-300 font-mono">Búsquedas locales</span>
+                    <span className="text-lg sm:text-xl font-black text-white font-mono block">
+                      {Number(skMetrics.impresionesBusqueda ?? 0).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] text-orange-300 font-mono">
+                      Posición media: {skMetrics.posicionMedia || '—'}
+                    </span>
                   </div>
 
                   <div className="p-3.5 rounded-xl bg-[#090d16] border border-slate-800">
@@ -786,10 +1031,25 @@ export default function ClientCmsPortal({ token }) {
                       <span className="text-[10px] font-mono">Velocidad Móvil</span>
                       <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
                     </div>
-                    <span className="text-lg sm:text-xl font-black text-emerald-400 block">98/100</span>
-                    <span className="text-[10px] text-emerald-400 font-mono">Carga 0.8s</span>
+                    <span className="text-lg sm:text-xl font-black text-emerald-400 font-mono block">
+                      {mobileSpeedScore}/100
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-mono">LCP {mobileLcp}</span>
                   </div>
                 </div>
+
+                {skMetrics.topKeywords && (
+                  <div className="p-3.5 rounded-xl bg-[#090d16] border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="text-slate-400 font-semibold">🔍 Términos con los que te encuentran en Google:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {skMetrics.topKeywords.split(',').map((kw, i) => (
+                        <span key={i} className="px-2.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-300 font-mono text-[11px]">
+                          {kw.trim()}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

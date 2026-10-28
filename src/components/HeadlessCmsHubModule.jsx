@@ -204,6 +204,13 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
   // Unificar proyectos de goglite_proyectos con la lista de sitios del CMS
   const mergeProjectsWithSites = (baseSites) => {
     const result = [...baseSites];
+    const normalizeSlug = (str) =>
+      (str || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
     const seenSlugs = new Set(result.map(s => s.slug));
 
     try {
@@ -211,13 +218,15 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
       if (Array.isArray(storedProjs)) {
         storedProjs.forEach(proj => {
           const empresa = proj.cliente?.empresa || proj.lead?.empresa || 'Cliente VIP';
-          const slug = proj.cmsSlug || proj.portalToken || empresa.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+          const slug = proj.cmsSlug || normalizeSlug(empresa) || proj.id;
           if (!slug || seenSlugs.has(slug)) return;
           seenSlugs.add(slug);
 
           const pais = proj.cliente?.pais || proj.lead?.pais || proj.pais || 'DO';
           const telefono = proj.cliente?.telefono || proj.lead?.telefono || '';
-          const dominio = proj.dominio || proj.portalConfig?.dominio || `${ empresa.toLowerCase().replace(/[^a-z0-9]/g, '') }.com`;
+          const dominio = (proj.dominio || proj.portalConfig?.dominio || `${empresa.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`)
+            .replace(/^https?:\/\//, '')
+            .replace(/\/$/, '');
 
           result.push({
             id: proj.id,
@@ -225,12 +234,13 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
             nombre: empresa,
             pais,
             dominio,
+            urlProduccion: proj.portalConfig?.urlProduccion || `https://${dominio}`,
             estado: 'publicado',
             planMensual: Number(proj.portalConfig?.planMensual) || 99,
             portalConfig: proj.portalConfig || {},
             cliente: {
               contacto: proj.cliente?.contacto || proj.lead?.contacto || 'Administrador',
-              email: proj.cliente?.email || proj.lead?.email || '',
+              email: proj.portalConfig?.cuentaCmsSitioRegistrada || proj.cliente?.email || proj.lead?.email || '',
               telefono,
               identificacion: proj.cliente?.identificacion || ''
             },
@@ -396,6 +406,32 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
       handleSelectSite(targetSlug);
     }
     setActiveView(targetView);
+  };
+
+  // Actualizar dominio / URL de producción de un sitio desde el modal de configuración
+  const handleUpdateSiteConfig = (slug, newConfig) => {
+    setSites(prev => {
+      const next = prev.map(s => {
+        if (s.slug === slug) {
+          return {
+            ...s,
+            dominio: newConfig.dominio || s.dominio,
+            urlProduccion: newConfig.urlProduccion || s.urlProduccion,
+            planMensual: newConfig.planMensual || s.planMensual,
+            cliente: {
+              ...(s.cliente || {}),
+              email: newConfig.emailClienteCms || s.cliente?.email,
+              telefono: newConfig.telefono || s.cliente?.telefono
+            }
+          };
+        }
+        return s;
+      });
+      try {
+        localStorage.setItem('goglite_cms_sites', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
   };
 
   const handleSaveContent = async () => {
@@ -688,9 +724,11 @@ Reglas técnicas de cumplimiento obligatorio:
 
   // URL del sitio actual para el iframe
   const isGogliteDefault = selectedSlug === 'goglite';
-  const iframeUrl = isGogliteDefault 
-    ? 'https://goglite.com/?goglite_edit=true' 
-    : (currentSite?.dominio?.startsWith('http') ? `${currentSite.dominio}?goglite_edit=true` : `https://${currentSite?.dominio || 'sitio.com'}?goglite_edit=true`);
+  const rawProdUrl = currentSite?.urlProduccion || currentSite?.dominio || 'sitio.com';
+  const baseProdUrl = rawProdUrl.startsWith('http') ? rawProdUrl : `https://${rawProdUrl}`;
+  const iframeUrl = isGogliteDefault
+    ? 'https://goglite.com/?goglite_edit=true'
+    : `${baseProdUrl}${baseProdUrl.includes('?') ? '&' : '?'}goglite_edit=true`;
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#080b11] p-6 text-slate-100 flex flex-col gap-5">
@@ -836,6 +874,7 @@ Reglas técnicas de cumplimiento obligatorio:
           selectedSlug={selectedSlug}
           onSelectSiteInHub={handleSelectSubscriberTool}
           onOpenNewSiteModal={() => setShowNewSiteModal(true)}
+          onUpdateSiteConfig={handleUpdateSiteConfig}
           initialInvoiceClientSlug={initialInvoiceClientSlug}
           onClearInitialInvoiceClient={() => setInitialInvoiceClientSlug(null)}
         />
@@ -1184,11 +1223,24 @@ Reglas técnicas de cumplimiento obligatorio:
                       <span className="w-3 h-3 rounded-full bg-amber-500/90 inline-block shadow-sm"></span>
                       <span className="w-3 h-3 rounded-full bg-emerald-500/90 inline-block shadow-sm"></span>
                     </div>
-                    <div className="flex-1 max-w-md mx-4 bg-[#0a0d14] rounded-lg px-3 py-1 text-[11px] font-mono text-slate-300 border border-slate-700/60 text-center truncate flex items-center justify-center gap-1.5">
+                    <div className="flex-1 max-w-lg mx-4 bg-[#0a0d14] rounded-lg px-3 py-1 text-[11px] font-mono text-slate-300 border border-slate-700/60 flex items-center gap-1.5">
                       <span className="text-emerald-400">🔒</span>
                       <span className="text-slate-400">https://</span>
-                      <span className="text-white font-bold">{currentSite?.dominio || 'goglite.com'}</span>
-                      <span className="text-orange-400">?goglite_edit=true</span>
+                      <input
+                        type="text"
+                        value={(currentSite?.urlProduccion || currentSite?.dominio || '').replace(/^https?:\/\//i, '')}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/^https?:\/\//i, '');
+                          handleUpdateSiteConfig(selectedSlug, {
+                            dominio: raw.split('/')[0] || raw,
+                            urlProduccion: raw ? `https://${raw}` : ''
+                          });
+                        }}
+                        placeholder="tudominio.com"
+                        title="Haz clic para cambiar la URL de producción conectada al Editor Visual"
+                        className="bg-transparent text-white font-bold focus:outline-none focus:text-amber-300 flex-1 min-w-[120px]"
+                      />
+                      <span className="text-orange-400 shrink-0">?goglite_edit=true</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
