@@ -34,9 +34,9 @@ import {
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 
 /**
- * PROTOCOLO MAESTRO DE 38 CHEQUEOS DE PRE-ENTREGA & CONTROL DE CALIDAD
+ * PROTOCOLO MAESTRO DE 44 CHEQUEOS DE PRE-ENTREGA & CONTROL DE CALIDAD
  * Auditoría rigurosa y obligatoria de la agencia antes de liberar cualquier sitio web a un cliente.
- * Integra las 12 Fases de Construcción: SEO On-Page, SEO Local, Google Maps, Presencia IA (GEO), i18n, Seguridad y Conversión.
+ * Integra las 12 Fases de Construcción: SEO On-Page, SEO Local, Google Business Profile (GBP), Presencia IA (GEO), i18n, Seguridad y Conversión.
  */
 export const DEFAULT_CHECKLIST_ITEMS = [
   // 1. Analítica, Métricas & Tracking
@@ -133,47 +133,101 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
 
-  // 3. SEO Local, Google Maps & Presencia IA (GEO)
+  // 3. SEO Local & Google Business Profile (GBP)
   {
-    id: 'chk-11-google-business-maps',
+    id: 'chk-11-gbp-categorias',
     numero: 11,
-    categoria: '3. SEO Local, Google Maps & Presencia IA (GEO)',
-    item: 'Google Business Profile & Maps',
-    descripcion: 'Ficha de Google Business Profile reclamada y vinculada al sitio con mapa interactivo o botón de cómo llegar apuntando a la dirección física de la empresa.',
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
+    item: 'Categoría Primaria y Secundarias (GBP)',
+    descripcion: 'Categoría principal coincidente con la búsqueda transaccional de mayor volumen e intención comercial, y 2 a 4 categorías secundarias estratégicas sin canibalización.',
     critico: true,
     toolType: 'google_maps'
   },
   {
-    id: 'chk-12-consistencia-nap',
+    id: 'chk-12-gbp-areas-servicio',
     numero: 12,
-    categoria: '3. SEO Local, Google Maps & Presencia IA (GEO)',
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
+    item: 'Delimitación de Áreas de Servicio (Service Areas)',
+    descripcion: 'Definición de todas las zonas de cobertura geográfica específicas (ciudades, aeropuertos, provincias, corredores o puertos) donde opera la empresa, evitando radios genéricos.',
+    critico: true,
+    toolType: 'google_maps'
+  },
+  {
+    id: 'chk-13-gbp-catalogo-servicios',
+    numero: 13,
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
+    item: 'Catálogo de Servicios con Micro-SEO',
+    descripcion: 'Cada servicio ofrecido cuenta con su ficha en el catálogo de Google: nombre exacto, precio base/referencial y micro-descripción (150–250 caracteres) rica en keywords locales.',
+    critico: true,
+    toolType: 'google_maps'
+  },
+  {
+    id: 'chk-14-gbp-activos-visuales',
+    numero: 14,
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
+    item: 'Activos Visuales Safe-Zone para Maps',
+    descripcion: 'Logotipo en formato cuadrado 1:1 (mínimo 800x800px) con margen de seguridad circular para el avatar de Maps, y foto de portada en ratio 16:9 (1200x675px) optimizada para desktop y móvil.',
+    critico: false,
+    toolType: null
+  },
+  {
+    id: 'chk-15-gbp-galeria-antistock',
+    numero: 15,
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
+    item: 'Galería de Operación Real (Anti-Stock)',
+    descripcion: 'Al menos 6 a 10 fotografías reales de alta calidad (flota/vehículos, choferes o personal con uniforme, oficinas o puntos de servicio), sin marcas de agua ni fotos de stock genéricas.',
+    critico: true,
+    toolType: null
+  },
+  {
+    id: 'chk-16-gbp-enlace-utm',
+    numero: 16,
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
+    item: 'Enlace Web con Atribución UTM y Cita',
+    descripcion: 'Enlace web con parámetros UTM (?utm_source=google_business&utm_medium=organic&utm_campaign=local_pack) para auditar visitas en Analytics, y botón de contacto apuntando al canal de conversión.',
+    critico: true,
+    toolType: 'analytics'
+  },
+  {
+    id: 'chk-17-gbp-kit-qr-resenas',
+    numero: 17,
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
+    item: 'Kit Físico de Reseñas QR & Enlace Directo',
+    descripcion: 'Enlace directo a reseñas (writereview / g.page/r/.../review), generación de código QR vectorial en alta resolución y plantilla imprimible para respaldo de asientos, mostrador o tarjeta física.',
+    critico: true,
+    toolType: 'google_reviews'
+  },
+  {
+    id: 'chk-18-gbp-post-lanzamiento',
+    numero: 18,
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
+    item: 'Publicación de Lanzamiento en Google Updates',
+    descripcion: 'Primera actualización o publicación activa en la pestaña de novedades del perfil anunciando la web oficial, servicios principales y llamado a la acción ("Llamar ahora" o "Reservar").',
+    critico: false,
+    toolType: 'google_maps'
+  },
+  {
+    id: 'chk-19-consistencia-nap',
+    numero: 19,
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
     item: 'Consistencia NAP (Nombre, Dirección, Teléfono)',
     descripcion: 'Datos NAP (Name, Address, Phone) 100% idénticos en footer, página de contacto, schema markup y Google Maps para máxima autoridad y ranking en el pack local.',
     critico: true,
     toolType: null
   },
   {
-    id: 'chk-13-resenas-google-maps',
-    numero: 13,
-    categoria: '3. SEO Local, Google Maps & Presencia IA (GEO)',
-    item: 'Enlace a Reseñas Google (writereview)',
-    descripcion: 'CTA o botón directo para dejar reseñas en Google Maps con parámetro writereview activo y carrusel de testimonios reales verificados.',
-    critico: true,
-    toolType: 'google_reviews'
-  },
-  {
-    id: 'chk-14-schema-localbusiness-geo',
-    numero: 14,
-    categoria: '3. SEO Local, Google Maps & Presencia IA (GEO)',
+    id: 'chk-20-schema-localbusiness-geo',
+    numero: 20,
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
     item: 'Schema JSON-LD LocalBusiness & Geo',
     descripcion: 'Datos estructurados Schema.org tipo LocalBusiness/ProfessionalService con GeoCoordinates (lat/long), horario comercial, teléfono oficial y municipio.',
     critico: true,
     toolType: 'rich_results'
   },
   {
-    id: 'chk-15-geo-trust-anchors-ia',
-    numero: 15,
-    categoria: '3. SEO Local, Google Maps & Presencia IA (GEO)',
+    id: 'chk-21-geo-trust-anchors-ia',
+    numero: 21,
+    categoria: '3. SEO Local & Google Business Profile (GBP)',
     item: 'GEO & Trust Anchors para IA',
     descripcion: 'Optimización para motores de respuesta de IA (ChatGPT, Perplexity, Gemini) con 3 anclas de confianza (/about, /contact, /privacy >500 chars), perfil del fundador y citas factuales.',
     critico: true,
@@ -182,8 +236,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
 
   // 4. Legal, Privacidad & Cumplimiento
   {
-    id: 'chk-16-cookies-banner',
-    numero: 16,
+    id: 'chk-22-cookies-banner',
+    numero: 22,
     categoria: '4. Legal, Privacidad & Cumplimiento',
     item: 'Banner de cookies',
     descripcion: 'Aviso de consentimiento de cookies conforme a normativas de privacidad que permite al usuario aceptar o configurar cookies analíticas.',
@@ -191,8 +245,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-17-terminos-condiciones',
-    numero: 17,
+    id: 'chk-23-terminos-condiciones',
+    numero: 23,
     categoria: '4. Legal, Privacidad & Cumplimiento',
     item: 'Términos y condiciones',
     descripcion: 'Páginas legales públicas enlazadas en el footer: Términos & Condiciones de Uso y Política de Privacidad y Protección de Datos Personales.',
@@ -200,8 +254,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-18-correos-smtp',
-    numero: 18,
+    id: 'chk-24-correos-smtp',
+    numero: 24,
     categoria: '4. Legal, Privacidad & Cumplimiento',
     item: 'Correos + SMTP',
     descripcion: 'Servicio de correo transaccional (SMTP/Resend/SendGrid) con registros SPF, DKIM y DMARC validados para que las alertas del formulario no caigan en spam.',
@@ -209,8 +263,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-19-datos-fiscales-b2b',
-    numero: 19,
+    id: 'chk-25-datos-fiscales-b2b',
+    numero: 25,
     categoria: '4. Legal, Privacidad & Cumplimiento',
     item: 'Datos Fiscales B2B (RNC / DGII / NIT)',
     descripcion: 'Identificación tributaria corporativa (RNC/DGII en Rep. Dominicana o NIT/NRC en El Salvador) visible en el footer o contacto para clientes que requieran factura fiscal.',
@@ -220,8 +274,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
 
   // 5. Seguridad, Infraestructura & Código
   {
-    id: 'chk-20-ssl-https',
-    numero: 20,
+    id: 'chk-26-ssl-https',
+    numero: 26,
     categoria: '5. Seguridad, Infraestructura & Código',
     item: 'SSL + HTTPS forzado',
     descripcion: 'Certificado SSL TLS 1.3 activo con candado verde, redirección forzada de HTTP a HTTPS y sin advertencias de contenido mixto (Mixed Content).',
@@ -229,8 +283,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'ssl'
   },
   {
-    id: 'chk-21-datos-sesiones',
-    numero: 21,
+    id: 'chk-27-datos-sesiones',
+    numero: 27,
     categoria: '5. Seguridad, Infraestructura & Código',
     item: 'Datos ocultos en sesiones',
     descripcion: 'Verificación de que no se almacenen datos confidenciales, contraseñas ni números de tarjeta en texto plano en localStorage, sessionStorage o cookies.',
@@ -238,8 +292,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-22-sin-tokens-js',
-    numero: 22,
+    id: 'chk-28-sin-tokens-js',
+    numero: 28,
     categoria: '5. Seguridad, Infraestructura & Código',
     item: 'Sin tokens en JS',
     descripcion: 'Inspección de bundles JavaScript para asegurar que no contengan API Keys maestras, tokens de GitHub, credenciales de base de datos ni secretos de pago.',
@@ -247,8 +301,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-23-vulnerabilidades',
-    numero: 23,
+    id: 'chk-29-vulnerabilidades',
+    numero: 29,
     categoria: '5. Seguridad, Infraestructura & Código',
     item: 'Vulnerabilidades y cabeceras',
     descripcion: 'Auditoría de cabeceras de seguridad HTTP (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, HSTS) y dependencias frontend sin exploits conocidos.',
@@ -256,8 +310,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'security_headers'
   },
   {
-    id: 'chk-24-honeypot-antispam',
-    numero: 24,
+    id: 'chk-30-honeypot-antispam',
+    numero: 30,
     categoria: '5. Seguridad, Infraestructura & Código',
     item: 'Blindaje Anti-Spam Honeypot en Formularios',
     descripcion: 'Trampa invisible honeypot (_hp_security_check o campo oculto con CSS) en el 100% de los formularios para neutralizar bots sin mermar la conversión con captchas tediosos.',
@@ -267,8 +321,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
 
   // 6. Rendimiento, UX & Conversión Mobile
   {
-    id: 'chk-25-favicon',
-    numero: 25,
+    id: 'chk-31-favicon',
+    numero: 31,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Favicon',
     descripcion: 'Icono de pestaña /favicon.ico, PNG en alta resolución (192x192 y 512x512) y apple-touch-icon para accesos directos en iOS y Android.',
@@ -276,8 +330,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-26-pagina-404',
-    numero: 26,
+    id: 'chk-32-pagina-404',
+    numero: 32,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Página 404 propia',
     descripcion: 'Página de error 404 personalizada con diseño corporativo, mensaje empático y botón visible para volver al inicio sin perder al usuario.',
@@ -285,8 +339,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'page_404'
   },
   {
-    id: 'chk-27-pagespeed',
-    numero: 27,
+    id: 'chk-33-pagespeed',
+    numero: 33,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'PageSpeed Insights',
     descripcion: 'Prueba en Google PageSpeed Insights con calificación móvil ≥ 85-90 puntos, garantizando fluidez y aprobación del algoritmo de Google.',
@@ -294,8 +348,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'pagespeed'
   },
   {
-    id: 'chk-28-core-web-vitals',
-    numero: 28,
+    id: 'chk-34-core-web-vitals',
+    numero: 34,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Core Web Vitals',
     descripcion: 'Métricas de experiencia en rango verde: LCP (renderizado principal) < 2.5s, CLS (estabilidad visual) < 0.1 e INP/FID (interactividad) < 100ms.',
@@ -303,8 +357,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'pagespeed'
   },
   {
-    id: 'chk-29-optimizar-recursos',
-    numero: 29,
+    id: 'chk-35-optimizar-recursos',
+    numero: 35,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Optimizar imágenes y JS',
     descripcion: 'Imágenes comprimidas en formatos WebP/AVIF con dimensiones fijas; JavaScript minificado y scripts no esenciales diferidos con defer o async.',
@@ -312,8 +366,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-30-test-celulares',
-    numero: 30,
+    id: 'chk-36-test-celulares',
+    numero: 36,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Test en celulares reales',
     descripcion: 'Prueba física en dispositivos móviles reales (iPhone y Android) verificando que no existan barras de scroll horizontal ni tipografías ilegibles.',
@@ -321,8 +375,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-31-accesibilidad',
-    numero: 31,
+    id: 'chk-37-accesibilidad',
+    numero: 37,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Accesibilidad y contraste',
     descripcion: 'Contraste cromático de textos superior a 4.5:1 (norma WCAG AA), navegación clara por teclado y áreas táctiles de botones superiores a 44x44px.',
@@ -330,8 +384,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'contrast_checker'
   },
   {
-    id: 'chk-32-test-formularios',
-    numero: 32,
+    id: 'chk-38-test-formularios',
+    numero: 38,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Test de formularios y cotizador',
     descripcion: 'Prueba de envío completa de todos los formularios de contacto y del Cotizador Dinámico a WhatsApp, validando validaciones requeridas y evento de conversión.',
@@ -339,8 +393,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-33-botones-whatsapp',
-    numero: 33,
+    id: 'chk-39-botones-whatsapp',
+    numero: 39,
     categoria: '6. Rendimiento, UX & Conversión Mobile',
     item: 'Botones, links, WhatsApp',
     descripcion: 'Verificación de que ningún botón o enlace esté roto (cero 404). Botón de WhatsApp abre la app con mensaje comercial predefinido y enlace tel: funcional.',
@@ -350,8 +404,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
 
   // 7. DevOps, Infraestructura & Respaldo
   {
-    id: 'chk-34-dns-configurados',
-    numero: 34,
+    id: 'chk-40-dns-configurados',
+    numero: 40,
     categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'DNS configurados',
     descripcion: 'Registros DNS A, CNAME, www y verificación de propagación global completada; dominio principal y www apuntan al mismo servidor sin bucles.',
@@ -359,8 +413,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'dns_checker'
   },
   {
-    id: 'chk-35-backups-automaticos',
-    numero: 35,
+    id: 'chk-41-backups-automaticos',
+    numero: 41,
     categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'Backups automáticos',
     descripcion: 'Sistema de respaldo periódico automatizado del repositorio de código, archivos multimedia y base de datos con retención mínima de 30 días.',
@@ -368,8 +422,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-36-test-restauracion',
-    numero: 36,
+    id: 'chk-42-test-restauracion',
+    numero: 42,
     categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'Test de restauración',
     descripcion: 'Procedimiento de restauración de respaldo probado y documentado para garantizar que la web puede recuperarse en menos de 1 hora ante un fallo.',
@@ -377,8 +431,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: null
   },
   {
-    id: 'chk-37-alertas-caida',
-    numero: 37,
+    id: 'chk-43-alertas-caida',
+    numero: 43,
     categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'Alertas de caída',
     descripcion: 'Servicio de monitoreo de disponibilidad 24/7 (Uptime Robot o Pingdom) configurado con chequeos cada 5 minutos y alertas por correo o WhatsApp.',
@@ -386,8 +440,8 @@ export const DEFAULT_CHECKLIST_ITEMS = [
     toolType: 'uptime_monitor'
   },
   {
-    id: 'chk-38-monitoreo-errores',
-    numero: 38,
+    id: 'chk-44-monitoreo-errores',
+    numero: 44,
     categoria: '7. DevOps, Infraestructura & Respaldo',
     item: 'Monitoreo de errores',
     descripcion: 'Rastreador de excepciones en producción activo o consola de desarrollador limpia de errores JS que puedan interrumpir la experiencia del visitante.',
@@ -399,7 +453,7 @@ export const DEFAULT_CHECKLIST_ITEMS = [
 export const QA_CATEGORIES = [
   '1. Analítica, Métricas & Tracking',
   '2. SEO On-Page, Indexación & Contenido',
-  '3. SEO Local, Google Maps & Presencia IA (GEO)',
+  '3. SEO Local & Google Business Profile (GBP)',
   '4. Legal, Privacidad & Cumplimiento',
   '5. Seguridad, Infraestructura & Código',
   '6. Rendimiento, UX & Conversión Mobile',
@@ -1366,21 +1420,21 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
                     <span># REQUISITO DE CALIDAD (01 - {String(mitad).padStart(2, '0')})</span>
                     <span>ESTADO</span>
                   </div>
-                  <div className="divide-y divide-slate-200 text-[8px] leading-tight">
+                  <div className="divide-y divide-slate-200 text-[7.5px] leading-tight">
                     {col1.map((item) => {
                       const st = item.estado || (item.completado ? 'APROBADO' : 'PENDIENTE');
                       return (
-                        <div key={item.id} className="px-2 py-[1.5px] flex items-center justify-between gap-1 hover:bg-slate-50">
+                        <div key={item.id} className="px-2 py-[1px] flex items-center justify-between gap-1 hover:bg-slate-50">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="font-mono font-bold text-slate-500 shrink-0 text-[7.5px]">
+                            <span className="font-mono font-bold text-slate-500 shrink-0 text-[7px]">
                               {String(item.numero).padStart(2, '0')}
                             </span>
                             <span className={`font-medium truncate ${st === 'NO_APLICA' ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
                               {item.item}
-                              {item.critico && st !== 'NO_APLICA' && <span className="text-rose-600 font-bold ml-1 text-[7px] font-mono">[Crítico]</span>}
+                              {item.critico && st !== 'NO_APLICA' && <span className="text-rose-600 font-bold ml-1 text-[6.5px] font-mono">[Crítico]</span>}
                             </span>
                           </div>
-                          <span className={`shrink-0 font-mono font-bold text-[7px] px-1 py-0.2 rounded ${
+                          <span className={`shrink-0 font-mono font-bold text-[6.5px] px-1 py-0.2 rounded ${
                             st === 'APROBADO'
                               ? 'text-emerald-800 bg-emerald-100'
                               : st === 'NO_APLICA'
@@ -1401,21 +1455,21 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
                     <span># REQUISITO DE CALIDAD ({String(mitad + 1).padStart(2, '0')} - {String(checklist.length).padStart(2, '0')})</span>
                     <span>ESTADO</span>
                   </div>
-                  <div className="divide-y divide-slate-200 text-[8px] leading-tight">
+                  <div className="divide-y divide-slate-200 text-[7.5px] leading-tight">
                     {col2.map((item) => {
                       const st = item.estado || (item.completado ? 'APROBADO' : 'PENDIENTE');
                       return (
-                        <div key={item.id} className="px-2 py-[1.5px] flex items-center justify-between gap-1 hover:bg-slate-50">
+                        <div key={item.id} className="px-2 py-[1px] flex items-center justify-between gap-1 hover:bg-slate-50">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="font-mono font-bold text-slate-500 shrink-0 text-[7.5px]">
+                            <span className="font-mono font-bold text-slate-500 shrink-0 text-[7px]">
                               {String(item.numero).padStart(2, '0')}
                             </span>
                             <span className={`font-medium truncate ${st === 'NO_APLICA' ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
                               {item.item}
-                              {item.critico && st !== 'NO_APLICA' && <span className="text-rose-600 font-bold ml-1 text-[7px] font-mono">[Crítico]</span>}
+                              {item.critico && st !== 'NO_APLICA' && <span className="text-rose-600 font-bold ml-1 text-[6.5px] font-mono">[Crítico]</span>}
                             </span>
                           </div>
-                          <span className={`shrink-0 font-mono font-bold text-[7px] px-1 py-0.2 rounded ${
+                          <span className={`shrink-0 font-mono font-bold text-[6.5px] px-1 py-0.2 rounded ${
                             st === 'APROBADO'
                               ? 'text-emerald-800 bg-emerald-100'
                               : st === 'NO_APLICA'
