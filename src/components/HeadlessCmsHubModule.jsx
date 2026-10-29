@@ -84,7 +84,49 @@ const GOGLITE_DEFAULT_SITE = {
   }
 };
 
-function buildDefaultContentForClient({ nombre, telefono, colorPrimario, ciudad, categoria, pais }) {
+const TURISRAN_REAL_CONTENT = {
+  branding: {
+    nombreMarca: 'TurisRan Dominicana',
+    slogan: 'Viaja cómodo. Llega seguro.',
+    colorPrimario: '#D4AF37',
+    telefonoWhatsApp: '+1 (849) 752-7408',
+    ciudadPrincipal: 'Punta Cana, Santo Domingo & Toda República Dominicana',
+    categoriaNegocio: 'Transporte Turístico, Ejecutivo, Transfers Aeropuerto (PUJ/SDQ/STI/LRM) & Tours VIP'
+  },
+  hero: {
+    badge: 'CHOFERES VIP DISPONIBLES EN TIEMPO REAL · 24/7',
+    titulo: 'TurisRan Dominicana | Transfers & Experiencias VIP',
+    subtitulo: 'Servicio de transporte privado VIP en la República Dominicana. Traslados puntuales desde aeropuertos de Punta Cana (PUJ), Santo Domingo (SDQ), Santiago (STI), La Romana (LRM) y excursiones privadas.',
+    botonTexto: 'Cotizar por WhatsApp Oficial',
+    botonSubtexto: 'Monitoreo de vuelos 24/7 · Tarifa fija garantizada'
+  },
+  servicios: [
+    { id: 'tr-1', titulo: 'Traslado Privado Aeropuerto Punta Cana (PUJ)', descripcion: 'Servicio de transfer privado VIP desde el Aeropuerto de Punta Cana (PUJ) a hoteles de Bávaro, Uvero Alto y Cap Cana con monitoreo 24/7 y cartel de bienvenida.', precio: 'Cotizar Ruta VIP' },
+    { id: 'tr-2', titulo: 'Traslado Aeropuerto Las Américas Santo Domingo (SDQ)', descripcion: 'Transporte privado ejecutivo desde el Aeropuerto Las Américas (SDQ) hacia Santo Domingo, Zona Colonial, Boca Chica, Juan Dolio y La Romana con facturación NCF.', precio: 'Tarifa Fija' },
+    { id: 'tr-3', titulo: 'Excursión Privada Isla Saona VIP', descripcion: 'Excursión exclusiva puerta a puerta con transporte climatizado hacia Bayahíbe, lancha rápida, piscina natural y almuerzo en Isla Saona.', precio: 'Tour Privado' },
+    { id: 'tr-4', titulo: 'Chofer Privado y Transporte VIP Corporativo', descripcion: 'Servicio de chofer bilingüe por horas o días en SUVs de lujo y Vans ejecutivas para empresas, diplomáticos, bodas y congresos con Facturación Fiscal (NCF).', precio: 'Ejecutivo VIP' },
+    { id: 'tr-5', titulo: 'Traslado Directo Santo Domingo ↔ Punta Cana', descripcion: 'Viaje privado directo entre Santo Domingo y Punta Cana/Bávaro por Autopista del Coral en unidades confortables con Wi-Fi a bordo.', precio: 'Interurbano' },
+    { id: 'tr-6', titulo: 'Excursión Privada Samaná, Cayo Levantado & Montaña Redonda', descripcion: 'Tours privados personalizados hacia Samaná, Salto del Limón, Montaña Redonda y City Tour Histórico Zona Colonial.', precio: 'Experiencia VIP' }
+  ],
+  testimonios: [
+    { id: 'rev-1', cliente: 'Kimberlin Montero · Google Maps 5★', comentario: 'Excelente conductor. El servicio fue excepcionalmente profesional y atento; llegó puntual con un vehículo impecable, demostrando gran habilidad al volante y conocimiento de las rutas.', estrellas: 5 },
+    { id: 'rev-2', cliente: 'Familia Isasi · Google Maps 5★', comentario: 'Ransel muy profesional, nos trajo a Samaná desde Bayahibe. El viaje fue muy agradable y ameno. Buen coche y muy buena conducción. Es de total confianza.', estrellas: 5 },
+    { id: 'rev-3', cliente: 'Rafalis Montero Medina · Google Maps 5★', comentario: 'Excelente servicio la verdad, buen confort en el vehículo, altamente responsable y todo servido exactamente a tiempo.', estrellas: 5 },
+    { id: 'rev-4', cliente: 'Mercedes Dolores Méndez Matos · Local Guide 5★', comentario: 'Trato agradable y persona de absoluta confianza, lo recomiendo 100%. Vehículo cómodo, limpio y muy confortable.', estrellas: 5 },
+    { id: 'rev-5', cliente: 'Acelis Grisel Montero Medina · Google Maps 5★', comentario: 'Excelente servicio, máximo respeto y muy amable el conductor. Servicio 100% recomendable para viajar en República Dominicana.', estrellas: 5 }
+  ],
+  faqs: [
+    { pregunta: '¿Qué pasa si mi vuelo se retrasa al llegar a Punta Cana (PUJ) o Santo Domingo (SDQ)?', respuesta: 'Monitoreamos tu número de vuelo en tiempo real sin costo adicional. Nuestro chofer te esperará en la salida de la terminal con un cartel con tu nombre a la hora exacta en que aterrice tu avión.' },
+    { pregunta: '¿Los precios son por persona o por vehículo privado completo?', respuesta: 'Todas nuestras tarifas son por vehículo privado completo (SUV o Van Ejecutiva) exclusivo para ti y tu grupo, sin compartir con desconocidos ni hacer paradas innecesarias.' },
+    { pregunta: '¿Emiten Factura con Comprobante Fiscal (NCF) para empresas?', respuesta: 'Sí, emitimos facturación corporativa con Comprobante Fiscal (NCF) válido en República Dominicana para empresas, embajadas y eventos ejecutivos.' }
+  ]
+};
+
+function buildDefaultContentForClient({ nombre, telefono, colorPrimario, ciudad, categoria, pais, slug }) {
+  const norm = (slug || nombre || '').toLowerCase();
+  if (norm.includes('turisra')) {
+    return JSON.parse(JSON.stringify(TURISRAN_REAL_CONTENT));
+  }
   const defaultCity = ciudad || (pais === 'DO' ? 'Santo Domingo' : 'San Salvador');
   return {
     branding: {
@@ -186,6 +228,27 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
         setUnsavedChangesCount((c) => c + 1);
       } else if (event.data.type === 'GOGLITE_CMS_PAGE_DISCOVERED') {
         setDiscoveredPageInfo(event.data);
+        if (Array.isArray(event.data.elements) && event.data.elements.length > 0) {
+          setEditableContent((prev) => {
+            if (!prev) return prev;
+            const next = JSON.parse(JSON.stringify(prev));
+            if (!next.textos) next.textos = {};
+            event.data.elements.forEach((el) => {
+              if (el.key && el.text) {
+                const parts = el.key.split('.');
+                let target = next;
+                for (let i = 0; i < parts.length - 1; i++) {
+                  if (!target[parts[i]]) target[parts[i]] = {};
+                  target = target[parts[i]];
+                }
+                if (!target[parts[parts.length - 1]]) {
+                  target[parts[parts.length - 1]] = el.text;
+                }
+              }
+            });
+            return next;
+          });
+        }
       }
     };
 
@@ -203,7 +266,18 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
 
   // Unificar proyectos de goglite_proyectos con la lista de sitios del CMS
   const mergeProjectsWithSites = (baseSites) => {
-    const result = [...baseSites];
+    const result = baseSites.map((s) => {
+      if (s.slug && s.slug.includes('turisra')) {
+        const isGenericHero = !s.contenido?.hero?.titulo || s.contenido.hero.titulo.includes('TurisRan en ');
+        return {
+          ...s,
+          dominio: (!s.dominio || s.dominio === 'turisran.com') ? 'turisran-dominicana.com' : s.dominio,
+          urlProduccion: (!s.urlProduccion || s.urlProduccion.includes('turisran.com')) ? 'https://turisran-dominicana.com' : s.urlProduccion,
+          contenido: isGenericHero ? JSON.parse(JSON.stringify(TURISRAN_REAL_CONTENT)) : s.contenido
+        };
+      }
+      return s;
+    });
     const normalizeSlug = (str) =>
       (str || '')
         .toLowerCase()
@@ -219,14 +293,27 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
         storedProjs.forEach(proj => {
           const empresa = proj.cliente?.empresa || proj.lead?.empresa || 'Cliente VIP';
           const slug = proj.cmsSlug || normalizeSlug(empresa) || proj.id;
-          if (!slug || seenSlugs.has(slug)) return;
+          const bovedaUrl = proj.bovedaRepos?.urlProduccion || proj.bovedaRepos?.stagingUrl || '';
+          const defaultDom = slug.includes('turisra') ? 'turisran-dominicana.com' : `${empresa.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
+          const rawDom = proj.portalConfig?.urlProduccion || bovedaUrl || proj.dominio || proj.portalConfig?.dominio || defaultDom;
+          const dominio = rawDom.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+          const urlProduccion = proj.portalConfig?.urlProduccion || bovedaUrl || `https://${dominio}`;
+
+          if (seenSlugs.has(slug)) {
+            const existingIdx = result.findIndex(s => s.slug === slug);
+            if (existingIdx !== -1 && bovedaUrl && (result[existingIdx].dominio === 'turisran.com' || !result[existingIdx].urlProduccion)) {
+              result[existingIdx] = {
+                ...result[existingIdx],
+                dominio,
+                urlProduccion
+              };
+            }
+            return;
+          }
           seenSlugs.add(slug);
 
           const pais = proj.cliente?.pais || proj.lead?.pais || proj.pais || 'DO';
-          const telefono = proj.cliente?.telefono || proj.lead?.telefono || '';
-          const dominio = (proj.dominio || proj.portalConfig?.dominio || `${empresa.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`)
-            .replace(/^https?:\/\//, '')
-            .replace(/\/$/, '');
+          const telefono = proj.cliente?.telefono || proj.lead?.telefono || (slug.includes('turisra') ? '+1 (849) 752-7408' : '');
 
           result.push({
             id: proj.id,
@@ -234,12 +321,12 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
             nombre: empresa,
             pais,
             dominio,
-            urlProduccion: proj.portalConfig?.urlProduccion || `https://${dominio}`,
+            urlProduccion,
             estado: 'publicado',
             planMensual: Number(proj.portalConfig?.planMensual) || 99,
             portalConfig: proj.portalConfig || {},
             cliente: {
-              contacto: proj.cliente?.contacto || proj.lead?.contacto || 'Administrador',
+              contacto: proj.cliente?.contacto || proj.cliente?.nombre || proj.lead?.contacto || 'Administrador',
               email: proj.portalConfig?.cuentaCmsSitioRegistrada || proj.cliente?.email || proj.lead?.email || '',
               telefono,
               identificacion: proj.cliente?.identificacion || ''
@@ -247,6 +334,7 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
             ultimaActualizacion: new Date().toISOString().split('T')[0],
             contenido: buildDefaultContentForClient({
               nombre: empresa,
+              slug,
               telefono,
               colorPrimario: '#FF6B00',
               ciudad: pais === 'DO' ? 'Santo Domingo' : 'San Salvador',

@@ -11,7 +11,16 @@
     return scripts[scripts.length - 1];
   })();
 
-  var siteSlug = (scriptTag && scriptTag.getAttribute('data-site')) || 'goglite';
+  var rawSlugAttr = (scriptTag && scriptTag.getAttribute('data-site')) || '';
+  var host = (window.location && window.location.hostname || '').toLowerCase();
+  var siteSlug = rawSlugAttr || 'goglite';
+  if ((!rawSlugAttr || rawSlugAttr === 'goglite') && host && host.indexOf('goglite') === -1 && host !== 'localhost' && host !== '127.0.0.1') {
+    if (host.indexOf('turisra') !== -1) {
+      siteSlug = 'turisran';
+    } else {
+      siteSlug = host.replace(/^www\./, '').split('.')[0].replace(/[^a-z0-9-]/g, '');
+    }
+  }
   var apiUrl = (scriptTag && scriptTag.getAttribute('data-api')) || 'https://goglite-agency.web.app';
   var cacheKey = 'goglite_cms_' + siteSlug;
   var isEditorMode = false;

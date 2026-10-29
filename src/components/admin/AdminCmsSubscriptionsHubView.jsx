@@ -225,12 +225,16 @@ export default function AdminCmsSubscriptionsHubView({
       }
 
       const stats = computeRemainingStats(careVenceAt, esMesDePrueba, nowTick);
-      const dominioLimpio = (
-        matchingSite?.dominio ||
+      const bovedaUrl = proj.bovedaRepos?.urlProduccion || proj.bovedaRepos?.stagingUrl || '';
+      const fallbackDom = slug.includes('turisra') ? 'turisran-dominicana.com' : `${empresa.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
+      const rawDom =
+        portalConfig.urlProduccion ||
+        bovedaUrl ||
+        (matchingSite?.dominio && matchingSite.dominio !== 'turisran.com' ? matchingSite.dominio : '') ||
         proj.dominio ||
         portalConfig.dominio ||
-        `${empresa.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`
-      ).replace(/^https?:\/\//, '').replace(/\/$/, '');
+        fallbackDom;
+      const dominioLimpio = rawDom.replace(/^https?:\/\//i, '').replace(/\/$/, '');
 
       list.push({
         id: proj.id,
@@ -239,13 +243,13 @@ export default function AdminCmsSubscriptionsHubView({
         proyectoRef: proj,
         siteRef: matchingSite || null,
         empresa,
-        contacto: proj.cliente?.contacto || proj.lead?.contacto || 'Administrador',
+        contacto: proj.cliente?.contacto || proj.cliente?.nombre || proj.lead?.contacto || 'Administrador',
         email: portalConfig.cuentaCmsSitioRegistrada || proj.cliente?.email || proj.lead?.email || '',
-        telefono: proj.cliente?.telefono || proj.lead?.telefono || '',
+        telefono: proj.cliente?.telefono || proj.lead?.telefono || (slug.includes('turisra') ? '+1 (849) 752-7408' : ''),
         identificacion: proj.cliente?.identificacion || proj.cliente?.rnc || '',
         pais: proj.cliente?.pais || proj.lead?.pais || proj.pais || 'DO',
         dominio: dominioLimpio,
-        urlProduccion: portalConfig.urlProduccion || matchingSite?.urlProduccion || `https://${dominioLimpio}`,
+        urlProduccion: portalConfig.urlProduccion || bovedaUrl || matchingSite?.urlProduccion || `https://${dominioLimpio}`,
         portalToken: proj.portalToken || proj.presupuestoId || slug,
         careVenceAt,
         esMesDePrueba,

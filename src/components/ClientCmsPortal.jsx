@@ -99,15 +99,20 @@ export default function ClientCmsPortal({ token }) {
   };
 
   const getClientDomain = (pData, fallbackSite) => {
+    const slug = getClientSiteSlug(pData, fallbackSite);
     const rawDom =
-      fallbackSite?.dominio ||
+      fallbackSite?.urlProduccion ||
+      (fallbackSite?.dominio && fallbackSite.dominio !== 'turisran.com' ? fallbackSite.dominio : '') ||
+      pData?.portalConfig?.urlProduccion ||
+      pData?.proyecto?.bovedaRepos?.urlProduccion ||
       pData?.dominio ||
       pData?.portalConfig?.dominio ||
       pData?.lead?.dominio ||
       pData?.proyecto?.onboarding?.datos?.dominioOficial ||
       '';
-    if (rawDom && rawDom.includes('.')) return rawDom.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    return `${getClientSiteSlug(pData, fallbackSite)}.com`;
+    if (rawDom && rawDom.includes('.')) return rawDom.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+    if (slug.includes('turisra')) return 'turisran-dominicana.com';
+    return `${slug}.com`;
   };
 
   // Cargar datos del portal y del sitio CMS aislado del cliente (tanto de 5 Fases como de Integración Directa en Módulo 6)
