@@ -2479,31 +2479,31 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   };
   const isSV = currentPais === 'SV';
   const activeBankTab = selectedBankTab === 'US' ? 'US' : currentPais;
-  const totalInversion = Number(presupuesto?.inversion?.precioTotal || lead.presupuestoMonto) || 650;
+  const totalInversion = Number(presupuesto?.inversion?.precioTotal || lead?.presupuestoMonto) || 650;
   const anticipoMonto = Number(presupuesto?.inversion?.anticipo) || Math.round(totalInversion * 0.5);
   const liquidacionMonto = Number(presupuesto?.inversion?.contraEntrega) || (totalInversion - anticipoMonto);
-  const clientEmpresa = presupuesto?.cliente?.empresa || lead.empresa || 'Empresa Cliente';
-  const clientContacto = presupuesto?.cliente?.nombre || lead.contacto || 'Representante Legal';
+  const clientEmpresa = presupuesto?.cliente?.empresa || lead?.empresa || 'Empresa Cliente';
+  const clientContacto = presupuesto?.cliente?.nombre || lead?.contacto || 'Representante Legal';
   const clientUbicacion = presupuesto?.cliente?.ubicacion || (currentPais === 'DO' ? 'Santo Domingo, República Dominicana' : 'San Salvador, El Salvador');
 
   // Asegurar que el contrato formal SOW y el proyecto estén siempre resueltos y reconciliados con el presupuesto
   const rawActiveProyecto = data.proyecto || (presupuesto ? buildProyectoFromPresupuesto(presupuesto) : (lead ? buildProyectoFromPresupuesto({
     id: lead.id,
-    codigo: lead.presupuestoCodigo || 'P-2026',
-    cliente: { nombre: clientContacto, empresa: clientEmpresa, telefono: lead.telefono, email: lead.email, ubicacion: clientUbicacion },
+    codigo: lead?.presupuestoCodigo || 'P-2026',
+    cliente: { nombre: clientContacto, empresa: clientEmpresa, telefono: lead?.telefono, email: lead?.email, ubicacion: clientUbicacion },
     pais: currentPais,
     inversion: { precioTotal: totalInversion, anticipo: anticipoMonto, contraEntrega: liquidacionMonto }
   }) : null));
 
   const activeProyecto = (rawActiveProyecto && (presupuesto || totalInversion))
     ? reconcileProyectoWithPresupuesto(rawActiveProyecto, presupuesto || {
-        codigo: lead.presupuestoCodigo || 'P-2026',
+        codigo: lead?.presupuestoCodigo || 'P-2026',
         inversion: { precioTotal: totalInversion, anticipo: anticipoMonto, contraEntrega: liquidacionMonto }
       })
     : rawActiveProyecto;
 
   // Resolver URLs y repositorios oficiales (Bóveda Fase 4 / Proyecto / Lead / Configuración)
-  const resolvedProductionUrl = React.useMemo(() => {
+  const resolvedProductionUrl = (() => {
     const rawCandidates = [
       portalConfig?.urlProduccion,
       portalConfig?.productionUrl,
@@ -2542,9 +2542,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
     const defaultSlug = (lead?.empresa || clientEmpresa || 'empresa').toLowerCase().replace(/\s+/g, '');
     return `https://${defaultSlug}.com`;
-  }, [portalConfig, activeProyecto, lead, clientEmpresa]);
+  })();
 
-  const resolvedGithubRepo = React.useMemo(() => {
+  const resolvedGithubRepo = (() => {
     const rawCandidates = [
       portalConfig?.githubRepo,
       portalConfig?.bovedaRepos?.githubRepo,
@@ -2578,16 +2578,16 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
     const defaultSlug = (lead?.empresa || clientEmpresa || 'cliente').toLowerCase().replace(/\s+/g, '-');
     return `github.com/goglite-clients/${defaultSlug}`;
-  }, [portalConfig, activeProyecto, lead, clientEmpresa]);
+  })();
 
-  const cleanDomainHost = React.useMemo(() => {
+  const cleanDomainHost = (() => {
     try {
       const clean = resolvedProductionUrl.replace(/^https?:\/\//i, '').split('/')[0].split('?')[0];
       return clean || `${(lead?.empresa || clientEmpresa || 'empresa').toLowerCase().replace(/\s+/g, '')}.com`;
     } catch {
       return `${(lead?.empresa || clientEmpresa || 'empresa').toLowerCase().replace(/\s+/g, '')}.com`;
     }
-  }, [resolvedProductionUrl, lead, clientEmpresa]);
+  })();
 
   const ensureAbsoluteUrl = (url) => {
     if (!url) return '#';
@@ -3210,7 +3210,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       </div>
                       {presupuesto?.inversion?.beneficioExclusivo && (
                         <div className="text-[10px] text-emerald-300 font-sans pt-1 border-t border-white/10">
-                          ★ <strong>Beneficio Exclusivo:</strong> {presupuesto.inversion.beneficioExclusivo}
+                          ★ <strong>Beneficio Exclusivo:</strong> {presupuesto?.inversion?.beneficioExclusivo}
                         </div>
                       )}
                     </div>

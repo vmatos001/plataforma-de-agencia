@@ -17,7 +17,8 @@ import {
   PanelLeftOpen,
   Globe,
   ShieldCheck,
-  LogOut
+  LogOut,
+  AlertCircle
 } from 'lucide-react';
 import AgencyWhiteLabelSettingsModal from './components/AgencyWhiteLabelSettingsModal';
 import { DEFAULT_AGENCY_BRANDING } from './constants/defaultAgencyBranding';
