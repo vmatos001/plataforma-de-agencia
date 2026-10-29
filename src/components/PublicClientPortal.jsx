@@ -64,7 +64,7 @@ import {
   normalizeFacturaItems 
 } from './GestionRentabilidadModule';
 import { DEFAULT_AGENCY_BRANDING, getAgencyContactForCountry } from '../constants/defaultAgencyBranding';
-import { apiClient } from '../services/apiClient';
+import { apiClient, getApiUrl } from '../services/apiClient';
 import { auth } from '../services/firebase';
 import { getPortalCloud, savePortalCloud, subscribePortalCloud, saveProyectoCloud, uploadReceiptToCloudStorage } from '../services/firestoreSyncService';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
@@ -717,7 +717,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
       let vault = null;
       try {
-        const res = await fetch(`/api/portal/${token}/sync-drive`, {
+        const res = await fetch(getApiUrl(`/api/portal/${token}/sync-drive`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -897,10 +897,15 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       // Set initial active tab based on progress ONCE
       if (!tabInitializedRef.current) {
         tabInitializedRef.current = true;
-        if (cfg.fase4Liquidada || (cfg.faseActual && cfg.faseActual >= 5)) setActiveTab(5);
-        else if (cfg.fase3InsumosCompletos || (cfg.faseActual && cfg.faseActual >= 4)) setActiveTab(4);
-        else if (cfg.fase2Firmada || (cfg.faseActual && cfg.faseActual >= 3)) setActiveTab(3);
-        else if (cfg.fase1Aprobada || (cfg.faseActual && cfg.faseActual >= 2)) setActiveTab(2);
+        const rawFase = cfg.faseActual;
+        const faseNum = typeof rawFase === 'number'
+          ? rawFase
+          : (Number(String(rawFase || '').match(/\d+/)?.[0]) || 1);
+
+        if (cfg.fase4Liquidada || faseNum >= 5) setActiveTab(5);
+        else if (cfg.fase3InsumosCompletos || faseNum >= 4) setActiveTab(4);
+        else if (cfg.fase2Firmada || faseNum >= 3) setActiveTab(3);
+        else if (cfg.fase1Aprobada || faseNum >= 2) setActiveTab(2);
         else setActiveTab(1);
       }
     }
@@ -1015,7 +1020,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       const newCuentaRegistrada = boundClientEmail || (authRole === 'client' ? cleanAttemptEmail : '');
 
       try {
-        await fetch('/api/auth/client-register', {
+        await fetch(getApiUrl('/api/auth/client-register'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1237,8 +1242,13 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
       // 1.1 Consultar en tiempo real la Base de Datos de la Aplicación (Fases 1 a 7) vía API si está disponible
       try {
-        const res = await fetch(`/api/portal/${token}`);
-        const ctype = res.headers.get('content-type') || '';
+        let res = await fetch(getApiUrl(`/api/portal/${token}`));
+        let ctype = res.headers.get('content-type') || '';
+        // Failover directo a Vercel si Firebase Hosting devuelve index.html (text/html)
+        if (!ctype.includes('application/json')) {
+          res = await fetch(`https://goglite-agency.vercel.app/api/portal/${token}`);
+          ctype = res.headers.get('content-type') || '';
+        }
         if (res.ok && ctype.includes('application/json')) {
           const apiData = await res.json();
           if (apiData && (apiData.lead || apiData.presupuesto || apiData.proyecto)) {
@@ -1539,7 +1549,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         }
 
         // Notificar al backend en segundo plano que el cliente abrió el enlace
-        fetch(`/api/portal/${token}/update`, {
+        fetch(getApiUrl(`/api/portal/${token}/update`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1684,7 +1694,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
     // Sync with server API
     try {
-      const res = await fetch(`/api/portal/${token}/update`, {
+      const res = await fetch(getApiUrl(`/api/portal/${token}/update`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates)

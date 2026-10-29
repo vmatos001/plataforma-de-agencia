@@ -23,6 +23,7 @@ jobs:
       - name: Compilar Frontend (dist)
         run: npm run build
         env:
+          VITE_API_URL: 'https://goglite-agency.vercel.app'
           VITE_PUBLIC_GEMINI_ACTIVE: 'true'
           VITE_PUBLIC_GEMINI_MASKED: 'AQ.A••••••••FSpQ'
           VITE_PUBLIC_SERPER_ACTIVE: 'true'

@@ -4,9 +4,15 @@
  * o recurre a enrutamiento relativo (/api/...) compatible con el proxy de desarrollo de Vite.
  */
 
-const RAW_API_URL = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL
+const RAW_API_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL)
   ? String(import.meta.env.VITE_API_URL).trim()
-  : '';
+  : (typeof window !== 'undefined' && (
+      window.location.hostname.includes('goglite.com') ||
+      window.location.hostname.includes('web.app') ||
+      window.location.hostname.includes('firebaseapp.com')
+    )
+      ? 'https://goglite-agency.vercel.app'
+      : '');
 
 export const API_BASE_URL = RAW_API_URL.replace(/\/+$/, '');
 
@@ -21,7 +27,12 @@ export function getApiUrl(endpoint = '') {
     return endpoint;
   }
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  return API_BASE_URL ? `${API_BASE_URL}${cleanEndpoint}` : cleanEndpoint;
+  const base = API_BASE_URL || (typeof window !== 'undefined' && (
+    window.location.hostname.includes('goglite.com') ||
+    window.location.hostname.includes('web.app') ||
+    window.location.hostname.includes('firebaseapp.com')
+  ) ? 'https://goglite-agency.vercel.app' : '');
+  return base ? `${base}${cleanEndpoint}` : cleanEndpoint;
 }
 
 /**
@@ -51,12 +62,32 @@ export async function apiFetch(endpoint, options = {}) {
       serializedBody = JSON.stringify(body);
     }
 
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       ...restOptions,
       signal: effectiveSignal,
       headers: finalHeaders,
       body: serializedBody
     });
+
+    // Si Firebase Hosting o un hosting estático devolvió index.html para un endpoint /api/
+    const cType = response.headers.get('content-type') || '';
+    if (cType.includes('text/html') && url.includes('/api/') && !url.includes('vercel.app')) {
+      const fallbackUrl = `https://goglite-agency.vercel.app${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+      try {
+        const fallbackRes = await fetch(fallbackUrl, {
+          ...restOptions,
+          signal: effectiveSignal,
+          headers: finalHeaders,
+          body: serializedBody
+        });
+        const fbCtype = fallbackRes.headers.get('content-type') || '';
+        if (fbCtype.includes('application/json') || fallbackRes.ok) {
+          response = fallbackRes;
+        }
+      } catch (fbErr) {
+        console.warn('[apiClient] Fallback a Vercel falló:', fbErr);
+      }
+    }
 
     if (timerId) clearTimeout(timerId);
 
