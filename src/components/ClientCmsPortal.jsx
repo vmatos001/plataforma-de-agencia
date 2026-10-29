@@ -567,10 +567,10 @@ export default function ClientCmsPortal({ token }) {
         return;
       }
 
-      if (AGENCY_BLOCKED_EMAILS.includes(email)) {
+      if (token !== 'goglite' && AGENCY_BLOCKED_EMAILS.includes(email) && registeredCmsEmail && registeredCmsEmail !== email) {
         await auth.signOut();
         setAuthError(
-          `La cuenta "${email}" es la cuenta administradora delegada de Goglite. Como cliente, inicia sesión con tu propio correo empresarial.`
+          `La cuenta "${email}" es la cuenta administradora de Goglite. Como cliente de este proyecto, inicia sesión con el correo oficial del negocio.`
         );
         return;
       }
