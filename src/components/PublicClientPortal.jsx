@@ -2476,6 +2476,22 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const clientContacto = presupuesto?.cliente?.nombre || lead.contacto || 'Representante Legal';
   const clientUbicacion = presupuesto?.cliente?.ubicacion || (currentPais === 'DO' ? 'Santo Domingo, República Dominicana' : 'San Salvador, El Salvador');
 
+  // Asegurar que el contrato formal SOW y el proyecto estén siempre resueltos y reconciliados con el presupuesto
+  const rawActiveProyecto = data.proyecto || (presupuesto ? buildProyectoFromPresupuesto(presupuesto) : (lead ? buildProyectoFromPresupuesto({
+    id: lead.id,
+    codigo: lead.presupuestoCodigo || 'P-2026',
+    cliente: { nombre: clientContacto, empresa: clientEmpresa, telefono: lead.telefono, email: lead.email, ubicacion: clientUbicacion },
+    pais: currentPais,
+    inversion: { precioTotal: totalInversion, anticipo: anticipoMonto, contraEntrega: liquidacionMonto }
+  }) : null));
+
+  const activeProyecto = (rawActiveProyecto && (presupuesto || totalInversion))
+    ? reconcileProyectoWithPresupuesto(rawActiveProyecto, presupuesto || {
+        codigo: lead.presupuestoCodigo || 'P-2026',
+        inversion: { precioTotal: totalInversion, anticipo: anticipoMonto, contraEntrega: liquidacionMonto }
+      })
+    : rawActiveProyecto;
+
   // Resolver URLs y repositorios oficiales (Bóveda Fase 4 / Proyecto / Lead / Configuración)
   const resolvedProductionUrl = React.useMemo(() => {
     const rawCandidates = [
@@ -2514,7 +2530,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       }
     } catch {}
 
-    const defaultSlug = (lead.empresa || clientEmpresa || 'empresa').toLowerCase().replace(/\s+/g, '');
+    const defaultSlug = (lead?.empresa || clientEmpresa || 'empresa').toLowerCase().replace(/\s+/g, '');
     return `https://${defaultSlug}.com`;
   }, [portalConfig, activeProyecto, lead, clientEmpresa]);
 
@@ -2550,39 +2566,23 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       }
     } catch {}
 
-    const defaultSlug = (lead.empresa || clientEmpresa || 'cliente').toLowerCase().replace(/\s+/g, '-');
+    const defaultSlug = (lead?.empresa || clientEmpresa || 'cliente').toLowerCase().replace(/\s+/g, '-');
     return `github.com/goglite-clients/${defaultSlug}`;
   }, [portalConfig, activeProyecto, lead, clientEmpresa]);
 
   const cleanDomainHost = React.useMemo(() => {
     try {
       const clean = resolvedProductionUrl.replace(/^https?:\/\//i, '').split('/')[0].split('?')[0];
-      return clean || `${(lead.empresa || clientEmpresa || 'empresa').toLowerCase().replace(/\s+/g, '')}.com`;
+      return clean || `${(lead?.empresa || clientEmpresa || 'empresa').toLowerCase().replace(/\s+/g, '')}.com`;
     } catch {
-      return `${(lead.empresa || clientEmpresa || 'empresa').toLowerCase().replace(/\s+/g, '')}.com`;
+      return `${(lead?.empresa || clientEmpresa || 'empresa').toLowerCase().replace(/\s+/g, '')}.com`;
     }
-  }, [resolvedProductionUrl, lead.empresa, clientEmpresa]);
+  }, [resolvedProductionUrl, lead, clientEmpresa]);
 
   const ensureAbsoluteUrl = (url) => {
     if (!url) return '#';
     return (url.startsWith('http://') || url.startsWith('https://')) ? url : `https://${url}`;
   };
-
-  // Asegurar que el contrato formal SOW y el proyecto estén siempre resueltos y reconciliados con el presupuesto
-  const rawActiveProyecto = data.proyecto || (presupuesto ? buildProyectoFromPresupuesto(presupuesto) : (lead ? buildProyectoFromPresupuesto({
-    id: lead.id,
-    codigo: lead.presupuestoCodigo || 'P-2026',
-    cliente: { nombre: clientContacto, empresa: clientEmpresa, telefono: lead.telefono, email: lead.email, ubicacion: clientUbicacion },
-    pais: currentPais,
-    inversion: { precioTotal: totalInversion, anticipo: anticipoMonto, contraEntrega: liquidacionMonto }
-  }) : null));
-
-  const activeProyecto = (rawActiveProyecto && (presupuesto || totalInversion))
-    ? reconcileProyectoWithPresupuesto(rawActiveProyecto, presupuesto || {
-        codigo: lead.presupuestoCodigo || 'P-2026',
-        inversion: { precioTotal: totalInversion, anticipo: anticipoMonto, contraEntrega: liquidacionMonto }
-      })
-    : rawActiveProyecto;
 
   const contrato = activeProyecto?.contrato;
 
