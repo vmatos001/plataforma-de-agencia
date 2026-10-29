@@ -37,9 +37,9 @@ import {
 } from 'lucide-react';
 import WireframesStoryBrandModule from './WireframesStoryBrandModule';
 import apiClient from '../services/apiClient';
-import { getStoredProyectos } from '../services/contractGenerator';
+import { getStoredProyectos, saveStoredProyectos } from '../services/contractGenerator';
 import { syncAllProyectosWithEvents } from '../services/projectMilestoneSync';
-import { getAppStateCloud, saveAppStateCloud, getProyectosCloud } from '../services/firestoreSyncService';
+import { getAppStateCloud, saveAppStateCloud, getProyectosCloud, saveProyectoCloud } from '../services/firestoreSyncService';
 
 // Generador dinámico de PRD Técnico adaptado al proyecto específico (Playbook Maestro 2026)
 export function generatePrdForProyecto(proyecto, defaultCountry = 'DO') {
@@ -358,6 +358,54 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         const vaultByProj = vaultByProjRaw ? JSON.parse(vaultByProjRaw) : {};
         vaultByProj[selectedProyectoId] = repoVault;
         localStorage.setItem('goglite_repo_vault_by_project', JSON.stringify(vaultByProj));
+        saveAppStateCloud('repo_vault_by_project', 'repo_vault', vaultByProj).catch(() => {});
+
+        const bovedaData = {
+          googleStitchUrl: repoVault.googleStitchUrl || '',
+          driveAssets: repoVault.driveAssets || '',
+          stagingUrl: repoVault.stagingUrl || '',
+          githubRepo: repoVault.githubRepo || '',
+          urlProduccion: repoVault.productionUrl || '',
+          productionUrl: repoVault.productionUrl || ''
+        };
+
+        const updatedProjs = proyectos.map(p => {
+          if (p.id === selectedProyectoId) {
+            return {
+              ...p,
+              bovedaRepos: { ...(p.bovedaRepos || {}), ...bovedaData },
+              repoVault: { ...repoVault }
+            };
+          }
+          return p;
+        });
+        setProyectos(updatedProjs);
+        saveStoredProyectos(updatedProjs);
+
+        const currentP = updatedProjs.find(p => p.id === selectedProyectoId);
+        if (currentP) {
+          saveProyectoCloud(currentP).catch(() => {});
+          apiClient.patch(`/api/proyectos/${selectedProyectoId}`, {
+            bovedaRepos: bovedaData,
+            repoVault: { ...repoVault }
+          }).catch(() => {});
+
+          const token = currentP.portalToken || currentP.presupuestoId || currentP.id;
+          if (token) {
+            apiClient.post(`/api/portal/${token}/update`, {
+              bovedaRepos: bovedaData,
+              productionUrl: repoVault.productionUrl,
+              urlProduccion: repoVault.productionUrl,
+              githubRepo: repoVault.githubRepo,
+              stagingUrl: repoVault.stagingUrl,
+              googleStitchUrl: repoVault.googleStitchUrl,
+              enlaceDriveArchivos: repoVault.driveAssets,
+              driveVaultUrl: repoVault.driveAssets
+            }).catch(() => {});
+          }
+        }
+        window.dispatchEvent(new CustomEvent('goglite_proyectos_synced'));
+        window.dispatchEvent(new CustomEvent('goglite_portal_updated'));
       }
       setSavedVaultNotice(true);
       setTimeout(() => setSavedVaultNotice(false), 3000);
@@ -464,11 +512,21 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
       } else {
         setSprintTasks(DEFAULT_SPRINT_TASKS);
       }
+      const proj = proyectos.find(p => p.id === selectedProyectoId);
+      const boveda = proj?.bovedaRepos || proj?.repoVault || {};
+      const baseVault = {
+        googleStitchUrl: boveda.googleStitchUrl || '',
+        driveAssets: boveda.driveAssets || proj?.portalConfig?.driveVaultUrl || proj?.portalConfig?.enlaceDriveArchivos || proj?.onboarding?.driveFolderUrl || '',
+        stagingUrl: boveda.stagingUrl || '',
+        githubRepo: boveda.githubRepo || '',
+        productionUrl: boveda.urlProduccion || boveda.productionUrl || ''
+      };
+
       const vaultByProjRaw = localStorage.getItem('goglite_repo_vault_by_project');
       if (vaultByProjRaw) {
         const vaultByProj = JSON.parse(vaultByProjRaw);
         if (vaultByProj && vaultByProj[selectedProyectoId]) {
-          const pVault = { ...vaultByProj[selectedProyectoId] };
+          const pVault = { ...baseVault, ...vaultByProj[selectedProyectoId] };
           if (pVault.figmaBoard && !pVault.googleStitchUrl) {
             delete pVault.figmaBoard;
           }
@@ -478,27 +536,15 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
           if (pVault.driveAssets === 'https://drive.google.com/drive/folders/goglite-client-assets') pVault.driveAssets = '';
           setRepoVault(pVault);
         } else {
-          const proj = proyectos.find(p => p.id === selectedProyectoId);
-          setRepoVault({
-            googleStitchUrl: '',
-            driveAssets: proj?.portalConfig?.driveVaultUrl || proj?.onboarding?.driveFolderUrl || '',
-            stagingUrl: '',
-            githubRepo: '',
-            productionUrl: ''
-          });
+          setRepoVault(baseVault);
         }
       } else {
-        const proj = proyectos.find(p => p.id === selectedProyectoId);
-        setRepoVault(prev => ({
-          ...prev,
-          driveAssets: prev.driveAssets || proj?.portalConfig?.driveVaultUrl || proj?.onboarding?.driveFolderUrl || ''
-        }));
+        setRepoVault(baseVault);
       }
 
       // Cargar o generar PRD específico del proyecto seleccionado
       const prdByProjRaw = localStorage.getItem('goglite_prd_by_project');
       const prdByProj = prdByProjRaw ? JSON.parse(prdByProjRaw) : {};
-      const proj = proyectos.find(p => p.id === selectedProyectoId);
 
       if (prdByProj && prdByProj[selectedProyectoId]) {
         const savedPrd = prdByProj[selectedProyectoId];

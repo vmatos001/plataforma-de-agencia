@@ -15,8 +15,7 @@ export default function GogliteCareCard({
   moneda = 'USD'
 }) {
   const precioMensual = Number(careService?.precioUSD) || 99;
-  const precioDOP = Number(careService?.precioDOP) || (precioMensual * 60);
-  const displayPrice = moneda === 'DOP' ? `RD$ ${precioDOP.toLocaleString()}` : `$${precioMensual}`;
+  const displayPrice = `$${precioMensual} USD`;
 
   // Cronómetro de suscripción activa si tiene fecha de vencimiento
   const [subTimeLeft, setSubTimeLeft] = useState(() => calculateSubscriptionRemaining(careVenceAt));

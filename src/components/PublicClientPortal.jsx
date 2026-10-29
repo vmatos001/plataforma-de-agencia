@@ -437,22 +437,56 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     const targetEmpresa = (data?.presupuesto?.cliente?.empresa || data?.lead?.empresa || '').toLowerCase().trim();
     const targetPresupuestoId = data?.presupuesto?.id;
     const targetPresupuestoCodigo = data?.presupuesto?.codigo || data?.lead?.presupuestoCodigo;
+    const targetProyectoId = data?.proyecto?.id || data?.lead?.proyectoId;
 
     let matched = [];
     if (Array.isArray(clientFacturaList) && clientFacturaList.length > 0) {
       matched = clientFacturaList.filter(f => 
+        (targetProyectoId && (f.proyectoId === targetProyectoId || f.id === targetProyectoId)) ||
         (targetPresupuestoId && (f.presupuestoId === targetPresupuestoId || f.id === targetPresupuestoId)) ||
-        (targetPresupuestoCodigo && (f.codigoPresupuesto === targetPresupuestoCodigo || f.numeroFactura?.includes(targetPresupuestoCodigo))) ||
+        (targetPresupuestoCodigo && (f.codigoPresupuesto === targetPresupuestoCodigo || f.codigoProyecto === targetPresupuestoCodigo || f.numeroFactura?.includes(targetPresupuestoCodigo))) ||
         (targetEmpresa && f.cliente?.empresa && f.cliente.empresa.toLowerCase().trim() === targetEmpresa)
       );
     }
 
-    // Filtrar estrictamente por el estado confirmado de cada hito
-    const valid = matched.filter(f => {
-      if (f.tipoHito === 'anticipo' || f.id?.endsWith('-anticipo')) return isAnticipoConfirmed;
-      if (f.tipoHito === 'saldo' || f.id?.endsWith('-saldo')) return isSaldoConfirmed || hasSettlementReceiptSubmitted;
-      return isAnticipoConfirmed || isSaldoConfirmed || hasSettlementReceiptSubmitted;
-    }).map(f => {
+    // Clasificar facturas encontradas
+    const isAnticipoFac = (f) => f.tipoHito === 'anticipo' || f.id?.endsWith('-anticipo') || f.concepto?.toLowerCase().includes('anticipo');
+    const isSaldoFac = (f) => f.tipoHito === 'saldo' || f.id?.endsWith('-saldo') || f.concepto?.toLowerCase().includes('saldo') || f.concepto?.toLowerCase().includes('liquidaci');
+
+    const anticipoInvoices = matched.filter(isAnticipoFac);
+    const saldoInvoices = matched.filter(isSaldoFac);
+    const hasMilestones = anticipoInvoices.length > 0 || saldoInvoices.length > 0;
+
+    let selectedList = [];
+
+    if (hasMilestones) {
+      // Si ya existen facturas por hito (Anticipo 50% y Saldo 50%), se excluye cualquier factura global/resumen previa
+      if (isAnticipoConfirmed && anticipoInvoices.length > 0) {
+        selectedList.push(anticipoInvoices[anticipoInvoices.length - 1]);
+      }
+      if ((isSaldoConfirmed || hasSettlementReceiptSubmitted) && saldoInvoices.length > 0) {
+        selectedList.push(saldoInvoices[saldoInvoices.length - 1]);
+      }
+    } else {
+      // Si no hay facturas por hito en la lista, construirlas desde el presupuesto
+      if (data?.presupuesto) {
+        const isSettlement = isSaldoConfirmed || hasSettlementReceiptSubmitted;
+        const milestoneInvoices = buildMilestoneInvoices(data.presupuesto, 0);
+        if (milestoneInvoices.length === 2) {
+          const facAnticipo = reconcileInvoiceWithPresupuesto(milestoneInvoices[0], data.presupuesto, { isAnticipoPaid: isAnticipoConfirmed });
+          const facSaldo = reconcileInvoiceWithPresupuesto(milestoneInvoices[1], data.presupuesto, { isSaldoPaid: isSettlement });
+          if (isAnticipoConfirmed) selectedList.push(facAnticipo);
+          if (isSettlement) selectedList.push(facSaldo);
+        } else if (matched.length > 0) {
+          selectedList.push(matched[0]);
+        }
+      } else if (matched.length > 0) {
+        selectedList.push(matched[0]);
+      }
+    }
+
+    // Normalizar items y montos con respecto al presupuesto
+    const normalized = selectedList.map(f => {
       let inv = normalizeFacturaItems(f);
       if (data?.presupuesto) {
         inv = reconcileInvoiceWithPresupuesto(inv, data.presupuesto, {
@@ -465,26 +499,19 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       return inv;
     });
 
-    // Si la administración confirmó en el panel pero la factura aún no sincronizó en clientFacturaList
-    if (valid.length === 0 && (isAnticipoConfirmed || isSaldoConfirmed || hasSettlementReceiptSubmitted) && data?.presupuesto) {
-      const isSettlement = isSaldoConfirmed || hasSettlementReceiptSubmitted;
-      const milestoneInvoices = buildMilestoneInvoices(data.presupuesto, 0);
-      if (milestoneInvoices.length === 2) {
-        const facAnticipo = reconcileInvoiceWithPresupuesto(milestoneInvoices[0], data.presupuesto, { isAnticipoPaid: isAnticipoConfirmed });
-        const facSaldo = reconcileInvoiceWithPresupuesto(milestoneInvoices[1], data.presupuesto, { isSaldoPaid: isSettlement });
-        if (isAnticipoConfirmed) valid.push(normalizeFacturaItems(facAnticipo));
-        if (isSettlement) valid.push(normalizeFacturaItems(facSaldo));
-      } else {
-        let built = buildInvoiceFromPresupuesto(data.presupuesto);
-        built = reconcileInvoiceWithPresupuesto(built, data.presupuesto, {
-          isAnticipoPaid: isAnticipoConfirmed,
-          isSaldoPaid: isSettlement
-        });
-        valid.push(normalizeFacturaItems(built));
+    // Deduplicación estricta por tipoHito (máximo 1 de anticipo y 1 de saldo = 2 facturas en total)
+    const seenHitos = new Set();
+    const finalInvoices = [];
+    for (const inv of normalized) {
+      const hitoKey = inv.tipoHito || (inv.id?.endsWith('-saldo') ? 'saldo' : inv.id?.endsWith('-anticipo') ? 'anticipo' : inv.id);
+      if (!seenHitos.has(hitoKey)) {
+        seenHitos.add(hitoKey);
+        finalInvoices.push(inv);
       }
     }
 
-    return valid;
+    // El portal oficial del cliente maneja estrictamente un máximo de 2 facturas (Anticipo 50% y Liquidación 50%)
+    return finalInvoices.slice(0, 2);
   }, [clientFacturaList, data, isAnticipoConfirmed, isSaldoConfirmed, hasSettlementReceiptSubmitted]);
 
   const matchingFactura = React.useMemo(() => {
@@ -2397,7 +2424,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       faseActual: 5
     });
     setCarePlanActive(true);
-    const precioDisplay = currentPais === 'DO' ? `RD$ ${(Number(careService.precioDOP) || 5940).toLocaleString()}` : `$${Number(careService.precioUSD) || 99}`;
+    const precioDisplay = `$${Number(careService.precioUSD) || 99} USD`;
     showNotification(`👑 ¡Plan Goglite Care (${precioDisplay}/mes) activado! Tu plataforma cuenta con soporte prioritario.`);
   };
 
@@ -2448,6 +2475,98 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const clientEmpresa = presupuesto?.cliente?.empresa || lead.empresa || 'Empresa Cliente';
   const clientContacto = presupuesto?.cliente?.nombre || lead.contacto || 'Representante Legal';
   const clientUbicacion = presupuesto?.cliente?.ubicacion || (currentPais === 'DO' ? 'Santo Domingo, República Dominicana' : 'San Salvador, El Salvador');
+
+  // Resolver URLs y repositorios oficiales (Bóveda Fase 4 / Proyecto / Lead / Configuración)
+  const resolvedProductionUrl = React.useMemo(() => {
+    const rawCandidates = [
+      portalConfig?.urlProduccion,
+      portalConfig?.productionUrl,
+      portalConfig?.bovedaRepos?.urlProduccion,
+      portalConfig?.bovedaRepos?.productionUrl,
+      portalConfig?.repoVault?.productionUrl,
+      activeProyecto?.bovedaRepos?.urlProduccion,
+      activeProyecto?.bovedaRepos?.productionUrl,
+      activeProyecto?.repoVault?.productionUrl,
+      activeProyecto?.urlProduccion,
+      lead?.bovedaRepos?.urlProduccion,
+      lead?.bovedaRepos?.productionUrl
+    ];
+    for (const c of rawCandidates) {
+      if (typeof c === 'string' && c.trim() && c.trim() !== 'https://www.gruasandreasv.com') {
+        return c.trim();
+      }
+    }
+    try {
+      if (typeof window !== 'undefined') {
+        const projId = activeProyecto?.id || lead?.proyectoId || lead?.id;
+        const rawVault = localStorage.getItem('goglite_repo_vault_by_project');
+        if (rawVault && projId) {
+          const parsed = JSON.parse(rawVault);
+          const pVal = parsed[projId]?.productionUrl || parsed[projId]?.urlProduccion;
+          if (pVal && pVal.trim() && pVal.trim() !== 'https://www.gruasandreasv.com') return pVal.trim();
+        }
+        const globalVault = localStorage.getItem('goglite_repo_vault');
+        if (globalVault) {
+          const parsedG = JSON.parse(globalVault);
+          const gVal = parsedG?.productionUrl || parsedG?.urlProduccion;
+          if (gVal && gVal.trim() && gVal.trim() !== 'https://www.gruasandreasv.com') return gVal.trim();
+        }
+      }
+    } catch {}
+
+    const defaultSlug = (lead.empresa || clientEmpresa || 'empresa').toLowerCase().replace(/\s+/g, '');
+    return `https://${defaultSlug}.com`;
+  }, [portalConfig, activeProyecto, lead, clientEmpresa]);
+
+  const resolvedGithubRepo = React.useMemo(() => {
+    const rawCandidates = [
+      portalConfig?.githubRepo,
+      portalConfig?.bovedaRepos?.githubRepo,
+      portalConfig?.repoVault?.githubRepo,
+      activeProyecto?.bovedaRepos?.githubRepo,
+      activeProyecto?.repoVault?.githubRepo,
+      lead?.bovedaRepos?.githubRepo
+    ];
+    for (const c of rawCandidates) {
+      if (typeof c === 'string' && c.trim() && !c.includes('cliente-web-platform')) {
+        return c.trim();
+      }
+    }
+    try {
+      if (typeof window !== 'undefined') {
+        const projId = activeProyecto?.id || lead?.proyectoId || lead?.id;
+        const rawVault = localStorage.getItem('goglite_repo_vault_by_project');
+        if (rawVault && projId) {
+          const parsed = JSON.parse(rawVault);
+          const pVal = parsed[projId]?.githubRepo;
+          if (pVal && pVal.trim() && !pVal.includes('cliente-web-platform')) return pVal.trim();
+        }
+        const globalVault = localStorage.getItem('goglite_repo_vault');
+        if (globalVault) {
+          const parsedG = JSON.parse(globalVault);
+          const gVal = parsedG?.githubRepo;
+          if (gVal && gVal.trim() && !gVal.includes('cliente-web-platform')) return gVal.trim();
+        }
+      }
+    } catch {}
+
+    const defaultSlug = (lead.empresa || clientEmpresa || 'cliente').toLowerCase().replace(/\s+/g, '-');
+    return `github.com/goglite-clients/${defaultSlug}`;
+  }, [portalConfig, activeProyecto, lead, clientEmpresa]);
+
+  const cleanDomainHost = React.useMemo(() => {
+    try {
+      const clean = resolvedProductionUrl.replace(/^https?:\/\//i, '').split('/')[0].split('?')[0];
+      return clean || `${(lead.empresa || clientEmpresa || 'empresa').toLowerCase().replace(/\s+/g, '')}.com`;
+    } catch {
+      return `${(lead.empresa || clientEmpresa || 'empresa').toLowerCase().replace(/\s+/g, '')}.com`;
+    }
+  }, [resolvedProductionUrl, lead.empresa, clientEmpresa]);
+
+  const ensureAbsoluteUrl = (url) => {
+    if (!url) return '#';
+    return (url.startsWith('http://') || url.startsWith('https://')) ? url : `https://${url}`;
+  };
 
   // Asegurar que el contrato formal SOW y el proyecto estén siempre resueltos y reconciliados con el presupuesto
   const rawActiveProyecto = data.proyecto || (presupuesto ? buildProyectoFromPresupuesto(presupuesto) : (lead ? buildProyectoFromPresupuesto({
@@ -4573,19 +4692,19 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
                     <div className="p-3.5 rounded-xl bg-[#090d16] border border-slate-800 font-mono text-xs">
                       <span className="text-[10px] text-slate-400 block mb-1">Dominio Oficial de Producción:</span>
-                      <strong className="text-white block truncate">https://{lead.empresa.toLowerCase().replace(/\s+/g, '')}.com</strong>
+                      <strong className="text-white block truncate" title={resolvedProductionUrl}>{resolvedProductionUrl}</strong>
                       <span className="text-[9px] text-emerald-400">SSL Let's Encrypt Activo</span>
                     </div>
 
                     <div className="p-3.5 rounded-xl bg-[#090d16] border border-slate-800 font-mono text-xs overflow-hidden">
                       <span className="text-[10px] text-slate-400 block mb-1">Panel Administrativo / CMS:</span>
-                      <div className="text-white break-all">Usuario: <strong className="text-orange-400">admin@{lead.empresa.toLowerCase().replace(/\s+/g, '')}.com</strong></div>
+                      <div className="text-white break-all">Usuario: <strong className="text-orange-400">admin@{cleanDomainHost}</strong></div>
                       <div className="text-white">Clave: <strong className="text-emerald-400">Goglite#2026!Secured</strong></div>
                     </div>
 
                     <div className="p-3.5 rounded-xl bg-[#090d16] border border-slate-800 font-mono text-xs">
                       <span className="text-[10px] text-slate-400 block mb-1">Repositorio Privado GitHub:</span>
-                      <strong className="text-white block truncate">github.com/goglite-clients/{lead.empresa.toLowerCase().replace(/\s+/g, '-')}</strong>
+                      <strong className="text-white block truncate" title={resolvedGithubRepo}>{resolvedGithubRepo}</strong>
                       <span className="text-[9px] text-sky-400">Propiedad Intelectual 100% Cedida</span>
                     </div>
                   </div>
@@ -4854,14 +4973,14 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       </span>
                     </div>
                     <h3 className="text-base sm:text-lg font-extrabold text-white mt-0.5 break-all">
-                      https://{(lead.empresa || 'empresa').toLowerCase().replace(/\s+/g, '')}.com
+                      {resolvedProductionUrl}
                     </h3>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
                   <a
-                    href={`https://${(lead.empresa || 'empresa').toLowerCase().replace(/\s+/g, '')}.com`}
+                    href={ensureAbsoluteUrl(resolvedProductionUrl)}
                     target="_blank"
                     rel="noreferrer"
                     className="flex-1 sm:flex-none justify-center px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all"
@@ -4995,7 +5114,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   onActivarCare={handleActivarGogliteCare}
                   lead={lead}
                   resolvedAgencyContact={resolvedAgencyContact}
-                  moneda={currentPais === 'DO' ? 'DOP' : 'USD'}
+                  moneda="USD"
                 />
               </div>
 

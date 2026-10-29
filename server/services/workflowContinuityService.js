@@ -592,7 +592,14 @@ export function getUnifiedPortalPayload(rawToken) {
     comprobanteLiquidacionNombre: proyecto?.pagos?.saldoComprobanteNombre || rawConfig.comprobanteLiquidacionNombre || null,
     seoScoreSalud: seoAudit?.scoreSalud || null,
     cmsSlug: cmsSite?.slug || null,
-    cmsDominio: cmsSite?.dominio || null
+    cmsDominio: cmsSite?.dominio || null,
+    bovedaRepos: proyecto?.bovedaRepos || rawConfig.bovedaRepos || null,
+    productionUrl: proyecto?.bovedaRepos?.urlProduccion || proyecto?.bovedaRepos?.productionUrl || rawConfig.productionUrl || rawConfig.urlProduccion || null,
+    urlProduccion: proyecto?.bovedaRepos?.urlProduccion || proyecto?.bovedaRepos?.productionUrl || rawConfig.urlProduccion || rawConfig.productionUrl || null,
+    stagingUrl: proyecto?.bovedaRepos?.stagingUrl || rawConfig.stagingUrl || null,
+    githubRepo: proyecto?.bovedaRepos?.githubRepo || rawConfig.githubRepo || null,
+    googleStitchUrl: proyecto?.bovedaRepos?.googleStitchUrl || rawConfig.googleStitchUrl || null,
+    enlaceDriveArchivos: proyecto?.bovedaRepos?.driveAssets || rawConfig.enlaceDriveArchivos || null
   };
 
   return {
@@ -745,6 +752,21 @@ export function applyPortalUpdateToWorkflow(token, updates = {}) {
           h7.completado = true;
           h7.fecha = todayFormatted;
         }
+      }
+
+      // Bóveda de Repositorios, Entornos y URLs
+      if (updates.bovedaRepos || updates.productionUrl || updates.urlProduccion || updates.githubRepo || updates.stagingUrl) {
+        const pUrl = updates.productionUrl || updates.urlProduccion || updates.bovedaRepos?.productionUrl || updates.bovedaRepos?.urlProduccion || targetProj.bovedaRepos?.urlProduccion;
+        targetProj.bovedaRepos = {
+          ...(targetProj.bovedaRepos || {}),
+          ...(updates.bovedaRepos || {}),
+          urlProduccion: pUrl,
+          productionUrl: pUrl,
+          stagingUrl: updates.stagingUrl || updates.bovedaRepos?.stagingUrl || targetProj.bovedaRepos?.stagingUrl || '',
+          githubRepo: updates.githubRepo || updates.bovedaRepos?.githubRepo || targetProj.bovedaRepos?.githubRepo || '',
+          googleStitchUrl: updates.googleStitchUrl || updates.bovedaRepos?.googleStitchUrl || targetProj.bovedaRepos?.googleStitchUrl || '',
+          driveAssets: updates.enlaceDriveArchivos || updates.driveVaultUrl || updates.bovedaRepos?.driveAssets || targetProj.bovedaRepos?.driveAssets || ''
+        };
       }
 
       // Recalcular porcentaje de avance del proyecto según hitos completados
