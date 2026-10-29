@@ -32,6 +32,13 @@ import {
 } from 'lucide-react';
 import { getStoredProyectos, saveStoredProyectos } from '../../services/contractGenerator';
 import { saveProyectoCloud, savePortalCloud, saveAppStateCloud, saveCmsSiteCloud } from '../../services/firestoreSyncService';
+import {
+  CorporateInvoiceDocument,
+  buildCorporateInvoiceHtml,
+  printHtmlViaHiddenIframe,
+  DEFAULT_CONFIGURACION
+} from '../GestionRentabilidadModule';
+import { getAgencyContactForCountry, DEFAULT_AGENCY_BRANDING } from '../../constants/defaultAgencyBranding';
 
 const CMS_MEMBERSHIP_PLANS = [
   {
@@ -542,6 +549,42 @@ export default function AdminCmsSubscriptionsHubView({
     }
   };
 
+  const getInvoiceConfig = (invoice) => {
+    const pais = invoice?.cliente?.pais || 'DO';
+    let customSettings = null;
+    try {
+      const saved = localStorage.getItem('goglite_agency_branding');
+      if (saved) customSettings = JSON.parse(saved);
+    } catch {}
+    const contact = getAgencyContactForCountry(pais, customSettings);
+    const docLogo =
+      (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null) ||
+      customSettings?.logoDocumentosUrl ||
+      customSettings?.logoUrl ||
+      DEFAULT_AGENCY_BRANDING.logoUrl;
+
+    return {
+      ...DEFAULT_CONFIGURACION,
+      emisor: {
+        empresa: contact.empresa || 'Goglite Digital Hub',
+        subtitulo: customSettings?.eslogan || 'Suite Integral de Crecimiento Digital & Desarrollo Web Antigravity',
+        logoUrl: docLogo,
+        logoDocumentosUrl: docLogo,
+        identificacion: contact.identificacion || (pais === 'DO' ? 'RNC: 1-32-45678-9' : 'NIT: 0614-290390-102-1'),
+        email: contact.email || 'contacto@goglite.com',
+        telefono: contact.telefonoWhatsapp || contact.telefono || '+1 (829) 528-4713',
+        ubicacion: contact.ubicacion || contact.direccion || 'Santo Domingo, República Dominicana'
+      }
+    };
+  };
+
+  const handlePrintInvoicePdf = (invoice) => {
+    if (!invoice) return;
+    const config = getInvoiceConfig(invoice);
+    const html = buildCorporateInvoiceHtml(invoice, config);
+    printHtmlViaHiddenIframe(html);
+  };
+
   // Helper para crear y guardar la factura en Módulo 6 y Módulo 7 (Rentabilidad)
   const createAndPersistCmsInvoice = async ({
     targetSub,
@@ -607,6 +650,7 @@ export default function AdminCmsSubscriptionsHubView({
       impuestoTotal,
       total,
       moneda: 'USD',
+      estado: isPaid ? 'cobrada' : 'pendiente',
       montoCobrado,
       saldoPendiente,
       metodoPago: metodoPago || 'Transferencia Bancaria',
@@ -1918,129 +1962,74 @@ export default function AdminCmsSubscriptionsHubView({
         </div>
       )}
 
-      {/* MODAL 4: VISTA PREVIA E IMPRESIÓN PDF DE LA FACTURA PARA ENTREGAR AL CLIENTE */}
+      {/* MODAL 4: VISTA PREVIA E IMPRESIÓN PDF OFICIAL DE LA FACTURA CORPORATIVA */}
       {selectedInvoicePreview && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white text-slate-900 rounded-2xl max-w-2xl w-full p-8 space-y-6 shadow-2xl my-8">
-            <div className="flex items-start justify-between border-b border-slate-200 pb-5">
-              <div>
-                <div className="text-xs font-mono uppercase tracking-widest text-orange-600 font-bold">
-                  GOGLITE DIGITAL HUB · HEADLESS CMS CARE
-                </div>
-                <h3 className="text-2xl font-black text-slate-900 mt-1">
-                  FACTURA COMERCIAL #{selectedInvoicePreview.numeroFactura}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Fecha de Emisión: {selectedInvoicePreview.fechaEmision} · Estado:{' '}
-                  <strong className={Number(selectedInvoicePreview.saldoPendiente) <= 0 ? 'text-emerald-600' : 'text-amber-600'}>
-                    {Number(selectedInvoicePreview.saldoPendiente) <= 0 ? 'PAGADA & MEMBRESÍA ACTIVA' : 'PENDIENTE DE PAGO'}
-                  </strong>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedInvoicePreview(null)}
-                className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
-              <div>
-                <div className="text-[10px] font-mono uppercase text-slate-400 font-bold">Facturado a:</div>
-                <div className="font-bold text-slate-900 text-sm mt-0.5">{selectedInvoicePreview.cliente?.empresa}</div>
-                <div className="text-slate-600">Atención: {selectedInvoicePreview.cliente?.contacto}</div>
-                {selectedInvoicePreview.cliente?.identificacion && (
-                  <div className="text-slate-600 font-mono">ID Fiscal: {selectedInvoicePreview.cliente.identificacion}</div>
-                )}
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] font-mono uppercase text-slate-400 font-bold">Cobertura Headless CMS:</div>
-                <div className="font-bold text-emerald-700 text-sm mt-0.5">
-                  +{selectedInvoicePreview.periodoMembresia || '30 Días'} de Suscripción Activa
-                </div>
-                {selectedInvoicePreview.venceHasta && (
-                  <div className="text-slate-600">Vigencia hasta: <strong>{selectedInvoicePreview.venceHasta}</strong></div>
-                )}
-                <div className="text-slate-500 font-mono text-[11px]">Método: {selectedInvoicePreview.metodoPago}</div>
-              </div>
-            </div>
-
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b-2 border-slate-200 text-slate-500 uppercase text-[10px] font-mono">
-                  <th className="py-2">Descripción del Servicio / Membresía</th>
-                  <th className="py-2 text-right">Cant.</th>
-                  <th className="py-2 text-right">Total (USD)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {(selectedInvoicePreview.items || []).map((it, i) => (
-                  <tr key={i}>
-                    <td className="py-3 font-medium text-slate-800">{it.descripcion}</td>
-                    <td className="py-3 text-right font-mono">{it.cantidad}</td>
-                    <td className="py-3 text-right font-mono font-bold">${Number(it.total || 0).toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className="border-t border-slate-200 pt-4 flex flex-col items-end space-y-1 text-xs">
-              <div className="flex justify-between w-56 text-slate-600">
-                <span>Subtotal:</span>
-                <span className="font-mono">${Number(selectedInvoicePreview.subtotal || 0).toFixed(2)} USD</span>
-              </div>
-              {Number(selectedInvoicePreview.impuestoTotal) > 0 && (
-                <div className="flex justify-between w-56 text-slate-600">
-                  <span>Impuestos ({selectedInvoicePreview.impuestoPorcentaje}%):</span>
-                  <span className="font-mono">${Number(selectedInvoicePreview.impuestoTotal).toFixed(2)} USD</span>
-                </div>
-              )}
-              <div className="flex justify-between w-56 text-base font-black text-slate-900 pt-1 border-t border-slate-200">
-                <span>Total Facturado:</span>
-                <span className="font-mono text-orange-600">${Number(selectedInvoicePreview.total || 0).toFixed(2)} USD</span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-200">
-              <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Contabilizada automáticamente en el Módulo 7 (Rentabilidad &amp; Finanzas)</span>
-              </span>
-
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#0e1320] border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden my-4">
+            {/* Cabecera del Modal */}
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-[#121828]">
               <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-orange-400" />
+                <span className="font-bold text-sm text-white">
+                  Factura Comercial Oficial · {selectedInvoicePreview.numeroFactura}
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  {selectedInvoicePreview.periodoMembresia || 'Membresía Activa'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePrintInvoicePdf(selectedInvoicePreview)}
+                  className="px-3.5 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center gap-1.5 shadow transition-all cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir / Guardar PDF</span>
+                </button>
                 {selectedInvoicePreview.cliente?.telefono && (
                   <a
                     href={`https://wa.me/${selectedInvoicePreview.cliente.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(
-                      `Hola ${selectedInvoicePreview.cliente.contacto || selectedInvoicePreview.cliente.empresa}, te compartimos el comprobante de tu factura *${selectedInvoicePreview.numeroFactura}* por *$${Number(selectedInvoicePreview.total).toFixed(2)} USD* correspondiente a tu *Membresía Headless CMS (${selectedInvoicePreview.periodoMembresia || 'Activa'})*. ¡Tu plataforma web y herramientas IA están 100% activas!`
+                      `Hola ${selectedInvoicePreview.cliente.contacto || selectedInvoicePreview.cliente.empresa}, te compartimos el comprobante oficial de tu factura *${selectedInvoicePreview.numeroFactura}* por *$${Number(selectedInvoicePreview.total).toFixed(2)} USD* correspondiente a tu *Membresía Headless CMS (${selectedInvoicePreview.periodoMembresia || 'Activa'})*. ¡Tu plataforma web y herramientas IA están 100% activas!`
                     )}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5"
+                    className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow transition-all"
                   >
                     <Send className="w-3.5 h-3.5" />
                     <span>Entregar por WhatsApp</span>
                   </a>
                 )}
-
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Imprimir / Guardar PDF</span>
-                </button>
-
                 <button
                   type="button"
                   onClick={() => setSelectedInvoicePreview(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold"
+                  className="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
                 >
-                  Cerrar
+                  <X className="w-4 h-4" />
                 </button>
               </div>
+            </div>
+
+            {/* Documento Oficial de Factura Corporativa */}
+            <div className="p-6 sm:p-10 overflow-y-auto bg-[#FAFAFA]">
+              <CorporateInvoiceDocument
+                invoice={selectedInvoicePreview}
+                configuracion={getInvoiceConfig(selectedInvoicePreview)}
+              />
+            </div>
+
+            {/* Pie con estado contable */}
+            <div className="p-3 bg-[#0a0d16] border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 px-6">
+              <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Factura registrada y sincronizada con el Módulo 7 (Rentabilidad &amp; Finanzas)</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedInvoicePreview(null)}
+                className="px-3.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>
