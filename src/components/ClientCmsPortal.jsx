@@ -59,6 +59,8 @@ export default function ClientCmsPortal({ token }) {
     return () => clearInterval(interval);
   }, []);
 
+  const [syncingGoogle, setSyncingGoogle] = useState(false);
+
   // Campos de texto sencillo editables por el cliente (sincronizados con el Módulo 6)
   const [editableText, setEditableText] = useState({
     heroTitulo: '',
@@ -486,6 +488,33 @@ export default function ClientCmsPortal({ token }) {
                 reviewUrl: loc.metadata?.newReviewUri || nextGbpProfile.reviewUrl
               };
               syncedAny = true;
+
+              // Intentar leer las reseñas reales de la ficha mediante GBP API
+              try {
+                const revsRes = await fetch(
+                  `https://mybusiness.googleapis.com/v4/${acc.name}/${loc.name}/reviews`,
+                  { headers: { Authorization: `Bearer ${oauthToken}` } }
+                );
+                if (revsRes.ok) {
+                  const revsJson = await revsRes.json();
+                  if (Array.isArray(revsJson.reviews) && revsJson.reviews.length > 0) {
+                    const normalizedRevs = revsJson.reviews.map(r => ({
+                      id: r.reviewId || 'rev-' + Date.now(),
+                      autor: r.reviewer?.displayName || 'Cliente Verificado Google Maps',
+                      fecha: r.createTime ? new Date(r.createTime).toLocaleDateString('es-DO', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Reciente',
+                      rating: r.starRating === 'FIVE' ? 5 : r.starRating === 'FOUR' ? 4 : r.starRating === 'THREE' ? 3 : r.starRating === 'TWO' ? 2 : 1,
+                      estrellas: r.starRating === 'FIVE' ? 5 : r.starRating === 'FOUR' ? 4 : r.starRating === 'THREE' ? 3 : r.starRating === 'TWO' ? 2 : 1,
+                      comentario: r.comment || '',
+                      texto: r.comment || '',
+                      estado: r.reviewReply ? 'respondida' : 'pendiente',
+                      respuesta: r.reviewReply?.comment || '',
+                      fechaRespuesta: r.reviewReply?.updateTime ? new Date(r.reviewReply.updateTime).toLocaleDateString('es-DO') : ''
+                    }));
+                    nextGbpProfile.reseñasCliente = normalizedRevs;
+                  }
+                }
+              } catch (eRev) {}
+
               break;
             }
           }
@@ -503,12 +532,16 @@ export default function ClientCmsPortal({ token }) {
         autorizadoPorClienteEmail: clientEmail,
         siteKitMetrics: nextSiteKit,
         gbpProfile: nextGbpProfile,
+        reseñasCliente: nextGbpProfile.reseñasCliente || cmsSite?.reseñasCliente || [],
         ultimaSincronizacionOAuthCliente: new Date().toISOString()
       };
       setCmsSite(updatedCms);
       try {
         localStorage.setItem(`goglite_sitekit_metrics_${slug}`, JSON.stringify(nextSiteKit));
         localStorage.setItem(`goglite_gbp_profile_${slug}`, JSON.stringify(nextGbpProfile));
+        if (nextGbpProfile.reseñasCliente) {
+          localStorage.setItem(`goglite_gbp_reviews_${slug}`, JSON.stringify(nextGbpProfile.reseñasCliente));
+        }
       } catch (e) {}
       await saveCmsSiteCloud(slug, updatedCms);
     }
@@ -568,6 +601,7 @@ export default function ClientCmsPortal({ token }) {
       });
 
       if (oauthToken) {
+        sessionStorage.setItem('goglite_client_oauth_token', oauthToken);
         await autoSyncClientGoogleDataOnLogin(oauthToken, email);
       }
 
@@ -899,24 +933,56 @@ export default function ClientCmsPortal({ token }) {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-bold text-white">Centro de Control Único: {empresaNombre}</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                      🔗 Sincronizado vía Admin: {cmsSite?.adminDelegadoGoogle || 'sitesgoglite@gmail.com'}
-                    </span>
+                    {cmsSite?.autorizadoPorClienteEmail ? (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 font-bold">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        <span>Google Vinculado por Cliente: {cmsSite.autorizadoPorClienteEmail}</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-blue-400" />
+                        <span>Sincronizado vía Admin: {cmsSite?.adminDelegadoGoogle || 'sitesgoglite@gmail.com'}</span>
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Toda tu información de Web, Google Maps y Google Analytics centralizada en un solo lugar sin compartir tus contraseñas.
+                    Toda tu información de Web, Google Maps y Google Analytics centralizada en un solo lugar con autorización directa de tu cuenta Google.
                   </p>
                 </div>
               </div>
-              <a
-                href={`https://${dominioCliente}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700 shrink-0"
-              >
-                <span>Ver Sitio en Vivo</span>
-                <ExternalLink className="w-3.5 h-3.5 text-orange-400" />
-              </a>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cachedToken = sessionStorage.getItem('goglite_client_oauth_token');
+                    const clientEmail = portalData?.portalConfig?.cuentaCmsSitioRegistrada || cmsSite?.autorizadoPorClienteEmail || '';
+                    if (cachedToken) {
+                      setSyncingGoogle(true);
+                      autoSyncClientGoogleDataOnLogin(cachedToken, clientEmail)
+                        .then(() => showToast('✓ Métricas de Google actualizadas con éxito'))
+                        .catch(() => showToast('Aviso: Vuelve a iniciar sesión para renovar permisos'))
+                        .finally(() => setSyncingGoogle(false));
+                    } else {
+                      handleSiteGoogleLogin();
+                    }
+                  }}
+                  disabled={syncingGoogle}
+                  className="px-3 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-orange-950/40 cursor-pointer"
+                  title="Consultar y actualizar métricas en vivo desde Search Console, GA4 y Google Maps"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncingGoogle ? 'animate-spin' : ''}`} />
+                  <span>{syncingGoogle ? 'Sincronizando...' : '🔄 Sincronizar mis datos de Google'}</span>
+                </button>
+                <a
+                  href={`https://${dominioCliente}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700 shrink-0"
+                >
+                  <span>Ver Sitio en Vivo</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-orange-400" />
+                </a>
+              </div>
             </div>
 
             {/* Navegación de las 3 Funciones Exclusivas del Cliente */}
