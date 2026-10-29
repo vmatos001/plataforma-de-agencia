@@ -326,14 +326,207 @@ export default function ClientCmsPortal({ token }) {
     };
   }, [token]);
 
-  // Autenticación exclusiva con la cuenta Google Empresarial del Sitio del Cliente
+  // Sincronización automática usando el Token OAuth autorizado por el propio cliente al iniciar sesión
+  const autoSyncClientGoogleDataOnLogin = async (oauthToken, clientEmail) => {
+    if (!oauthToken) return;
+    const slug = getClientSiteSlug(portalData, cmsSite);
+    const domain = getClientDomain(portalData, cmsSite)
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .replace(/\/$/, '')
+      .toLowerCase();
+
+    const endDate = new Date().toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - 28 * 86400000).toISOString().split('T')[0];
+
+    let nextSiteKit = { ...(cmsSite?.siteKitMetrics || {}) };
+    let nextGbpProfile = { ...(cmsSite?.gbpProfile || {}) };
+    let syncedAny = false;
+
+    // 1. Leer Google Search Console con el permiso del cliente
+    try {
+      const sitesRes = await fetch('https://www.googleapis.com/webmasters/v3/sites', {
+        headers: { Authorization: `Bearer ${oauthToken}` }
+      });
+      if (sitesRes.ok) {
+        const sitesJson = await sitesRes.json();
+        const entries = sitesJson.siteEntry || [];
+        const matched = entries.find(e => (e.siteUrl || '').toLowerCase().includes(domain));
+        const candidates = matched
+          ? [matched.siteUrl]
+          : [`sc-domain:${domain}`, `https://${domain}/`, `https://www.${domain}/`];
+
+        for (const propUrl of candidates) {
+          const qRes = await fetch(
+            `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(propUrl)}/searchAnalytics/query`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${oauthToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ startDate, endDate, dimensions: ['query'], rowLimit: 8 })
+            }
+          );
+          if (qRes.ok) {
+            const qData = await qRes.json();
+            if (Array.isArray(qData.rows) && qData.rows.length > 0) {
+              let totalClicks = 0;
+              let totalImpr = 0;
+              let weightedPos = 0;
+              const kwList = [];
+              qData.rows.forEach(r => {
+                const c = Number(r.clicks || 0);
+                const imp = Number(r.impressions || 0);
+                totalClicks += c;
+                totalImpr += imp;
+                weightedPos += Number(r.position || 0) * (imp || 1);
+                if (r.keys?.[0]) kwList.push(r.keys[0]);
+              });
+              nextSiteKit = {
+                ...nextSiteKit,
+                clicsBusqueda: totalClicks,
+                impresionesBusqueda: totalImpr,
+                ctrPromedio: totalImpr > 0 ? ((totalClicks / totalImpr) * 100).toFixed(1) + '%' : nextSiteKit.ctrPromedio,
+                posicionMedia: totalImpr > 0 ? (weightedPos / totalImpr).toFixed(1) : nextSiteKit.posicionMedia,
+                topKeywords: kwList.slice(0, 6).join(', ') || nextSiteKit.topKeywords
+              };
+              syncedAny = true;
+            }
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Client OAuth Search Console Sync]', e);
+    }
+
+    // 2. Leer Google Analytics 4 (GA4) con el permiso del cliente
+    try {
+      const sumRes = await fetch('https://analyticsadmin.googleapis.com/v1beta/accountSummaries', {
+        headers: { Authorization: `Bearer ${oauthToken}` }
+      });
+      if (sumRes.ok) {
+        const sumJson = await sumRes.json();
+        const summaries = sumJson.accountSummaries || [];
+        const cleanDomKey = domain.split('.')[0];
+        let targetProp = null;
+        for (const acc of summaries) {
+          for (const p of (acc.propertySummaries || [])) {
+            const disp = (p.displayName || '').toLowerCase();
+            if (disp.includes(cleanDomKey) || disp.includes(slug)) {
+              targetProp = p.property;
+              break;
+            }
+          }
+          if (targetProp) break;
+        }
+        if (!targetProp && summaries[0]?.propertySummaries?.[0]?.property) {
+          targetProp = summaries[0].propertySummaries[0].property;
+        }
+        if (targetProp) {
+          const repRes = await fetch(`https://analyticsdata.googleapis.com/v1beta/${targetProp}:runReport`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${oauthToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              dateRanges: [{ startDate, endDate }],
+              metrics: [
+                { name: 'activeUsers' },
+                { name: 'newUsers' },
+                { name: 'sessions' },
+                { name: 'engagementRate' }
+              ]
+            })
+          });
+          if (repRes.ok) {
+            const repJson = await repRes.json();
+            const vals = repJson.rows?.[0]?.metricValues;
+            if (vals && vals.length >= 4) {
+              nextSiteKit = {
+                ...nextSiteKit,
+                usuariosUnicos: Number(vals[0]?.value || 0),
+                nuevosUsuarios: Number(vals[1]?.value || 0),
+                sesionesTotales: Number(vals[2]?.value || 0),
+                tasaInteraccion: (Number(vals[3]?.value || 0) * 100).toFixed(1) + '%'
+              };
+              syncedAny = true;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Client OAuth GA4 Sync]', e);
+    }
+
+    // 3. Leer Google Business Profile con el permiso del cliente
+    try {
+      const accRes = await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
+        headers: { Authorization: `Bearer ${oauthToken}` }
+      });
+      if (accRes.ok) {
+        const accJson = await accRes.json();
+        for (const acc of (accJson.accounts || [])) {
+          const locRes = await fetch(
+            `https://mybusinessbusinessinformation.googleapis.com/v1/${acc.name}/locations?readMask=name,title,phoneNumbers,categories,storefrontAddress,websiteUri,metadata`,
+            { headers: { Authorization: `Bearer ${oauthToken}` } }
+          );
+          if (locRes.ok) {
+            const locJson = await locRes.json();
+            const loc = (locJson.locations || [])[0];
+            if (loc) {
+              nextGbpProfile = {
+                ...nextGbpProfile,
+                nombre: loc.title || nextGbpProfile.nombre,
+                telefono: loc.phoneNumbers?.primaryPhone || nextGbpProfile.telefono,
+                categoria: loc.categories?.primaryCategory?.displayName || nextGbpProfile.categoria,
+                mapsUrl: loc.metadata?.mapsUri || nextGbpProfile.mapsUrl,
+                reviewUrl: loc.metadata?.newReviewUri || nextGbpProfile.reviewUrl
+              };
+              syncedAny = true;
+              break;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Client OAuth GBP Sync]', e);
+    }
+
+    if (syncedAny) {
+      const updatedCms = {
+        ...(cmsSite || {}),
+        slug,
+        dominio: domain,
+        autorizadoPorClienteEmail: clientEmail,
+        siteKitMetrics: nextSiteKit,
+        gbpProfile: nextGbpProfile,
+        ultimaSincronizacionOAuthCliente: new Date().toISOString()
+      };
+      setCmsSite(updatedCms);
+      try {
+        localStorage.setItem(`goglite_sitekit_metrics_${slug}`, JSON.stringify(nextSiteKit));
+        localStorage.setItem(`goglite_gbp_profile_${slug}`, JSON.stringify(nextGbpProfile));
+      } catch (e) {}
+      await saveCmsSiteCloud(slug, updatedCms);
+    }
+  };
+
+  // Autenticación con la cuenta Google del Sitio del Cliente + Solicitud de Permisos de Lectura (Search Console, GA4 y Ficha de Google)
   const handleSiteGoogleLogin = async () => {
     setAuthError('');
     setAuthLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
+      provider.addScope('https://www.googleapis.com/auth/webmasters.readonly');
+      provider.addScope('https://www.googleapis.com/auth/analytics.readonly');
+      provider.addScope('https://www.googleapis.com/auth/business.manage');
+      provider.setCustomParameters({ prompt: 'select_account consent' });
       const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const oauthToken = credential?.accessToken || '';
       const email = (result?.user?.email || '').toLowerCase().trim();
 
       if (!email) {
@@ -374,7 +567,11 @@ export default function ClientCmsPortal({ token }) {
         portalConfig: newPortalConfig
       });
 
-      showToast(`✓ Sesión iniciada con el perfil oficial del cliente (${email})`);
+      if (oauthToken) {
+        await autoSyncClientGoogleDataOnLogin(oauthToken, email);
+      }
+
+      showToast(`✓ Sesión iniciada y permisos de Google sincronizados (${email})`);
     } catch (err) {
       if (err?.code !== 'auth/popup-closed-by-user') {
         setAuthError('Error al iniciar sesión con Google: ' + (err?.message || 'Intenta nuevamente'));
