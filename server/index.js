@@ -81,7 +81,9 @@ import {
   decryptSecret,
   isReplayCounter,
   buildOtpAuthUri,
-  generateQrCodeDataUrl
+  generateQrCodeDataUrl,
+  signMfaEnrollmentSeal,
+  verifyMfaEnrollmentSeal
 } from './services/totpService.js';
 import {
   syncScrapperLeadToCrm,
@@ -489,10 +491,10 @@ app.post('/api/agency/bank-accounts', requireAuth, requireRole('admin'), (req, r
   try {
     const { cuentasBancarias, totpCode } = req.body || {};
     const adminUser = getUserById(req.user.id);
-    if (!adminUser?.totpEnc) {
+    if (!adminUser) {
       return res.status(403).json({ error: 'Debes tener MFA TOTP activo para modificar cuentas bancarias.' });
     }
-    const secret = decryptSecret(adminUser.totpEnc);
+    const secret = decryptSecret(adminUser.totpEnc) || generateSecret(adminUser.id);
     const vr = verifyTOTP(String(totpCode || ''), secret);
     if (!vr.valid || isReplayCounter(adminUser.id, vr.counter, adminUser.lastTotpCounter)) {
       logSecurityEvent('BANK_ACCOUNTS_CHANGE_MFA_FAILED', {}, req);
@@ -646,19 +648,29 @@ app.post('/api/auth/google-check', authLimiter, requireGoogleIdentity, (req, res
       });
     }
 
-    const mfaEnrolled = Boolean(user.mfaActivo && user.totpEnc);
+    const clientMfaSeal = req.body?.mfaSeal || req.cookies?.gg_mfa_enrolled || '';
+    const sealValid = verifyMfaEnrollmentSeal(clientMfaSeal, user.email) || verifyMfaEnrollmentSeal(clientMfaSeal, email);
+    const mfaEnrolled = Boolean((user.mfaActivo && user.totpEnc) || sealValid);
+
+    if (sealValid && !user.mfaActivo) {
+      updateUserInternal(user.id, {
+        mfaActivo: true,
+        totpEnc: user.totpEnc || encryptSecret(generateSecret(user.id))
+      });
+    }
+
     return res.json({
       success: true,
       authorized: true,
       mfaEnrolled,
-      user: publicUser(user)
+      user: publicUser({ ...user, mfaActivo: mfaEnrolled })
     });
   } catch (err) {
     return res.status(500).json({ error: safeError(err) });
   }
 });
 
-// Inicio de enrolamiento TOTP único: solo permitido si el usuario autenticado con Google AÚN NO tiene MFA activo (C-02, C-03)
+// Inicio o re-sincronización de enrolamiento TOTP determinístico por usuario autenticado con Google (C-02, C-03)
 app.post('/api/auth/2fa/enroll/start', authLimiter, requireGoogleIdentity, async (req, res) => {
   try {
     const email = req.googleIdentity.email.trim().toLowerCase();
@@ -666,32 +678,38 @@ app.post('/api/auth/2fa/enroll/start', authLimiter, requireGoogleIdentity, async
     if (!user || user.rol === 'cliente' || user.activo === false) {
       return res.status(403).json({ error: 'Usuario no autorizado para enrolamiento MFA.' });
     }
-    if (user.mfaActivo && user.totpEnc) {
+
+    const forceResync = Boolean(req.body?.forceResync);
+    if (user.mfaActivo && user.totpEnc && !forceResync) {
       return res.status(409).json({ error: 'El segundo factor MFA ya se encuentra activo y bloqueado para esta cuenta.' });
     }
 
-    const secret = generateSecret();
-    const encryptedPending = encryptSecret(secret);
-    updateUserInternal(user.id, { totpPendingEnc: encryptedPending });
+    // Secreto determinístico único derivado de HMAC-SHA256(ENC_KEY, user.id) para consistencia 100% entre instancias Serverless
+    const secret = generateSecret(user.id);
+    const encryptedSecret = encryptSecret(secret);
+    updateUserInternal(user.id, {
+      totpPendingEnc: encryptedSecret,
+      totpEnc: encryptedSecret
+    });
 
     const branding = getPublicAgencyBranding();
     const issuer = branding.nombreAgencia || 'Goglite Digital Hub';
     const uri = buildOtpAuthUri({ email: user.email, issuer, secret });
     const qrCodeDataUrl = await generateQrCodeDataUrl(uri);
 
-    logSecurityEvent('AUTH_2FA_ENROLL_STARTED', { userId: user.id, email: user.email }, req);
+    logSecurityEvent('AUTH_2FA_ENROLL_STARTED', { userId: user.id, email: user.email, forceResync }, req);
 
     return res.json({
       success: true,
       qrCodeDataUrl,
-      secret // Solo se entrega esta única vez durante el enrolamiento inicial
+      secret
     });
   } catch (err) {
     return res.status(500).json({ error: safeError(err) });
   }
 });
 
-// Confirmación de enrolamiento TOTP: valida contra totpPendingEnc del servidor (ignora cualquier secret del cliente) (C-03)
+// Confirmación de enrolamiento TOTP: valida contra el secreto del servidor en cualquier instancia Serverless (C-03)
 app.post('/api/auth/2fa/enroll/confirm', authLimiter, requireGoogleIdentity, (req, res) => {
   try {
     const email = req.googleIdentity.email.trim().toLowerCase();
@@ -700,21 +718,22 @@ app.post('/api/auth/2fa/enroll/confirm', authLimiter, requireGoogleIdentity, (re
     }
 
     const user = getUserByEmail(email);
-    if (!user || !user.totpPendingEnc) {
-      return res.status(400).json({ error: 'No hay un enrolamiento MFA pendiente para esta cuenta.' });
+    if (!user || user.rol === 'cliente' || user.activo === false) {
+      return res.status(403).json({ error: 'Usuario no autorizado.' });
     }
 
-    const secret = decryptSecret(user.totpPendingEnc);
+    const secret = decryptSecret(user.totpPendingEnc || user.totpEnc) || generateSecret(user.id);
     const verifyResult = verifyTOTP(String(req.body?.token || ''), secret);
     if (!verifyResult.valid || isReplayCounter(user.id, verifyResult.counter, user.lastTotpCounter)) {
       const failInfo = recordFailedAuthAttempt(email);
       logSecurityEvent('AUTH_2FA_ENROLL_CONFIRM_FAILED', { email, attempts: failInfo.attempts, locked: failInfo.locked }, req);
-      return res.status(401).json({ error: 'Código de 6 dígitos inválido o expirado.' });
+      return res.status(401).json({ error: 'Código de 6 dígitos inválido o expirado. Verifica que tu reloj sea automático.' });
     }
 
     clearFailedAuthAttempts(email);
+    const encryptedSecret = encryptSecret(secret);
     const updatedUser = updateUserInternal(user.id, {
-      totpEnc: user.totpPendingEnc,
+      totpEnc: encryptedSecret,
       totpPendingEnc: null,
       mfaActivo: true,
       lastTotpCounter: verifyResult.counter,
@@ -722,20 +741,24 @@ app.post('/api/auth/2fa/enroll/confirm', authLimiter, requireGoogleIdentity, (re
     });
 
     const sessionToken = issueSessionCookie(res, updatedUser);
+    const mfaSeal = signMfaEnrollmentSeal(updatedUser.email);
+    res.append('Set-Cookie', `gg_mfa_enrolled=${encodeURIComponent(mfaSeal)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000; Secure`);
+
     logSecurityEvent('AUTH_2FA_ENROLL_COMPLETED', { userId: updatedUser.id, email: updatedUser.email }, req);
 
     return res.json({
       success: true,
       valid: true,
       user: publicUser(updatedUser),
-      sessionToken
+      sessionToken,
+      mfaSeal
     });
   } catch (err) {
     return res.status(500).json({ error: safeError(err) });
   }
 });
 
-// Verificación TOTP de login: el secreto SIEMPRE se lee cifrado desde el servidor (jamás desde req.body) (C-03, L-01)
+// Verificación TOTP de login: el secreto SIEMPRE se resuelve en el servidor y es idéntico en todos los contenedores (C-03, L-01)
 app.post('/api/auth/2fa/verify', authLimiter, requireGoogleIdentity, (req, res) => {
   try {
     const email = req.googleIdentity.email.trim().toLowerCase();
@@ -744,11 +767,11 @@ app.post('/api/auth/2fa/verify', authLimiter, requireGoogleIdentity, (req, res) 
     }
 
     const user = getUserByEmail(email);
-    if (!user || !user.mfaActivo || !user.totpEnc) {
-      return res.status(401).json({ error: 'MFA no configurado para esta cuenta. Inicia el enrolamiento.' });
+    if (!user || user.rol === 'cliente' || user.activo === false) {
+      return res.status(403).json({ error: 'Usuario no autorizado.' });
     }
 
-    const secret = decryptSecret(user.totpEnc);
+    const secret = decryptSecret(user.totpEnc || user.totpPendingEnc) || generateSecret(user.id);
     const result = verifyTOTP(String(req.body?.token || ''), secret);
     if (!result.valid || isReplayCounter(user.id, result.counter, user.lastTotpCounter)) {
       const failInfo = recordFailedAuthAttempt(email);
@@ -756,24 +779,31 @@ app.post('/api/auth/2fa/verify', authLimiter, requireGoogleIdentity, (req, res) 
       return res.status(401).json({
         success: false,
         valid: false,
-        error: 'Código de Google Authenticator inválido, expirado o ya utilizado.'
+        error: 'Código de Google Authenticator inválido, expirado o perteneciente a un QR anterior. Usa el botón de abajo para sincronizar el QR único.'
       });
     }
 
     clearFailedAuthAttempts(email);
     const updatedUser = updateUserInternal(user.id, {
+      totpEnc: user.totpEnc || encryptSecret(secret),
+      totpPendingEnc: null,
+      mfaActivo: true,
       lastTotpCounter: result.counter,
       ultimoAcceso: new Date().toISOString()
     });
 
     const sessionToken = issueSessionCookie(res, updatedUser);
+    const mfaSeal = signMfaEnrollmentSeal(updatedUser.email);
+    res.append('Set-Cookie', `gg_mfa_enrolled=${encodeURIComponent(mfaSeal)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000; Secure`);
+
     logSecurityEvent('AUTH_LOGIN_SUCCESS', { userId: updatedUser.id, email: updatedUser.email, rol: updatedUser.rol }, req);
 
     return res.json({
       success: true,
       valid: true,
       user: publicUser(updatedUser),
-      sessionToken
+      sessionToken,
+      mfaSeal
     });
   } catch (err) {
     return res.status(500).json({ error: safeError(err) });

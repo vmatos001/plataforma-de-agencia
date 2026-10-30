@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShieldCheck, 
   Lock, 
@@ -76,7 +76,9 @@ export default function LoginGatekeeper({
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [enrollmentSecret, setEnrollmentSecret] = useState('');
   const [copiedSecret, setCopiedSecret] = useState(false);
+  const [loadingResyncQr, setLoadingResyncQr] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(30 - (Math.floor(Date.now() / 1000) % 30));
+  const verifyingLockRef = useRef(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -97,12 +99,20 @@ export default function LoginGatekeeper({
         throw new Error('No se pudo obtener el correo de la cuenta de Google.');
       }
 
+      const cleanEmail = user.email.trim().toLowerCase();
+      const storedMfaSeal =
+        (typeof window !== 'undefined' && (
+          localStorage.getItem(`goglite_mfa_seal_${cleanEmail}`) ||
+          localStorage.getItem('goglite_mfa_seal_default')
+        )) || '';
+
       const idToken = await user.getIdToken();
       const checkRes = await apiFetch('/api/auth/google-check', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${idToken}`
-        }
+        },
+        body: { mfaSeal: storedMfaSeal }
       });
 
       const checkData = await checkRes.json().catch(() => ({}));
@@ -153,19 +163,48 @@ export default function LoginGatekeeper({
     }
   };
 
+  // Re-sincronizar / Mostrar el código QR único determinístico de esta cuenta
+  const handleShowResyncQr = async () => {
+    try {
+      setLoadingResyncQr(true);
+      setErrorMessage('');
+      const freshIdToken = googleUser ? await googleUser.getIdToken() : googleIdToken;
+      const enrollRes = await apiFetch('/api/auth/2fa/enroll/start', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${freshIdToken}`
+        },
+        body: { forceResync: true }
+      });
+      const enrollData = await enrollRes.json().catch(() => ({}));
+      if (!enrollRes.ok) {
+        throw new Error(enrollData.error || 'No se pudo obtener el código QR.');
+      }
+      setQrCodeDataUrl(enrollData.qrCodeDataUrl || '');
+      setEnrollmentSecret(enrollData.secret || '');
+      setIsMfaEnrolled(false);
+    } catch (err) {
+      setErrorMessage(`Error mostrando código QR: ${err.message}`);
+    } finally {
+      setLoadingResyncQr(false);
+    }
+  };
+
   // Paso 2: Verificar código TOTP de Google Authenticator exclusivamente en el backend (C-03, C-04)
   const handleVerifyTotp = async (e, explicitCode = null) => {
     if (e) e.preventDefault();
-    setErrorMessage('');
-    const code = String(explicitCode !== null ? explicitCode : totpCode).trim();
+    if (verifyingLockRef.current || mfaSuccess) return;
 
+    const code = String(explicitCode !== null ? explicitCode : totpCode).trim();
     if (code.length !== 6) {
       setErrorMessage('Ingresa los 6 dígitos del código de Google Authenticator.');
       return;
     }
 
     try {
+      verifyingLockRef.current = true;
       setVerifyingMfa(true);
+      setErrorMessage('');
 
       const freshIdToken = googleUser ? await googleUser.getIdToken() : googleIdToken;
       const endpoint = isMfaEnrolled ? '/api/auth/2fa/verify' : '/api/auth/2fa/enroll/confirm';
@@ -189,22 +228,31 @@ export default function LoginGatekeeper({
           setSessionToken(data.sessionToken);
         }
 
-        if (!isMfaEnrolled && onUpdateUserMfa && data.user.id) {
+        if (data.mfaSeal && typeof window !== 'undefined') {
+          const emailKey = (googleUser?.email || data.user.email || '').trim().toLowerCase();
+          if (emailKey) {
+            localStorage.setItem(`goglite_mfa_seal_${emailKey}`, data.mfaSeal);
+          }
+          localStorage.setItem('goglite_mfa_seal_default', data.mfaSeal);
+        }
+
+        if (onUpdateUserMfa && data.user.id) {
           onUpdateUserMfa(data.user.id, true);
         }
 
         setTimeout(() => {
           onLoginSuccess(data.user);
-        }, 800);
+        }, 500);
       } else {
         setErrorMessage(
           data.error ||
-          'Código incorrecto o expirado. Verifica el código actual de 6 dígitos que muestra tu app de Google Authenticator.'
+          'Código incorrecto o expirado. Si tienes varios códigos antiguos en tu app, pulsa abajo "Sincronizar código QR único".'
         );
       }
     } catch (err) {
       setErrorMessage(`Error validando código en el servidor: ${err.message}`);
     } finally {
+      verifyingLockRef.current = false;
       setVerifyingMfa(false);
     }
   };
@@ -348,15 +396,15 @@ export default function LoginGatekeeper({
               </button>
             </div>
 
-            {/* Enrolamiento Inicial Único generado por el servidor */}
+            {/* Enrolamiento / Sincronización de QR Único Determinístico */}
             {!isMfaEnrolled && (
               <div className="p-4 rounded-2xl bg-[#0c1018] border border-orange-500/30 space-y-3 animate-fade-in text-center">
                 <div className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-400">
                   <QrCode className="w-4 h-4" />
-                  <span>Configuración Inicial de Google Authenticator</span>
+                  <span>Código QR Único Oficial de Google Authenticator</span>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Es tu primer inicio de sesión. Abre <strong>Google Authenticator</strong> en tu teléfono móvil, pulsa <strong>"+"</strong> y escanea este código QR único generado por el servidor:
+                  Si tienes códigos anteriores de Goglite en tu app <strong>Google Authenticator</strong>, <strong>elimínalos primero</strong> en tu teléfono, pulsa <strong>"+"</strong> y escanea este único código QR permanente:
                 </p>
 
                 {qrCodeDataUrl ? (
@@ -371,7 +419,7 @@ export default function LoginGatekeeper({
 
                 {enrollmentSecret && (
                   <div className="space-y-1">
-                    <div className="text-[10px] text-slate-500 font-mono">Clave de respaldo manual (única exhibición):</div>
+                    <div className="text-[10px] text-slate-500 font-mono">Clave de configuración manual permanente:</div>
                     <div className="inline-flex items-center gap-2 bg-[#121929] border border-slate-800 px-3 py-1.5 rounded-lg text-xs font-mono text-white">
                       <span>{enrollmentSecret}</span>
                       <button
@@ -387,7 +435,7 @@ export default function LoginGatekeeper({
                 )}
 
                 <div className="text-[10px] text-slate-400">
-                  Una vez sincronizado, introduce abajo el código de 6 dígitos para validar y sellar tu cuenta de forma definitiva.
+                  Una vez escaneado, introduce abajo el código de 6 dígitos para dejar vinculada tu cuenta de forma permanente (no volverá a cambiar al cerrar sesión).
                 </div>
               </div>
             )}
@@ -397,12 +445,12 @@ export default function LoginGatekeeper({
               <div className="space-y-1.5 text-center">
                 <label className="text-xs font-bold text-white flex items-center justify-center gap-1.5">
                   <Smartphone className="w-4 h-4 text-orange-400" />
-                  <span>{isMfaEnrolled ? 'Código de Google Authenticator' : 'Confirma tu primer código de 6 dígitos'}</span>
+                  <span>{isMfaEnrolled ? 'Código de Google Authenticator' : 'Introduce el código de 6 dígitos'}</span>
                 </label>
                 <p className="text-[11px] text-slate-400">
                   {isMfaEnrolled 
                     ? 'Abre la app en tu teléfono e introduce el código dinámico de 6 dígitos.'
-                    : 'Ingresa los 6 dígitos generados en tu móvil para activar la protección.'}
+                    : 'Ingresa los 6 dígitos generados en tu móvil para activar y entrar.'}
                 </p>
 
                 <div className="pt-2">
@@ -436,18 +484,36 @@ export default function LoginGatekeeper({
                   <span>¡Código Verificado! Abriendo plataforma...</span>
                 </div>
               ) : (
-                <button
-                  type="submit"
-                  disabled={verifyingMfa || totpCode.length !== 6}
-                  className="w-full py-3 px-4 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-orange-600/30 transition-all cursor-pointer"
-                >
-                  {verifyingMfa ? (
-                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                  ) : (
-                    <ArrowRight className="w-4 h-4" />
+                <div className="space-y-2.5">
+                  <button
+                    type="submit"
+                    disabled={verifyingMfa || totpCode.length !== 6}
+                    className="w-full py-3 px-4 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-orange-600/30 transition-all cursor-pointer"
+                  >
+                    {verifyingMfa ? (
+                      <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                    ) : (
+                      <ArrowRight className="w-4 h-4" />
+                    )}
+                    <span>{verifyingMfa ? 'Validando con Google Authenticator...' : (isMfaEnrolled ? 'Verificar y Acceder' : 'Activar MFA y Acceder')}</span>
+                  </button>
+
+                  {isMfaEnrolled && (
+                    <button
+                      type="button"
+                      onClick={handleShowResyncQr}
+                      disabled={loadingResyncQr}
+                      className="w-full py-2 px-3 rounded-xl bg-[#121929] hover:bg-slate-800/80 border border-slate-800 text-slate-300 hover:text-orange-400 text-[11px] font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <QrCode className="w-3.5 h-3.5 text-orange-400" />
+                      <span>
+                        {loadingResyncQr
+                          ? 'Cargando código QR único...'
+                          : '¿Tienes códigos duplicados o quieres re-escanear el QR único?'}
+                      </span>
+                    </button>
                   )}
-                  <span>{verifyingMfa ? 'Validando con Google Authenticator...' : (isMfaEnrolled ? 'Verificar y Acceder' : 'Activar MFA y Acceder')}</span>
-                </button>
+                </div>
               )}
             </form>
 

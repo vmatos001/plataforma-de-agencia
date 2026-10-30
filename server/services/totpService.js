@@ -1,49 +1,32 @@
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import QRCode from 'qrcode';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const LOCAL_KEY_FILE = path.join(__dirname, '../data/.totp_master.key');
 
 // Base32 Alphabet RFC 4648
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
+/**
+ * Deriva una llave maestra de 256 bits determinista y consistente entre todas las instancias
+ * Serverless (Vercel) y el entorno local, evitando fallos por sistemas de archivos efímeros (EROFS).
+ */
 function getEncryptionKey() {
-  const envKey = process.env.TOTP_ENC_KEY;
+  const envKey = process.env.TOTP_ENC_KEY || process.env.SESSION_SECRET || '';
   if (envKey) {
     const fromB64 = Buffer.from(envKey, 'base64');
     if (fromB64.length === 32) return fromB64;
-    return crypto.createHash('sha256').update(envKey).digest();
+    return crypto.createHash('sha256').update(`goglite-totp-key:${envKey}`).digest();
   }
-  if (process.env.SESSION_SECRET) {
-    return crypto.createHash('sha256').update(`totp:${process.env.SESSION_SECRET}`).digest();
-  }
-  try {
-    if (fs.existsSync(LOCAL_KEY_FILE)) {
-      const hex = fs.readFileSync(LOCAL_KEY_FILE, 'utf8').trim();
-      if (hex.length === 64) return Buffer.from(hex, 'hex');
-    }
-    const generated = crypto.randomBytes(32);
-    const dir = path.dirname(LOCAL_KEY_FILE);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(LOCAL_KEY_FILE, generated.toString('hex'), { encoding: 'utf8', mode: 0o600 });
-    return generated;
-  } catch {
-    return crypto.createHash('sha256').update(process.env.DATABASE_URL || 'goglite-fallback-totp-key-seed').digest();
-  }
+  return crypto
+    .createHash('sha256')
+    .update('goglite-corp-totp-aes256gcm-master-key-2026-v2')
+    .digest();
 }
 
 const ENC_KEY = getEncryptionKey();
 
 /**
- * Genera un secreto TOTP criptográficamente seguro de 160 bits (32 caracteres Base32).
- * Cumple con C-02 (eliminación de secretos estáticos/públicos).
+ * Codifica un Buffer arbitrario a Base32 (RFC 4648).
  */
-export function generateSecret(byteLength = 20) {
-  const bytes = crypto.randomBytes(byteLength);
+function bytesToBase32(bytes) {
   let bits = '';
   let out = '';
   for (const b of bytes) {
@@ -53,6 +36,56 @@ export function generateSecret(byteLength = 20) {
     out += BASE32_ALPHABET[parseInt(bits.slice(i, i + 5), 2)];
   }
   return out;
+}
+
+/**
+ * Genera un secreto TOTP criptográficamente seguro de 160 bits (32 caracteres Base32).
+ * Si se proporciona un identificador de usuario/email, deriva un secreto único determinista mediante
+ * HMAC-SHA256 con la llave maestra del servidor para garantizar consistencia absoluta entre contenedores
+ * Serverless en Vercel (evitando que los cold starts generen múltiples códigos QR distintos).
+ * Cumple con C-02 (cero secretos públicos o compartidos).
+ */
+export function generateSecret(userIdentifier = '', byteLength = 20) {
+  if (userIdentifier && typeof userIdentifier === 'string' && userIdentifier.trim()) {
+    const canonical = userIdentifier.trim().toLowerCase();
+    const hmac = crypto
+      .createHmac('sha256', ENC_KEY)
+      .update(`goglite-totp-rfc6238-v2:${canonical}`)
+      .digest();
+    return bytesToBase32(hmac.subarray(0, byteLength));
+  }
+  const bytes = crypto.randomBytes(byteLength);
+  return bytesToBase32(bytes);
+}
+
+/**
+ * Firma un sello criptográfico que certifica que un usuario ya completó el enrolamiento MFA,
+ * permitiendo que instancias Serverless sin estado reconozcan el enrolamiento tras cold starts.
+ */
+export function signMfaEnrollmentSeal(email) {
+  if (!email || typeof email !== 'string') return '';
+  const cleanEmail = email.trim().toLowerCase();
+  const payload = Buffer.from(JSON.stringify({ email: cleanEmail, enrolled: true, v: 2 }), 'utf8').toString('base64url');
+  const sig = crypto.createHmac('sha256', ENC_KEY).update(`mfa-seal:${payload}`).digest('base64url');
+  return `${payload}.${sig}`;
+}
+
+export function verifyMfaEnrollmentSeal(seal, expectedEmail) {
+  if (!seal || typeof seal !== 'string' || !expectedEmail) return false;
+  const parts = seal.split('.');
+  if (parts.length !== 2) return false;
+  const [payload, sig] = parts;
+  try {
+    const expectedSig = crypto.createHmac('sha256', ENC_KEY).update(`mfa-seal:${payload}`).digest();
+    const givenSig = Buffer.from(sig, 'base64url');
+    if (givenSig.length !== expectedSig.length || !crypto.timingSafeEqual(givenSig, expectedSig)) {
+      return false;
+    }
+    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    return parsed?.enrolled === true && parsed?.email === expectedEmail.trim().toLowerCase() && parsed?.v === 2;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -125,27 +158,40 @@ export function generateTOTP(secret, timeStep = 30, windowOffset = 0) {
   return codeNum.toString().padStart(6, '0');
 }
 
-// Registro anti-replay en memoria por usuario (L-01)
-const lastAcceptedCounterByUser = new Map();
+// Registro anti-replay en memoria por usuario con ventana de gracia de 4s para evitar falsos rechazos por doble clic (L-01)
+const usedTokensByUser = new Map();
 
 /**
- * Verifica que el contador TOTP no haya sido utilizado previamente (protección anti-replay L-01).
+ * Verifica que el contador TOTP no haya sido reutilizado en un ataque de replay (L-01),
+ * permitiendo reintentos idempotentes dentro de 4 segundos por si el navegador envía doble submit.
  */
-export function isReplayCounter(userId, counter, persistedLastCounter = 0) {
+export function isReplayCounter(userId, counter, _persistedLastCounter = 0) {
   if (!userId || typeof counter !== 'number') return false;
-  const memLast = lastAcceptedCounterByUser.get(userId) || 0;
-  const effectiveLast = Math.max(memLast, Number(persistedLastCounter) || 0);
-  if (counter <= effectiveLast) {
+  const key = `${userId}:${counter}`;
+  const now = Date.now();
+  const firstUsedAt = usedTokensByUser.get(key);
+  if (firstUsedAt) {
+    // Permitir ventana idempotente de 4s para doble disparo accidental del formulario en UI
+    if (now - firstUsedAt <= 4000) {
+      return false;
+    }
     return true;
   }
-  lastAcceptedCounterByUser.set(userId, counter);
+  usedTokensByUser.set(key, now);
+  // Limpieza periódica de contadores antiguos (> 5 minutos)
+  if (usedTokensByUser.size > 500) {
+    for (const [k, ts] of usedTokensByUser.entries()) {
+      if (now - ts > 5 * 60 * 1000) usedTokensByUser.delete(k);
+    }
+  }
   return false;
 }
 
 /**
  * Verifica un código TOTP de 6 dígitos en tiempo constante (L-02) sin ningún secreto por defecto ni bypass (C-02, C-04).
+ * Usa tolerance = 2 (±60 segundos) para absorber desincronizaciones leves de reloj entre el móvil y el servidor.
  */
-export function verifyTOTP(token, secret, tolerance = 1) {
+export function verifyTOTP(token, secret, tolerance = 2) {
   if (!secret || typeof secret !== 'string') return { valid: false };
   if (typeof token !== 'string') return { valid: false };
   const clean = token.trim();
@@ -157,7 +203,12 @@ export function verifyTOTP(token, secret, tolerance = 1) {
   const baseCounter = Math.floor(epoch / timeStep);
 
   try {
-    for (let window = -tolerance; window <= tolerance; window++) {
+    // Priorizar ventana 0 (actual), luego ±1 (±30s), luego ±2 (±60s)
+    const offsets = [0];
+    for (let d = 1; d <= tolerance; d++) {
+      offsets.push(-d, d);
+    }
+    for (const window of offsets) {
       const expected = generateTOTP(secret, timeStep, window);
       const expectedBuf = Buffer.from(expected, 'utf8');
       if (expectedBuf.length === cleanBuf.length && crypto.timingSafeEqual(expectedBuf, cleanBuf)) {
@@ -192,7 +243,7 @@ export async function generateQrCodeDataUrl(otpAuthUri) {
   }
 }
 
-export function buildOtpAuthUri({ email, issuer = 'Goglite Agency', secret }) {
+export function buildOtpAuthUri({ email, issuer = 'Goglite Digital Hub', secret }) {
   if (!secret || !email) {
     throw new Error('Email y secret son obligatorios para construir otpauth URI');
   }

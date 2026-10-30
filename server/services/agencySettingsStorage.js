@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
@@ -6,6 +7,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const SETTINGS_PATH = path.join(__dirname, '../data/agency_settings.json');
+const TMP_SETTINGS_PATH = path.join(os.tmpdir(), 'goglite_agency_settings.json');
+let memorySettingsCache = null;
 
 // Llaves MCP expuestas históricamente en código o bundle que quedan revocadas de inmediato (C-07)
 const COMPROMISED_MCP_KEYS = new Set([
@@ -245,16 +248,38 @@ function maskSecretValue(val) {
   return `${val.slice(0, 6)}••••••••${val.slice(-4)}`;
 }
 
+function persistSettingsFile(updated) {
+  memorySettingsCache = { ...updated };
+  const payload = JSON.stringify(memorySettingsCache, null, 2);
+  try {
+    const dir = path.dirname(SETTINGS_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(SETTINGS_PATH, payload, { encoding: 'utf8', mode: 0o600 });
+  } catch {
+    try {
+      fs.writeFileSync(TMP_SETTINGS_PATH, payload, { encoding: 'utf8', mode: 0o600 });
+    } catch {}
+  }
+}
+
 export function getAgencySettings() {
   try {
-    if (!fs.existsSync(SETTINGS_PATH)) {
-      const dir = path.dirname(SETTINGS_PATH);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(SETTINGS_PATH, JSON.stringify(defaultAgencySettings, null, 2), { encoding: 'utf8', mode: 0o600 });
+    const candidatePaths = [SETTINGS_PATH, TMP_SETTINGS_PATH];
+    let parsed = null;
+    for (const filePath of candidatePaths) {
+      if (fs.existsSync(filePath)) {
+        const data = fs.readFileSync(filePath, 'utf8');
+        parsed = JSON.parse(data);
+        break;
+      }
+    }
+
+    if (!parsed) {
+      if (memorySettingsCache) return memorySettingsCache;
+      persistSettingsFile(defaultAgencySettings);
       return defaultAgencySettings;
     }
-    const data = fs.readFileSync(SETTINGS_PATH, 'utf8');
-    const parsed = JSON.parse(data);
+
     let dirty = false;
 
     // Si existe una llave MCP en texto plano en el JSON, migrar a hash SHA-256 o revocar si es comprometida
@@ -267,16 +292,15 @@ export function getAgencySettings() {
       dirty = true;
     }
 
+    const merged = { ...defaultAgencySettings, ...parsed };
+    memorySettingsCache = merged;
     if (dirty) {
-      try {
-        fs.writeFileSync(SETTINGS_PATH, JSON.stringify(parsed, null, 2), { encoding: 'utf8', mode: 0o600 });
-      } catch {}
+      persistSettingsFile(merged);
     }
 
-    return { ...defaultAgencySettings, ...parsed };
+    return merged;
   } catch (err) {
-    console.error('Error leyendo agency_settings.json:', err.message);
-    return defaultAgencySettings;
+    return memorySettingsCache || defaultAgencySettings;
   }
 }
 
@@ -330,11 +354,7 @@ export function saveAgencySettings(rawPatch = {}) {
     };
     delete updated.mcpAgentKey;
 
-    try {
-      fs.writeFileSync(SETTINGS_PATH, JSON.stringify(updated, null, 2), { encoding: 'utf8', mode: 0o600 });
-    } catch (fsErr) {
-      console.warn('[AgencySettings] Entorno read-only, guardando en memoria:', fsErr.message);
-    }
+    persistSettingsFile(updated);
     return getSanitizedAgencySettings();
   } catch (err) {
     console.error('Error guardando agency_settings.json:', err.message);
@@ -357,9 +377,7 @@ export function updateAgencyBankAccounts(cuentasBancarias) {
     actualizadoEn: new Date().toISOString()
   };
   delete updated.mcpAgentKey;
-  try {
-    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(updated, null, 2), { encoding: 'utf8', mode: 0o600 });
-  } catch {}
+  persistSettingsFile(updated);
   return updated.cuentasBancarias;
 }
 
@@ -381,9 +399,7 @@ export function rotateMcpAgentKey() {
   };
   delete updated.mcpAgentKey;
 
-  try {
-    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(updated, null, 2), { encoding: 'utf8', mode: 0o600 });
-  } catch {}
+  persistSettingsFile(updated);
 
   return { rawKey, masked, keyHash };
 }

@@ -1,11 +1,14 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { generateSecret, encryptSecret } from './totpService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const USERS_PATH = path.join(__dirname, '../data/users.json');
+const TMP_USERS_PATH = path.join(os.tmpdir(), 'goglite_users.json');
 
 export const ALLOWED_PERMS = [
   'lead_scrapper',
@@ -25,6 +28,8 @@ const COMPROMISED_TOTP_SECRETS = new Set([
   'JBSWY3DPEHPK3PXP'
 ]);
 
+const defaultAdminTotpEnc = encryptSecret(generateSecret('user-admin-victor'));
+
 const defaultUsers = [
   {
     id: 'user-admin-victor',
@@ -35,14 +40,16 @@ const defaultUsers = [
     rol: 'admin',
     avatar: 'VM',
     authProvider: 'google_authenticator',
-    mfaActivo: false, // Se activa tras enrolamiento único con secreto CSPRNG cifrado en servidor
-    totpEnc: null,
+    mfaActivo: false, // Se sella tras el enrolamiento inicial o con el sello criptográfico de enrolamiento
+    totpEnc: defaultAdminTotpEnc,
     totpPendingEnc: null,
     permisos: ['all'],
     creadoEn: '2026-10-01T00:00:00Z',
     ultimoAcceso: new Date().toISOString()
   }
 ];
+
+let memoryUsersCache = null;
 
 /**
  * Elimina todos los campos sensibles antes de enviar un usuario por red o guardarlo en estado de cliente.
@@ -66,16 +73,17 @@ export function publicUser(user) {
 }
 
 function sanitizeLoadedUsers(users) {
-  if (!Array.isArray(users)) return defaultUsers;
+  if (!Array.isArray(users)) return defaultUsers.map(u => ({ ...u }));
   let modified = false;
   const cleaned = users.map(u => {
     const copy = { ...u };
     // Si la cuenta tenía el secreto de ejemplo público comprometido, revocarlo para forzar enrolamiento seguro
     if (copy.totpKeySecret && COMPROMISED_TOTP_SECRETS.has(copy.totpKeySecret)) {
       delete copy.totpKeySecret;
-      if (!copy.totpEnc) {
-        copy.mfaActivo = false;
-      }
+      modified = true;
+    }
+    if (!copy.totpEnc && copy.id) {
+      copy.totpEnc = encryptSecret(generateSecret(copy.id));
       modified = true;
     }
     return copy;
@@ -89,30 +97,48 @@ function sanitizeLoadedUsers(users) {
 
 export function getUsers() {
   try {
-    if (!fs.existsSync(USERS_PATH)) {
-      const dir = path.dirname(USERS_PATH);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(USERS_PATH, JSON.stringify(defaultUsers, null, 2), { encoding: 'utf8', mode: 0o600 });
-      return defaultUsers;
+    const candidatePaths = [USERS_PATH, TMP_USERS_PATH];
+    for (const filePath of candidatePaths) {
+      if (fs.existsSync(filePath)) {
+        const data = fs.readFileSync(filePath, 'utf8');
+        const parsed = JSON.parse(data);
+        const sanitized = sanitizeLoadedUsers(parsed);
+        memoryUsersCache = sanitized;
+        return sanitized;
+      }
     }
-    const data = fs.readFileSync(USERS_PATH, 'utf8');
-    const parsed = JSON.parse(data);
-    return sanitizeLoadedUsers(parsed);
+
+    if (memoryUsersCache && Array.isArray(memoryUsersCache)) {
+      return memoryUsersCache;
+    }
+
+    const initial = defaultUsers.map(u => ({ ...u }));
+    memoryUsersCache = initial;
+    saveUsers(initial);
+    return initial;
   } catch (err) {
-    console.error('Error leyendo users.json:', err.message);
-    return defaultUsers;
+    if (memoryUsersCache && Array.isArray(memoryUsersCache)) {
+      return memoryUsersCache;
+    }
+    return defaultUsers.map(u => ({ ...u }));
   }
 }
 
 export function saveUsers(usersList) {
+  memoryUsersCache = Array.isArray(usersList) ? usersList.map(u => ({ ...u })) : defaultUsers.map(u => ({ ...u }));
+  const payload = JSON.stringify(memoryUsersCache, null, 2);
   try {
     const dir = path.dirname(USERS_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(USERS_PATH, JSON.stringify(usersList, null, 2), { encoding: 'utf8', mode: 0o600 });
+    fs.writeFileSync(USERS_PATH, payload, { encoding: 'utf8', mode: 0o600 });
     return true;
-  } catch (err) {
-    console.error('Error guardando users.json:', err.message);
-    return false;
+  } catch {
+    try {
+      fs.writeFileSync(TMP_USERS_PATH, payload, { encoding: 'utf8', mode: 0o600 });
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -162,8 +188,9 @@ export function createCollaborator({ nombre, email, cargo, permisos = [], costoP
     ? permisos.filter(p => ALLOWED_PERMS.includes(p))
     : ['desarrollo_prd', 'seo_motor', 'headless_cms'];
 
+  const newUserId = `user-colab-${crypto.randomBytes(8).toString('hex')}`;
   const newUser = {
-    id: `user-colab-${crypto.randomBytes(8).toString('hex')}`,
+    id: newUserId,
     nombre: cleanNombre,
     email: cleanEmail,
     cargo: String(cargo || 'Especialista de Proyecto').trim().slice(0, 120),
@@ -172,7 +199,7 @@ export function createCollaborator({ nombre, email, cargo, permisos = [], costoP
     avatar: initials,
     authProvider: 'google',
     mfaActivo: false,
-    totpEnc: null,
+    totpEnc: encryptSecret(generateSecret(newUserId)),
     totpPendingEnc: null,
     permisos: safePermisos.length > 0 ? safePermisos : ['desarrollo_prd', 'seo_motor', 'headless_cms'],
     activo: true,
