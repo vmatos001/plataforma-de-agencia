@@ -31,7 +31,7 @@ import {
   MinusCircle,
   Ban
 } from 'lucide-react';
-import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
+import { DEFAULT_AGENCY_BRANDING, getAgencyContactForCountry } from '../constants/defaultAgencyBranding';
 
 /**
  * PROTOCOLO MAESTRO DE 48 CHEQUEOS DE PRE-ENTREGA, CONTROL DE CALIDAD Y SEO LOCAL RANK & RENT
@@ -821,28 +821,53 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
   const currentProject = proyectos.find(p => p.id === selectedProyectoId) || proyectos[0];
 
   // Dynamic Agency Settings from System / LocalStorage / White-Label
+  const [agencySettings, setAgencySettings] = useState(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_settings') : null;
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const handleSettingsUpdated = (e) => {
+      if (e.detail) {
+        setAgencySettings(e.detail);
+      }
+    };
+    window.addEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
+    return () => window.removeEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
+  }, []);
+
   const agencyData = useMemo(() => {
     try {
-      const storedSettings = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_settings') : null;
+      const storedSettings = agencySettings || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('goglite_agency_settings') || '{}') : {});
       const storedLogo = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null;
       const storedLogoDocs = typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null;
-      const parsed = storedSettings ? JSON.parse(storedSettings) : {};
       return {
         ...DEFAULT_AGENCY_BRANDING,
-        ...parsed,
-        logoUrl: parsed.logoUrl || storedLogo || DEFAULT_AGENCY_BRANDING.logoUrl,
-        logoDocumentosUrl: parsed.logoDocumentosUrl || storedLogoDocs || ''
+        ...storedSettings,
+        logoUrl: storedLogo || storedSettings.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl,
+        logoDocumentosUrl: storedLogoDocs || storedSettings.logoDocumentosUrl || ''
       };
     } catch {
       return DEFAULT_AGENCY_BRANDING;
     }
-  }, []);
+  }, [agencySettings]);
 
-  const activeDocLogo = agencyData.logoDocumentosUrl || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null) || agencyData.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl;
-  const activeAgencyName = agencyData.nombreAgencia || 'Goglite Digital Hub';
-  const activeAgencySlogan = agencyData.eslogan || 'Agencia Web, Automatización & Posicionamiento IA (GEO)';
-  const activeAgencyLocation = agencyData.ubicacionPrincipal || 'San Salvador, SV · Santo Domingo, DO';
-  const activeDirectorName = agencyData.responsable || 'Víctor Matos';
+  const activeDocLogo = (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null)
+    || agencyData.logoDocumentosUrl
+    || (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null)
+    || agencyData.logoUrl
+    || DEFAULT_AGENCY_BRANDING.logoUrl;
+
+  const projectPais = (currentProject?.cliente?.pais || currentProject?.pais || 'SV').toUpperCase();
+  const sedeContact = getAgencyContactForCountry(projectPais, agencySettings);
+  const activeAgencyName = agencyData.nombreAgencia || sedeContact.empresa || 'Goglite Digital Hub';
+  const activeAgencySlogan = agencyData.eslogan || 'Suite Integral de Crecimiento Digital & Desarrollo Web Antigravity';
+  const activeAgencyLocation = sedeContact.ubicacion || agencyData.ubicacionPrincipal || 'San Salvador, SV · Santo Domingo, DO';
+  const activeDirectorName = sedeContact.responsable || agencyData.responsable || 'Víctor Matos';
 
   // Filtrado de ítems para el operador
   const filteredChecklist = useMemo(() => {

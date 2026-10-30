@@ -1646,9 +1646,6 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
             >
               <Users className="w-3.5 h-3.5 text-orange-400" />
               <span>Base de Datos & Fichas</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                👑 {leadsGanadosCount} Clientes
-              </span>
             </button>
             <button
               onClick={() => setActiveTab('tabla')}
