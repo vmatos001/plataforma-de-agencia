@@ -1904,7 +1904,11 @@ const CRM_LEAD_PATCH_ALLOWLIST = [
   'proximaAccion',
   'notas',
   'servicio',
-  'interacciones'
+  'interacciones',
+  'archivado',
+  'fechaArchivado',
+  'fechaArchivadoFormateada',
+  'motivoArchivado'
 ];
 
 app.patch('/api/crm/leads/:id', (req, res) => {

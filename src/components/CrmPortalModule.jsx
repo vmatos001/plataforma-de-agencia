@@ -640,15 +640,20 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     };
   }, [isQrModalOpen]);
 
-  // Helper para persistir leads tanto en localStorage como en Firestore Cloud
+  // Helper para persistir leads tanto en localStorage como en Firestore Cloud (solo sincroniza los leads que cambiaron)
   const updateAndPersistLeads = (updater) => {
     setLeads(prev => {
-      const nextLeads = typeof updater === 'function' ? updater(prev) : updater;
+      const prevMap = new Map((Array.isArray(prev) ? prev : []).map(l => [l?.id, l]));
+      const rawNext = typeof updater === 'function' ? updater(prev) : updater;
+      const nextLeads = syncCrmLeadsWithPresupuestos(rawNext);
       saveStoredCrmLeads(nextLeads);
       if (Array.isArray(nextLeads)) {
         nextLeads.forEach(lead => {
           if (lead && lead.id) {
-            saveCrmLeadCloud(lead).catch(() => {});
+            const prevLead = prevMap.get(lead.id);
+            if (!prevLead || JSON.stringify(prevLead) !== JSON.stringify(lead)) {
+              saveCrmLeadCloud(lead).catch(() => {});
+            }
           }
         });
       }
@@ -660,14 +665,19 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   useEffect(() => {
     fetchCrmLeads();
 
-    // Listener en tiempo real desde Firestore Cloud
+    // Listener en tiempo real desde Firestore Cloud (respeta ediciones locales más recientes)
     const unsubscribeCloud = subscribeCrmLeadsCloud((cloudLeads) => {
       if (Array.isArray(cloudLeads) && cloudLeads.length > 0) {
         setLeads(prev => {
           const map = new Map(prev.map(l => [l.id, l]));
           cloudLeads.forEach(cl => {
             if (cl?.id) {
-              map.set(cl.id, { ...(map.get(cl.id) || {}), ...cl });
+              const existing = map.get(cl.id);
+              if (existing?.updatedAt && cl?.updatedAt && existing.updatedAt > cl.updatedAt) {
+                map.set(cl.id, { ...cl, ...existing });
+              } else {
+                map.set(cl.id, { ...(existing || {}), ...cl });
+              }
             }
           });
           const merged = syncCrmLeadsWithPresupuestos(Array.from(map.values()));
@@ -728,11 +738,29 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       }
       // 2. API Backend
       if (Array.isArray(apiData)) {
-        apiData.forEach(l => { if (l?.id) mergedMap.set(l.id, { ...(mergedMap.get(l.id) || {}), ...l }); });
+        apiData.forEach(l => {
+          if (l?.id) {
+            const existing = mergedMap.get(l.id);
+            if (existing?.updatedAt && l?.updatedAt && existing.updatedAt > l.updatedAt) {
+              mergedMap.set(l.id, { ...l, ...existing });
+            } else {
+              mergedMap.set(l.id, { ...(existing || {}), ...l });
+            }
+          }
+        });
       }
-      // 3. Firestore Nube (Máxima autoridad en producción)
+      // 3. Firestore Nube (respeta cambios locales con updatedAt más reciente)
       if (Array.isArray(cloudLeads)) {
-        cloudLeads.forEach(l => { if (l?.id) mergedMap.set(l.id, { ...(mergedMap.get(l.id) || {}), ...l }); });
+        cloudLeads.forEach(l => {
+          if (l?.id) {
+            const existing = mergedMap.get(l.id);
+            if (existing?.updatedAt && l?.updatedAt && existing.updatedAt > l.updatedAt) {
+              mergedMap.set(l.id, { ...l, ...existing });
+            } else {
+              mergedMap.set(l.id, { ...(existing || {}), ...l });
+            }
+          }
+        });
       }
 
       const finalLeads = syncCrmLeadsWithPresupuestos(Array.from(mergedMap.values()));
@@ -769,11 +797,12 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       if (l.id === leadId) {
         return {
           ...l,
-          archivado: nuevoEstadoArchivado,
+          archivado: Boolean(nuevoEstadoArchivado),
           fechaArchivado: nuevoEstadoArchivado ? nowIso : null,
           fechaArchivadoFormateada: nuevoEstadoArchivado ? nowFormatted : null,
           motivoArchivado: nuevoEstadoArchivado ? motivo : null,
-          actualizadoEn: nowIso.split('T')[0]
+          actualizadoEn: nowIso.split('T')[0],
+          updatedAt: nowIso
         };
       }
       return l;

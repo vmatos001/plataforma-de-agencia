@@ -165,9 +165,8 @@ export function syncCrmLeadsWithPresupuestos(crmLeads) {
         }
         if (wasDeletedProj) {
           cleanedLead.proyectoId = null;
-          cleanedLead.archivado = false;
-          if (cleanedLead.etapa === 'cerrado_ganado' || cleanedLead.etapa === 'ganado') {
-            cleanedLead.etapa = 'contactado';
+          if (cleanedLead.etapa === 'cerrado_ganado') {
+            cleanedLead.etapa = 'ganado';
           }
           if (cleanedLead.portalConfig) {
             cleanedLead.portalConfig = {

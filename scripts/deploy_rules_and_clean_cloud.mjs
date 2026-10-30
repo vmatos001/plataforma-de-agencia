@@ -230,33 +230,16 @@ async function purgeSpecificTestRecords(accessToken, projectId) {
     }
   }
 
-  // Asegurar que el lead de TurisRan exista limpio y activo en crm_leads (desvinculado de la propuesta de prueba P-2026-001)
+  // Asegurar que el lead de TurisRan en crm_leads tenga limpios los campos de propuesta/proyecto de prueba sin sobreescribir su estado de archivado
   try {
     const turisranDocId = 'crm-lead-1792969777629-cjfz';
-    const docUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/crm_leads/${turisranDocId}`;
+    const docUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/crm_leads/${turisranDocId}?updateMask.fieldPaths=presupuestoId&updateMask.fieldPaths=presupuestoCodigo&updateMask.fieldPaths=presupuestoEstado&updateMask.fieldPaths=presupuestoMonto&updateMask.fieldPaths=proyectoId`;
     const fields = {
-      id: { stringValue: turisranDocId },
-      leadId: { stringValue: turisranDocId },
-      empresa: { stringValue: 'TurisRan Dominicana' },
-      contacto: { stringValue: 'Ransel' },
-      cargo: { stringValue: 'Director de Operaciones / Propietario' },
-      email: { stringValue: 'info@turisran-dominicana.com' },
-      telefono: { stringValue: '+1 (849) 752-7408' },
-      dominio: { stringValue: 'https://turisran-dominicana.com' },
-      pais: { stringValue: 'DO' },
-      etapa: { stringValue: 'contactado' },
-      archivado: { booleanValue: false },
-      fuente: { stringValue: 'WhatsApp Inbound' },
-      temperatura: { stringValue: 'caliente' },
-      valorEstimado: { integerValue: '850' },
-      probabilidad: { integerValue: '50' },
       presupuestoId: { nullValue: null },
       presupuestoCodigo: { nullValue: null },
       presupuestoEstado: { nullValue: null },
       presupuestoMonto: { nullValue: null },
-      proyectoId: { nullValue: null },
-      resumenEjecutivo: { stringValue: 'Cliente TurisRan Dominicana (Ransel Urbáez). Servicios de traslados turísticos y presencia digital en República Dominicana.' },
-      updatedAt: { stringValue: new Date().toISOString() }
+      proyectoId: { nullValue: null }
     };
     const patchRes = await fetch(docUrl, {
       method: 'PATCH',
@@ -267,10 +250,10 @@ async function purgeSpecificTestRecords(accessToken, projectId) {
       body: JSON.stringify({ fields })
     });
     if (patchRes.ok) {
-      console.log('✅ Lead TurisRan Dominicana restaurado/actualizado en crm_leads (activo y sin propuesta vinculada).');
+      console.log('✅ Lead TurisRan Dominicana desvinculado de referencias de prueba en crm_leads (preservando su estado de archivado).');
     }
   } catch (e) {
-    console.warn('Error restaurando lead TurisRan en crm_leads:', e.message);
+    console.warn('Error actualizando referencias de TurisRan en crm_leads:', e.message);
   }
 }
 
