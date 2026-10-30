@@ -670,7 +670,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
               map.set(cl.id, { ...(map.get(cl.id) || {}), ...cl });
             }
           });
-          const merged = Array.from(map.values());
+          const merged = syncCrmLeadsWithPresupuestos(Array.from(map.values()));
           saveStoredCrmLeads(merged);
           return merged;
         });
@@ -735,7 +735,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
         cloudLeads.forEach(l => { if (l?.id) mergedMap.set(l.id, { ...(mergedMap.get(l.id) || {}), ...l }); });
       }
 
-      const finalLeads = Array.from(mergedMap.values());
+      const finalLeads = syncCrmLeadsWithPresupuestos(Array.from(mergedMap.values()));
       if (finalLeads.length > 0) {
         setLeads(finalLeads);
         saveStoredCrmLeads(finalLeads);

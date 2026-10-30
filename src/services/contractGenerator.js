@@ -3,7 +3,7 @@
  * Garantiza persistencia Local-First (localStorage) y compatibilidad con Firebase Hosting y Backend API.
  */
 
-import { isExcludedTestRecord } from './firestoreSyncService';
+import { isExcludedProyecto } from './firestoreSyncService';
 
 export const STORAGE_KEY_PROYECTOS = 'goglite_proyectos';
 export const STORAGE_KEY_PRESUPUESTOS = 'goglite_presupuestos';
@@ -18,7 +18,7 @@ export function getStoredProyectos() {
 
     let modified = false;
     const beforeCount = list.length;
-    list = list.filter(proj => !isExcludedTestRecord(
+    list = list.filter(proj => !isExcludedProyecto(
       proj?.cliente?.empresa || proj?.cliente?.nombre,
       proj?.id,
       proj?.codigo,

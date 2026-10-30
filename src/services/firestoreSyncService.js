@@ -43,23 +43,41 @@ function sanitizeForFirestore(obj) {
   return clean;
 }
 
-const DELETED_RECORDS_STORAGE_KEY = 'goglite_deleted_records_v1';
+// Purgar clave legacy compartida (v1) que acoplaba erróneamente leads, propuestas y contratos
+if (typeof window !== 'undefined') {
+  try {
+    localStorage.removeItem('goglite_deleted_records_v1');
+  } catch {}
+}
+
+const DELETED_CRM_LEADS_KEY = 'goglite_deleted_crm_leads_v2';
+const DELETED_PRESUPUESTOS_KEY = 'goglite_deleted_presupuestos_v2';
+const DELETED_PROYECTOS_KEY = 'goglite_deleted_proyectos_v2';
 
 const PERMANENTLY_EXCLUDED_COMPANIES = [
   'multiservicios gisselle',
   'clínica dental escalón'
 ];
 
-const PERMANENTLY_EXCLUDED_IDS_AND_CODES = new Set([
-  'con-2026-001',
-  'con-2026-002'
+const PERMANENTLY_EXCLUDED_PRESUPUESTO_IDS = new Set([
+  'prop-1792978056908',
+  'p-2026-001'
 ]);
 
-export function getDeletedRecordsSet() {
-  const set = new Set(PERMANENTLY_EXCLUDED_IDS_AND_CODES);
+const PERMANENTLY_EXCLUDED_PROYECTO_IDS = new Set([
+  'con-2026-001',
+  'con-2026-002',
+  'p-2026-do-001',
+  'proj-turisran-do',
+  'proj-prop-1792978056908',
+  'prop-1792978056908'
+]);
+
+function readSetFromStorage(storageKey, baseSet = new Set()) {
+  const set = new Set(baseSet);
   if (typeof window !== 'undefined') {
     try {
-      const raw = localStorage.getItem(DELETED_RECORDS_STORAGE_KEY);
+      const raw = localStorage.getItem(storageKey);
       if (raw) {
         const arr = JSON.parse(raw);
         if (Array.isArray(arr)) {
@@ -73,42 +91,99 @@ export function getDeletedRecordsSet() {
   return set;
 }
 
-export function markRecordDeleted(...keys) {
-  const set = getDeletedRecordsSet();
+function writeSetToStorage(storageKey, baseSet, ...keys) {
+  const set = readSetFromStorage(storageKey, baseSet);
   for (const k of keys) {
     if (k && typeof k === 'string') {
       const clean = k.toLowerCase().trim();
       if (clean) set.add(clean);
     }
   }
-  const list = Array.from(set);
   if (typeof window !== 'undefined') {
     try {
-      localStorage.setItem(DELETED_RECORDS_STORAGE_KEY, JSON.stringify(list));
+      localStorage.setItem(storageKey, JSON.stringify(Array.from(set)));
     } catch {}
   }
   return set;
 }
 
+export function getDeletedCrmLeadsSet() {
+  return readSetFromStorage(DELETED_CRM_LEADS_KEY);
+}
+
+export function markCrmLeadDeleted(...leadIds) {
+  return writeSetToStorage(DELETED_CRM_LEADS_KEY, new Set(), ...leadIds);
+}
+
+export function getDeletedPresupuestosSet() {
+  return readSetFromStorage(DELETED_PRESUPUESTOS_KEY, PERMANENTLY_EXCLUDED_PRESUPUESTO_IDS);
+}
+
+export function markPresupuestoDeleted(...presupuestoIds) {
+  return writeSetToStorage(DELETED_PRESUPUESTOS_KEY, PERMANENTLY_EXCLUDED_PRESUPUESTO_IDS, ...presupuestoIds);
+}
+
+export function getDeletedProyectosSet() {
+  return readSetFromStorage(DELETED_PROYECTOS_KEY, PERMANENTLY_EXCLUDED_PROYECTO_IDS);
+}
+
+export function markProyectoDeleted(...proyectoIds) {
+  return writeSetToStorage(DELETED_PROYECTOS_KEY, PERMANENTLY_EXCLUDED_PROYECTO_IDS, ...proyectoIds);
+}
+
+function isBannedDemoCompany(empresaOrName) {
+  if (!empresaOrName) return false;
+  const norm = String(empresaOrName).toLowerCase().trim();
+  if (!norm) return false;
+  return PERMANENTLY_EXCLUDED_COMPANIES.some(banned => norm.includes(banned));
+}
+
 /**
- * Filtra leads, propuestas y contratos de prueba o eliminados que no deben persistirse ni reaparecer
+ * Evalúa exclusivamente si un Lead del CRM fue eliminado (independiente de Propuestas y Contratos)
  */
-export function isExcludedTestRecord(empresaOrName, ...idsOrCodes) {
-  const deletedSet = getDeletedRecordsSet();
-  for (const rawKey of idsOrCodes) {
+export function isExcludedCrmLead(empresaOrName, ...leadIds) {
+  if (isBannedDemoCompany(empresaOrName)) return true;
+  const deletedSet = getDeletedCrmLeadsSet();
+  for (const rawKey of leadIds) {
     if (!rawKey) continue;
     const normKey = String(rawKey).toLowerCase().trim();
     if (normKey && deletedSet.has(normKey)) return true;
   }
-  if (empresaOrName) {
-    const norm = String(empresaOrName).toLowerCase().trim();
-    if (norm && deletedSet.has(norm)) return true;
-    for (const banned of PERMANENTLY_EXCLUDED_COMPANIES) {
-      if (norm.includes(banned)) return true;
-    }
+  return false;
+}
+
+/**
+ * Evalúa exclusivamente si una Propuesta/Presupuesto fue eliminada (nunca elimina ni afecta al Lead)
+ */
+export function isExcludedPresupuesto(empresaOrName, ...presupuestoIds) {
+  if (isBannedDemoCompany(empresaOrName)) return true;
+  const deletedSet = getDeletedPresupuestosSet();
+  for (const rawKey of presupuestoIds) {
+    if (!rawKey) continue;
+    const normKey = String(rawKey).toLowerCase().trim();
+    if (normKey && deletedSet.has(normKey)) return true;
   }
   return false;
 }
+
+/**
+ * Evalúa exclusivamente si un Proyecto/Contrato SOW fue eliminado (nunca elimina al Lead ni a la Propuesta)
+ */
+export function isExcludedProyecto(empresaOrName, ...proyectoIds) {
+  if (isBannedDemoCompany(empresaOrName)) return true;
+  const deletedSet = getDeletedProyectosSet();
+  for (const rawKey of proyectoIds) {
+    if (!rawKey) continue;
+    const normKey = String(rawKey).toLowerCase().trim();
+    if (normKey && deletedSet.has(normKey)) return true;
+  }
+  return false;
+}
+
+// Alias de compatibilidad para código existente (sin mezclar nombres de empresas ni colecciones)
+export const getDeletedRecordsSet = getDeletedProyectosSet;
+export const markRecordDeleted = markProyectoDeleted;
+export const isExcludedTestRecord = isExcludedProyecto;
 
 // ============================================================================
 // 1. PORTALES DE CLIENTES (/portales/{token})
@@ -265,7 +340,7 @@ export async function getProyectosCloud() {
       if (docSnap.exists()) {
         const data = docSnap.data() || {};
         const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
-        if (isExcludedTestRecord(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, item.presupuestoId, item.presupuestoCodigo, docSnap.id)) {
+        if (isExcludedProyecto(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, item.presupuestoId, item.presupuestoCodigo, docSnap.id)) {
           deleteDoc(docSnap.ref).catch(() => {});
           return;
         }
@@ -284,7 +359,7 @@ export async function getProyectosCloud() {
  */
 export async function saveProyectoCloud(proyecto) {
   if (!proyecto || !proyecto.id) return null;
-  if (isExcludedTestRecord(proyecto.cliente?.empresa || proyecto.cliente?.nombre, proyecto.id, proyecto.codigo, proyecto.presupuestoId, proyecto.presupuestoCodigo)) return null;
+  if (isExcludedProyecto(proyecto.cliente?.empresa || proyecto.cliente?.nombre, proyecto.id, proyecto.codigo, proyecto.presupuestoId, proyecto.presupuestoCodigo)) return null;
   try {
     await ensureAuth();
     const docId = String(proyecto.id).trim();
@@ -324,11 +399,11 @@ export async function saveProyectoCloud(proyecto) {
 }
 
 /**
- * Elimina un proyecto de Firestore y lo registra en la lista de exclusión permanente
+ * Elimina un proyecto de Firestore y lo registra en la lista de exclusión de proyectos (sin afectar Leads ni Propuestas)
  */
 export async function deleteProyectoCloud(proyectoId, extraKeys = []) {
   if (!proyectoId && (!extraKeys || extraKeys.length === 0)) return false;
-  markRecordDeleted(proyectoId, ...(Array.isArray(extraKeys) ? extraKeys : [extraKeys]));
+  markProyectoDeleted(proyectoId, ...(Array.isArray(extraKeys) ? extraKeys : [extraKeys]));
   try {
     await ensureAuth();
     const candidates = new Set([proyectoId, ...(Array.isArray(extraKeys) ? extraKeys : [])].filter(Boolean).map(x => String(x).trim()));
@@ -344,7 +419,7 @@ export async function deleteProyectoCloud(proyectoId, extraKeys = []) {
           candidates.has(docSnap.id) ||
           (d.id && candidates.has(String(d.id).trim())) ||
           (d.codigo && candidates.has(String(d.codigo).trim())) ||
-          isExcludedTestRecord(d.cliente?.empresa || d.cliente?.nombre, d.id, d.codigo, docSnap.id)
+          isExcludedProyecto(d.cliente?.empresa || d.cliente?.nombre, d.id, d.codigo, docSnap.id)
         ) {
           deletions.push(deleteDoc(docSnap.ref).catch(() => {}));
         }
@@ -370,7 +445,7 @@ export function subscribeProyectosCloud(onUpdate) {
         if (docSnap.exists()) {
           const data = docSnap.data() || {};
           const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
-          if (isExcludedTestRecord(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, item.presupuestoId, item.presupuestoCodigo, docSnap.id)) {
+          if (isExcludedProyecto(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, item.presupuestoId, item.presupuestoCodigo, docSnap.id)) {
             deleteDoc(docSnap.ref).catch(() => {});
             return;
           }
@@ -403,7 +478,7 @@ export async function getCrmLeadsCloud() {
       if (docSnap.exists()) {
         const data = docSnap.data() || {};
         const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
-        if (isExcludedTestRecord(item.empresa || item.nombreEmpresa || item.contacto, item.id, item.leadId, docSnap.id)) {
+        if (isExcludedCrmLead(item.empresa || item.nombreEmpresa || item.contacto, item.id, item.leadId, docSnap.id)) {
           deleteDoc(docSnap.ref).catch(() => {});
           return;
         }
@@ -422,7 +497,7 @@ export async function getCrmLeadsCloud() {
  */
 export async function saveCrmLeadCloud(lead) {
   if (!lead || !lead.id) return null;
-  if (isExcludedTestRecord(lead.empresa || lead.nombreEmpresa || lead.contacto, lead.id, lead.leadId)) return null;
+  if (isExcludedCrmLead(lead.empresa || lead.nombreEmpresa || lead.contacto, lead.id, lead.leadId)) return null;
   try {
     await ensureAuth();
     const docId = String(lead.id).trim();
@@ -449,11 +524,11 @@ export async function saveCrmLeadCloud(lead) {
 }
 
 /**
- * Elimina un lead de Firestore
+ * Elimina un lead de Firestore (sin afectar Propuestas ni Contratos)
  */
 export async function deleteCrmLeadCloud(leadId, extraKeys = []) {
   if (!leadId) return false;
-  markRecordDeleted(leadId, ...(Array.isArray(extraKeys) ? extraKeys : [extraKeys]));
+  markCrmLeadDeleted(leadId, ...(Array.isArray(extraKeys) ? extraKeys : [extraKeys]));
   try {
     await ensureAuth();
     const docId = String(leadId).trim();
@@ -477,7 +552,7 @@ export function subscribeCrmLeadsCloud(onUpdate) {
         if (docSnap.exists()) {
           const data = docSnap.data() || {};
           const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
-          if (isExcludedTestRecord(item.empresa || item.nombreEmpresa || item.contacto, item.id, item.leadId, docSnap.id)) {
+          if (isExcludedCrmLead(item.empresa || item.nombreEmpresa || item.contacto, item.id, item.leadId, docSnap.id)) {
             deleteDoc(docSnap.ref).catch(() => {});
             return;
           }
@@ -510,7 +585,7 @@ export async function getPresupuestosCloud() {
       if (docSnap.exists()) {
         const data = docSnap.data() || {};
         const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
-        if (isExcludedTestRecord(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, docSnap.id)) {
+        if (isExcludedPresupuesto(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, docSnap.id)) {
           deleteDoc(docSnap.ref).catch(() => {});
           return;
         }
@@ -529,7 +604,7 @@ export async function getPresupuestosCloud() {
  */
 export async function savePresupuestoCloud(presupuesto) {
   if (!presupuesto || !presupuesto.id) return null;
-  if (isExcludedTestRecord(presupuesto.cliente?.empresa || presupuesto.cliente?.nombre, presupuesto.id, presupuesto.codigo)) return null;
+  if (isExcludedPresupuesto(presupuesto.cliente?.empresa || presupuesto.cliente?.nombre, presupuesto.id, presupuesto.codigo)) return null;
   try {
     await ensureAuth();
     const docId = String(presupuesto.id).trim();
@@ -555,11 +630,11 @@ export async function savePresupuestoCloud(presupuesto) {
 }
 
 /**
- * Elimina un presupuesto de Firestore y lo registra en la lista de exclusión permanente
+ * Elimina un presupuesto de Firestore y lo registra en la lista de exclusión de presupuestos (nunca elimina al Lead)
  */
 export async function deletePresupuestoCloud(presupuestoId, extraKeys = []) {
   if (!presupuestoId && (!extraKeys || extraKeys.length === 0)) return false;
-  markRecordDeleted(presupuestoId, ...(Array.isArray(extraKeys) ? extraKeys : [extraKeys]));
+  markPresupuestoDeleted(presupuestoId, ...(Array.isArray(extraKeys) ? extraKeys : [extraKeys]));
   try {
     await ensureAuth();
     const candidates = new Set([presupuestoId, ...(Array.isArray(extraKeys) ? extraKeys : [])].filter(Boolean).map(x => String(x).trim()));
@@ -575,7 +650,7 @@ export async function deletePresupuestoCloud(presupuestoId, extraKeys = []) {
           candidates.has(docSnap.id) ||
           (d.id && candidates.has(String(d.id).trim())) ||
           (d.codigo && candidates.has(String(d.codigo).trim())) ||
-          isExcludedTestRecord(d.cliente?.empresa || d.cliente?.nombre, d.id, d.codigo, docSnap.id)
+          isExcludedPresupuesto(d.cliente?.empresa || d.cliente?.nombre, d.id, d.codigo, docSnap.id)
         ) {
           deletions.push(deleteDoc(docSnap.ref).catch(() => {}));
         }
@@ -601,7 +676,7 @@ export function subscribePresupuestosCloud(onUpdate) {
         if (docSnap.exists()) {
           const data = docSnap.data() || {};
           const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
-          if (isExcludedTestRecord(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, docSnap.id)) {
+          if (isExcludedPresupuesto(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, docSnap.id)) {
             deleteDoc(docSnap.ref).catch(() => {});
             return;
           }

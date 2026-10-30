@@ -169,16 +169,34 @@ async function purgeFirestoreCollections(accessToken, projectId) {
 }
 
 async function purgeSpecificTestRecords(accessToken, projectId) {
-  console.log('\n[2/2] Limpiando registros de prueba específicos en Firestore Cloud...');
-  const collections = ['presupuestos', 'proyectos', 'portales', 'crm_leads'];
-  const bannedPatterns = [
-    'multiservicios gisselle',
-    'clínica dental escalón',
-    'con-2026-001',
-    'con-2026-002'
-  ];
+  console.log('\n[2/2] Limpiando registros de prueba por colección (desacoplados) en Firestore Cloud...');
+  const bannedByCollection = {
+    presupuestos: [
+      'multiservicios gisselle',
+      'clínica dental escalón',
+      'prop-1792978056908',
+      'p-2026-001'
+    ],
+    proyectos: [
+      'multiservicios gisselle',
+      'clínica dental escalón',
+      'con-2026-001',
+      'con-2026-002',
+      'p-2026-do-001',
+      'proj-turisran-do',
+      'proj-prop-1792978056908'
+    ],
+    portales: [
+      'multiservicios gisselle',
+      'clínica dental escalón'
+    ],
+    crm_leads: [
+      'multiservicios gisselle',
+      'clínica dental escalón'
+    ]
+  };
 
-  for (const col of collections) {
+  for (const [col, bannedPatterns] of Object.entries(bannedByCollection)) {
     try {
       const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${col}?pageSize=300`;
       const res = await fetch(url, {
@@ -210,6 +228,49 @@ async function purgeSpecificTestRecords(accessToken, projectId) {
     } catch (e) {
       console.warn(`Error limpiando documentos de prueba en ${col}:`, e.message);
     }
+  }
+
+  // Asegurar que el lead de TurisRan exista limpio y activo en crm_leads (desvinculado de la propuesta de prueba P-2026-001)
+  try {
+    const turisranDocId = 'crm-lead-1792969777629-cjfz';
+    const docUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/crm_leads/${turisranDocId}`;
+    const fields = {
+      id: { stringValue: turisranDocId },
+      leadId: { stringValue: turisranDocId },
+      empresa: { stringValue: 'TurisRan Dominicana' },
+      contacto: { stringValue: 'Ransel' },
+      cargo: { stringValue: 'Director de Operaciones / Propietario' },
+      email: { stringValue: 'info@turisran-dominicana.com' },
+      telefono: { stringValue: '+1 (849) 752-7408' },
+      dominio: { stringValue: 'https://turisran-dominicana.com' },
+      pais: { stringValue: 'DO' },
+      etapa: { stringValue: 'contactado' },
+      archivado: { booleanValue: false },
+      fuente: { stringValue: 'WhatsApp Inbound' },
+      temperatura: { stringValue: 'caliente' },
+      valorEstimado: { integerValue: '850' },
+      probabilidad: { integerValue: '50' },
+      presupuestoId: { nullValue: null },
+      presupuestoCodigo: { nullValue: null },
+      presupuestoEstado: { nullValue: null },
+      presupuestoMonto: { nullValue: null },
+      proyectoId: { nullValue: null },
+      resumenEjecutivo: { stringValue: 'Cliente TurisRan Dominicana (Ransel Urbáez). Servicios de traslados turísticos y presencia digital en República Dominicana.' },
+      updatedAt: { stringValue: new Date().toISOString() }
+    };
+    const patchRes = await fetch(docUrl, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ fields })
+    });
+    if (patchRes.ok) {
+      console.log('✅ Lead TurisRan Dominicana restaurado/actualizado en crm_leads (activo y sin propuesta vinculada).');
+    }
+  } catch (e) {
+    console.warn('Error restaurando lead TurisRan en crm_leads:', e.message);
   }
 }
 

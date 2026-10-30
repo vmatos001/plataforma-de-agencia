@@ -63,8 +63,9 @@ import {
   deleteProyectoCloud,
   subscribeProyectosCloud, 
   savePortalCloud,
-  isExcludedTestRecord,
-  markRecordDeleted
+  isExcludedProyecto,
+  isExcludedPresupuesto,
+  markProyectoDeleted
 } from '../services/firestoreSyncService';
 import { apiFetch } from '../services/apiClient';
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
@@ -125,7 +126,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
           const map = new Map();
           [...cloudList, ...prev].forEach(p => {
             if (!p?.id && !p?.codigo) return;
-            if (isExcludedTestRecord(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p.presupuestoId, p.presupuestoCodigo, p._firestoreDocId)) return;
+            if (isExcludedProyecto(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p.presupuestoId, p.presupuestoCodigo, p._firestoreDocId)) return;
             const key = p.id || p.codigo;
             if (!map.has(key)) map.set(key, p);
           });
@@ -173,7 +174,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
         const parsedProps = JSON.parse(rawProps);
         let createdAny = false;
         parsedProps.forEach(prop => {
-          if (isExcludedTestRecord(prop?.cliente?.empresa || prop?.cliente?.nombre, prop?.id, prop?.codigo, prop?._firestoreDocId)) {
+          if (isExcludedPresupuesto(prop?.cliente?.empresa || prop?.cliente?.nombre, prop?.id, prop?.codigo, prop?._firestoreDocId)) {
             return;
           }
           if (prop?.estado === 'aceptado') {
@@ -188,7 +189,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
               createdAny = true;
             } else {
               const newProj = buildProyectoFromPresupuesto(prop, localList);
-              if (newProj && !isExcludedTestRecord(newProj.cliente?.empresa, newProj.id, newProj.codigo, newProj.presupuestoId, newProj.presupuestoCodigo)) {
+              if (newProj && !isExcludedProyecto(newProj.cliente?.empresa, newProj.id, newProj.codigo, newProj.presupuestoId, newProj.presupuestoCodigo)) {
                 localList.unshift(newProj);
                 createdAny = true;
               }
@@ -221,7 +222,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       // Filtrar registros de prueba o eliminados permanentemente
       localList = localList.filter(p =>
         p &&
-        !isExcludedTestRecord(
+        !isExcludedProyecto(
           p.cliente?.empresa || p.cliente?.nombre,
           p.id,
           p.codigo,
@@ -372,7 +373,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     }
   };
 
-  // Delete project
+  // Delete project (desacoplado: solo elimina el contrato/proyecto sin afectar la propuesta ni el lead en CRM)
   const handleDeleteProyecto = async (id, e) => {
     e?.stopPropagation();
     if (!confirm('¿Seguro que deseas eliminar este proyecto y su contrato?')) return;
@@ -382,24 +383,19 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
         id,
         targetProj?.id,
         targetProj?.codigo,
-        targetProj?._firestoreDocId,
-        targetProj?.presupuestoId,
-        targetProj?.presupuestoCodigo,
-        targetProj?.cliente?.empresa
+        targetProj?._firestoreDocId
       ].filter(Boolean);
 
-      markRecordDeleted(...extraKeys);
+      markProyectoDeleted(...extraKeys);
 
       const updated = proyectos.filter(
         p =>
           p.id !== id &&
           p.codigo !== id &&
-          !isExcludedTestRecord(
+          !isExcludedProyecto(
             p.cliente?.empresa || p.cliente?.nombre,
             p.id,
             p.codigo,
-            p.presupuestoId,
-            p.presupuestoCodigo,
             p._firestoreDocId
           )
       );

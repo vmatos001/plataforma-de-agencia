@@ -41,8 +41,9 @@ import {
   deletePresupuestoCloud,
   subscribePresupuestosCloud,
   savePortalCloud,
-  isExcludedTestRecord,
-  markRecordDeleted
+  saveCrmLeadCloud,
+  isExcludedPresupuesto,
+  markPresupuestoDeleted
 } from '../services/firestoreSyncService';
 import { apiFetch } from '../services/apiClient';
 import { DEFAULT_AGENCY_BRANDING, getAgencyContactForCountry } from '../constants/defaultAgencyBranding';
@@ -283,7 +284,7 @@ export default function PresupuestosModule({
         p &&
         (p.id || p.codigo) &&
         !(p.cliente?.empresa === 'Empresa' && !p.codigo) &&
-        !isExcludedTestRecord(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p._firestoreDocId)
+        !isExcludedPresupuesto(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p._firestoreDocId)
     );
 
     const seen = new Map();
@@ -730,7 +731,7 @@ export default function PresupuestosModule({
     }
   };
 
-  // Delete proposal
+  // Delete proposal (independiente de CRM Leads: solo elimina la propuesta y desvincula su referencia en el lead sin borrar el lead)
   const handleDeletePresupuesto = async (id, e) => {
     e?.stopPropagation();
     if (!confirm('¿Eliminar esta propuesta?')) return;
@@ -740,24 +741,68 @@ export default function PresupuestosModule({
         id,
         targetProp?.id,
         targetProp?.codigo,
-        targetProp?._firestoreDocId,
-        targetProp?.cliente?.empresa
+        targetProp?._firestoreDocId
       ].filter(Boolean);
 
-      markRecordDeleted(...extraKeys);
+      markPresupuestoDeleted(...extraKeys);
 
       setPresupuestos(prev => {
         const updated = prev.filter(
           p =>
             p.id !== id &&
             p.codigo !== id &&
-            !isExcludedTestRecord(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p._firestoreDocId)
+            !isExcludedPresupuesto(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p._firestoreDocId)
         );
         if (typeof window !== 'undefined') {
           localStorage.setItem('goglite_presupuestos', JSON.stringify(updated));
         }
         return updated;
       });
+
+      // Desvincular únicamente la referencia de esta propuesta en el Lead del CRM (sin eliminar el Lead)
+      if (typeof window !== 'undefined') {
+        try {
+          const rawCrm = localStorage.getItem('goglite_crm_leads_v4_prod');
+          if (rawCrm) {
+            const parsedCrm = JSON.parse(rawCrm);
+            if (Array.isArray(parsedCrm)) {
+              let crmChanged = false;
+              const updatedCrm = parsedCrm.map(cl => {
+                if (!cl) return cl;
+                const matchesProp =
+                  (cl.presupuestoId && (cl.presupuestoId === id || cl.presupuestoId === targetProp?.id)) ||
+                  (cl.presupuestoCodigo && (cl.presupuestoCodigo === id || cl.presupuestoCodigo === targetProp?.codigo));
+                if (matchesProp) {
+                  crmChanged = true;
+                  const unlinkedLead = {
+                    ...cl,
+                    presupuestoId: null,
+                    presupuestoCodigo: null,
+                    presupuestoMonto: null,
+                    presupuestoEstado: null,
+                    portalConfig: cl.portalConfig
+                      ? {
+                          ...cl.portalConfig,
+                          presupuestoId: null,
+                          estadoPropuesta: null,
+                          fase1Aprobada: false
+                        }
+                      : cl.portalConfig
+                  };
+                  saveCrmLeadCloud(unlinkedLead).catch(() => {});
+                  return unlinkedLead;
+                }
+                return cl;
+              });
+              if (crmChanged) {
+                saveStoredCrmLeads(updatedCrm);
+              }
+            }
+          }
+        } catch (unlinkErr) {
+          console.warn('[Presupuestos] Error desvinculando propuesta del lead:', unlinkErr);
+        }
+      }
 
       if (activePresupuesto?.id === id || activePresupuesto?.codigo === id) {
         setViewMode('list');

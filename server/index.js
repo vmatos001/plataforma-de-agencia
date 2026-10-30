@@ -1329,8 +1329,43 @@ app.patch('/api/presupuestos/:id', (req, res) => {
 
 app.delete('/api/presupuestos/:id', (req, res) => {
   let list = getPresupuestos();
+  const target = list.find(p => p.id === req.params.id || p.codigo === req.params.id);
   list = list.filter(p => p.id !== req.params.id && p.codigo !== req.params.id);
   savePresupuestos(list);
+
+  // Desvincular la propuesta del lead en CRM sin eliminar el lead
+  try {
+    let crmLeads = getCrmLeads();
+    let changed = false;
+    crmLeads = crmLeads.map(l => {
+      if (
+        l.presupuestoId === req.params.id ||
+        l.presupuestoCodigo === req.params.id ||
+        (target?.id && l.presupuestoId === target.id) ||
+        (target?.codigo && l.presupuestoCodigo === target.codigo)
+      ) {
+        changed = true;
+        return {
+          ...l,
+          presupuestoId: null,
+          presupuestoCodigo: null,
+          presupuestoMonto: null,
+          presupuestoEstado: null,
+          portalConfig: l.portalConfig
+            ? {
+                ...l.portalConfig,
+                presupuestoId: null,
+                estadoPropuesta: null,
+                fase1Aprobada: false
+              }
+            : l.portalConfig
+        };
+      }
+      return l;
+    });
+    if (changed) saveCrmLeads(crmLeads);
+  } catch (e) {}
+
   res.json({ success: true });
 });
 
@@ -1427,11 +1462,36 @@ app.patch('/api/proyectos/:id', (req, res) => {
   res.json(list[idx]);
 });
 
-// Eliminar proyecto
+// Eliminar proyecto (desacoplado: solo elimina el contrato/proyecto sin eliminar la propuesta ni el lead)
 app.delete('/api/proyectos/:id', (req, res) => {
   let list = getProyectos();
+  const target = list.find(p => p.id === req.params.id || p.codigo === req.params.id);
   list = list.filter(p => p.id !== req.params.id && p.codigo !== req.params.id);
   saveProyectos(list);
+
+  try {
+    let crmLeads = getCrmLeads();
+    let changed = false;
+    crmLeads = crmLeads.map(l => {
+      if (
+        l.proyectoId === req.params.id ||
+        (target?.id && l.proyectoId === target.id) ||
+        (target?.codigo && l.proyectoId === target.codigo)
+      ) {
+        changed = true;
+        return {
+          ...l,
+          proyectoId: null,
+          portalConfig: l.portalConfig
+            ? { ...l.portalConfig, proyectoId: null }
+            : l.portalConfig
+        };
+      }
+      return l;
+    });
+    if (changed) saveCrmLeads(crmLeads);
+  } catch (e) {}
+
   res.json({ success: true });
 });
 

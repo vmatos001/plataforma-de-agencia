@@ -5,7 +5,7 @@
  */
 
 import { INITIAL_PROD_CRM_LEADS } from '../constants/initialCrmData';
-import { isExcludedTestRecord } from './firestoreSyncService';
+import { isExcludedCrmLead, isExcludedPresupuesto, isExcludedProyecto } from './firestoreSyncService';
 
 export const STORAGE_KEYS = {
   // Navegación y estado global
@@ -102,7 +102,7 @@ export function syncCrmLeadsWithPresupuestos(crmLeads) {
   if (typeof window === 'undefined' || !Array.isArray(crmLeads)) return crmLeads;
   try {
     const filteredLeads = crmLeads.filter(
-      l => l && !isExcludedTestRecord(l.empresa || l.nombreEmpresa || l.contacto, l.id, l.leadId, l.presupuestoId, l.presupuestoCodigo)
+      l => l && !isExcludedCrmLead(l.empresa || l.nombreEmpresa || l.contacto, l.id, l.leadId, l._firestoreDocId)
     );
     const normalizedLeads = filteredLeads.map(l => ({
       ...l,
@@ -110,9 +110,10 @@ export function syncCrmLeadsWithPresupuestos(crmLeads) {
     }));
 
     const rawP = localStorage.getItem(STORAGE_KEYS.PRESUPUESTOS);
-    if (!rawP) return normalizedLeads;
-    const presupuestos = JSON.parse(rawP);
-    if (!Array.isArray(presupuestos) || presupuestos.length === 0) return normalizedLeads;
+    const parsedP = rawP ? JSON.parse(rawP) : [];
+    const presupuestos = Array.isArray(parsedP)
+      ? parsedP.filter(p => p && !isExcludedPresupuesto(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p._firestoreDocId))
+      : [];
 
     return normalizedLeads.map(lead => {
       const lName = (lead.empresa || '').toLowerCase().trim();
@@ -139,6 +140,45 @@ export function syncCrmLeadsWithPresupuestos(crmLeads) {
           etapa: (lead.etapa === 'nuevo' || lead.etapa === 'contactado') ? 'propuesta_enviada' : lead.etapa
         };
       }
+
+      // Si el lead apuntaba a una propuesta o contrato eliminado, desvincularlo sin eliminar el lead
+      const wasDeletedProp =
+        isExcludedPresupuesto(null, lead.presupuestoId, lead.presupuestoCodigo) ||
+        (rawP !== null && presupuestos.length > 0 && Boolean(lead.presupuestoId || lead.presupuestoCodigo));
+      const wasDeletedProj = isExcludedProyecto(null, lead.proyectoId, lead.portalConfig?.proyectoId);
+
+      if (wasDeletedProp || wasDeletedProj) {
+        const cleanedLead = { ...lead };
+        if (wasDeletedProp) {
+          cleanedLead.presupuestoId = null;
+          cleanedLead.presupuestoCodigo = null;
+          cleanedLead.presupuestoMonto = null;
+          cleanedLead.presupuestoEstado = null;
+          if (cleanedLead.portalConfig) {
+            cleanedLead.portalConfig = {
+              ...cleanedLead.portalConfig,
+              presupuestoId: null,
+              estadoPropuesta: null,
+              fase1Aprobada: false
+            };
+          }
+        }
+        if (wasDeletedProj) {
+          cleanedLead.proyectoId = null;
+          cleanedLead.archivado = false;
+          if (cleanedLead.etapa === 'cerrado_ganado' || cleanedLead.etapa === 'ganado') {
+            cleanedLead.etapa = 'contactado';
+          }
+          if (cleanedLead.portalConfig) {
+            cleanedLead.portalConfig = {
+              ...cleanedLead.portalConfig,
+              proyectoId: null
+            };
+          }
+        }
+        return cleanedLead;
+      }
+
       return lead;
     });
   } catch (e) {
