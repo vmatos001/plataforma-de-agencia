@@ -165,14 +165,15 @@ export default function AgencyWhiteLabelSettingsModal({
     monedaDefecto: 'USD',
     tasaCambioDop: 60.00,
     tasaCambioEur: 0.92,
-    mcpAgentKey: DEFAULT_AGENCY_BRANDING.mcpAgentKey || 'gog_agent_live_d92cd28fb0ce6cd0139bf8127427bd39',
+    mcpAgentKey: '',
+    mcpAgentKeyMasked: '',
     serviciosOficiales: DEFAULT_SERVICES,
     apisIntegraciones: {
       googleSiteKitConnected: true,
       googleDriveVault: 'Goglite Agency Drive Vault',
       gmailWorkspaceConnected: true,
       serperApiKey: 'serper_api_active',
-      geminiApiKey: 'AIzaSy_storybrand_active',
+      geminiApiKey: 'gemini_api_active',
       whatsappGatewayStatus: 'Conectado (Baileys v6)'
     }
   });
@@ -438,7 +439,8 @@ export default function AgencyWhiteLabelSettingsModal({
         ubicacionSV: mergedProfiles.SV.direccion,
         logoUrl: agencySettings.logoUrl || storedLogo || prev.logoUrl || DEFAULT_AGENCY_BRANDING.logoUrl,
         logoDocumentosUrl: agencySettings.logoDocumentosUrl || storedLogoDocs || prev.logoDocumentosUrl || '',
-        mcpAgentKey: agencySettings.mcpAgentKey || prev.mcpAgentKey || DEFAULT_AGENCY_BRANDING.mcpAgentKey || 'gog_agent_live_3554881d91556ec76d8734f10fda7366',
+        mcpAgentKey: '',
+        mcpAgentKeyMasked: agencySettings.mcpAgentKeyMasked || prev.mcpAgentKeyMasked || '',
         serviciosOficiales: (agencySettings.serviciosOficiales && agencySettings.serviciosOficiales.length > 0)
           ? agencySettings.serviciosOficiales
           : (prev.serviciosOficiales || DEFAULT_SERVICES),
@@ -575,19 +577,38 @@ export default function AgencyWhiteLabelSettingsModal({
   };
 
   const handleCopyMcpKey = () => {
-    if (!form.mcpAgentKey) return;
-    navigator.clipboard.writeText(form.mcpAgentKey);
+    const keyToCopy = form.mcpAgentKey;
+    if (!keyToCopy) {
+      alert('Por seguridad, la llave MCP solo se muestra en texto plano al momento de rotarla. Haz clic en "Regenerar" para emitir una nueva llave.');
+      return;
+    }
+    navigator.clipboard.writeText(keyToCopy);
     setCopiedMcpKey(true);
     setTimeout(() => setCopiedMcpKey(false), 2000);
   };
 
-  const handleRegenerateMcpKey = () => {
-    if (window.confirm('¿Deseas generar una nueva clave de acceso para el agente IA? Si regeneras la clave, cualquier agente conectado previamente con la clave anterior perderá el acceso hasta que se actualice.')) {
-      const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-      const newKey = `gog_agent_live_${randomHex}`;
-      setForm(prev => ({ ...prev, mcpAgentKey: newKey }));
+  const handleRegenerateMcpKey = async () => {
+    if (!window.confirm('¿Deseas rotar y generar una nueva clave de acceso para el agente IA en el servidor? Cualquier agente conectado previamente con la clave anterior perderá el acceso hasta que se actualice.')) {
+      return;
+    }
+    try {
+      const res = await apiClient.post('/api/agency/mcp-key/rotate');
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.mcpAgentKey) {
+          setForm(prev => ({
+            ...prev,
+            mcpAgentKey: data.mcpAgentKey,
+            mcpAgentKeyMasked: data.mcpAgentKeyMasked || `${data.mcpAgentKey.slice(0, 18)}••••••••`
+          }));
+          setShowMcpKey(true);
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`No se pudo rotar la llave MCP: ${err.error || 'Error de autorización'}`);
+      }
+    } catch (e) {
+      alert(`Error de red al rotar llave MCP: ${e.message}`);
     }
   };
 
@@ -2156,9 +2177,9 @@ export default function AgencyWhiteLabelSettingsModal({
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                       <div className="relative flex-1">
                         <input
-                          type={showMcpKey ? "text" : "password"}
+                          type={showMcpKey && form.mcpAgentKey ? "text" : "password"}
                           readOnly
-                          value={form.mcpAgentKey || 'gog_agent_live_3554881d91556ec76d8734f10fda7366'}
+                          value={form.mcpAgentKey || form.mcpAgentKeyMasked || '•••••••••••••••••••••••••••••••• (Almacenada con SHA-256 en servidor)'}
                           className="w-full bg-[#111726] border border-slate-700/80 rounded-lg px-3 py-2 text-xs font-mono text-orange-300 pr-10 tracking-wider focus:outline-none select-all"
                         />
                         <button

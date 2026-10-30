@@ -7,12 +7,6 @@ function getValidSerperKey(key) {
   if (key && typeof key === 'string' && key.trim().length > 20 && !key.includes('active') && !key.includes('mock')) {
     return key.trim();
   }
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SERPER_API_KEY) {
-      const envKey = import.meta.env.VITE_SERPER_API_KEY.trim();
-      if (envKey.length > 20) return envKey;
-    }
-  } catch (e) {}
   return MASTER_SERPER_KEY;
 }
 

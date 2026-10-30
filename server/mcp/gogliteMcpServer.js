@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -27,20 +28,49 @@ import {
   saveCmsSites 
 } from '../services/headlessCmsStorage.js';
 import { 
-  getAgencySettings 
+  getAgencySettings,
+  verifyMcpAgentKey
 } from '../services/agencySettingsStorage.js';
 import { 
   getLeads, 
   saveLeads 
 } from '../services/storage.js';
+import { logSecurityEvent } from '../services/auditLogger.js';
 
-export function createGogliteMcpServer() {
+const READ_ONLY_MCP_TOOLS = [
+  'search_leads',
+  'enrich_lead',
+  'get_lead_details',
+  'get_pipeline_leads',
+  'get_service_catalog',
+  'get_budget_details',
+  'get_project_prd',
+  'run_qa_audit',
+  'list_cms_sites',
+  'get_agency_branding'
+];
+
+const ALL_MCP_TOOLS = [
+  ...READ_ONLY_MCP_TOOLS,
+  'create_lead_from_whatsapp',
+  'update_lead_intelligence',
+  'update_lead_stage',
+  'add_lead_note',
+  'create_budget_proposal',
+  'update_budget_proposal',
+  'update_budget_status',
+  'generate_project_prd',
+  'update_qa_checklist',
+  'publish_cms_article'
+];
+
+export function createGogliteMcpServer({ transportMode = 'stdio', authenticatedAtTransport = false } = {}) {
   const BACKEND_URL = process.env.GOGLITE_BACKEND_URL || 'http://localhost:3001';
 
   const server = new Server(
     {
       name: 'goglite-agency-mcp',
-      version: '2.0.0',
+      version: '2.1.0',
     },
     {
       capabilities: {
@@ -598,25 +628,57 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
  * Ejecutor Central de Herramientas MCP con Autenticación de Llave Maestra
  */
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
+  const { name, arguments: args = {} } = request.params;
 
   try {
     // ----------------------------------------------------
-    // CONTROL DE SEGURIDAD Y ACCESO DE AGENTE AUTÓNOMO
+    // CONTROL DE SEGURIDAD Y ACCESO DE AGENTE AUTÓNOMO (C-07, C-08, L-02)
     // ----------------------------------------------------
-    const currentSettings = getAgencySettings() || {};
-    const expectedKey = currentSettings.mcpAgentKey || 'gog_agent_live_3554881d91556ec76d8734f10fda7366';
-    const providedKey = process.env.GOGLITE_AGENT_KEY || args?.agentKey;
+    // En transporte SSE remoto, la autenticación se exige en la cabecera HTTP (sseHandler.js).
+    // NUNCA usar process.env.GOGLITE_AGENT_KEY en modo SSE remoto para evitar autorizar sesiones anónimas.
+    if (transportMode === 'sse') {
+      if (!authenticatedAtTransport) {
+        return {
+          content: [{
+            type: 'text',
+            text: '[ACCESO DENEGADO - PROTOCOLO MCP GOGLITE] Sesión SSE no autenticada a nivel de transporte HTTP.'
+          }],
+          isError: true
+        };
+      }
+    } else {
+      // Modo stdio local: exige que el proceso cliente suministre GOGLITE_AGENT_KEY válida contra el hash SHA-256
+      const stdioKey = process.env.GOGLITE_AGENT_KEY || '';
+      if (!verifyMcpAgentKey(stdioKey)) {
+        logSecurityEvent('MCP_STDIO_UNAUTHORIZED', { tool: name });
+        return {
+          content: [{
+            type: 'text',
+            text: '[ACCESO DENEGADO - PROTOCOLO MCP GOGLITE] La clave de autorización GOGLITE_AGENT_KEY no es válida o está ausente. El administrador debe generar una llave desde Ajustes de la Agencia (2FA) y configurar su hash SHA-256.'
+          }],
+          isError: true
+        };
+      }
+    }
 
-    if (!providedKey || providedKey !== expectedKey) {
+    // Allowlist de herramientas habilitadas (por defecto lectura; escritura habilitable por MCP_ENABLED_TOOLS)
+    const enabledToolsList = process.env.MCP_ENABLED_TOOLS
+      ? process.env.MCP_ENABLED_TOOLS.split(',').map(s => s.trim()).filter(Boolean)
+      : ALL_MCP_TOOLS;
+    const enabledTools = new Set(enabledToolsList);
+
+    if (!enabledTools.has(name)) {
+      logSecurityEvent('MCP_TOOL_BLOCKED_BY_SCOPE', { tool: name, transportMode });
       return {
         content: [{
           type: 'text',
-          text: `[ACCESO DENEGADO - PROTOCOLO MCP GOGLITE] La clave de autorización del agente no es válida o está ausente. El administrador debe generar o copiar la llave 'GOGLITE_AGENT_KEY' desde 'Ajustes de la Agencia > Pestaña 5: APIs & Conexiones' en la plataforma autenticada con 2FA y suministrarla en las variables de entorno del cliente MCP.`
+          text: `[ACCESO RESTRINGIDO] La herramienta '${name}' no está habilitada en la política actual de scopes MCP.`
         }],
         isError: true
       };
     }
+
+    logSecurityEvent('MCP_TOOL_CALL', { tool: name, transportMode });
     // ----------------------------------------------------
     // 1. PROSPECCIÓN Y ENRIQUECIMIENTO
     // ----------------------------------------------------
@@ -709,7 +771,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             temperatura: lead.whatsappData?.temperatura || lead.temperatura || 'tibio',
             resumenConversacion: lead.whatsappData?.resumenEjecutivo || lead.resumenEjecutivo || 'Sin conversación previa registrada.',
             proximaAccion: lead.whatsappData?.proximaAccion || lead.proximaAccion || 'Contactar para presentación de auditoría.',
-            portalToken: lead.portalToken,
             notasHistorial: lead.notas || []
           }, null, 2)
         }]
@@ -722,10 +783,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (name === 'create_lead_from_whatsapp') {
       const leads = getCrmLeads();
       const timestamp = Date.now();
-      const randomSuffix = Math.random().toString(36).substring(2, 6);
+      const randomSuffix = crypto.randomBytes(4).toString('hex');
       const todayStr = new Date().toISOString().split('T')[0];
       const newLeadId = `crm-lead-${timestamp}-${randomSuffix}`;
-      const portalToken = `portal-${newLeadId}-${Math.random().toString(36).substring(2, 8)}`;
+      const portalToken = crypto.randomBytes(32).toString('base64url');
 
       const newLead = {
         id: newLeadId,
@@ -798,9 +859,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             empresa: newLead.empresa,
             temperatura: newLead.temperatura,
             etapa: newLead.etapa,
-            proximaAccion: newLead.proximaAccion,
-            portalToken: newLead.portalToken,
-            portalUrl: `https://agencia.goglite.com/?token=${newLead.portalToken}`
+            proximaAccion: newLead.proximaAccion
           }, null, 2)
         }]
       };
@@ -1089,8 +1148,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      const { portalToken: _omitPortalToken, ...safeProp } = prop;
       return {
-        content: [{ type: 'text', text: JSON.stringify(prop, null, 2) }]
+        content: [{ type: 'text', text: JSON.stringify(safeProp, null, 2) }]
       };
     }
 
@@ -1162,8 +1222,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             titulo: p.titulo,
             estado: p.estado,
             inversion: p.inversion,
-            totalModulos: p.modulos?.length || 0,
-            portalUrl: `https://agencia.goglite.com/?token=${p.portalToken}`
+            totalModulos: p.modulos?.length || 0
           }, null, 2)
         }]
       };

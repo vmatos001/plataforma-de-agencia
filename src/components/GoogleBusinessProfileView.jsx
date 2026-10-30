@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiClient } from '../services/apiClient';
 import { connectGoogleBusinessAccount } from '../services/firebase';
 import { getCmsSiteCloud, saveCmsSiteCloud } from '../services/firestoreSyncService';
 import {
@@ -535,14 +536,11 @@ export default function GoogleBusinessProfileView({ currentSite }) {
       ? `Menciona con naturalidad términos de SEO local como "${review.servicio}" y "${city}".`
       : 'No incluyas términos forzados de SEO.';
 
-    // Lectura de clave de Gemini de entorno o localStorage
-    const geminiKey = (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY)) || (typeof window !== 'undefined' && window.__GOGLITE_GEMINI_KEY) || localStorage.getItem('goglite_gemini_api_key') || '';
-
+    // H-01: Llamada mediante proxy seguro del servidor (/api/ai/generate) sin exponer claves en el navegador
     let generatedText = '';
 
-    if (geminiKey && geminiKey.trim()) {
-      try {
-        const prompt = `Eres el Director de Reputación y Relaciones Públicas de la empresa "${siteName}".
+    try {
+      const prompt = `Eres el Director de Reputación y Relaciones Públicas de la empresa "${siteName}".
 Redacta una respuesta oficial para esta reseña pública de Google Maps:
 
 CLIENTE: ${review.autor} (${review.empresa || 'Cliente'})
@@ -559,25 +557,21 @@ INSTRUCCIONES CLAVE:
 4. Extensión máxima: 2 a 3 oraciones contundentes. Cero frases cliché vacías ("estimado cliente", "nos esforzamos").
 5. Devuelve ÚNICAMENTE el texto listo para publicar.`;
 
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 250 }
-          })
-        });
+      const res = await apiClient.post('/api/ai/generate', {
+        prompt,
+        model: 'gemini-2.5-flash',
+        temperature: 0.7,
+        maxOutputTokens: 250
+      });
 
-        if (res.ok) {
-          const data = await res.json();
-          const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (candidate && candidate.trim()) {
-            generatedText = candidate.trim().replace(/^"|"$/g, '');
-          }
+      if (res.ok) {
+        const data = await res.json();
+        if (data.text && data.text.trim()) {
+          generatedText = data.text.trim().replace(/^"|"$/g, '');
         }
-      } catch (err) {
-        console.warn('[Gemini AI] Fallback a motor de copywriting local:', err);
       }
+    } catch (err) {
+      console.warn('[Gemini AI Proxy] Fallback a motor de copywriting local:', err);
     }
 
     // Fallback inteligente determinista basado en el tono seleccionado y en el nombre del cliente activo

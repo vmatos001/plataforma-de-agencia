@@ -177,10 +177,22 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Verifica si el usuario cuenta con privilegios de administrador mediante Custom Claims o Token Role
+    // Verifica si el usuario cuenta con privilegios de administrador mediante Custom Claims, Token Role o email verificado de bootstrap
     function isAdmin() {
       return isAuthenticated() &&
-        (request.auth.token.admin == true || request.auth.token.role == 'admin');
+        (request.auth.token.admin == true ||
+         request.auth.token.role == 'admin' ||
+         (request.auth.token.email_verified == true &&
+          request.auth.token.email in ['sitesgoglite@gmail.com', 'victor@goglite.com']));
+    }
+
+    // Verifica si el usuario es miembro del staff de la agencia (excluyendo autenticación anónima)
+    function isStaff() {
+      return isAdmin() ||
+        (isAuthenticated() &&
+         (request.auth.token.role in ['admin', 'colaborador'] ||
+          (request.auth.token.email_verified == true &&
+           request.auth.token.firebase.sign_in_provider != 'anonymous')));
     }
 
     // Valida que el documento contenga todos los campos obligatorios
@@ -480,6 +492,15 @@ service cloud.firestore {
         (!('createdBy' in resource.data) || request.resource.data.createdBy == resource.data.createdBy);
     }
 
+    // Identifica si el documento de app_state corresponde al módulo financiero confidencial
+    function isFinancialAppStateDoc(docId) {
+      return docId in ['finanzas_v1', 'finanzas_master'];
+    }
+
+    function isFinancialAppStateData(data) {
+      return 'module' in data && data.module == 'finanzas';
+    }
+
     // ===============================================================
     // Collection Rules
     // ===============================================================
@@ -489,11 +510,12 @@ service cloud.firestore {
       // 1. Lectura pública: Sitios web estáticos renderizan contenido con script universal cms.js
       allow read: if true;
 
-      // 2. Creación: Validación de esquema y pertenencia de slug
-      allow create: if isValidCmsSite(request.resource.data, siteSlug);
+      // 2. Creación: Restringido a staff con validación de esquema y pertenencia de slug
+      allow create: if isStaff() && isValidCmsSite(request.resource.data, siteSlug);
 
-      // 3. Actualización: Validación de esquema y preservación de inmutabilidad
-      allow update: if isValidCmsSite(request.resource.data, siteSlug) &&
+      // 3. Actualización: Restringido a staff con validación de esquema y preservación de inmutabilidad
+      allow update: if isStaff() &&
+                    isValidCmsSite(request.resource.data, siteSlug) &&
                     isImmutableSiteDataPreserved();
 
       // 4. Eliminación: Restringido a administradores
@@ -502,17 +524,18 @@ service cloud.firestore {
 
     // Colección: Portales confidenciales de clientes de la agencia
     match /portales/{token} {
-      // 1. Lectura puntual protegida: Clientes acceden a su portal privado en iPhone/Android mediante el token exacto
+      // 1. Lectura puntual protegida: Clientes acceden a su portal privado mediante el token secreto exacto
       allow get: if true;
 
-      // 2. Listado restringido: Previene la enumeración masiva de portales por terceros no autenticados
-      allow list: if isAuthenticated();
+      // 2. Listado restringido a staff: Previene la enumeración de portales por terceros o sesiones anónimas
+      allow list: if isStaff();
 
-      // 3. Creación: Validación de esquema con concordancia estricta de token
-      allow create: if isValidPortal(request.resource.data, token);
+      // 3. Creación: Restringido a staff con validación de esquema y concordancia estricta de token
+      allow create: if isStaff() && isValidPortal(request.resource.data, token);
 
-      // 4. Actualización: Validación de esquema e inmutabilidad de token
-      allow update: if isValidPortal(request.resource.data, token) &&
+      // 4. Actualización: Requiere autenticación (cliente en portal o staff), validación de esquema e inmutabilidad
+      allow update: if (isStaff() || isAuthenticated()) &&
+                    isValidPortal(request.resource.data, token) &&
                     isImmutablePortalDataPreserved();
 
       // 5. Eliminación: Restringido a administradores
@@ -521,14 +544,15 @@ service cloud.firestore {
 
     // Colección: Proyectos y contratos SOW de la agencia
     match /proyectos/{proyectoId} {
-      // 1. Lectura pública: Portales de clientes enlazan y concilian hitos SOW en tiempo real
-      allow read: if true;
+      // 1. Lectura restringida a staff de la agencia
+      allow read: if isStaff();
 
-      // 2. Creación: Validación de esquema
-      allow create: if isValidProyecto(request.resource.data, proyectoId);
+      // 2. Creación: Restringido a staff con validación de esquema
+      allow create: if isStaff() && isValidProyecto(request.resource.data, proyectoId);
 
-      // 3. Actualización: Validación de esquema e inmutabilidad de id y fechas de origen
-      allow update: if isValidProyecto(request.resource.data, proyectoId) &&
+      // 3. Actualización: Restringido a staff con validación de esquema e inmutabilidad de id y fechas de origen
+      allow update: if isStaff() &&
+                    isValidProyecto(request.resource.data, proyectoId) &&
                     isImmutableProyectoDataPreserved();
 
       // 4. Eliminación: Restringido a administradores
@@ -537,14 +561,15 @@ service cloud.firestore {
 
     // Colección: Leads comerciales de CRM & WhatsApp
     match /crm_leads/{leadId} {
-      // 1. Lectura: Sincronización transparente de pipeline comercial multidispositivo
-      allow read: if true;
+      // 1. Lectura restringida a staff (protege PII y portalToken contra enumeración pública)
+      allow read: if isStaff();
 
-      // 2. Creación: Validación de esquema
-      allow create: if isValidCrmLead(request.resource.data, leadId);
+      // 2. Creación: Restringido a staff con validación de esquema
+      allow create: if isStaff() && isValidCrmLead(request.resource.data, leadId);
 
-      // 3. Actualización: Validación de esquema e inmutabilidad
-      allow update: if isValidCrmLead(request.resource.data, leadId) &&
+      // 3. Actualización: Restringido a staff con validación de esquema e inmutabilidad
+      allow update: if isStaff() &&
+                    isValidCrmLead(request.resource.data, leadId) &&
                     isImmutableLeadDataPreserved();
 
       // 4. Eliminación: Restringido a administradores
@@ -553,14 +578,15 @@ service cloud.firestore {
 
     // Colección: Presupuestos y propuestas comerciales
     match /presupuestos/{presupuestoId} {
-      // 1. Lectura pública: Clientes consultan su cotización directamente desde el portal
-      allow read: if true;
+      // 1. Lectura restringida a staff
+      allow read: if isStaff();
 
-      // 2. Creación: Validación de esquema
-      allow create: if isValidPresupuesto(request.resource.data, presupuestoId);
+      // 2. Creación: Restringido a staff con validación de esquema
+      allow create: if isStaff() && isValidPresupuesto(request.resource.data, presupuestoId);
 
-      // 3. Actualización: Validación de esquema e inmutabilidad de código e id
-      allow update: if isValidPresupuesto(request.resource.data, presupuestoId) &&
+      // 3. Actualización: Restringido a staff con validación de esquema e inmutabilidad de código e id
+      allow update: if isStaff() &&
+                    isValidPresupuesto(request.resource.data, presupuestoId) &&
                     isImmutablePresupuestoDataPreserved();
 
       // 4. Eliminación: Restringido a administradores
@@ -569,14 +595,15 @@ service cloud.firestore {
 
     // Colección: Tareas de sprint de desarrollo Kanban (Playbook Maestro)
     match /sprint_tasks/{taskId} {
-      // 1. Lectura: Sincronización en vivo del avance del proyecto
-      allow read: if true;
+      // 1. Lectura restringida a staff
+      allow read: if isStaff();
 
-      // 2. Creación: Validación de esquema
-      allow create: if isValidSprintTask(request.resource.data, taskId);
+      // 2. Creación: Restringido a staff con validación de esquema
+      allow create: if isStaff() && isValidSprintTask(request.resource.data, taskId);
 
-      // 3. Actualización: Validación de esquema e inmutabilidad
-      allow update: if isValidSprintTask(request.resource.data, taskId) &&
+      // 3. Actualización: Restringido a staff con validación de esquema e inmutabilidad
+      allow update: if isStaff() &&
+                    isValidSprintTask(request.resource.data, taskId) &&
                     isImmutableTaskDataPreserved();
 
       // 4. Eliminación: Restringido a administradores
@@ -585,13 +612,26 @@ service cloud.firestore {
 
     // Colección: Estado y persistencia unificada de módulos internos de la agencia
     match /app_state/{docId} {
-      // 1. Lectura: Sincronización en tiempo real de finanzas, PRD, wireframes, QA y repositorios
-      allow read: if true;
+      // 1. Lectura: Documentos financieros restringidos exclusivamente a Admin; resto de módulos a Staff
+      allow read: if isAdmin() ||
+                  (isStaff() &&
+                   !isFinancialAppStateDoc(docId) &&
+                   (resource == null || !isFinancialAppStateData(resource.data)));
 
-      // 2. Creación y actualización: Validación de esquema y datos de módulo
-      allow create: if isValidAppState(request.resource.data, docId);
+      // 2. Creación y actualización: Finanzas restringido a Admin; resto de módulos a Staff, siempre con validación de esquema
+      allow create: if isValidAppState(request.resource.data, docId) &&
+                    (isAdmin() ||
+                     (isStaff() &&
+                      !isFinancialAppStateDoc(docId) &&
+                      !isFinancialAppStateData(request.resource.data)));
+
       allow update: if isValidAppState(request.resource.data, docId) &&
-                    isImmutableAppStateDataPreserved();
+                    isImmutableAppStateDataPreserved() &&
+                    (isAdmin() ||
+                     (isStaff() &&
+                      !isFinancialAppStateDoc(docId) &&
+                      !isFinancialAppStateData(request.resource.data) &&
+                      !isFinancialAppStateData(resource.data)));
 
       // 3. Eliminación: Restringido a administradores
       allow delete: if isAdmin();

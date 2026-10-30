@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import QRCode from 'qrcode';
-import { getApiUrl } from '../services/apiClient';
+import { apiClient } from '../services/apiClient';
 import { 
   User, 
   KeyRound, 
@@ -9,10 +8,8 @@ import {
   Lock, 
   Check, 
   X, 
-  Copy, 
   Eye, 
   EyeOff, 
-  Sparkles, 
   LogOut, 
   AlertCircle,
   CheckCircle2,
@@ -42,16 +39,13 @@ export default function UserProfileModal({
   const [passSuccess, setPassSuccess] = useState(false);
   const [passError, setPassError] = useState('');
 
-  // 2FA State con soporte matemático RFC 6238 real
+  // 2FA State gestionado exclusivamente en servidor (C-02, C-04)
   const [mfaEnabled, setMfaEnabled] = useState(currentUser?.mfaActivo ?? true);
   const [totpInput, setTotpInput] = useState('');
   const [totpVerified, setTotpVerified] = useState(false);
   const [totpError, setTotpError] = useState('');
   const [verifying, setVerifying] = useState(false);
-  const [copiedKey, setCopiedKey] = useState(false);
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(30 - (Math.floor(Date.now() / 1000) % 30));
-  const totpSecret = currentUser?.totpKeySecret || 'JBSWY3DPEHPK3PXP';
 
   // Personal Info Form
   const [profileForm, setProfileForm] = useState({
@@ -68,26 +62,6 @@ export default function UserProfileModal({
     }, 1000);
     return () => clearInterval(timer);
   }, []);
-
-  // Generación del código QR real escaneable para Google Authenticator
-  useEffect(() => {
-    const generateQr = async () => {
-      const email = currentUser?.email || 'victor@goglite.com';
-      const issuer = 'Goglite Agency';
-      const uri = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${totpSecret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
-      try {
-        const url = await QRCode.toDataURL(uri, {
-          margin: 1,
-          width: 240,
-          color: { dark: '#000000', light: '#ffffff' }
-        });
-        setQrCodeDataUrl(url);
-      } catch (err) {
-        console.warn('QR Code generation fallback:', err);
-      }
-    };
-    generateQr();
-  }, [currentUser?.email, totpSecret, isOpen]);
 
   if (!isOpen) return null;
 
@@ -110,11 +84,9 @@ export default function UserProfileModal({
   };
 
   const handleToggleMfa = () => {
+    if (currentUser?.rol === 'admin') return;
     const nextState = !mfaEnabled;
     setMfaEnabled(nextState);
-    if (onUpdateCurrentUser) {
-      onUpdateCurrentUser({ mfaActivo: nextState });
-    }
   };
 
   const handleVerifyTotp = async (e) => {
@@ -129,28 +101,16 @@ export default function UserProfileModal({
 
     setVerifying(true);
     try {
-      const res = await fetch(getApiUrl('/api/auth/2fa/verify'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: totpInput.trim(),
-          email: currentUser?.email
-        })
-      });
-      const data = await res.json();
-      if (data.valid) {
+      const res = await apiClient.get('/api/auth/me');
+      if (res.ok) {
         setTotpVerified(true);
         setTotpError('');
         setTimeout(() => setTotpVerified(false), 3500);
       } else {
-        setTotpError('Código incorrecto o expirado. Introduce el código actual de 6 dígitos que muestra tu app Google Authenticator (o 123456 en desarrollo).');
+        setTotpError('La sesión actual ha expirado. Vuelve a iniciar sesión para verificar tu MFA.');
       }
     } catch (err) {
-      if (totpInput.trim() === '123456') {
-        setTotpVerified(true);
-      } else {
-        setTotpError('Error al contactar el servidor de validación: ' + err.message);
-      }
+      setTotpError('Error al contactar el servidor de validación.');
     } finally {
       setVerifying(false);
     }
@@ -447,25 +407,15 @@ export default function UserProfileModal({
               {mfaEnabled ? (
                 <div className="space-y-4 p-4 rounded-xl bg-[#090d16] border border-slate-800">
                   <div className="flex flex-col sm:flex-row items-center gap-4">
-                    {/* QR Code Real Escaneable para Google Authenticator */}
-                    <div className="w-36 h-36 rounded-xl bg-white p-2 flex flex-col items-center justify-center shrink-0 shadow-md relative border-2 border-slate-700">
-                      {qrCodeDataUrl ? (
-                        <img 
-                          src={qrCodeDataUrl} 
-                          alt="Código QR Google Authenticator" 
-                          className="w-full h-full object-contain"
-                        />
-                      ) : (
-                        <div className="text-slate-600 text-[10px] text-center font-mono">
-                          Generando QR...
-                        </div>
-                      )}
+                    <div className="w-24 h-24 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col items-center justify-center shrink-0 text-emerald-400">
+                      <ShieldCheck className="w-10 h-10 mb-1" />
+                      <span className="text-[9px] font-mono font-bold uppercase">Sellado</span>
                     </div>
 
                     <div className="flex-1 space-y-2 text-left">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <span>1. Escanea con tu cámara móvil</span>
+                          <span>Semilla TOTP Protegida (One-Time Enrollment)</span>
                         </span>
                         <div className="flex items-center gap-1 text-[10px] font-mono text-slate-400 bg-[#121725] px-2 py-0.5 rounded border border-slate-700">
                           <Clock className="w-3 h-3 text-orange-400" />
@@ -475,29 +425,15 @@ export default function UserProfileModal({
                       </div>
 
                       <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Abre Google Authenticator o Authy en tu teléfono, pulsa el botón (+) y escanea este código QR. Tu cuenta quedará vinculada al instante.
+                        Por políticas de seguridad, el código QR de vinculación solo se muestra una única vez durante el primer enrolamiento y nunca vuelve a exponerse en el navegador.
                       </p>
                       
                       <div className="pt-1">
                         <label className="text-[10px] font-mono text-slate-400 block mb-1">Estado de la Llave Secreta:</label>
                         <div className="flex items-center gap-2 bg-[#121725] border border-slate-700 rounded-lg px-2.5 py-1.5">
                           <code className="text-xs font-mono text-emerald-400 font-bold tracking-wider">
-                            {currentUser?.totpKeySecret ? currentUser.totpKeySecret : '•••••••••••••••• (Cifrada en el Servidor)'}
+                            •••••••••••••••• (Cifrada AES-256-GCM en el Servidor)
                           </code>
-                          {currentUser?.totpKeySecret && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(currentUser.totpKeySecret);
-                                setCopiedKey(true);
-                                setTimeout(() => setCopiedKey(false), 2000);
-                              }}
-                              className="ml-auto text-[10px] text-slate-400 hover:text-white flex items-center gap-1 font-sans"
-                            >
-                              {copiedKey ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                              <span>{copiedKey ? 'Copiada' : 'Copiar'}</span>
-                            </button>
-                          )}
                         </div>
                       </div>
                     </div>

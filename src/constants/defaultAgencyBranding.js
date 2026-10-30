@@ -71,8 +71,7 @@ export const DEFAULT_AGENCY_BRANDING = {
   telefonoFijoSV: "+503 2200-3344",
   ubicacionSV: "Santa Ana / San Salvador, El Salvador",
 
-  ubicacionPrincipal: "San Salvador (SV) & Santo Domingo (DO)",
-  mcpAgentKey: "gog_agent_live_d92cd28fb0ce6cd0139bf8127427bd39"
+  ubicacionPrincipal: "San Salvador (SV) & Santo Domingo (DO)"
 };
 
 export function getAgencyContactForCountry(countryCode = 'SV', settings = null) {

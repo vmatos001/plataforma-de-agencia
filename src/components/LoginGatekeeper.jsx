@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import QRCode from 'qrcode';
 import { 
   ShieldCheck, 
   Lock, 
@@ -8,7 +7,6 @@ import {
   CheckCircle2, 
   RefreshCw, 
   LogOut, 
-  KeyRound, 
   Copy, 
   Check, 
   QrCode,
@@ -17,72 +15,9 @@ import {
 } from 'lucide-react';
 import { signInWithGoogle, signOutUser } from '../services/firebase';
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
-import { getApiUrl } from '../services/apiClient';
-
-// Algoritmo RFC 6238 TOTP en cliente usando Web Cryptography API nativa
-function base32ToBytes(base32) {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = '';
-  const clean = base32.replace(/=+$/, '').toUpperCase();
-  for (let i = 0; i < clean.length; i++) {
-    const val = alphabet.indexOf(clean.charAt(i));
-    if (val === -1) continue;
-    bits += val.toString(2).padStart(5, '0');
-  }
-  const bytes = new Uint8Array(Math.floor(bits.length / 8));
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(bits.substr(i * 8, 8), 2);
-  }
-  return bytes;
-}
-
-async function verifyClientTotp(token, secret, tolerance = 1) {
-  const cleanToken = String(token).trim();
-  if (cleanToken.length !== 6) return false;
-  // Bypass de emergencia en desarrollo si está explícitamente habilitado
-  if (cleanToken === '123456') return true;
-
-  try {
-    const keyBytes = base32ToBytes(secret);
-    const cryptoKey = await window.crypto.subtle.importKey(
-      'raw',
-      keyBytes,
-      { name: 'HMAC', hash: 'SHA-1' },
-      false,
-      ['sign']
-    );
-
-    const nowEpoch = Math.floor(Date.now() / 1000);
-    const timeStep = 30;
-
-    for (let windowOffset = -tolerance; windowOffset <= tolerance; windowOffset++) {
-      const counter = Math.floor(nowEpoch / timeStep) + windowOffset;
-      const counterBuffer = new ArrayBuffer(8);
-      const view = new DataView(counterBuffer);
-      view.setBigUint64(0, BigInt(counter));
-
-      const hmacBuffer = await window.crypto.subtle.sign('HMAC', cryptoKey, counterBuffer);
-      const hmac = new Uint8Array(hmacBuffer);
-      const offset = hmac[hmac.length - 1] & 0x0f;
-      const code = (
-        ((hmac[offset] & 0x7f) << 24) |
-        ((hmac[offset + 1] & 0xff) << 16) |
-        ((hmac[offset + 2] & 0xff) << 8) |
-        (hmac[offset + 3] & 0xff)
-      ) % 1000000;
-      const formatted = String(code).padStart(6, '0');
-      if (formatted === cleanToken) {
-        return true;
-      }
-    }
-  } catch (err) {
-    console.warn('[MFA] Error evaluando TOTP en cliente:', err);
-  }
-  return false;
-}
+import { apiFetch, setSessionToken } from '../services/apiClient';
 
 export default function LoginGatekeeper({
-  usersList = [],
   agencySettings = null,
   onLoginSuccess,
   onUpdateUserMfa,
@@ -91,10 +26,12 @@ export default function LoginGatekeeper({
   const [step, setStep] = useState('google'); // 'google' | 'mfa'
   const [loadingGoogle, setLoadingGoogle] = useState(false);
   const [googleUser, setGoogleUser] = useState(null);
+  const [googleIdToken, setGoogleIdToken] = useState('');
   const [matchedAppUser, setMatchedAppUser] = useState(null);
+  const [isMfaEnrolled, setIsMfaEnrolled] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-  
-  // Logo & Branding de Agencia
+
+  // Logo & Branding público de Agencia (C-09)
   const [imgError, setImgError] = useState(false);
   const [fetchedLogo, setFetchedLogo] = useState('');
   const [fetchedName, setFetchedName] = useState('');
@@ -116,7 +53,7 @@ export default function LoginGatekeeper({
       } catch {}
     }
 
-    fetch('/api/agency/settings')
+    apiFetch('/api/agency/branding')
       .then(res => {
         const cType = res.headers.get('content-type') || '';
         return (res.ok && cType.includes('application/json')) ? res.json() : null;
@@ -132,18 +69,15 @@ export default function LoginGatekeeper({
   const resolvedLogo = (!imgError && rawLogo) ? rawLogo : null;
   const agencyName = agencySettings?.nombreAgencia || fetchedName || DEFAULT_AGENCY_BRANDING.nombreAgencia || 'Goglite Digital Hub';
 
-  // MFA State & Regla de Enrolamiento Único
-  const isMfaEnrolled = Boolean(matchedAppUser?.mfaActivo);
+  // Estado MFA gestionado exclusivamente por el servidor (C-02, C-03, C-04)
   const [totpCode, setTotpCode] = useState('');
   const [verifyingMfa, setVerifyingMfa] = useState(false);
   const [mfaSuccess, setMfaSuccess] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
+  const [enrollmentSecret, setEnrollmentSecret] = useState('');
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(30 - (Math.floor(Date.now() / 1000) % 30));
 
-  const totpSecret = matchedAppUser?.totpKeySecret || 'JBSWY3DPEHPK3PXP';
-
-  // Temporizador visual para la ventana de 30s de Google Authenticator
   useEffect(() => {
     const timer = setInterval(() => {
       setSecondsLeft(30 - (Math.floor(Date.now() / 1000) % 30));
@@ -151,21 +85,7 @@ export default function LoginGatekeeper({
     return () => clearInterval(timer);
   }, []);
 
-  // Generar QR para vinculación inicial ÚNICAMENTE si el usuario NO tiene MFA activo
-  useEffect(() => {
-    if (!isMfaEnrolled && (googleUser?.email || matchedAppUser?.email)) {
-      const email = googleUser?.email || matchedAppUser?.email || 'sitesgoglite@gmail.com';
-      const issuer = agencyName || 'Goglite Digital Hub';
-      const uri = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${totpSecret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
-      QRCode.toDataURL(uri, {
-        margin: 1,
-        width: 180,
-        color: { dark: '#000000', light: '#ffffff' }
-      }).then(url => setQrCodeDataUrl(url)).catch(() => {});
-    }
-  }, [isMfaEnrolled, googleUser, matchedAppUser, totpSecret, agencyName]);
-
-  // Paso 1: Iniciar Sesión con Google
+  // Paso 1: Iniciar Sesión con Google y validar token criptográficamente en el backend
   const handleGoogleSignIn = async () => {
     try {
       setLoadingGoogle(true);
@@ -177,37 +97,50 @@ export default function LoginGatekeeper({
         throw new Error('No se pudo obtener el correo de la cuenta de Google.');
       }
 
-      const emailNormalized = user.email.trim().toLowerCase();
+      const idToken = await user.getIdToken();
+      const checkRes = await apiFetch('/api/auth/google-check', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${idToken}`
+        }
+      });
 
-      // Comprobar Whitelist de Administradores y Colaboradores Autorizados
-      const isAuthorizedRoot = emailNormalized === 'sitesgoglite@gmail.com' || emailNormalized === 'victor@goglite.com';
-      const foundInList = usersList.find(u => 
-        (u.email && u.email.trim().toLowerCase() === emailNormalized) ||
-        (u.secondaryEmail && u.secondaryEmail.trim().toLowerCase() === emailNormalized)
-      );
-
-      if (!isAuthorizedRoot && !foundInList) {
-        // Cuenta de Google denegada
+      const checkData = await checkRes.json().catch(() => ({}));
+      if (!checkRes.ok) {
         await signOutUser();
-        setErrorMessage(`Acceso Denegado: La cuenta de Google (${user.email}) no está registrada como Administrador o colaborador autorizado de Goglite Agency.`);
+        setErrorMessage(
+          checkData.error ||
+          `Acceso Denegado: La cuenta de Google (${user.email}) no está autorizada en Goglite Agency.`
+        );
         setLoadingGoogle(false);
         return;
       }
 
-      // Usuario autorizado identificado
-      const appUser = foundInList || {
-        id: 'user-admin-victor',
-        nombre: user.displayName || 'Víctor Matos',
-        email: user.email,
-        cargo: 'CEO & Director General',
-        rol: 'admin',
-        avatar: 'VM',
-        mfaActivo: true,
-        permisos: ['all']
-      };
-
       setGoogleUser(user);
-      setMatchedAppUser(appUser);
+      setGoogleIdToken(idToken);
+      setMatchedAppUser(checkData.user);
+      const enrolled = Boolean(checkData.mfaEnrolled);
+      setIsMfaEnrolled(enrolled);
+
+      // Si aún no tiene MFA enrolado, solicitar al backend el inicio de enrolamiento único (C-02, C-03)
+      if (!enrolled) {
+        const enrollRes = await apiFetch('/api/auth/2fa/enroll/start', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${idToken}`
+          }
+        });
+        const enrollData = await enrollRes.json().catch(() => ({}));
+        if (!enrollRes.ok) {
+          throw new Error(enrollData.error || 'No se pudo iniciar el enrolamiento 2FA en el servidor.');
+        }
+        setQrCodeDataUrl(enrollData.qrCodeDataUrl || '');
+        setEnrollmentSecret(enrollData.secret || '');
+      } else {
+        setQrCodeDataUrl('');
+        setEnrollmentSecret('');
+      }
+
       setStep('mfa');
     } catch (err) {
       if (err.code === 'auth/popup-closed-by-user') {
@@ -220,11 +153,11 @@ export default function LoginGatekeeper({
     }
   };
 
-  // Paso 2: Verificar código TOTP de Google Authenticator
-  const handleVerifyTotp = async (e) => {
+  // Paso 2: Verificar código TOTP de Google Authenticator exclusivamente en el backend (C-03, C-04)
+  const handleVerifyTotp = async (e, explicitCode = null) => {
     if (e) e.preventDefault();
     setErrorMessage('');
-    const code = totpCode.trim();
+    const code = String(explicitCode !== null ? explicitCode : totpCode).trim();
 
     if (code.length !== 6) {
       setErrorMessage('Ingresa los 6 dígitos del código de Google Authenticator.');
@@ -234,80 +167,43 @@ export default function LoginGatekeeper({
     try {
       setVerifyingMfa(true);
 
-      // 1. Validación en backend seguro (Vercel o Express Server)
-      let isValid = false;
-      const targetEmail = googleUser?.email || matchedAppUser?.email;
-      try {
-        const verifyEndpoint = getApiUrl('/api/auth/2fa/verify');
-        const res = await fetch(verifyEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            token: code,
-            email: targetEmail,
-            // Solo se envía secreto durante el enrolamiento inicial
-            secret: !isMfaEnrolled ? totpSecret : undefined
-          })
-        });
-        if (res.ok && (res.headers.get('content-type') || '').includes('application/json')) {
-          const data = await res.json();
-          if (data.valid) isValid = true;
-        }
-      } catch (errApi) {
-        console.warn('[MFA] Servidor de autenticación en la nube offline:', errApi);
-      }
+      const freshIdToken = googleUser ? await googleUser.getIdToken() : googleIdToken;
+      const endpoint = isMfaEnrolled ? '/api/auth/2fa/verify' : '/api/auth/2fa/enroll/confirm';
 
-      // 2. Si el usuario está enrolando por primera vez y el backend está offline, validar en cliente
-      if (!isValid && !isMfaEnrolled && totpSecret) {
-        isValid = await verifyClientTotp(code, totpSecret, 1);
-      }
+      const res = await apiFetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${freshIdToken}`
+        },
+        body: { token: code }
+      });
 
-      if (isValid) {
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.valid && data.user) {
         setMfaSuccess(true);
+        setEnrollmentSecret('');
+        setQrCodeDataUrl('');
 
-        // Si el usuario no tenía enrolado el 2FA, activarlo de forma permanente en su perfil
-        if (!isMfaEnrolled && matchedAppUser?.id) {
-          const updatedUser = { ...matchedAppUser, mfaActivo: true };
-          delete updatedUser.totpKeySecret;
-          setMatchedAppUser(updatedUser);
-          if (onUpdateUserMfa) {
-            onUpdateUserMfa(matchedAppUser.id, true);
-          }
-          try {
-            fetch(getApiUrl(`/api/users/${matchedAppUser.id}`), {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ mfaActivo: true })
-            }).catch(() => {});
-          } catch {}
+        if (data.sessionToken) {
+          setSessionToken(data.sessionToken);
         }
 
-        // Persistir sesión autenticada en sessionStorage (sin secretos ni claves)
-        try {
-          const sessionPayload = {
-            id: matchedAppUser.id,
-            email: googleUser?.email || matchedAppUser.email,
-            nombre: matchedAppUser.nombre,
-            rol: matchedAppUser.rol,
-            mfaVerified: true,
-            loginTimestamp: Date.now(),
-            lastActivityTimestamp: Date.now()
-          };
-          sessionStorage.setItem('goglite_auth_session', JSON.stringify(sessionPayload));
-        } catch {}
+        if (!isMfaEnrolled && onUpdateUserMfa && data.user.id) {
+          onUpdateUserMfa(data.user.id, true);
+        }
 
         setTimeout(() => {
-          const cleanUser = { ...matchedAppUser, mfaActivo: true };
-          delete cleanUser.totpKeySecret;
-          delete cleanUser.password;
-          delete cleanUser.passwordHash;
-          onLoginSuccess(cleanUser);
-        }, 1200);
+          onLoginSuccess(data.user);
+        }, 800);
       } else {
-        setErrorMessage('Código incorrecto o expirado. Verifica el código actual de 6 dígitos que muestra tu app de Google Authenticator.');
+        setErrorMessage(
+          data.error ||
+          'Código incorrecto o expirado. Verifica el código actual de 6 dígitos que muestra tu app de Google Authenticator.'
+        );
       }
     } catch (err) {
-      setErrorMessage(`Error validando código: ${err.message}`);
+      setErrorMessage(`Error validando código en el servidor: ${err.message}`);
     } finally {
       setVerifyingMfa(false);
     }
@@ -318,15 +214,19 @@ export default function LoginGatekeeper({
       await signOutUser();
     } catch {}
     setGoogleUser(null);
+    setGoogleIdToken('');
     setMatchedAppUser(null);
     setTotpCode('');
+    setQrCodeDataUrl('');
+    setEnrollmentSecret('');
     setErrorMessage('');
     setMfaSuccess(false);
     setStep('google');
   };
 
   const handleCopySecret = () => {
-    navigator.clipboard.writeText(totpSecret);
+    if (!enrollmentSecret) return;
+    navigator.clipboard.writeText(enrollmentSecret);
     setCopiedSecret(true);
     setTimeout(() => setCopiedSecret(false), 2500);
   };
@@ -448,9 +348,7 @@ export default function LoginGatekeeper({
               </button>
             </div>
 
-            {/* CONDICIONAL CRÍTICA DE SEGURIDAD (One-Time Enrollment):
-                Si el usuario NO tiene enrolado el MFA (primer acceso), se le presenta el código QR para que lo escanee en su app.
-                Si YA tiene mfaActivo === true (Administrador o usuarios ya enrolados), ESTE BLOQUE QUEDA 100% INACCESIBLE Y OCULTO. */}
+            {/* Enrolamiento Inicial Único generado por el servidor */}
             {!isMfaEnrolled && (
               <div className="p-4 rounded-2xl bg-[#0c1018] border border-orange-500/30 space-y-3 animate-fade-in text-center">
                 <div className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-400">
@@ -458,7 +356,7 @@ export default function LoginGatekeeper({
                   <span>Configuración Inicial de Google Authenticator</span>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Es tu primer inicio de sesión. Abre <strong>Google Authenticator</strong> en tu teléfono móvil, pulsa <strong>"+"</strong> y escanea este código QR:
+                  Es tu primer inicio de sesión. Abre <strong>Google Authenticator</strong> en tu teléfono móvil, pulsa <strong>"+"</strong> y escanea este código QR único generado por el servidor:
                 </p>
 
                 {qrCodeDataUrl ? (
@@ -471,23 +369,25 @@ export default function LoginGatekeeper({
                   </div>
                 )}
 
-                <div className="space-y-1">
-                  <div className="text-[10px] text-slate-500 font-mono">Clave de respaldo manual:</div>
-                  <div className="inline-flex items-center gap-2 bg-[#121929] border border-slate-800 px-3 py-1.5 rounded-lg text-xs font-mono text-white">
-                    <span>{totpSecret}</span>
-                    <button
-                      type="button"
-                      onClick={handleCopySecret}
-                      className="text-slate-400 hover:text-white transition-colors"
-                      title="Copiar clave"
-                    >
-                      {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
+                {enrollmentSecret && (
+                  <div className="space-y-1">
+                    <div className="text-[10px] text-slate-500 font-mono">Clave de respaldo manual (única exhibición):</div>
+                    <div className="inline-flex items-center gap-2 bg-[#121929] border border-slate-800 px-3 py-1.5 rounded-lg text-xs font-mono text-white">
+                      <span>{enrollmentSecret}</span>
+                      <button
+                        type="button"
+                        onClick={handleCopySecret}
+                        className="text-slate-400 hover:text-white transition-colors"
+                        title="Copiar clave"
+                      >
+                        {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="text-[10px] text-slate-400">
-                  Una vez sincronizado, introduce abajo el código de 6 dígitos para validar y asegurar tu cuenta de forma definitiva.
+                  Una vez sincronizado, introduce abajo el código de 6 dígitos para validar y sellar tu cuenta de forma definitiva.
                 </div>
               </div>
             )}
@@ -516,8 +416,7 @@ export default function LoginGatekeeper({
                       const val = e.target.value.replace(/\D/g, '').slice(0, 6);
                       setTotpCode(val);
                       if (val.length === 6) {
-                        // Disparo automático al completar los 6 dígitos
-                        setTimeout(() => handleVerifyTotp(), 100);
+                        setTimeout(() => handleVerifyTotp(null, val), 80);
                       }
                     }}
                     placeholder="••••••"

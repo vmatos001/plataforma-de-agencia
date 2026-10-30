@@ -1,8 +1,37 @@
 /**
  * Cliente HTTP centralizado y resiliente para Goglite Agency Platform
- * Lee import.meta.env.VITE_API_URL para entornos distribuidos (Cloud Run, Railway, Render)
- * o recurre a enrutamiento relativo (/api/...) compatible con el proxy de desarrollo de Vite.
+ * Incluye gestión de sesión autenticada (cookie HttpOnly + cabecera firmada X-GG-Session).
  */
+
+const SESSION_TOKEN_KEY = 'goglite_session_token';
+
+export function getSessionToken() {
+  if (typeof window === 'undefined') return '';
+  try {
+    return sessionStorage.getItem(SESSION_TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function setSessionToken(token) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (token) {
+      sessionStorage.setItem(SESSION_TOKEN_KEY, String(token));
+    } else {
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    }
+  } catch {}
+}
+
+export function clearSessionToken() {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    sessionStorage.removeItem('goglite_auth_session');
+  } catch {}
+}
 
 const RAW_API_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL)
   ? String(import.meta.env.VITE_API_URL).trim()
@@ -36,11 +65,11 @@ export function getApiUrl(endpoint = '') {
 }
 
 /**
- * Fetch mejorado con timeout por defecto y manejo estándar de errores JSON
+ * Fetch mejorado con timeout por defecto, credenciales de sesión y manejo estándar de errores JSON
  */
 export async function apiFetch(endpoint, options = {}) {
   const url = getApiUrl(endpoint);
-  const { timeoutMs = 25000, headers = {}, body, ...restOptions } = options;
+  const { timeoutMs = 25000, headers = {}, body, credentials = 'include', ...restOptions } = options;
 
   const controller = new AbortController();
   let timerId = null;
@@ -51,8 +80,10 @@ export async function apiFetch(endpoint, options = {}) {
   const effectiveSignal = options.signal || controller.signal;
 
   try {
+    const sessionToken = getSessionToken();
     const finalHeaders = {
       'Accept': 'application/json',
+      ...(sessionToken ? { 'X-GG-Session': sessionToken } : {}),
       ...headers
     };
 
@@ -64,6 +95,7 @@ export async function apiFetch(endpoint, options = {}) {
 
     let response = await fetch(url, {
       ...restOptions,
+      credentials,
       signal: effectiveSignal,
       headers: finalHeaders,
       body: serializedBody
@@ -76,6 +108,7 @@ export async function apiFetch(endpoint, options = {}) {
       try {
         const fallbackRes = await fetch(fallbackUrl, {
           ...restOptions,
+          credentials,
           signal: effectiveSignal,
           headers: finalHeaders,
           body: serializedBody
@@ -107,7 +140,7 @@ export const apiClient = {
 };
 
 /**
- * Conexión resiliente a Server-Sent Events (SSE) en tiempo real
+ * Conexión resiliente a Server-Sent Events (SSE) autenticada en tiempo real
  */
 export function subscribeToPlatformEvents(onEvent) {
   if (typeof window === 'undefined' || typeof EventSource === 'undefined') return () => {};
@@ -118,7 +151,7 @@ export function subscribeToPlatformEvents(onEvent) {
 
   function connect() {
     try {
-      es = new EventSource(eventsUrl);
+      es = new EventSource(eventsUrl, { withCredentials: true });
 
       es.onmessage = (event) => {
         try {

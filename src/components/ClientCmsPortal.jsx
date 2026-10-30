@@ -33,6 +33,7 @@ import {
   Wand2
 } from 'lucide-react';
 import { auth } from '../services/firebase';
+import { apiClient } from '../services/apiClient';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import {
   getPortalCloud,
@@ -956,17 +957,11 @@ export default function ClientCmsPortal({ token }) {
     }
   };
 
-  // Generador de Respuestas con Inteligencia Artificial para Reseñas de Google Maps
+  // Generador de Respuestas con Inteligencia Artificial para Reseñas de Google Maps (Proxy Backend H-01)
   const handleGenerateAiResponse = async (review, toneOverride = null) => {
     const tone = toneOverride || aiToneByReview[review.id] || 'storybrand';
     setGeneratingAiId(review.id);
     const siteName = cmsSite?.nombre || empresaNombre;
-
-    const geminiKey =
-      (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY)) ||
-      (typeof window !== 'undefined' && window.__GOGLITE_GEMINI_KEY) ||
-      localStorage.getItem('goglite_gemini_api_key') ||
-      '';
 
     let toneDesc = 'StoryBrand: Agradece cálidamente, posiciona al cliente como el héroe y a la empresa como su guía de total confianza.';
     if (tone === 'profesional') toneDesc = 'Profesional & Corporativo: Muy formal, conciso, alta autoridad técnica y agradecimiento impecable.';
@@ -975,9 +970,8 @@ export default function ClientCmsPortal({ token }) {
 
     let generatedText = '';
 
-    if (geminiKey && geminiKey.trim()) {
-      try {
-        const prompt = `Eres el Director de Reputación y Relaciones Públicas de la empresa "${siteName}".
+    try {
+      const prompt = `Eres el Director de Reputación y Relaciones Públicas de la empresa "${siteName}".
 Redacta una respuesta oficial para esta reseña pública de Google Maps:
 
 CLIENTE: ${review.autor}
@@ -991,21 +985,16 @@ INSTRUCCIONES CLAVE:
 3. Extensión máxima: 2 a 3 oraciones contundentes. Cero frases cliché vacías.
 4. Devuelve ÚNICAMENTE el texto final de la respuesta, sin comillas adicionales.`;
 
-        const resp = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey.trim()}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-          }
-        );
-        if (resp.ok) {
-          const data = await resp.json();
-          generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-        }
-      } catch (e) {
-        console.warn('Gemini API call error, applying high quality fallback:', e);
+      const resp = await apiClient.post('/api/ai/generate', {
+        prompt,
+        model: 'gemini-1.5-flash'
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        generatedText = data.text?.trim() || '';
       }
+    } catch (e) {
+      console.warn('Gemini proxy call fallback:', e);
     }
 
     if (!generatedText) {

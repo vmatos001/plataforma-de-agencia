@@ -358,15 +358,10 @@ export default function WireframesStoryBrandModule({ selectedCountry = 'SV', ext
       .map(([k, v]) => `- ${k}: ${v}`)
       .join('\n') || '- Datos base registrados en SOW';
 
-    // Retrieve Gemini API Key from secure Vite environment or Global settings
-    const geminiKey = (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY)) || 
-                      (typeof window !== 'undefined' && window.__GOGLITE_GEMINI_KEY) || 
-                      localStorage.getItem('goglite_gemini_api_key') || '';
-
+    // H-01: Generación vía proxy de servidor autenticado (/api/ai/generate) sin exponer claves en el cliente
     let generated = null;
 
-    if (geminiKey && geminiKey.trim()) {
-      const prompt = `Eres el Director Creativo de Copywriting de la agencia "Goglite" y un experto de clase mundial en el Framework StoryBrand de Donald Miller.
+    const prompt = `Eres el Director Creativo de Copywriting de la agencia "Goglite" y un experto de clase mundial en el Framework StoryBrand de Donald Miller.
 Diseña el guion BrandScript de 7 partes de alta conversión para este cliente real:
 EMPRESA / MARCA: "${nombreComercial}"
 NICHO / ACTIVIDAD: "${actividad}"
@@ -399,47 +394,41 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin markdown ni texto antes o después)
   "exito": "..."
 }`;
 
-      const modelsToTry = ['gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
-      for (const m of modelsToTry) {
-        try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${geminiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: {
-                temperature: 0.7,
-                responseMimeType: 'application/json'
-              }
-            })
-          });
+    const modelsToTry = ['gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-flash-lite-latest'];
+    for (const m of modelsToTry) {
+      try {
+        const res = await apiClient.post('/api/ai/generate', {
+          prompt,
+          model: m,
+          responseMimeType: 'application/json',
+          temperature: 0.7
+        });
 
-          if (res.ok) {
-            const data = await res.json();
-            let raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            raw = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
-            const parsed = JSON.parse(raw);
-            if (parsed.heroe && parsed.problema && parsed.guia && parsed.plan && parsed.llamadaAccion) {
-              generated = {
-                id: 'sb-' + proj.id,
-                proyectoId: proj.id,
-                clienteNombre: cliente.nombre || 'Cliente',
-                empresa: nombreComercial,
-                nicho: actividad,
-                pais,
-                ubicacion,
-                fechaActualizacion: new Date().toISOString().split('T')[0],
-                aiGenerated: true,
-                aiModel: m,
-                generatorType: `Google Gemini AI (${m})`,
-                storyBrand: parsed
-              };
-              break;
-            }
+        if (res.ok) {
+          const data = await res.json();
+          let raw = data.text || '';
+          raw = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(raw);
+          if (parsed.heroe && parsed.problema && parsed.guia && parsed.plan && parsed.llamadaAccion) {
+            generated = {
+              id: 'sb-' + proj.id,
+              proyectoId: proj.id,
+              clienteNombre: cliente.nombre || 'Cliente',
+              empresa: nombreComercial,
+              nicho: actividad,
+              pais,
+              ubicacion,
+              fechaActualizacion: new Date().toISOString().split('T')[0],
+              aiGenerated: true,
+              aiModel: m,
+              generatorType: `Google Gemini AI (${m})`,
+              storyBrand: parsed
+            };
+            break;
           }
-        } catch (e) {
-          console.warn(`[StoryBrand AI] Fallo en ${m}:`, e);
         }
+      } catch (e) {
+        console.warn(`[StoryBrand AI] Fallo en ${m}:`, e);
       }
     }
 

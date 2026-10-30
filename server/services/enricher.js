@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import { getSettings } from './storage.js';
-import { isSafePublicHost } from './auditor.js';
+import { isSafePublicHost, resolveAndValidatePublicHost } from './auditor.js';
 
 /**
  * Extracts decision makers and verified emails for a domain
@@ -63,8 +63,9 @@ export async function enrichDomain(domain, companyName = '', country = 'SV') {
 
 async function scrapeWebsiteContact(domain) {
   const cleanDomain = (domain || '').replace(/^https?:\/\//, '').split('/')[0].trim();
-  if (!isSafePublicHost(cleanDomain)) {
-    console.warn(`[ENRICHER SSRF] Dominio bloqueado por política de seguridad: "${cleanDomain}"`);
+  const isSafe = await resolveAndValidatePublicHost(cleanDomain);
+  if (!isSafe) {
+    console.warn(`[ENRICHER SSRF] Dominio bloqueado por política de seguridad/DNS: "${cleanDomain}"`);
     return null;
   }
 
@@ -81,12 +82,14 @@ async function scrapeWebsiteContact(domain) {
       const timeoutId = setTimeout(() => controller.abort(), 4000);
       const res = await fetch(url, {
         signal: controller.signal,
+        redirect: 'manual', // Prevenir redirecciones hacia IPs internas (M-03)
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
       });
       clearTimeout(timeoutId);
 
       if (res.ok) {
-        const html = await res.text();
+        const rawHtml = await res.text();
+        const html = rawHtml.slice(0, 1500000); // Limitar respuesta a 1.5 MB (M-03)
         const $ = cheerio.load(html);
 
         // find mailto links

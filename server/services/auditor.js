@@ -1,4 +1,6 @@
 import * as cheerio from 'cheerio';
+import dns from 'dns';
+import net from 'net';
 import { getSettings } from './storage.js';
 
 /**
@@ -77,38 +79,81 @@ function generateMapsNoWebAudit(domain, queryKeyword = '', country = 'SV', optio
   };
 }
 
+export function isPrivateOrReservedIp(ip) {
+  if (!ip || typeof ip !== 'string') return true;
+  const cleanIp = ip.trim().toLowerCase();
+
+  // IPv6 mapped IPv4 (::ffff:127.0.0.1)
+  if (cleanIp.startsWith('::ffff:')) {
+    return isPrivateOrReservedIp(cleanIp.slice(7));
+  }
+
+  if (net.isIPv4(cleanIp)) {
+    const parts = cleanIp.split('.').map(Number);
+    const [o1, o2] = parts;
+    if (o1 === 0 || o1 === 10 || o1 === 127) return true; // 0.0.0.0/8, 10.0.0.0/8, 127.0.0.0/8
+    if (o1 === 169 && o2 === 254) return true; // 169.254.0.0/16 (Link-local / Cloud Metadata)
+    if (o1 === 172 && o2 >= 16 && o2 <= 31) return true; // 172.16.0.0/12
+    if (o1 === 192 && o2 === 168) return true; // 192.168.0.0/16
+    if (o1 === 100 && o2 >= 64 && o2 <= 127) return true; // 100.64.0.0/10 (CGNAT)
+    if (o1 >= 224) return true; // Multicast / Reserved
+    return false;
+  }
+
+  if (net.isIPv6(cleanIp)) {
+    if (cleanIp === '::1' || cleanIp === '::') return true;
+    if (cleanIp.startsWith('fc') || cleanIp.startsWith('fd')) return true; // Unique Local fc00::/7
+    if (cleanIp.startsWith('fe8') || cleanIp.startsWith('fe9') || cleanIp.startsWith('fea') || cleanIp.startsWith('feb')) return true; // Link-local fe80::/10
+    return false;
+  }
+
+  return true;
+}
+
 export function isSafePublicHost(rawHost) {
   if (!rawHost || typeof rawHost !== 'string') return false;
   const clean = rawHost.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
   if (!clean || clean.length > 253) return false;
 
   // Bloqueo de localhost y nombres reservados
-  if (clean === 'localhost' || clean.endsWith('.local') || clean.endsWith('.internal') || clean.endsWith('.onion')) {
+  if (
+    clean === 'localhost' ||
+    clean.endsWith('.local') ||
+    clean.endsWith('.internal') ||
+    clean.endsWith('.onion') ||
+    clean.endsWith('.arpa')
+  ) {
     return false;
   }
 
-  // Bloqueo de rangos de IPs privadas y especiales (SSRF)
-  const isIpv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(clean);
-  if (isIpv4) {
-    const [_, o1, o2, o3, o4] = isIpv4.map(Number);
-    if (o1 === 10) return false; // 10.0.0.0/8
-    if (o1 === 127) return false; // 127.0.0.0/8
-    if (o1 === 169 && o2 === 254) return false; // 169.254.0.0/16
-    if (o1 === 172 && o2 >= 16 && o2 <= 31) return false; // 172.16.0.0/12
-    if (o1 === 192 && o2 === 168) return false; // 192.168.0.0/16
-    if (o1 === 0 || o1 >= 224) return false; // Multicast / Reservado
+  if (net.isIP(clean)) {
+    return !isPrivateOrReservedIp(clean);
   }
-
-  if (clean.includes(':') || clean === '::1') return false; // IPv6 local/especial
 
   // Validación de formato de dominio estándar
   return /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(clean);
 }
 
+/**
+ * Resuelve DNS del host y verifica que ninguna IP resultante pertenezca a rangos privados o internos (M-03 SSRF).
+ */
+export async function resolveAndValidatePublicHost(rawHost) {
+  const clean = (rawHost || '').trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
+  if (!isSafePublicHost(clean)) return false;
+  try {
+    const records = await dns.promises.lookup(clean, { all: true });
+    if (!Array.isArray(records) || records.length === 0) return false;
+    return records.every(r => !isPrivateOrReservedIp(r.address));
+  } catch {
+    return false;
+  }
+}
+
 async function inspectSite(domain) {
   const cleanDomain = (domain || '').replace(/^https?:\/\//, '').split('/')[0].trim();
-  if (!isSafePublicHost(cleanDomain)) {
-    console.warn(`[AUDITOR SSRF] Dominio descartado por validación de seguridad: "${cleanDomain}"`);
+  const isSafe = await resolveAndValidatePublicHost(cleanDomain);
+  if (!isSafe) {
+    console.warn(`[AUDITOR SSRF] Dominio descartado por validación de seguridad/DNS: "${cleanDomain}"`);
     return {
       reachable: false,
       title: '',
@@ -127,6 +172,7 @@ async function inspectSite(domain) {
 
     const res = await fetch(`https://${cleanDomain}`, {
       signal: controller.signal,
+      redirect: 'manual', // Prevenir redirección SSRF hacia IPs internas (M-03)
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) GogliteAuditorBot/1.0'
       }

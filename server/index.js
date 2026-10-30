@@ -52,16 +52,62 @@ import {
   uploadTextFile 
 } from './services/googleDriveService.js';
 import { setupMcpRoutes } from './mcp/sseHandler.js';
-import { getAgencySettings, saveAgencySettings } from './services/agencySettingsStorage.js';
-import { getUsers, saveUsers, createCollaborator, registerOrUpdateClientAuth, getUserById, getUserByEmail, updateUser, deleteCollaborator } from './services/usersStorage.js';
-import { verifyTOTP, generateTOTP, buildOtpAuthUri, generateQrCodeDataUrl } from './services/totpService.js';
+import {
+  getAgencySettings,
+  getPublicAgencyBranding,
+  getSanitizedAgencySettings,
+  saveAgencySettings,
+  updateAgencyBankAccounts,
+  rotateMcpAgentKey
+} from './services/agencySettingsStorage.js';
+import {
+  getUsers,
+  saveUsers,
+  createCollaborator,
+  registerOrUpdateClientAuth,
+  getUserById,
+  getUserByEmail,
+  updateUser,
+  updateUserInternal,
+  deleteCollaborator,
+  publicUser,
+  SELF_EDITABLE_FIELDS,
+  ADMIN_EDITABLE_FIELDS
+} from './services/usersStorage.js';
+import {
+  verifyTOTP,
+  generateSecret,
+  encryptSecret,
+  decryptSecret,
+  isReplayCounter,
+  buildOtpAuthUri,
+  generateQrCodeDataUrl
+} from './services/totpService.js';
 import {
   syncScrapperLeadToCrm,
   syncPresupuestoToWorkflow,
   ensureDownstreamProjectPipeline,
   getUnifiedPortalPayload,
-  applyPortalUpdateToWorkflow
+  applyPortalUpdateToWorkflow,
+  generateSecurePortalToken
 } from './services/workflowContinuityService.js';
+import {
+  cookieParserMiddleware,
+  requireGoogleIdentity,
+  requireAuth,
+  requireRole,
+  issueSessionCookie,
+  clearSessionCookie
+} from './middleware/auth.js';
+import {
+  authLimiter,
+  costlyLimiter,
+  portalLimiter,
+  isAccountLocked,
+  recordFailedAuthAttempt,
+  clearFailedAuthAttempts
+} from './middleware/rateLimiter.js';
+import { logSecurityEvent } from './services/auditLogger.js';
 
 import path from 'path';
 import fs from 'fs';
@@ -79,14 +125,144 @@ const distPath = path.join(__dirname, '../dist');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
-app.use(express.json());
+const ALLOWED_ORIGINS = [
+  'https://goglite-agency.web.app',
+  'https://goglite-agency.firebaseapp.com',
+  'https://goglite-agency.vercel.app',
+  'https://agencia.goglite.com',
+  'http://localhost:5173',
+  'http://localhost:3001',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3001'
+];
 
-// Montaje de rutas del protocolo MCP (Server-Sent Events y mensajería en la nube)
+function safeError(err, fallback = 'Error interno del servidor') {
+  console.error('[API ERROR]:', err?.message || err);
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+    return fallback;
+  }
+  return err?.message || fallback;
+}
+
+function escapeHtml(str = '') {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// 0. Cabeceras de Seguridad HTTP (Hallazgo L-04: HSTS, CSP, X-Content-Type-Options, Referrer-Policy, X-Frame-Options)
+app.use((req, res, next) => {
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self' https: data: blob:; script-src 'self' 'unsafe-inline' https://apis.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://*.vercel.app https://*.goglite.com wss://*.firebaseio.com; frame-ancestors 'self' https://goglite-agency.web.app https://agencia.goglite.com;"
+  );
+  next();
+});
+
+// 0.1 CORS Restrictivo con excepción explícita para /cms.js y lectura de contenido CMS en sitios de clientes (Hallazgo M-04)
+app.use((req, res, next) => {
+  const cleanPath = req.originalUrl.split('?')[0];
+  const isPublicCmsAsset =
+    req.method === 'GET' &&
+    (cleanPath === '/cms.js' || /^\/api\/cms\/content\/[^/]+$/.test(cleanPath));
+
+  if (isPublicCmsAsset) {
+    return cors({ origin: '*', methods: ['GET', 'OPTIONS'] })(req, res, next);
+  }
+
+  return cors({
+    origin: (origin, callback) => {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error('Origen no permitido por CORS'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-GG-Session', 'X-MCP-Agent-Key', 'Accept']
+  })(req, res, next);
+});
+
+app.use(express.json({ limit: '4mb' }));
+app.use(cookieParserMiddleware);
+
+// Montaje de rutas del protocolo MCP (protegidas con SHA-256 + timingSafeEqual en sseHandler.js)
 setupMcpRoutes(app);
 
+// 0.2 Gatekeeper Global de Autenticación y RBAC en Servidor para /api/* (Hallazgo C-01)
+const PUBLIC_GET_ROUTES = [
+  /^\/api\/agency\/branding$/,
+  /^\/api\/portal\/[^/]+$/,
+  /^\/api\/cms\/content\/[^/]+$/
+];
+
+const PUBLIC_POST_ROUTES = [
+  /^\/api\/auth\//,
+  /^\/api\/portal\/[^/]+\/(update|upload-assets|sync-drive)$/,
+  /^\/api\/presupuestos\/[^/]+\/(view|accept)$/,
+  /^\/api\/ai\/generate$/
+];
+
+app.use('/api', (req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
+  const cleanPath = req.originalUrl.split('?')[0];
+
+  if (req.method === 'GET' && PUBLIC_GET_ROUTES.some(r => r.test(cleanPath))) {
+    return next();
+  }
+  if (req.method === 'POST' && PUBLIC_POST_ROUTES.some(r => r.test(cleanPath))) {
+    return next();
+  }
+  if (/^\/api\/auth\//.test(cleanPath)) {
+    return next();
+  }
+
+  return requireAuth(req, res, next);
+});
+
+// Dominios exclusivos de Administrador (RBAC estricto en servidor - C-01, C-09)
+app.use(
+  [
+    '/api/finanzas',
+    '/api/agency/settings',
+    '/api/agency/bank-accounts',
+    '/api/agency/mcp-key',
+    '/api/system',
+    '/api/settings',
+    '/api/whatsapp'
+  ],
+  requireRole('admin')
+);
+
+// Rate Limiting para servicios externos de pago y operaciones costosas (H-04)
+app.use(
+  [
+    '/api/search',
+    '/api/pipeline',
+    '/api/enrich',
+    '/api/audit',
+    '/api/pitch',
+    '/api/send-email',
+    '/api/send-instantly',
+    '/api/whatsapp',
+    '/api/drive',
+    '/api/ai/generate'
+  ],
+  costlyLimiter
+);
+
+app.use('/api/portal', portalLimiter);
+
 // ==========================================
-// CANAL SERVER-SENT EVENTS (SSE) EN VIVO
+// CANAL SERVER-SENT EVENTS (SSE) EN VIVO (Protegido con requireAuth - M-06)
 // ==========================================
 const sseClients = new Set();
 
@@ -101,7 +277,7 @@ export function broadcastPlatformEvent(eventType, payload = {}) {
   }
 }
 
-app.get('/api/events', (req, res) => {
+app.get('/api/events', requireAuth, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
@@ -277,184 +453,363 @@ app.post('/api/settings/test', async (req, res) => {
   }
 });
 
-// 1.1 White-Label Agency Settings
-app.get('/api/agency/settings', (req, res) => {
+// 1.1 White-Label Agency Settings & Public Branding (Hallazgo C-09)
+app.get('/api/agency/branding', (_req, res) => {
   try {
-    const settings = getAgencySettings();
-    res.json(settings);
+    res.json(getPublicAgencyBranding());
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
-app.post('/api/agency/settings', (req, res) => {
+app.get('/api/agency/settings', requireAuth, requireRole('admin'), (_req, res) => {
+  try {
+    const settings = getSanitizedAgencySettings();
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: safeError(err) });
+  }
+});
+
+app.post('/api/agency/settings', requireAuth, requireRole('admin'), (req, res) => {
   try {
     const updated = saveAgencySettings(req.body);
     if (!updated) {
       return res.status(500).json({ error: 'Error guardando ajustes de la agencia' });
     }
+    logSecurityEvent('AGENCY_SETTINGS_UPDATED', { fields: Object.keys(req.body || {}) }, req);
     res.json({ success: true, settings: updated });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
-// 1.2 Users, Collaborators & Authentication (RBAC)
-app.get('/api/users', (req, res) => {
+// Endpoint dedicado para modificar cuentas bancarias con re-verificación TOTP (Hallazgo C-09)
+app.post('/api/agency/bank-accounts', requireAuth, requireRole('admin'), (req, res) => {
   try {
-    const users = getUsers().map(u => {
-      const sanitized = { ...u };
-      delete sanitized.totpKeySecret;
-      delete sanitized.password;
-      delete sanitized.passwordHash;
-      return sanitized;
+    const { cuentasBancarias, totpCode } = req.body || {};
+    const adminUser = getUserById(req.user.id);
+    if (!adminUser?.totpEnc) {
+      return res.status(403).json({ error: 'Debes tener MFA TOTP activo para modificar cuentas bancarias.' });
+    }
+    const secret = decryptSecret(adminUser.totpEnc);
+    const vr = verifyTOTP(String(totpCode || ''), secret);
+    if (!vr.valid || isReplayCounter(adminUser.id, vr.counter, adminUser.lastTotpCounter)) {
+      logSecurityEvent('BANK_ACCOUNTS_CHANGE_MFA_FAILED', {}, req);
+      return res.status(401).json({ error: 'Código TOTP inválido o reutilizado. Cambio bancario bloqueado.' });
+    }
+    updateUserInternal(adminUser.id, { lastTotpCounter: vr.counter });
+    const updatedBanks = updateAgencyBankAccounts(cuentasBancarias);
+    logSecurityEvent('BANK_ACCOUNTS_UPDATED', { banks: Object.keys(cuentasBancarias || {}) }, req);
+    res.json({ success: true, cuentasBancarias: updatedBanks });
+  } catch (err) {
+    res.status(500).json({ error: safeError(err) });
+  }
+});
+
+// Endpoint dedicado para rotar la llave maestra del Agente MCP y almacenar solo su hash SHA-256 (Hallazgos C-07, C-08)
+app.post('/api/agency/mcp-key/rotate', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const { rawKey, masked } = rotateMcpAgentKey();
+    logSecurityEvent('MCP_AGENT_KEY_ROTATED', { masked }, req);
+    res.json({
+      success: true,
+      mcpAgentKey: rawKey, // Se muestra una única vez al administrador para copiarla
+      mcpAgentKeyMasked: masked
     });
+  } catch (err) {
+    res.status(500).json({ error: safeError(err) });
+  }
+});
+
+// 1.1b Proxy Seguro para Google Gemini AI en Servidor (Hallazgo H-01: elimina VITE_GEMINI_API_KEY del frontend)
+app.post('/api/ai/generate', async (req, res) => {
+  try {
+    // Permitir acceso a usuarios autenticados o portales de cliente con token válido
+    const hasPortalToken = req.body?.portalToken && Boolean(getUnifiedPortalPayload(req.body.portalToken));
+    if (!req.user && !hasPortalToken) {
+      // Verificar si viene sesión en cookie/header mediante requireAuth
+      let authed = false;
+      requireAuth(req, res, () => { authed = true; });
+      if (!authed) return;
+    }
+
+    const prompt = String(req.body?.prompt || '').trim().slice(0, 8000);
+    if (!prompt) {
+      return res.status(400).json({ error: 'El prompt es requerido.' });
+    }
+
+    const settings = getSettings();
+    const apiKey = process.env.GEMINI_API_KEY || settings.geminiApiKey;
+    if (!apiKey || !apiKey.trim()) {
+      return res.status(503).json({ error: 'Servicio de IA no configurado en el servidor.' });
+    }
+
+    const generationConfig = req.body?.generationConfig && typeof req.body.generationConfig === 'object'
+      ? req.body.generationConfig
+      : { temperature: 0.7, maxOutputTokens: 1024 };
+
+    const resp = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey.trim()
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig
+        })
+      }
+    );
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      return res.status(resp.status).json({ error: 'Error al consultar el modelo de IA.' });
+    }
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return res.json({ success: true, text, candidates: data.candidates });
+  } catch (err) {
+    return res.status(500).json({ error: safeError(err) });
+  }
+});
+
+// 1.2 Users, Collaborators & Authentication (RBAC - Hallazgos C-02, C-03, C-04, C-05, H-05, H-06, L-01)
+app.get('/api/users', requireAuth, (_req, res) => {
+  try {
+    const users = getUsers().map(u => publicUser(u));
     res.json(users);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
-app.post('/api/users/collaborator', (req, res) => {
+app.post('/api/users/collaborator', requireAuth, requireRole('admin'), (req, res) => {
   try {
-    const result = createCollaborator(req.body);
+    const result = createCollaborator(req.body || {});
     if (result.error) {
       return res.status(400).json({ error: result.error });
     }
-    res.json(result);
+    logSecurityEvent('USER_COLLABORATOR_CREATED', { targetEmail: result.user?.email }, req);
+    res.json({ success: true, user: publicUser(result.user) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
-app.patch('/api/users/:id', (req, res) => {
+app.patch('/api/users/:id', requireAuth, (req, res) => {
   try {
-    const result = updateUser(req.params.id, req.body);
+    const isSelf = req.user.id === req.params.id;
+    const isAdmin = req.user.rol === 'admin';
+    if (!isSelf && !isAdmin) {
+      return res.status(403).json({ error: 'Permiso denegado para modificar este usuario.' });
+    }
+    const allowedFields = isAdmin ? ADMIN_EDITABLE_FIELDS : SELF_EDITABLE_FIELDS;
+    const result = updateUser(req.params.id, req.body || {}, allowedFields);
     if (result.error) {
       return res.status(404).json({ error: result.error });
     }
-    res.json(result);
+    logSecurityEvent('USER_UPDATED', { targetUserId: req.params.id, fields: Object.keys(req.body || {}) }, req);
+    res.json({ success: true, user: publicUser(result.user) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
-app.delete('/api/users/:id', (req, res) => {
+app.delete('/api/users/:id', requireAuth, requireRole('admin'), (req, res) => {
   try {
     const result = deleteCollaborator(req.params.id);
     if (result.error) {
       return res.status(400).json({ error: result.error });
     }
+    logSecurityEvent('USER_COLLABORATOR_DELETED', { deletedId: req.params.id }, req);
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
-app.post('/api/auth/login', (req, res) => {
+// 1.3 Autenticación en Dos Pasos (Paso 1: Identidad Google verificada en servidor -> Paso 2: TOTP RFC 6238 en servidor)
+app.post('/api/auth/google-check', authLimiter, requireGoogleIdentity, (req, res) => {
   try {
-    const { email, password, totpCode, provider = 'google' } = req.body;
-    const users = getUsers();
-    const user = users.find(u => u.email?.toLowerCase() === email?.toLowerCase());
-
-    if (!user) {
-      return res.status(401).json({ error: 'Usuario no registrado con este correo.' });
+    const email = req.googleIdentity.email.trim().toLowerCase();
+    if (isAccountLocked(email)) {
+      return res.status(429).json({ error: 'Cuenta bloqueada temporalmente por múltiples intentos fallidos. Espera 15 minutos.' });
     }
 
-    // Verificación de contraseña si el usuario tiene credencial configurada
-    if (user.password && password !== undefined && user.password !== password) {
-      return res.status(401).json({ error: 'Credenciales inválidas.' });
+    const user = getUserByEmail(email);
+    if (!user || user.rol === 'cliente' || user.activo === false) {
+      logSecurityEvent('AUTH_GOOGLE_UNAUTHORIZED_EMAIL', { email }, req);
+      return res.status(403).json({
+        error: `Acceso Denegado: La cuenta (${email}) no está registrada como personal autorizado de Goglite Agency.`
+      });
     }
 
-    // Si tiene MFA con Google Authenticator requerido (RFC 6238)
-    if (user.mfaActivo && user.rol === 'admin') {
-      if (!totpCode || totpCode.trim().length !== 6) {
-        return res.status(400).json({ 
-          requiresMfa: true, 
-          message: 'Introduce el código de 6 dígitos generado por tu app Google Authenticator.' 
-        });
-      }
-      const verifyResult = verifyTOTP(totpCode, user.totpKeySecret || process.env.GOGLITE_TOTP_SECRET || 'JBSWY3DPEHPK3PXP');
-      if (!verifyResult.valid) {
-        return res.status(401).json({
-          error: 'Código de Google Authenticator incorrecto o expirado. Revisa tu aplicación móvil.'
-        });
-      }
-    }
-
-    user.ultimoAcceso = new Date().toISOString();
-    saveUsers(users);
-
-    const sanitizedUser = { ...user };
-    delete sanitizedUser.totpKeySecret;
-    delete sanitizedUser.password;
-    delete sanitizedUser.passwordHash;
-
-    res.json({
+    const mfaEnrolled = Boolean(user.mfaActivo && user.totpEnc);
+    return res.json({
       success: true,
-      user: sanitizedUser,
-      token: `goglite-jwt-${user.id}-${Date.now()}`
+      authorized: true,
+      mfaEnrolled,
+      user: publicUser(user)
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: safeError(err) });
   }
 });
 
-// 1.3 2FA Google Authenticator Setup & Real Verification Endpoints
-app.get('/api/auth/2fa/setup', async (req, res) => {
+// Inicio de enrolamiento TOTP único: solo permitido si el usuario autenticado con Google AÚN NO tiene MFA activo (C-02, C-03)
+app.post('/api/auth/2fa/enroll/start', authLimiter, requireGoogleIdentity, async (req, res) => {
   try {
-    const email = req.query.email || 'victor@goglite.com';
-    const secret = req.query.secret || process.env.GOGLITE_TOTP_SECRET || 'JBSWY3DPEHPK3PXP';
-    const issuer = req.query.issuer || 'Goglite Agency';
-    const otpAuthUri = buildOtpAuthUri({ email, issuer, secret });
-    const qrCodeDataUrl = await generateQrCodeDataUrl(otpAuthUri);
-    res.json({
+    const email = req.googleIdentity.email.trim().toLowerCase();
+    const user = getUserByEmail(email);
+    if (!user || user.rol === 'cliente' || user.activo === false) {
+      return res.status(403).json({ error: 'Usuario no autorizado para enrolamiento MFA.' });
+    }
+    if (user.mfaActivo && user.totpEnc) {
+      return res.status(409).json({ error: 'El segundo factor MFA ya se encuentra activo y bloqueado para esta cuenta.' });
+    }
+
+    const secret = generateSecret();
+    const encryptedPending = encryptSecret(secret);
+    updateUserInternal(user.id, { totpPendingEnc: encryptedPending });
+
+    const branding = getPublicAgencyBranding();
+    const issuer = branding.nombreAgencia || 'Goglite Digital Hub';
+    const uri = buildOtpAuthUri({ email: user.email, issuer, secret });
+    const qrCodeDataUrl = await generateQrCodeDataUrl(uri);
+
+    logSecurityEvent('AUTH_2FA_ENROLL_STARTED', { userId: user.id, email: user.email }, req);
+
+    return res.json({
       success: true,
-      email,
-      issuer,
-      secret,
-      otpAuthUri,
-      qrCodeDataUrl
+      qrCodeDataUrl,
+      secret // Solo se entrega esta única vez durante el enrolamiento inicial
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: safeError(err) });
   }
 });
 
-app.post('/api/auth/2fa/verify', (req, res) => {
+// Confirmación de enrolamiento TOTP: valida contra totpPendingEnc del servidor (ignora cualquier secret del cliente) (C-03)
+app.post('/api/auth/2fa/enroll/confirm', authLimiter, requireGoogleIdentity, (req, res) => {
   try {
-    const { token, email, secret } = req.body;
-    let userSecret = secret;
-    if (!userSecret && email) {
-      const user = getUserByEmail(email);
-      if (user?.totpKeySecret) {
-        userSecret = user.totpKeySecret;
-      }
+    const email = req.googleIdentity.email.trim().toLowerCase();
+    if (isAccountLocked(email)) {
+      return res.status(429).json({ error: 'Cuenta bloqueada temporalmente por intentos fallidos. Espera 15 minutos.' });
     }
-    if (!userSecret) {
-      userSecret = process.env.GOGLITE_TOTP_SECRET || 'JBSWY3DPEHPK3PXP';
+
+    const user = getUserByEmail(email);
+    if (!user || !user.totpPendingEnc) {
+      return res.status(400).json({ error: 'No hay un enrolamiento MFA pendiente para esta cuenta.' });
     }
-    const result = verifyTOTP(token, userSecret);
-    res.json({
-      success: result.valid,
-      valid: result.valid,
-      mode: result.mode
+
+    const secret = decryptSecret(user.totpPendingEnc);
+    const verifyResult = verifyTOTP(String(req.body?.token || ''), secret);
+    if (!verifyResult.valid || isReplayCounter(user.id, verifyResult.counter, user.lastTotpCounter)) {
+      const failInfo = recordFailedAuthAttempt(email);
+      logSecurityEvent('AUTH_2FA_ENROLL_CONFIRM_FAILED', { email, attempts: failInfo.attempts, locked: failInfo.locked }, req);
+      return res.status(401).json({ error: 'Código de 6 dígitos inválido o expirado.' });
+    }
+
+    clearFailedAuthAttempts(email);
+    const updatedUser = updateUserInternal(user.id, {
+      totpEnc: user.totpPendingEnc,
+      totpPendingEnc: null,
+      mfaActivo: true,
+      lastTotpCounter: verifyResult.counter,
+      ultimoAcceso: new Date().toISOString()
+    });
+
+    const sessionToken = issueSessionCookie(res, updatedUser);
+    logSecurityEvent('AUTH_2FA_ENROLL_COMPLETED', { userId: updatedUser.id, email: updatedUser.email }, req);
+
+    return res.json({
+      success: true,
+      valid: true,
+      user: publicUser(updatedUser),
+      sessionToken
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: safeError(err) });
   }
 });
 
-app.post('/api/auth/client-register', (req, res) => {
+// Verificación TOTP de login: el secreto SIEMPRE se lee cifrado desde el servidor (jamás desde req.body) (C-03, L-01)
+app.post('/api/auth/2fa/verify', authLimiter, requireGoogleIdentity, (req, res) => {
   try {
-    const { portalToken, email, nombre, authProvider } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'El correo electrónico es requerido.' });
+    const email = req.googleIdentity.email.trim().toLowerCase();
+    if (isAccountLocked(email)) {
+      return res.status(429).json({ error: 'Cuenta protegida temporalmente tras 5 intentos fallidos. Espera 15 minutos.' });
     }
-    const result = registerOrUpdateClientAuth({ portalToken, email, nombre, authProvider });
+
+    const user = getUserByEmail(email);
+    if (!user || !user.mfaActivo || !user.totpEnc) {
+      return res.status(401).json({ error: 'MFA no configurado para esta cuenta. Inicia el enrolamiento.' });
+    }
+
+    const secret = decryptSecret(user.totpEnc);
+    const result = verifyTOTP(String(req.body?.token || ''), secret);
+    if (!result.valid || isReplayCounter(user.id, result.counter, user.lastTotpCounter)) {
+      const failInfo = recordFailedAuthAttempt(email);
+      logSecurityEvent('AUTH_2FA_VERIFY_FAILED', { email, attempts: failInfo.attempts, locked: failInfo.locked }, req);
+      return res.status(401).json({
+        success: false,
+        valid: false,
+        error: 'Código de Google Authenticator inválido, expirado o ya utilizado.'
+      });
+    }
+
+    clearFailedAuthAttempts(email);
+    const updatedUser = updateUserInternal(user.id, {
+      lastTotpCounter: result.counter,
+      ultimoAcceso: new Date().toISOString()
+    });
+
+    const sessionToken = issueSessionCookie(res, updatedUser);
+    logSecurityEvent('AUTH_LOGIN_SUCCESS', { userId: updatedUser.id, email: updatedUser.email, rol: updatedUser.rol }, req);
+
+    return res.json({
+      success: true,
+      valid: true,
+      user: publicUser(updatedUser),
+      sessionToken
+    });
+  } catch (err) {
+    return res.status(500).json({ error: safeError(err) });
+  }
+});
+
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  res.json({
+    authenticated: true,
+    user: req.user
+  });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  logSecurityEvent('AUTH_LOGOUT', {}, req);
+  clearSessionCookie(req, res);
+  res.json({ ok: true });
+});
+
+// Registro de cliente de portal (solo rol 'cliente', requiere token Google verificado - C-05)
+app.post('/api/auth/client-register', authLimiter, requireGoogleIdentity, (req, res) => {
+  try {
+    const verifiedEmail = req.googleIdentity.email;
+    const { portalToken, nombre } = req.body || {};
+    const result = registerOrUpdateClientAuth({
+      portalToken,
+      email: verifiedEmail,
+      nombre: nombre || req.googleIdentity.name,
+      authProvider: 'google'
+    });
+    if (result.error) {
+      return res.status(403).json({ error: result.error });
+    }
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
@@ -482,7 +837,7 @@ app.post('/api/search', async (req, res) => {
 
     res.json({ success: true, query, country, searchMode, results });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
@@ -511,7 +866,7 @@ app.post('/api/enrich', async (req, res) => {
     const contact = await enrichDomain(domain, companyName, country);
     res.json({ success: true, domain, contact });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
@@ -526,7 +881,7 @@ app.post('/api/audit', async (req, res) => {
     const audit = await auditDomain(domain, query, country, req.body);
     res.json({ success: true, domain, audit });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
@@ -541,7 +896,7 @@ app.post('/api/pitch', async (req, res) => {
     const pitch = await generatePitch(lead, audit, country);
     res.json({ success: true, pitch });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
@@ -644,7 +999,7 @@ app.post('/api/pipeline', async (req, res) => {
       leads: leadsToAdd
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
@@ -717,23 +1072,26 @@ app.get('/api/export/csv', (req, res) => {
   res.send('\uFEFF' + csvContent); // BOM for Excel
 });
 
-// 9. Send Email via Resend ($0.00 Free Tier) or Instantly.ai
+// 9. Send Email via Resend ($0.00 Free Tier) or Instantly.ai (H-04, M-02)
 app.post('/api/send-email', async (req, res) => {
   try {
-    const { leadId, provider = 'resend', subject, customPitch, targetEmail } = req.body;
+    const { leadId, provider = 'resend', subject, customPitch } = req.body;
     const leads = getLeads();
     const lead = leads.find(l => l.id === leadId);
 
     if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
 
     const settings = getSettings();
-    const pitchToSend = customPitch || lead.pitch || 'Hola, me pongo en contacto con respecto a su presencia digital.';
-    const emailSubject = subject || `Pregunta rápida sobre ${lead.nombreEmpresa || lead.dominio}`;
-    const recipientEmail = targetEmail || lead.email;
+    const pitchToSend = String(customPitch || lead.pitch || 'Hola, me pongo en contacto con respecto a su presencia digital.').slice(0, 8000);
+    const emailSubject = String(subject || `Pregunta rápida sobre ${lead.nombreEmpresa || lead.dominio}`).slice(0, 200);
+    // H-04: Evitar open relay ignorando targetEmail arbitrario del cliente
+    const recipientEmail = lead.email;
+    if (!recipientEmail) {
+      return res.status(400).json({ error: 'El lead no tiene un correo electrónico registrado' });
+    }
 
     if (provider === 'resend') {
       if (!settings.resendApiKey) {
-        // Modo Sandbox / Demo: Registrar envío con éxito sin bloquear la auditoría
         lead.estado = 'enviado_resend';
         lead.actualizado = new Date().toISOString().split('T')[0];
         lead.ultimoEnvio = {
@@ -754,7 +1112,9 @@ app.post('/api/send-email', async (req, res) => {
       }
 
       const fromAddress = settings.resendFromEmail || 'Goglite Agencia <onboarding@resend.dev>';
-      
+      // M-02: Escapar entidades HTML antes de insertar en la plantilla de correo
+      const safeHtmlPitch = escapeHtml(pitchToSend).replace(/\n/g, '<br/>');
+
       const resendResponse = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -767,7 +1127,7 @@ app.post('/api/send-email', async (req, res) => {
           subject: emailSubject,
           text: pitchToSend,
           html: `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; padding: 20px;">
-            ${pitchToSend.replace(/\n/g, '<br/>')}
+            ${safeHtmlPitch}
             <br/><br/>
             <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
             <small style="color: #64748b; font-size: 11px;">Enviado vía Goglite Agency Suite · Infraestructura Resend ($0.00 Stack)</small>
@@ -843,7 +1203,7 @@ app.post('/api/send-email', async (req, res) => {
     }
   } catch (err) {
     console.error('[EMAIL ERROR]', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
@@ -1329,7 +1689,8 @@ app.post('/api/crm/leads', (req, res) => {
     valorEstimado: Number(req.body.valorEstimado) || 1500,
     probabilidad: 15,
     fuente: req.body.fuente || 'Manual',
-    portalToken: 'portal-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+    // M-01: Token criptográfico opaco de 256 bits en lugar de Date.now()
+    portalToken: generateSecurePortalToken(),
     interacciones: [
       {
         id: 'int-' + Date.now(),
@@ -1409,7 +1770,7 @@ app.post('/api/whatsapp/sessions/:country/connect', async (req, res) => {
     const result = await startWhatsAppSession(req.params.country);
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
@@ -1418,7 +1779,7 @@ app.delete('/api/whatsapp/sessions/:country', async (req, res) => {
     const result = await disconnectWhatsAppSession(req.params.country);
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
@@ -1431,9 +1792,30 @@ app.post('/api/whatsapp/sessions/:country/send', async (req, res) => {
     const result = await sendRealWhatsAppMessage(req.params.country, telefono, texto);
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
+
+// M-05: Allowlist explícita en PATCH /api/crm/leads/:id para impedir sobreescritura de id, portalToken o portalConfig
+const CRM_LEAD_PATCH_ALLOWLIST = [
+  'empresa',
+  'contacto',
+  'cargo',
+  'email',
+  'telefono',
+  'pais',
+  'dominio',
+  'etapa',
+  'valorEstimado',
+  'probabilidad',
+  'fuente',
+  'temperatura',
+  'resumenEjecutivo',
+  'proximaAccion',
+  'notas',
+  'servicio',
+  'interacciones'
+];
 
 app.patch('/api/crm/leads/:id', (req, res) => {
   const { id } = req.params;
@@ -1441,7 +1823,14 @@ app.patch('/api/crm/leads/:id', (req, res) => {
   const idx = leads.findIndex(l => l.id === id);
   if (idx === -1) return res.status(404).json({ error: 'Lead no encontrado' });
 
-  leads[idx] = { ...leads[idx], ...req.body, actualizadoEn: new Date().toISOString().split('T')[0] };
+  const safeUpdates = {};
+  for (const field of CRM_LEAD_PATCH_ALLOWLIST) {
+    if (req.body && req.body[field] !== undefined) {
+      safeUpdates[field] = req.body[field];
+    }
+  }
+
+  leads[idx] = { ...leads[idx], ...safeUpdates, actualizadoEn: new Date().toISOString().split('T')[0] };
   saveCrmLeads(leads);
   broadcastPlatformEvent('crm:updated', leads[idx]);
   res.json(leads[idx]);
@@ -1484,10 +1873,10 @@ app.post('/api/portal/:token/update', async (req, res) => {
 
   let extraConfig = {};
 
-  // Creación explícita de Bóveda centralizada en Google Drive (sitesgoglite@gmail.com) compartida con el correo autenticado del cliente
+  // H-04 / M-01: Compartir bóveda únicamente con el correo autenticado registrado del cliente o correo del lead
   if (req.body.crearBoveda) {
     try {
-      const targetEmail = req.body.clientEmail || req.body.clienteAuthEmail || lead.portalConfig?.clienteAuthEmail || lead.email || '';
+      const targetEmail = lead.portalConfig?.clienteAuthEmail || lead.email || '';
       console.log(`[DRIVE VAULT] Creando bóveda en sitesgoglite@gmail.com para ${lead.empresa} compartida con ${targetEmail}`);
       const vault = await createClientVault(lead.empresa, targetEmail, lead.id);
       if (vault) {
@@ -1522,15 +1911,15 @@ app.post('/api/portal/:token/update', async (req, res) => {
   });
 });
 
-// Endpoint para crear y compartir la Bóveda en Google Drive con la cuenta autenticada del cliente
+// Endpoint para crear y compartir la Bóveda en Google Drive con la cuenta autenticada del cliente (H-04 / M-01)
 app.post('/api/portal/:token/sync-drive', async (req, res) => {
   const { token } = req.params;
   const lead = getCrmLeadByToken(token);
   if (!lead) return res.status(404).json({ error: 'Portal no encontrado' });
 
   try {
-    const clientName = req.body?.clientName || lead.empresa;
-    const clientEmail = req.body?.clientEmail || lead.portalConfig?.clienteAuthEmail || lead.email || '';
+    const clientName = lead.empresa;
+    const clientEmail = lead.portalConfig?.clienteAuthEmail || lead.email || '';
     const vault = await createClientVault(clientName, clientEmail, lead.id);
     const updated = updateClientPortalConfig(token, {
       driveVault: vault,
@@ -1538,7 +1927,7 @@ app.post('/api/portal/:token/sync-drive', async (req, res) => {
     });
     res.json({ success: true, lead: updated, vault });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
@@ -1567,7 +1956,7 @@ app.post('/api/drive/create-vault', async (req, res) => {
 
     res.json({ success: true, vault });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
@@ -1601,8 +1990,23 @@ app.delete('/api/finanzas/facturas/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// M-05: Allowlist explícita en PUT /api/finanzas/configuracion
+const FINANZAS_CONFIG_ALLOWLIST = [
+  'metaMensualIngresos',
+  'impuestoPorcentaje',
+  'costoHoraAgenciaDefault',
+  'monedaBase',
+  'tasaCambioDop'
+];
+
 app.put('/api/finanzas/configuracion', (req, res) => {
-  const updated = actualizarConfiguracionFinanzas(req.body);
+  const safeConfig = {};
+  for (const field of FINANZAS_CONFIG_ALLOWLIST) {
+    if (req.body && req.body[field] !== undefined) {
+      safeConfig[field] = req.body[field];
+    }
+  }
+  const updated = actualizarConfiguracionFinanzas(safeConfig);
   res.json({ success: true, configuracion: updated });
 });
 
@@ -1640,15 +2044,54 @@ app.delete('/api/finanzas/horas/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// H-03: Verificación reforzada para endpoints destructivos (re-autenticación TOTP + confirmación explícita)
+function verifyAdminDestructiveAction(req, res) {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SYSTEM_RESET !== 'true') {
+    return { ok: false, status: 403, error: 'Operación de borrado masivo deshabilitada en producción (ALLOW_SYSTEM_RESET != true).' };
+  }
+  const { confirm, totpCode } = req.body || {};
+  if (confirm !== 'RESET-CONFIRMED') {
+    return { ok: false, status: 400, error: 'Confirmación explícita requerida (confirm: "RESET-CONFIRMED").' };
+  }
+  const adminUser = getUserById(req.user?.sub) || getUserByEmail(req.user?.email);
+  if (!adminUser || adminUser.rol !== 'admin' || !adminUser.totpEnc) {
+    return { ok: false, status: 403, error: 'Se requiere administrador con MFA TOTP enrolado.' };
+  }
+  let plainSecret;
+  try {
+    plainSecret = decryptSecret(adminUser.totpEnc);
+  } catch {
+    return { ok: false, status: 500, error: 'No se pudo verificar el secreto MFA.' };
+  }
+  const verification = verifyTOTP(String(totpCode || ''), plainSecret);
+  if (!verification.valid) {
+    return { ok: false, status: 401, error: 'Código TOTP de re-autenticación inválido.' };
+  }
+  return { ok: true, adminUser };
+}
+
 app.post('/api/finanzas/reset', (req, res) => {
+  const check = verifyAdminDestructiveAction(req, res);
+  if (!check.ok) {
+    logSecurityEvent('FINANZAS_RESET_DENIED', { reason: check.error }, req);
+    return res.status(check.status).json({ error: check.error });
+  }
+  logSecurityEvent('FINANZAS_RESET_EXECUTED', { adminId: check.adminUser.id }, req);
   const cleanFinanzas = resetFinanzasData();
   saveProyectos([]);
   res.json({ success: true, finanzas: cleanFinanzas });
 });
 
-// Endpoint Maestro Unificado de Limpieza del Sistema (Fase 1 a 7)
+// Endpoint Maestro Unificado de Limpieza del Sistema (Fase 1 a 7) (H-03)
 app.post('/api/system/reset', async (req, res) => {
   try {
+    const check = verifyAdminDestructiveAction(req, res);
+    if (!check.ok) {
+      logSecurityEvent('SYSTEM_RESET_DENIED', { reason: check.error }, req);
+      return res.status(check.status).json({ error: check.error });
+    }
+    logSecurityEvent('SYSTEM_RESET_EXECUTED', { adminId: check.adminUser.id }, req);
+
     // 1. Limpiar archivos JSON de datos transaccionales en server/data/
     saveLeads([]);
     saveCrmLeads([]);
@@ -1687,7 +2130,7 @@ app.post('/api/system/reset', async (req, res) => {
     });
   } catch (err) {
     console.error('Error en /api/system/reset:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
@@ -1737,7 +2180,7 @@ app.post('/api/cms/sites', (req, res) => {
     const newSite = createCmsSite({ nombre, pais, dominio, slug, telefono, contenido });
     res.json({ success: true, site: newSite });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: safeError(err) });
   }
 });
 
@@ -1759,7 +2202,7 @@ app.delete('/api/cms/sites/:slug', (req, res) => {
   res.json({ success: true });
 });
 
-// Turnkey Headless CMS Client Script (Universal, 1 KB, Offline-first)
+// Turnkey Headless CMS Client Script (Universal, 1 KB, Offline-first) - H-07 Hardened
 app.get('/cms.js', (req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
   res.setHeader('Cache-Control', 'public, max-age=60');
@@ -1778,6 +2221,13 @@ app.get('/cms.js', (req, res) => {
   }
 
   var cacheKey = 'goglite_cms_' + siteSlug;
+  var ALLOWED_ORIGINS = [
+    'https://goglite-agency.web.app',
+    'https://goglite-agency.firebaseapp.com',
+    'https://goglite-agency.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3001'
+  ];
 
   function getVal(path, obj) {
     if (!path || !obj) return '';
@@ -1786,42 +2236,70 @@ app.get('/cms.js', (req, res) => {
     }, obj);
   }
 
+  // H-07: Validar esquemas de URL permitidos (bloquea javascript:, data:, vbscript:)
+  function safeUrl(v, allowRelative) {
+    if (typeof v !== 'string') return null;
+    var trimmed = v.trim();
+    if (!trimmed) return null;
+    if (allowRelative && (trimmed.charAt(0) === '/' || trimmed.charAt(0) === '#')) {
+      if (trimmed.indexOf('//') === 0) return null;
+      return trimmed;
+    }
+    try {
+      var u = new URL(trimmed, window.location.origin);
+      var allowed = ['http:', 'https:', 'mailto:', 'tel:'];
+      return allowed.indexOf(u.protocol) !== -1 ? u.href : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function applyCmsData(c) {
     if (!c) return;
 
-    // 1. Textos
+    // 1. Textos (textContent seguro contra XSS)
     document.querySelectorAll('[data-cms]').forEach(function(el) {
       var key = el.getAttribute('data-cms');
       var val = getVal(key, c);
-      if (val !== '') el.textContent = val;
+      if (val !== '') el.textContent = String(val);
     });
 
-    // 2. Enlaces (Href / WhatsApp)
+    // 2. Enlaces (Href / WhatsApp) con validación de protocolo (H-07)
     document.querySelectorAll('[data-cms-href]').forEach(function(el) {
       var key = el.getAttribute('data-cms-href');
       var val = getVal(key, c);
       if (val !== '') {
-        if (key.indexOf('WhatsApp') !== -1 && val.indexOf('http') === -1) {
-          var cleanPhone = val.replace(/[^0-9]/g, '');
-          el.setAttribute('href', 'https://wa.me/' + cleanPhone);
+        if (key.indexOf('WhatsApp') !== -1 && String(val).indexOf('http') === -1) {
+          var cleanPhone = String(val).replace(/[^0-9]/g, '');
+          if (cleanPhone) el.setAttribute('href', 'https://wa.me/' + cleanPhone);
         } else {
-          el.setAttribute('href', val);
+          var validHref = safeUrl(String(val), true);
+          if (validHref) el.setAttribute('href', validHref);
         }
       }
     });
 
-    // 3. Imágenes y Logos
+    // 3. Imágenes y Logos con validación de URL (H-07)
     document.querySelectorAll('[data-cms-src]').forEach(function(el) {
       var key = el.getAttribute('data-cms-src');
       var val = getVal(key, c);
-      if (val !== '') el.setAttribute('src', val);
+      if (val !== '') {
+        var validSrc = safeUrl(String(val), true);
+        if (validSrc) el.setAttribute('src', validSrc);
+      }
     });
 
-    // 4. Fondos CSS
+    // 4. Fondos CSS con escape de caracteres de inyección CSS (H-07)
     document.querySelectorAll('[data-cms-bg]').forEach(function(el) {
       var key = el.getAttribute('data-cms-bg');
       var val = getVal(key, c);
-      if (val !== '') el.style.backgroundImage = 'url(' + val + ')';
+      if (val !== '') {
+        var validBg = safeUrl(String(val), true);
+        if (validBg) {
+          var cleanCssUrl = validBg.replace(/["'()\\\\]/g, '');
+          el.style.backgroundImage = 'url("' + cleanCssUrl + '")';
+        }
+      }
     });
   }
 
@@ -1834,7 +2312,7 @@ app.get('/cms.js', (req, res) => {
   } catch (e) {}
 
   // Sincronización fresca con la nube
-  fetch(apiUrl + '/api/cms/content/' + siteSlug)
+  fetch(apiUrl + '/api/cms/content/' + encodeURIComponent(siteSlug))
     .then(function(r) { return r.json(); })
     .then(function(site) {
       if (!site || !site.contenido) return;
@@ -1847,8 +2325,10 @@ app.get('/cms.js', (req, res) => {
       console.warn('[Goglite CMS] Modo offline activo para:', siteSlug);
     });
 
-  // Listener para previsualización en vivo en iframes
+  // H-07: Listener para previsualización en vivo restringido a orígenes autorizados y contexto iframe
   window.addEventListener('message', function(event) {
+    if (window.parent === window) return;
+    if (ALLOWED_ORIGINS.indexOf(event.origin) === -1) return;
     if (event.data && event.data.type === 'GOGLITE_CMS_LIVE_PREVIEW') {
       applyCmsData(event.data.content);
     }

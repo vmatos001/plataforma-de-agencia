@@ -25,7 +25,7 @@ import { DEFAULT_AGENCY_BRANDING } from './constants/defaultAgencyBranding';
 import UserProfileModal from './components/UserProfileModal';
 import LoginGatekeeper from './components/LoginGatekeeper';
 import { signOutUser } from './services/firebase';
-import { apiClient, subscribeToPlatformEvents } from './services/apiClient';
+import { apiClient, clearSessionToken, getSessionToken, subscribeToPlatformEvents } from './services/apiClient';
 import {
   STORAGE_KEYS,
   getLocalItem,
@@ -155,36 +155,9 @@ export default function App() {
   });
   const [showAgencySettingsModal, setShowAgencySettingsModal] = useState(false);
 
-  // Users & Role-Based Authentication State (RBAC) - Solo Administrador Maestro Activo
-  const defaultMasterAdmin = {
-    id: 'user-admin-victor',
-    nombre: 'Víctor Matos',
-    email: 'sitesgoglite@gmail.com',
-    secondaryEmail: 'victor@goglite.com',
-    cargo: 'CEO & Director General',
-    rol: 'admin',
-    avatar: 'VM',
-    mfaActivo: true,
-    permisos: ['all']
-  };
-
-  const [currentUser, setCurrentUser] = useState(() => {
-    const stored = getLocalItem(STORAGE_KEYS.CURRENT_USER, defaultMasterAdmin);
-    if (stored) {
-      if (stored.totpKeySecret || stored.password || stored.passwordHash) {
-        const clean = { ...stored };
-        delete clean.totpKeySecret;
-        delete clean.password;
-        delete clean.passwordHash;
-        setLocalItem(STORAGE_KEYS.CURRENT_USER, clean);
-        return clean;
-      }
-      return stored;
-    }
-    return defaultMasterAdmin;
-  });
-
-  const [usersList, setUsersList] = useState([defaultMasterAdmin]);
+  // Users & Role-Based Authentication State (RBAC) - Verificado por servidor (C-04)
+  const [currentUser, setCurrentUser] = useState(null);
+  const [usersList, setUsersList] = useState([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Protocolo de Seguridad de Sesiones (NIST SP 800-63B / OWASP)
@@ -197,34 +170,42 @@ export default function App() {
   };
 
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState('');
+  const [isAuthenticatedSession, setIsAuthenticatedSession] = useState(false);
 
-  // Gatekeeper de Seguridad: Verificación de sesión con Google OAuth + MFA Authenticator
-  const [isAuthenticatedSession, setIsAuthenticatedSession] = useState(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        const stored = sessionStorage.getItem('goglite_auth_session');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const now = Date.now();
-          const loginTime = parsed?.loginTimestamp || now;
-          const lastActivity = parsed?.lastActivityTimestamp || now;
-          const isAdmin = parsed?.rol === 'admin' || parsed?.email === 'sitesgoglite@gmail.com' || parsed?.email === 'victor@goglite.com';
-          const idleLimit = isAdmin ? 15 * 60 * 1000 : 30 * 60 * 1000;
-
-          // Si superó la jornada de 8h o el límite de inactividad, invalidar de inmediato
-          if (now - loginTime > 8 * 60 * 60 * 1000 || now - lastActivity > idleLimit) {
-            sessionStorage.removeItem('goglite_auth_session');
-            return false;
-          }
-
-          if (parsed?.mfaVerified && (parsed?.email === 'sitesgoglite@gmail.com' || parsed?.email === 'victor@goglite.com' || parsed?.email)) {
-            return true;
+  // C-04: Verificar sesión firmada contra el backend al montar
+  useEffect(() => {
+    let active = true;
+    const checkServerSession = async () => {
+      try {
+        const res = await apiClient.get('/api/auth/me');
+        if (!active) return;
+        if (res.ok && (res.headers.get('content-type') || '').includes('application/json')) {
+          const data = await res.json();
+          if (data?.authenticated && data?.user) {
+            setCurrentUser(data.user);
+            setIsAuthenticatedSession(true);
+            return;
           }
         }
+        clearSessionToken();
+        setCurrentUser(null);
+        setIsAuthenticatedSession(false);
+      } catch {
+        if (!active) return;
+        setIsAuthenticatedSession(false);
       }
-    } catch {}
-    return false;
-  });
+    };
+
+    if (!clientPortalToken && !clientCmsToken) {
+      checkServerSession();
+    } else {
+      fetchPublicBranding();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [clientPortalToken, clientCmsToken]);
 
   const handleLoginSuccess = (user) => {
     setSessionExpiredNotice('');
@@ -239,55 +220,32 @@ export default function App() {
 
   const handleLogout = async (expiredMessage = '') => {
     try {
-      await signOutUser();
+      await apiClient.post('/api/auth/logout');
     } catch {}
     try {
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('goglite_auth_session');
-      }
+      await signOutUser();
     } catch {}
+    clearSessionToken();
     if (expiredMessage) {
       setSessionExpiredNotice(expiredMessage);
     }
+    setCurrentUser(null);
     setIsAuthenticatedSession(false);
   };
 
   // Protocolo de Sesión Activa: Auditoría de Inactividad y Duración Absoluta
   useEffect(() => {
-    if (!isAuthenticatedSession) return;
+    if (!isAuthenticatedSession || !currentUser) return;
 
-    const getStoredSession = () => {
-      try {
-        const raw = sessionStorage.getItem('goglite_auth_session');
-        return raw ? JSON.parse(raw) : null;
-      } catch {
-        return null;
-      }
-    };
-
-    const session = getStoredSession();
-    if (!session) return;
-
-    const isAdmin = currentUser?.rol === 'admin' || session?.email === 'sitesgoglite@gmail.com' || session?.email === 'victor@goglite.com';
+    const isAdmin = currentUser?.rol === 'admin';
     const idleLimit = isAdmin ? SESSION_POLICIES.IDLE_TIMEOUT_ADMIN_MS : SESSION_POLICIES.IDLE_TIMEOUT_COLAB_MS;
     const idleMinutes = isAdmin ? 15 : 30;
 
-    let lastRecordedActivity = session.lastActivityTimestamp || Date.now();
+    const loginTime = Date.now();
+    let lastRecordedActivity = Date.now();
 
     const handleUserInteraction = () => {
-      const now = Date.now();
-      if (now - lastRecordedActivity > SESSION_POLICIES.ACTIVITY_THROTTLE_MS) {
-        lastRecordedActivity = now;
-        try {
-          const current = getStoredSession();
-          if (current) {
-            current.lastActivityTimestamp = now;
-            sessionStorage.setItem('goglite_auth_session', JSON.stringify(current));
-          }
-        } catch {}
-      } else {
-        lastRecordedActivity = now;
-      }
+      lastRecordedActivity = Date.now();
     };
 
     const monitoredEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
@@ -295,11 +253,6 @@ export default function App() {
 
     const sessionWatcher = setInterval(() => {
       const now = Date.now();
-      const current = getStoredSession();
-      if (!current) return;
-
-      const loginTime = current.loginTimestamp || now;
-      const activityTime = current.lastActivityTimestamp || lastRecordedActivity;
 
       // 1. Verificación de Duración Absoluta (8 Horas)
       if (now - loginTime > SESSION_POLICIES.ABSOLUTE_LIFETIME_MS) {
@@ -308,7 +261,7 @@ export default function App() {
       }
 
       // 2. Verificación de Inactividad (15 min Admin / 30 min Colaborador)
-      if (now - activityTime > idleLimit) {
+      if (now - lastRecordedActivity > idleLimit) {
         handleLogout(`Sesión suspendida por inactividad (${idleMinutes} minutos sin interacción). Valida tus credenciales para continuar.`);
         return;
       }
@@ -334,10 +287,12 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (!isAuthenticatedSession) return;
+
     fetchAgencySettings();
     fetchUsers();
 
-    // Suscripción al Canal SSE en Tiempo Real (Server-Sent Events)
+    // Suscripción al Canal SSE en Tiempo Real (Server-Sent Events autenticado - M-06)
     const unsubscribeSSE = subscribeToPlatformEvents((event) => {
       if (!event || !event.type) return;
 
@@ -365,13 +320,29 @@ export default function App() {
       unsubscribeSSE();
       window.removeEventListener('goglite_agency_settings_updated', handleSettingsUpdated);
     };
-  }, []);
+  }, [isAuthenticatedSession]);
+
+  const fetchPublicBranding = async () => {
+    try {
+      const res = await apiClient.get('/api/agency/branding');
+      const cType = res.headers.get('content-type') || '';
+      if (res.ok && cType.includes('application/json')) {
+        const data = await res.json();
+        if (data && typeof data === 'object') {
+          setAgencySettings(prev => ({
+            ...prev,
+            ...data,
+            logoUrl: data.logoUrl || prev.logoUrl
+          }));
+        }
+      }
+    } catch {}
+  };
 
   const fetchAgencySettings = async () => {
     try {
       const res = await apiClient.get('/api/agency/settings');
       const cType = res.headers.get('content-type') || '';
-      // Validar estrictamente que sea JSON del backend y no la plantilla HTML de Vite
       if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
         if (data && typeof data === 'object') {
@@ -398,9 +369,8 @@ export default function App() {
       if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          // Filtrar colaboradores de prueba y asegurar que Víctor Matos esté con sus datos correctos
           const cleaned = data.filter(u => u.id !== 'user-colab-carlos' && u.id !== 'user-colab-sofia');
-          setUsersList(cleaned.length > 0 ? cleaned : [defaultMasterAdmin]);
+          setUsersList(cleaned);
         }
       }
     } catch {
@@ -450,15 +420,9 @@ export default function App() {
         if (result.user) {
           setUsersList(prev => [...prev, result.user]);
         }
-      } else {
-        const initials = colabData.nombre.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || 'CO';
-        const dummy = { ...colabData, id: `user-colab-${Date.now()}`, avatar: initials, mfaActivo: false };
-        setUsersList(prev => [...prev, dummy]);
       }
-    } catch {
-      const initials = colabData.nombre.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || 'CO';
-      const dummy = { ...colabData, id: `user-colab-${Date.now()}`, avatar: initials, mfaActivo: false };
-      setUsersList(prev => [...prev, dummy]);
+    } catch (err) {
+      console.warn('Create colab error:', err);
     }
   };
 
@@ -483,7 +447,7 @@ export default function App() {
     }
   };
 
-  // Botón Maestro: Limpieza integral de datos de prueba para Fases 1 a 7
+  // Botón Maestro: Limpieza integral de datos de prueba para Fases 1 a 7 (H-03: requiere código TOTP)
   const handleResetAllPlatformData = async () => {
     if (!window.confirm('¿Deseas LIMPIAR TODOS LOS DATOS de prueba de las Fases 1 a 7?\n\n' +
       '• Fase 1: Limpiará leads y búsquedas del Scrapper.\n' +
@@ -497,15 +461,25 @@ export default function App() {
       return;
     }
 
-    try {
-      clearAllPlatformData();
+    const totpCode = window.prompt('Por seguridad, ingresa tu código actual de 6 dígitos de Google Authenticator para confirmar el borrado masivo:');
+    if (!totpCode || totpCode.trim().length !== 6) {
+      alert('Operación cancelada: Se requiere el código de 6 dígitos de Google Authenticator.');
+      return;
+    }
 
-      try {
-        await apiClient.post('/api/system/reset');
-      } catch (err) {
-        console.warn('[RESET] Aviso en llamada backend:', err.message);
+    try {
+      const res = await apiClient.post('/api/system/reset', {
+        confirm: 'RESET-CONFIRMED',
+        totpCode: totpCode.trim()
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        alert(`No se pudo resetear el sistema: ${errData.error || 'Error de autorización'}`);
+        return;
       }
 
+      clearAllPlatformData();
       setLeadForPresupuesto(null);
       setPresupuestoForFactura(null);
 
@@ -545,19 +519,12 @@ export default function App() {
 
   const handleUpdateUserMfa = (userId, mfaState = true) => {
     setUsersList(prev => prev.map(u => u.id === userId ? { ...u, mfaActivo: mfaState } : u));
-    try {
-      const stored = getLocalItem(STORAGE_KEYS.USERS, []);
-      if (Array.isArray(stored) && stored.length > 0) {
-        setLocalItem(STORAGE_KEYS.USERS, stored.map(u => u.id === userId ? { ...u, mfaActivo: mfaState } : u));
-      }
-    } catch {}
   };
 
-  // Gatekeeper de Seguridad: Bloqueo de Acceso hasta validar Google OAuth + MFA Authenticator
-  if (!isAuthenticatedSession) {
+  // Gatekeeper de Seguridad: Bloqueo de Acceso hasta validar Google OAuth + MFA Authenticator en el servidor
+  if (!isAuthenticatedSession || !currentUser) {
     return (
       <LoginGatekeeper
-        usersList={usersList}
         agencySettings={agencySettings}
         onLoginSuccess={handleLoginSuccess}
         onUpdateUserMfa={handleUpdateUserMfa}

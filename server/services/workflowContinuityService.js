@@ -12,6 +12,7 @@
  * - Fase 7 (Gestión, Rentabilidad, Facturación & Pagos: finanzasStorage.js)
  */
 
+import crypto from 'crypto';
 import { getLeads } from './storage.js';
 import { getCrmLeads, saveCrmLeads } from './crmStorage.js';
 import { getPresupuestos, savePresupuestos } from './presupuestosStorage.js';
@@ -27,6 +28,41 @@ function normalizeStr(val) {
 
 function normalizePhone(val) {
   return (val || '').toString().replace(/\D/g, '');
+}
+
+export function generateSecurePortalToken() {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+export const PORTAL_CLIENT_WRITABLE_FIELDS = [
+  'propuestaVista',
+  'fase1Aprobada',
+  'fase2Firmada',
+  'firmanteNombre',
+  'firmanteDocumento',
+  'firmaDigital',
+  'anticipoPagado',
+  'comprobanteAnticipo',
+  'comprobanteAnticipoImagen',
+  'comprobanteAnticipoNombre',
+  'fase3InsumosCompletos',
+  'onboardingRespuestas',
+  'fase4Liquidada',
+  'liquidacionPagada',
+  'comprobanteLiquidacion',
+  'comprobanteLiquidacionImagen',
+  'comprobanteLiquidacionNombre',
+  'notasCliente'
+];
+
+export function sanitizePortalClientUpdates(rawUpdates = {}) {
+  const out = {};
+  for (const [k, v] of Object.entries(rawUpdates || {})) {
+    if (PORTAL_CLIENT_WRITABLE_FIELDS.includes(k)) {
+      out[k] = v;
+    }
+  }
+  return out;
 }
 
 /**
@@ -75,7 +111,7 @@ export function syncScrapperLeadToCrm(scrapperLead) {
     return crmLeads[existingIdx];
   }
 
-  const portalToken = `portal-${scrapperLead.id || Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+  const portalToken = generateSecurePortalToken();
   const newCrmLead = {
     id: `crm-${scrapperLead.id || Date.now()}`,
     leadId: scrapperLead.id || null,
@@ -153,7 +189,9 @@ export function syncPresupuestoToWorkflow(presupuesto) {
   const today = new Date().toISOString().split('T')[0];
 
   if (!crmLead) {
-    const portalToken = presupuesto.portalToken || `portal-${presupuesto.id || Date.now()}`;
+    const portalToken = (presupuesto.portalToken && presupuesto.portalToken.length >= 24)
+      ? presupuesto.portalToken
+      : generateSecurePortalToken();
     crmLead = {
       id: presupuesto.leadId || `crm-${Date.now()}`,
       leadId: presupuesto.leadId || null,
@@ -210,8 +248,10 @@ export function syncPresupuestoToWorkflow(presupuesto) {
     crmLead.presupuestoMonto = monto;
     crmLead.valorEstimado = monto || crmLead.valorEstimado;
     crmLead.presupuestoEstado = presupuesto.estado || crmLead.presupuestoEstado;
-    if (!crmLead.portalToken) {
-      crmLead.portalToken = presupuesto.portalToken || `portal-${crmLead.id}`;
+    if (!crmLead.portalToken || crmLead.portalToken === `portal-${crmLead.id}`) {
+      crmLead.portalToken = (presupuesto.portalToken && presupuesto.portalToken.length >= 24)
+        ? presupuesto.portalToken
+        : generateSecurePortalToken();
     }
     if (presupuesto.estado === 'aceptado') {
       crmLead.etapa = 'ganado';
@@ -423,29 +463,31 @@ export function ensureDownstreamProjectPipeline({ presupuesto = null, proyecto =
  * Resuelve cualquier identificador de portal (portalToken, leadId, presupuestoId, codigo, proyectoId)
  * y construye el estado unificado en tiempo real desde la base de datos de las 7 Fases.
  */
-export function getUnifiedPortalPayload(rawToken) {
+export function getUnifiedPortalPayload(rawToken, { allowInternalIds = false } = {}) {
   const token = (rawToken || '').trim();
+  if (!token || token.length < 8) return null;
   const crmLeads = getCrmLeads();
   const presupuestos = getPresupuestos();
   const proyectos = getProyectos();
   const scrapperLeads = getLeads();
   const { facturas, timeEntries } = getFinanzas();
 
-  // 1. Buscar en CRM Leads
+  // 1. Buscar en CRM Leads por portalToken (y opcionalmente por IDs internos solo si es una llamada interna autenticada) (M-01)
   let lead = crmLeads.find(l =>
     l.portalToken === token ||
-    l.id === token ||
-    l.leadId === token ||
-    l.presupuestoId === token ||
-    l.proyectoId === token
+    (allowInternalIds && (
+      l.id === token ||
+      l.leadId === token ||
+      l.presupuestoId === token ||
+      l.proyectoId === token
+    ))
   ) || null;
 
   // 2. Buscar en Presupuestos
   let presupuesto = presupuestos.find(p =>
     p.portalToken === token ||
-    p.id === token ||
-    p.codigo === token ||
-    (lead && (p.id === lead.presupuestoId || p. id === lead.portalConfig?.presupuestoId || p.leadId === lead.id))
+    (allowInternalIds && (p.id === token || p.codigo === token)) ||
+    (lead && (p.id === lead.presupuestoId || p.id === lead.portalConfig?.presupuestoId || p.leadId === lead.id))
   ) || null;
 
   if (!presupuesto && lead) {
@@ -469,8 +511,8 @@ export function getUnifiedPortalPayload(rawToken) {
 
   // 3. Buscar en Proyectos / Contratos SOW
   let proyecto = proyectos.find(p =>
-    p.id === token ||
-    p.codigo === token ||
+    p.portalToken === token ||
+    (allowInternalIds && (p.id === token || p.codigo === token)) ||
     (presupuesto && p.presupuestoId === presupuesto.id) ||
     (lead && (p.id === lead.proyectoId || p.id === lead.portalConfig?.proyectoId))
   ) || null;
@@ -484,14 +526,6 @@ export function getUnifiedPortalPayload(rawToken) {
   if (proyecto && !lead) {
     const projEmp = normalizeStr(proyecto.cliente?.empresa);
     lead = crmLeads.find(l => projEmp && normalizeStr(l.empresa) === projEmp) || null;
-  }
-
-  // Fallback para 'portal-demo' si existen registros en la base de datos
-  if (!lead && !presupuesto && !proyecto && token === 'portal-demo' && crmLeads.length > 0) {
-    lead = crmLeads[0];
-    const lEmp = normalizeStr(lead.empresa);
-    presupuesto = presupuestos.find(p => p.id === lead.presupuestoId || normalizeStr(p.cliente?.empresa) === lEmp) || presupuestos[0] || null;
-    proyecto = proyectos.find(p => p.id === lead.proyectoId || normalizeStr(p.cliente?.empresa) === lEmp) || proyectos[0] || null;
   }
 
   if (!lead && !presupuesto && !proyecto) {
@@ -634,9 +668,14 @@ export function getUnifiedPortalPayload(rawToken) {
 /**
  * Propaga cualquier actualización realizada por el cliente en el Portal hacia todas las bases de datos (Fases 2 a 7)
  */
-export function applyPortalUpdateToWorkflow(token, updates = {}) {
+export function applyPortalUpdateToWorkflow(token, rawUpdates = {}) {
   const current = getUnifiedPortalPayload(token);
   if (!current) return null;
+
+  // Filtrar estrictamente por la allowlist de campos editables por el cliente en el portal (M-01)
+  const updates = sanitizePortalClientUpdates(rawUpdates);
+  if (rawUpdates?.driveVault) updates.driveVault = rawUpdates.driveVault;
+  if (rawUpdates?.enlaceDriveArchivos) updates.enlaceDriveArchivos = rawUpdates.enlaceDriveArchivos;
 
   const presupuestos = getPresupuestos();
   const proyectos = getProyectos();

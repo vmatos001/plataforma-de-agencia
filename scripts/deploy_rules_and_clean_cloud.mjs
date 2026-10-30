@@ -186,9 +186,11 @@ async function main() {
     console.log('Token de acceso obtenido exitosamente.');
 
     await deployFirestoreRules(accessToken, projectId);
-    await purgeFirestoreCollections(accessToken, projectId);
+    if (process.env.PURGE_FIRESTORE_ON_DEPLOY === 'true') {
+      await purgeFirestoreCollections(accessToken, projectId);
+    }
 
-    console.log('\n🎉 Mantenimiento y limpieza de Firebase Firestore completados con éxito.');
+    console.log('\n🎉 Despliegue de reglas de Firebase Firestore completado con éxito.');
   } catch (err) {
     console.error('Error durante el mantenimiento de Firestore:', err);
     // No romper el build si el SA tiene restricciones de IAM
