@@ -344,7 +344,6 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
           return p;
         });
         setProyectos(updatedProjs);
-        saveStoredProyectos(updatedProjs);
 
         const currentP = updatedProjs.find(p => p.id === selectedProyectoId);
         if (currentP) {

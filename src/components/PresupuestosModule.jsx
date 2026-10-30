@@ -32,15 +32,12 @@ import {
   Package
 } from 'lucide-react';
 import {
-  getStoredCrmLeads,
-  saveStoredCrmLeads
-} from '../services/localStore';
-import {
   getPresupuestosCloud,
   savePresupuestoCloud,
   deletePresupuestoCloud,
   subscribePresupuestosCloud,
   savePortalCloud,
+  getCrmLeadsCloud,
   saveCrmLeadCloud,
   isExcludedPresupuesto,
   markPresupuestoDeleted
@@ -537,12 +534,13 @@ export default function PresupuestosModule({
       const targetId = exists ? (presupuestos[existingIdx].id || activePresupuesto.id) : (activePresupuesto.id || ('prop-' + Date.now()));
       const targetCodigo = exists ? (presupuestos[existingIdx].codigo || activePresupuesto.codigo) : (activePresupuesto.codigo || `P-2026-${String(presupuestos.length + 1).padStart(3, '0')}`);
 
-      // Buscar el lead asociado en CRM para asociar portalToken y leadId
+      // Buscar el lead asociado en CRM Cloud para asociar portalToken y leadId
       let targetPortalToken = activePresupuesto.portalToken || (exists ? presupuestos[existingIdx].portalToken : null);
       let targetLeadId = activePresupuesto.leadId || (exists ? presupuestos[existingIdx].leadId : null);
+      let cloudCrmLeads = [];
       try {
-        const crmLeads = getStoredCrmLeads();
-        const matched = crmLeads.find(cl =>
+        cloudCrmLeads = await getCrmLeadsCloud();
+        const matched = cloudCrmLeads.find(cl =>
           (targetLeadId && cl.id === targetLeadId) ||
           (targetEmpresa && cl.empresa && cl.empresa.toLowerCase().trim() === targetEmpresa) ||
           (targetTelefono && cl.telefono && cl.telefono.replace(/\D/g, '') === targetTelefono)
@@ -614,44 +612,35 @@ export default function PresupuestosModule({
         console.warn('Backend sync error (usando local):', e);
       }
 
-      // 3. Sincronizar automáticamente con CRM Leads
-      if (typeof window !== 'undefined') {
-        try {
-          const crmLeads = getStoredCrmLeads();
-          const targetName = (propToSave.cliente?.empresa || '').toLowerCase().trim();
-          const targetPhone = (propToSave.cliente?.telefono || '').replace(/\D/g, '');
-          const nuevoMonto = Number(propToSave.inversion?.precioTotal) || 0;
+      // 3. Sincronizar automáticamente con CRM Leads en Firestore Cloud
+      try {
+        const crmLeads = cloudCrmLeads.length > 0 ? cloudCrmLeads : await getCrmLeadsCloud();
+        const targetName = (propToSave.cliente?.empresa || '').toLowerCase().trim();
+        const targetPhone = (propToSave.cliente?.telefono || '').replace(/\D/g, '');
+        const nuevoMonto = Number(propToSave.inversion?.precioTotal) || 0;
 
-          let updatedCrmFlag = false;
-          const updatedCrm = crmLeads.map(cl => {
-            const clName = (cl.empresa || '').toLowerCase().trim();
-            const clPhone = (cl.telefono || '').replace(/\D/g, '');
-            const isMatch = (targetName && (clName === targetName || clName.includes(targetName) || targetName.includes(clName))) ||
-                            (targetPhone && clPhone && (targetPhone === clPhone || clPhone.endsWith(targetPhone) || targetPhone.endsWith(clPhone))) ||
-                            (propToSave.leadId && cl.id === propToSave.leadId) ||
-                            (propToSave.cliente?.id && cl.id === propToSave.cliente.id);
+        for (const cl of crmLeads) {
+          const clName = (cl.empresa || '').toLowerCase().trim();
+          const clPhone = (cl.telefono || '').replace(/\D/g, '');
+          const isMatch = (targetName && (clName === targetName || clName.includes(targetName) || targetName.includes(clName))) ||
+                          (targetPhone && clPhone && (targetPhone === clPhone || targetPhone.endsWith(targetPhone) || clPhone.endsWith(targetPhone))) ||
+                          (propToSave.leadId && cl.id === propToSave.leadId) ||
+                          (propToSave.cliente?.id && cl.id === propToSave.cliente.id);
 
-            if (isMatch) {
-              updatedCrmFlag = true;
-              return {
-                ...cl,
-                presupuestoId: propToSave.id,
-                presupuestoCodigo: propToSave.codigo || 'P-2026',
-                presupuestoMonto: nuevoMonto,
-                valorEstimado: nuevoMonto,
-                presupuestoEstado: propToSave.estado || 'sin_abrir',
-                etapa: (cl.etapa === 'nuevo' || cl.etapa === 'contactado') ? 'propuesta_enviada' : cl.etapa
-              };
-            }
-            return cl;
-          });
-
-          if (updatedCrmFlag) {
-            saveStoredCrmLeads(updatedCrm);
+          if (isMatch) {
+            await saveCrmLeadCloud({
+              ...cl,
+              presupuestoId: propToSave.id,
+              presupuestoCodigo: propToSave.codigo || 'P-2026',
+              presupuestoMonto: nuevoMonto,
+              valorEstimado: nuevoMonto,
+              presupuestoEstado: propToSave.estado || 'sin_abrir',
+              etapa: (cl.etapa === 'nuevo' || cl.etapa === 'contactado') ? 'propuesta_enviada' : cl.etapa
+            });
           }
-        } catch (crmSyncErr) {
-          console.warn('[Presupuestos] Error sincronizando con CRM:', crmSyncErr);
         }
+      } catch (crmSyncErr) {
+        console.warn('[Presupuestos] Error sincronizando con CRM Cloud:', crmSyncErr);
       }
 
       // 4. Generar URL pública y abrir modal interactivo para compartir
@@ -796,20 +785,6 @@ export default function PresupuestosModule({
 
     let portalToken = target.portalToken || target.codigo || target.id;
     let matchedLead = null;
-    try {
-      const crmLeads = getStoredCrmLeads();
-      const targetEmpresa = (target.cliente?.empresa || '').toLowerCase().trim();
-      const targetTelefono = (target.cliente?.telefono || '').replace(/\D/g, '');
-      matchedLead = crmLeads.find(cl => 
-        (target.leadId && cl.id === target.leadId) ||
-        (targetEmpresa && cl.empresa && cl.empresa.toLowerCase().trim() === targetEmpresa) ||
-        (targetTelefono && cl.telefono && cl.telefono.replace(/\D/g, '') === targetTelefono)
-      );
-      if (matchedLead && matchedLead.portalToken) {
-        portalToken = matchedLead.portalToken;
-      }
-    } catch (e) {}
-
     if (!portalToken) portalToken = `portal-${target.id}`;
 
     // Sincronización en segundo plano con Firestore para garantizar persistencia sin inflar la URL

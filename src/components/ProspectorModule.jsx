@@ -23,12 +23,11 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../services/apiClient';
 import {
-  STORAGE_KEYS,
-  getLocalItem,
-  setLocalItem,
-  getStoredCrmLeads,
-  saveStoredCrmLeads
-} from '../services/localStore';
+  getAppStateCloud,
+  saveAppStateCloud,
+  getCrmLeadsCloud,
+  saveCrmLeadCloud
+} from '../services/firestoreSyncService';
 import { clientSearch, generateClientLead, generateClientAudit, generateClientPitch } from '../services/clientLeadEngine';
 
 export default function ProspectorModule({
@@ -47,10 +46,10 @@ export default function ProspectorModule({
   const [isPipelineRunning, setIsPipelineRunning] = useState(false);
   const [pipelineProgress, setPipelineProgress] = useState('');
 
-  // Leads y resultados
+  // Leads y resultados (100% Firestore Cloud)
   const [searchResults, setSearchResults] = useState([]);
   const [selectedResults, setSelectedResults] = useState(new Set());
-  const [leads, setLeads] = useState(() => getLocalItem(STORAGE_KEYS.OUTBOUND_LEADS, []));
+  const [leads, setLeads] = useState([]);
 
   // Filtros y búsquedas de leads
   const [leadFilter, setLeadFilter] = useState('todos');
@@ -108,21 +107,25 @@ export default function ProspectorModule({
 
   const fetchLeads = async () => {
     try {
+      const cloudOutbound = await getAppStateCloud('outbound_leads');
+      if (Array.isArray(cloudOutbound) && cloudOutbound.length > 0) {
+        setLeads(cloudOutbound);
+      }
       const res = await apiClient.get('/api/leads');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           setLeads(data);
-          setLocalItem(STORAGE_KEYS.OUTBOUND_LEADS, data);
+          saveAppStateCloud('outbound_leads', 'prospector', data).catch(() => {});
           autoSyncLeadsToCrmLocal(data);
         }
       }
     } catch (err) {
-      console.warn('[Prospector] API offline o en hosting estático, operando en modo Local-First:', err.message);
+      // Operando con Firestore Cloud
     }
   };
 
-  // Continuidad Automática Fase 1 -> Fase 2 (CRM) en el almacén local
+  // Continuidad Automática Fase 1 -> Fase 2 (CRM) en Firestore Cloud
   // Solo pasan al CRM los prospectos que ya han sido contactados/interactuados (empezando en etapa 'contactado')
   const mapFase1StatusToCrmStage = (estado) => {
     if (estado === 'cliente') return 'ganado';
@@ -130,11 +133,11 @@ export default function ProspectorModule({
     return 'contactado';
   };
 
-  const upsertLeadIntoCrm = (sl, statusOverride = null) => {
+  const upsertLeadIntoCrm = async (sl, statusOverride = null) => {
     if (!sl) return null;
     const effectiveStatus = statusOverride || sl.estado || 'contactado';
     const targetStage = mapFase1StatusToCrmStage(effectiveStatus);
-    const currentCrm = getStoredCrmLeads();
+    const currentCrm = await getCrmLeadsCloud().catch(() => []);
     const today = new Date().toISOString().split('T')[0];
 
     const slDom = (sl.dominio || '').toLowerCase().trim();
@@ -154,14 +157,14 @@ export default function ProspectorModule({
         ? (['propuesta_enviada', 'negociacion', 'ganado'].includes(existing.etapa) && targetStage === 'contactado' ? existing.etapa : targetStage)
         : existing.etapa;
 
-      currentCrm[existingIdx] = {
+      const updatedExisting = {
         ...existing,
         leadId: existing.leadId || sl.id || null,
         etapa: nextEtapa,
         actualizadoEn: today
       };
-      saveStoredCrmLeads(currentCrm);
-      return currentCrm[existingIdx];
+      await saveCrmLeadCloud(updatedExisting).catch(() => {});
+      return updatedExisting;
     }
 
     const newCrmLead = {
@@ -204,8 +207,7 @@ export default function ProspectorModule({
       creadoEn: today
     };
 
-    currentCrm.unshift(newCrmLead);
-    saveStoredCrmLeads(currentCrm);
+    await saveCrmLeadCloud(newCrmLead).catch(() => {});
     return newCrmLead;
   };
 
@@ -332,7 +334,7 @@ export default function ProspectorModule({
             const existingDomains = new Set(prev.map(l => l.dominio));
             const fresh = leadsToCreate.filter(l => !existingDomains.has(l.dominio));
             const updated = [...fresh, ...prev];
-            setLocalItem(STORAGE_KEYS.OUTBOUND_LEADS, updated);
+            saveAppStateCloud('outbound_leads', 'prospector', updated).catch(() => {});
             autoSyncLeadsToCrmLocal(fresh);
             return updated;
           });
@@ -437,7 +439,7 @@ export default function ProspectorModule({
         if (newLeadPayload) {
           setLeads(prev => {
             const updated = [newLeadPayload, ...prev];
-            setLocalItem(STORAGE_KEYS.OUTBOUND_LEADS, updated);
+            saveAppStateCloud('outbound_leads', 'prospector', updated).catch(() => {});
             autoSyncLeadsToCrmLocal([newLeadPayload]);
             return updated;
           });
@@ -463,7 +465,7 @@ export default function ProspectorModule({
         }
         return l;
       });
-      setLocalItem(STORAGE_KEYS.OUTBOUND_LEADS, updated);
+      saveAppStateCloud('outbound_leads', 'prospector', updated).catch(() => {});
       return updated;
     });
 
@@ -479,13 +481,11 @@ export default function ProspectorModule({
     if (['contactado', 'enviado_resend', 'enviado_instantly', 'respondio', 'cliente'].includes(newStatus)) {
       const leadToSync = targetLead || leads.find(l => l.id === leadId);
       if (leadToSync) {
-        const crmLead = upsertLeadIntoCrm(leadToSync, newStatus);
+        const crmLead = await upsertLeadIntoCrm(leadToSync, newStatus);
         if (crmLead) {
           try {
             await apiClient.post('/api/crm/leads', crmLead);
-          } catch (e) {
-            // Operando en modo Local-First
-          }
+          } catch (e) {}
         }
       }
     }
@@ -494,7 +494,7 @@ export default function ProspectorModule({
       await apiClient.patch(`/api/leads/${leadId}`, { estado: newStatus });
       fetchLeads();
     } catch (err) {
-      console.warn('Cambio guardado localmente (API offline):', err);
+      console.warn('Cambio guardado en Firestore Cloud:', err);
     }
   };
 
@@ -504,7 +504,7 @@ export default function ProspectorModule({
     try {
       setLeads(prev => {
         const next = prev.filter(l => l.id !== leadId);
-        setLocalItem(STORAGE_KEYS.OUTBOUND_LEADS, next);
+        saveAppStateCloud('outbound_leads', 'prospector', next).catch(() => {});
         return next;
       });
       await apiClient.delete(`/api/leads/${leadId}`);
@@ -517,7 +517,7 @@ export default function ProspectorModule({
   // Transferir lead al CRM (inicia directamente en 'contactado')
   const handleTransferLeadToCrm = async (lead) => {
     try {
-      const crmLeads = getStoredCrmLeads();
+      const crmLeads = await getCrmLeadsCloud().catch(() => []);
 
       const exists = crmLeads.some(cl =>
         (cl.id && (cl.id === lead.id || cl.leadId === lead.id || cl.id === `crm-${lead.id}`)) ||
@@ -526,7 +526,7 @@ export default function ProspectorModule({
       );
 
       const nextFase1Status = (!lead.estado || lead.estado === 'nuevo') ? 'contactado' : lead.estado;
-      const syncedCrmLead = upsertLeadIntoCrm(lead, nextFase1Status);
+      const syncedCrmLead = await upsertLeadIntoCrm(lead, nextFase1Status);
 
       if (lead.estado === 'nuevo' || !lead.estado) {
         handleUpdateLeadStatus(lead.id, 'contactado');

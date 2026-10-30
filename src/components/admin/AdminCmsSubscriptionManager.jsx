@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, PlusCircle, Calendar, Clock, AlertTriangle, CheckCircle2, Zap } from 'lucide-react';
 import { savePortalCloud, saveProyectoCloud } from '../../services/firestoreSyncService';
-import { saveStoredProyectos, getStoredProyectos } from '../../services/contractGenerator';
 
 /**
  * Gestor Administrativo de Membresías Goglite Care & CMS
@@ -80,14 +79,9 @@ export default function AdminCmsSubscriptionManager({
         portalConfig: updatedPortalConfig
       };
 
-      // 1. Persistir localmente en goglite_proyectos
-      const projs = getStoredProyectos();
-      const nextProjs = projs.map(p => p.id === proyecto.id ? updatedProyecto : p);
-      saveStoredProyectos(nextProjs);
-
-      // 2. Persistir en Firestore Cloud
+      // 1. Persistir en Firestore Cloud
       if (proyecto.id) {
-        await saveProyectoCloud(proyecto.id, updatedProyecto);
+        await saveProyectoCloud(updatedProyecto);
       }
       const activeToken = portalToken || proyecto.portalToken || proyecto.presupuestoId || proyecto.id;
       if (activeToken) {
@@ -97,8 +91,8 @@ export default function AdminCmsSubscriptionManager({
         });
       }
 
-      // 3. Notificar cambios a la interfaz y listeners
-      window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: nextProjs } }));
+      // 2. Notificar cambios a la interfaz y listeners
+      window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyecto: updatedProyecto } }));
       if (typeof onUpdate === 'function') {
         onUpdate(updatedProyecto);
       }

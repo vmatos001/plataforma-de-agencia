@@ -456,9 +456,7 @@ export default function ClientCmsPortal({ token }) {
           // Resolver Reseñas con la mayor fidelidad posible
           const resolvedReviews = (Array.isArray(existingCms?.reseñasCliente) && existingCms.reseñasCliente.length > 0)
             ? existingCms.reseñasCliente
-            : (Array.isArray(localGbpReviews) && localGbpReviews.length > 0)
-              ? localGbpReviews
-              : (baseline?.reseñasCliente || []);
+            : (baseline?.reseñasCliente || []);
 
           setEditableText(defaultContent);
           setCmsSite({
@@ -473,7 +471,7 @@ export default function ClientCmsPortal({ token }) {
             },
             gbpProfile: resolvedGbp,
             siteKitMetrics: resolvedSiteKit,
-            speedAnalysis: existingCms?.speedAnalysis || localSpeed || null,
+            speedAnalysis: existingCms?.speedAnalysis || null,
             reseñasCliente: resolvedReviews
           });
 

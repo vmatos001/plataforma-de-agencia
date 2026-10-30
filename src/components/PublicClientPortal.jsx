@@ -1768,7 +1768,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     // 1. Actualizar o crear proyecto formal firmado en el almacén local
     let targetUpdatedProj = null;
     try {
-      const projs = getStoredProyectos();
+      const projs = await getProyectosCloud();
       const targetEmp = (clientEmpresa || '').toLowerCase().trim();
       let found = false;
 
@@ -1862,7 +1862,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         }
       }
 
-      saveStoredProyectos(updatedProjs);
+      if (targetUpdatedProj) {
+        saveProyectoCloud(targetUpdatedProj).catch(() => {});
+      }
       window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: updatedProjs } }));
     } catch (e) {
       console.warn('Error guardando proyecto firmado:', e);
@@ -2009,14 +2011,14 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       const archivosActuales = data.portalConfig?.archivosSubidos || [];
       const actualizados = [...archivosActuales, nuevoArchivo];
 
-      // 3. Sincronizar con el proyecto en el Dashboard (Fase 3: Contratos & Onboarding)
+      // 3. Sincronizar con el proyecto en Firestore Cloud (Fase 3: Contratos & Onboarding)
       try {
-        const projs = getStoredProyectos();
+        const projs = await getProyectosCloud();
         const targetEmp = cleanEmpresa.toLowerCase().trim();
         const updatedProjs = projs.map(p => {
           const pEmp = (p.cliente?.empresa || '').toLowerCase().trim();
           if ((data?.proyecto?.id && p.id === data.proyecto.id) || (data?.presupuesto?.id && p.presupuestoId === data.presupuesto.id) || (targetEmp && pEmp === targetEmp)) {
-            return {
+            const modP = {
               ...p,
               onboarding: {
                 ...(p.onboarding || {}),
@@ -2028,10 +2030,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 ultimaRecepcionInsumos: new Date().toISOString()
               }
             };
+            saveProyectoCloud(modP).catch(() => {});
+            return modP;
           }
           return p;
         });
-        saveStoredProyectos(updatedProjs);
         window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: updatedProjs } }));
       } catch (projErr) {
         console.warn('Error sincronizando proyecto en Dashboard:', projErr);
@@ -2060,12 +2063,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     const actualizados = archivosActuales.filter(a => a.id !== archId);
 
     try {
-      const projs = getStoredProyectos();
+      const projs = await getProyectosCloud();
       const cleanEmpresa = (data?.presupuesto?.cliente?.empresa || data?.lead?.empresa || '').toLowerCase().trim();
       const updatedProjs = projs.map(p => {
         const pEmp = (p.cliente?.empresa || '').toLowerCase().trim();
         if ((data?.proyecto?.id && p.id === data.proyecto.id) || (data?.presupuesto?.id && p.presupuestoId === data.presupuesto.id) || (cleanEmpresa && pEmp === cleanEmpresa)) {
-          return {
+          const modP = {
             ...p,
             onboarding: {
               ...(p.onboarding || {}),
@@ -2073,10 +2076,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               archivosRecibidos: actualizados
             }
           };
+          saveProyectoCloud(modP).catch(() => {});
+          return modP;
         }
         return p;
       });
-      saveStoredProyectos(updatedProjs);
       window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: updatedProjs } }));
     } catch (e) {}
 
@@ -2092,7 +2096,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     const fullTimestamp = `${nowFecha} (${nowHora})`;
 
     try {
-      const storedProjs = getStoredProyectos();
+      const storedProjs = await getProyectosCloud();
       const leadEmp = (data?.lead?.empresa || '').toLowerCase().trim();
       const idx = storedProjs.findIndex(p => 
         (data?.proyecto && p.id === data.proyecto.id) ||
@@ -2109,7 +2113,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             estadoInsumos: 'pendiente_validacion_agencia'
           }
         };
-        saveStoredProyectos(storedProjs);
+        saveProyectoCloud(storedProjs[idx]).catch(() => {});
         window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: storedProjs } }));
       }
     } catch (e) {
@@ -2128,7 +2132,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const handleCompletarInsumos = async () => {
     const nowStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
     try {
-      const storedProjs = getStoredProyectos();
+      const storedProjs = await getProyectosCloud();
       const leadEmp = (data?.lead?.empresa || '').toLowerCase().trim();
       const idx = storedProjs.findIndex(p => 
         (data?.proyecto && p.id === data.proyecto.id) ||
@@ -2148,7 +2152,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             fechaValidacionAgencia: nowStr
           }
         });
-        saveStoredProyectos(storedProjs);
+        saveProyectoCloud(storedProjs[idx]).catch(() => {});
         window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: storedProjs } }));
       }
     } catch (e) {
@@ -2179,7 +2183,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
     setUnlockAnimating(true);
     setTimeout(async () => {
       try {
-        const storedProjs = getStoredProyectos();
+        const storedProjs = await getProyectosCloud();
         const leadEmp = (data?.lead?.empresa || '').toLowerCase().trim();
         const idx = storedProjs.findIndex(p => 
           (data?.proyecto && p.id === data.proyecto.id) ||
@@ -2198,6 +2202,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               saldoFecha: new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
             }
           });
+          saveProyectoCloud(storedProjs[idx]).catch(() => {});
           if (data?.proyecto) {
             saveProyectoCloud({
               ...data.proyecto,

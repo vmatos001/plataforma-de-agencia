@@ -2131,11 +2131,7 @@ export default function GestionRentabilidadModule({
       }
 
       // 2. Revisar prospectos en etapa 'ganado' o 'propuesta_enviada' en Módulo 2 (CRM)
-      let listM2 = m2CrmLeads;
-      try {
-        const stored = getStoredCrmLeads();
-        if (stored && stored.length > 0) listM2 = stored;
-      } catch {}
+      const listM2 = m2CrmLeads;
 
       if (Array.isArray(listM2)) {
         listM2.forEach(lead => {

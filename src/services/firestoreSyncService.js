@@ -50,6 +50,25 @@ if (typeof window !== 'undefined') {
   } catch {}
 }
 
+const PERMANENTLY_EXCLUDED_COMPANIES = [
+  'multiservicios gisselle',
+  'clínica dental escalón'
+];
+
+const PERMANENTLY_EXCLUDED_PRESUPUESTO_IDS = new Set([
+  'prop-1792978056908',
+  'p-2026-001'
+]);
+
+const PERMANENTLY_EXCLUDED_PROYECTO_IDS = new Set([
+  'con-2026-001',
+  'con-2026-002',
+  'p-2026-do-001',
+  'proj-turisran-do',
+  'proj-prop-1792978056908',
+  'prop-1792978056908'
+]);
+
 // Sets en memoria para exclusión defensiva de registros eliminados (sin usar localStorage)
 const deletedCrmLeadsMemory = new Set();
 const deletedPresupuestosMemory = new Set(PERMANENTLY_EXCLUDED_PRESUPUESTO_IDS);
@@ -323,7 +342,10 @@ export async function getProyectosCloud() {
 /**
  * Guarda o actualiza un proyecto en Firestore
  */
-export async function saveProyectoCloud(proyecto) {
+export async function saveProyectoCloud(proyectoOrId, maybeProyecto = null) {
+  const proyecto = (typeof proyectoOrId === 'string' && maybeProyecto && typeof maybeProyecto === 'object')
+    ? { ...maybeProyecto, id: maybeProyecto.id || proyectoOrId }
+    : proyectoOrId;
   if (!proyecto || !proyecto.id) return null;
   if (isExcludedProyecto(proyecto.cliente?.empresa || proyecto.cliente?.nombre, proyecto.id, proyecto.codigo, proyecto.presupuestoId, proyecto.presupuestoCodigo)) return null;
   try {
