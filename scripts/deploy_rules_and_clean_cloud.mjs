@@ -169,18 +169,13 @@ async function purgeFirestoreCollections(accessToken, projectId) {
 }
 
 async function purgeSpecificTestRecords(accessToken, projectId) {
-  console.log('\n[2/2] Limpiando registros de prueba específicos (TurisRan, TurisRan Dominicana, notable services transfer) en Firestore Cloud...');
+  console.log('\n[2/2] Limpiando registros de prueba específicos en Firestore Cloud...');
   const collections = ['presupuestos', 'proyectos', 'portales', 'crm_leads'];
   const bannedPatterns = [
-    'turisran',
-    'notable services transfer',
-    'p-2026-001',
-    'prop-1792978056908',
+    'multiservicios gisselle',
+    'clínica dental escalón',
     'con-2026-001',
-    'con-2026-002',
-    'p-2026-do-001',
-    'proj-turisran-do',
-    'crm-lead-1792969777629-cjfz'
+    'con-2026-002'
   ];
 
   for (const col of collections) {

@@ -47,20 +47,12 @@ const DELETED_RECORDS_STORAGE_KEY = 'goglite_deleted_records_v1';
 
 const PERMANENTLY_EXCLUDED_COMPANIES = [
   'multiservicios gisselle',
-  'clínica dental escalón',
-  'turisran',
-  'notable services transfer'
+  'clínica dental escalón'
 ];
 
 const PERMANENTLY_EXCLUDED_IDS_AND_CODES = new Set([
-  'p-2026-001',
-  'prop-1792978056908',
   'con-2026-001',
-  'con-2026-002',
-  'p-2026-do-001',
-  'proj-turisran-do',
-  'proj-prop-1792978056908',
-  'crm-lead-1792969777629-cjfz'
+  'con-2026-002'
 ]);
 
 export function getDeletedRecordsSet() {

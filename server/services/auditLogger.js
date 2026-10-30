@@ -24,7 +24,7 @@ export function logSecurityEvent(action, details = {}, req = null) {
   };
 
   const line = JSON.stringify(entry) + '\n';
-  console.info(`[SECURITY AUDIT] ${action} by ${entry.actor} (${entry.ip})`);
+  console.error(`[SECURITY AUDIT] ${action} by ${entry.actor} (${entry.ip})`);
 
   try {
     const dir = path.dirname(AUDIT_LOG_PATH);
