@@ -1329,7 +1329,7 @@ app.patch('/api/presupuestos/:id', (req, res) => {
 
 app.delete('/api/presupuestos/:id', (req, res) => {
   let list = getPresupuestos();
-  list = list.filter(p => p.id !== req.params.id);
+  list = list.filter(p => p.id !== req.params.id && p.codigo !== req.params.id);
   savePresupuestos(list);
   res.json({ success: true });
 });
@@ -1430,7 +1430,7 @@ app.patch('/api/proyectos/:id', (req, res) => {
 // Eliminar proyecto
 app.delete('/api/proyectos/:id', (req, res) => {
   let list = getProyectos();
-  list = list.filter(p => p.id !== req.params.id);
+  list = list.filter(p => p.id !== req.params.id && p.codigo !== req.params.id);
   saveProyectos(list);
   res.json({ success: true });
 });

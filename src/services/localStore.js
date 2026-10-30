@@ -5,6 +5,7 @@
  */
 
 import { INITIAL_PROD_CRM_LEADS } from '../constants/initialCrmData';
+import { isExcludedTestRecord } from './firestoreSyncService';
 
 export const STORAGE_KEYS = {
   // Navegación y estado global
@@ -100,7 +101,10 @@ export function removeLocalItem(key) {
 export function syncCrmLeadsWithPresupuestos(crmLeads) {
   if (typeof window === 'undefined' || !Array.isArray(crmLeads)) return crmLeads;
   try {
-    const normalizedLeads = crmLeads.map(l => ({
+    const filteredLeads = crmLeads.filter(
+      l => l && !isExcludedTestRecord(l.empresa || l.nombreEmpresa || l.contacto, l.id, l.leadId, l.presupuestoId, l.presupuestoCodigo)
+    );
+    const normalizedLeads = filteredLeads.map(l => ({
       ...l,
       etapa: (!l.etapa || l.etapa === 'nuevo') ? 'contactado' : l.etapa
     }));

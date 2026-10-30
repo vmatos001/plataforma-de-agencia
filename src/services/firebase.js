@@ -16,25 +16,33 @@ export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 
-let authInitPromise = null;
 export function ensureAuth() {
-  if (!authInitPromise) {
-    authInitPromise = new Promise((resolve) => {
-      onAuthStateChanged(auth, (user) => {
-        if (user) {
-          resolve(user);
-        } else {
+  if (auth.currentUser && !auth.currentUser.isAnonymous) {
+    return Promise.resolve(auth.currentUser);
+  }
+  return new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+      if (user) {
+        resolve(user);
+      } else {
+        const isPublicPortal =
+          typeof window !== 'undefined' &&
+          (window.location.pathname.startsWith('/portal/') ||
+           window.location.pathname.startsWith('/cms-cliente/'));
+        if (isPublicPortal) {
           signInAnonymously(auth)
             .then((cred) => resolve(cred.user))
             .catch((err) => {
               console.warn('[Firebase Auth] Anonymous sign-in fallback:', err);
               resolve(null);
             });
+        } else {
+          resolve(null);
         }
-      });
+      }
     });
-  }
-  return authInitPromise;
+  });
 }
 
 /**

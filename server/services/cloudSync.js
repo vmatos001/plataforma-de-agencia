@@ -204,3 +204,25 @@ export async function syncProyectoToCloud(proyecto) {
 
   return true;
 }
+
+export async function deletePresupuestoFromCloud(id) {
+  if (!id) return false;
+  try {
+    await ensureAuth();
+    await deleteDoc(doc(db, 'presupuestos', String(id).trim()));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteProyectoFromCloud(id) {
+  if (!id) return false;
+  try {
+    await ensureAuth();
+    await deleteDoc(doc(db, 'proyectos', String(id).trim()));
+    return true;
+  } catch {
+    return false;
+  }
+}

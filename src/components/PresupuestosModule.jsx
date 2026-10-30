@@ -40,8 +40,11 @@ import {
   savePresupuestoCloud,
   deletePresupuestoCloud,
   subscribePresupuestosCloud,
-  savePortalCloud
+  savePortalCloud,
+  isExcludedTestRecord,
+  markRecordDeleted
 } from '../services/firestoreSyncService';
+import { apiFetch } from '../services/apiClient';
 import { DEFAULT_AGENCY_BRANDING, getAgencyContactForCountry } from '../constants/defaultAgencyBranding';
 import { DEFAULT_SERVICES } from './AgencyWhiteLabelSettingsModal';
 
@@ -276,7 +279,11 @@ export default function PresupuestosModule({
     );
 
     const validList = list.filter(
-      p => p && (p.id || p.codigo) && !(p.cliente?.empresa === 'Empresa' && !p.codigo)
+      p =>
+        p &&
+        (p.id || p.codigo) &&
+        !(p.cliente?.empresa === 'Empresa' && !p.codigo) &&
+        !isExcludedTestRecord(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p._firestoreDocId)
     );
 
     const seen = new Map();
@@ -728,23 +735,40 @@ export default function PresupuestosModule({
     e?.stopPropagation();
     if (!confirm('¿Eliminar esta propuesta?')) return;
     try {
-      deletePresupuestoCloud(id).catch(e => console.warn('[Presupuestos] Error eliminando de nube:', e));
-      try {
-        await fetch(getBackendEndpoint(`/api/presupuestos/${id}`), { method: 'DELETE' });
-      } catch (err) {
-        console.warn('Delete backend error, removiendo localmente:', err);
-      }
+      const targetProp = presupuestos.find(p => p.id === id || p.codigo === id);
+      const extraKeys = [
+        id,
+        targetProp?.id,
+        targetProp?.codigo,
+        targetProp?._firestoreDocId,
+        targetProp?.cliente?.empresa
+      ].filter(Boolean);
+
+      markRecordDeleted(...extraKeys);
+
       setPresupuestos(prev => {
-        const updated = prev.filter(p => p.id !== id);
+        const updated = prev.filter(
+          p =>
+            p.id !== id &&
+            p.codigo !== id &&
+            !isExcludedTestRecord(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p._firestoreDocId)
+        );
         if (typeof window !== 'undefined') {
           localStorage.setItem('goglite_presupuestos', JSON.stringify(updated));
         }
         return updated;
       });
-      fetchPresupuestos();
-      if (activePresupuesto?.id === id) {
+
+      if (activePresupuesto?.id === id || activePresupuesto?.codigo === id) {
         setViewMode('list');
         setActivePresupuesto(null);
+      }
+
+      await deletePresupuestoCloud(id, extraKeys).catch(err => console.warn('[Presupuestos] Error eliminando de nube:', err));
+      try {
+        await apiFetch(`/api/presupuestos/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      } catch (err) {
+        console.warn('Delete backend error, removido localmente:', err);
       }
     } catch (err) {
       console.error(err);
@@ -1108,7 +1132,7 @@ export default function PresupuestosModule({
                             <Sliders className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={(e) => handleDeletePresupuesto(prop.id, e)}
+                            onClick={(e) => handleDeletePresupuesto(prop.id || prop.codigo, e)}
                             className="p-1.5 rounded hover:bg-slate-700 text-red-400 hover:text-red-300"
                             title="Eliminar"
                           >

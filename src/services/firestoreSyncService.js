@@ -43,13 +43,79 @@ function sanitizeForFirestore(obj) {
   return clean;
 }
 
+const DELETED_RECORDS_STORAGE_KEY = 'goglite_deleted_records_v1';
+
+const PERMANENTLY_EXCLUDED_COMPANIES = [
+  'multiservicios gisselle',
+  'clínica dental escalón',
+  'turisran',
+  'notable services transfer'
+];
+
+const PERMANENTLY_EXCLUDED_IDS_AND_CODES = new Set([
+  'p-2026-001',
+  'prop-1792978056908',
+  'con-2026-001',
+  'con-2026-002',
+  'p-2026-do-001',
+  'proj-turisran-do',
+  'proj-prop-1792978056908',
+  'crm-lead-1792969777629-cjfz'
+]);
+
+export function getDeletedRecordsSet() {
+  const set = new Set(PERMANENTLY_EXCLUDED_IDS_AND_CODES);
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(DELETED_RECORDS_STORAGE_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          arr.forEach(k => {
+            if (k) set.add(String(k).toLowerCase().trim());
+          });
+        }
+      }
+    } catch {}
+  }
+  return set;
+}
+
+export function markRecordDeleted(...keys) {
+  const set = getDeletedRecordsSet();
+  for (const k of keys) {
+    if (k && typeof k === 'string') {
+      const clean = k.toLowerCase().trim();
+      if (clean) set.add(clean);
+    }
+  }
+  const list = Array.from(set);
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(DELETED_RECORDS_STORAGE_KEY, JSON.stringify(list));
+    } catch {}
+  }
+  return set;
+}
+
 /**
- * Filtra leads de prueba que no deben persistirse en producción
+ * Filtra leads, propuestas y contratos de prueba o eliminados que no deben persistirse ni reaparecer
  */
-function isExcludedTestRecord(empresaOrName) {
-  if (!empresaOrName) return false;
-  const norm = String(empresaOrName).toLowerCase().trim();
-  return norm.includes('multiservicios gisselle') || norm.includes('clínica dental escalón');
+export function isExcludedTestRecord(empresaOrName, ...idsOrCodes) {
+  const deletedSet = getDeletedRecordsSet();
+  for (const rawKey of idsOrCodes) {
+    if (!rawKey) continue;
+    const normKey = String(rawKey).toLowerCase().trim();
+    if (normKey && deletedSet.has(normKey)) return true;
+  }
+  if (empresaOrName) {
+    const norm = String(empresaOrName).toLowerCase().trim();
+    if (norm && deletedSet.has(norm)) return true;
+    for (const banned of PERMANENTLY_EXCLUDED_COMPANIES) {
+      if (norm.includes(banned)) return true;
+    }
+  }
+  return false;
 }
 
 // ============================================================================
@@ -205,7 +271,13 @@ export async function getProyectosCloud() {
     const list = [];
     snap.forEach(docSnap => {
       if (docSnap.exists()) {
-        list.push({ id: docSnap.id, ...docSnap.data() });
+        const data = docSnap.data() || {};
+        const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
+        if (isExcludedTestRecord(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, item.presupuestoId, item.presupuestoCodigo, docSnap.id)) {
+          deleteDoc(docSnap.ref).catch(() => {});
+          return;
+        }
+        list.push(item);
       }
     });
     return list;
@@ -220,13 +292,14 @@ export async function getProyectosCloud() {
  */
 export async function saveProyectoCloud(proyecto) {
   if (!proyecto || !proyecto.id) return null;
-  if (isExcludedTestRecord(proyecto.cliente?.empresa)) return null;
+  if (isExcludedTestRecord(proyecto.cliente?.empresa || proyecto.cliente?.nombre, proyecto.id, proyecto.codigo, proyecto.presupuestoId, proyecto.presupuestoCodigo)) return null;
   try {
     await ensureAuth();
     const docId = String(proyecto.id).trim();
     const projRef = doc(db, 'proyectos', docId);
+    const { _firestoreDocId, ...restProyecto } = proyecto;
     const payload = sanitizeForFirestore({
-      ...proyecto,
+      ...restProyecto,
       id: docId,
       updatedAt: new Date().toISOString()
     });
@@ -259,14 +332,33 @@ export async function saveProyectoCloud(proyecto) {
 }
 
 /**
- * Elimina un proyecto de Firestore
+ * Elimina un proyecto de Firestore y lo registra en la lista de exclusión permanente
  */
-export async function deleteProyectoCloud(proyectoId) {
-  if (!proyectoId) return false;
+export async function deleteProyectoCloud(proyectoId, extraKeys = []) {
+  if (!proyectoId && (!extraKeys || extraKeys.length === 0)) return false;
+  markRecordDeleted(proyectoId, ...(Array.isArray(extraKeys) ? extraKeys : [extraKeys]));
   try {
     await ensureAuth();
-    const docId = String(proyectoId).trim();
-    await deleteDoc(doc(db, 'proyectos', docId));
+    const candidates = new Set([proyectoId, ...(Array.isArray(extraKeys) ? extraKeys : [])].filter(Boolean).map(x => String(x).trim()));
+    for (const cId of candidates) {
+      await deleteDoc(doc(db, 'proyectos', cId)).catch(() => {});
+    }
+    const snap = await getDocs(collection(db, 'proyectos')).catch(() => null);
+    if (snap) {
+      const deletions = [];
+      snap.forEach(docSnap => {
+        const d = docSnap.data() || {};
+        if (
+          candidates.has(docSnap.id) ||
+          (d.id && candidates.has(String(d.id).trim())) ||
+          (d.codigo && candidates.has(String(d.codigo).trim())) ||
+          isExcludedTestRecord(d.cliente?.empresa || d.cliente?.nombre, d.id, d.codigo, docSnap.id)
+        ) {
+          deletions.push(deleteDoc(docSnap.ref).catch(() => {}));
+        }
+      });
+      await Promise.all(deletions);
+    }
     return true;
   } catch (err) {
     console.warn('[FirestoreSync] Error eliminando proyecto de Firestore:', proyectoId, err);
@@ -284,7 +376,13 @@ export function subscribeProyectosCloud(onUpdate) {
       const list = [];
       snap.forEach(docSnap => {
         if (docSnap.exists()) {
-          list.push({ id: docSnap.id, ...docSnap.data() });
+          const data = docSnap.data() || {};
+          const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
+          if (isExcludedTestRecord(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, item.presupuestoId, item.presupuestoCodigo, docSnap.id)) {
+            deleteDoc(docSnap.ref).catch(() => {});
+            return;
+          }
+          list.push(item);
         }
       });
       onUpdate(list);
@@ -311,7 +409,13 @@ export async function getCrmLeadsCloud() {
     const list = [];
     snap.forEach(docSnap => {
       if (docSnap.exists()) {
-        list.push({ id: docSnap.id, ...docSnap.data() });
+        const data = docSnap.data() || {};
+        const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
+        if (isExcludedTestRecord(item.empresa || item.nombreEmpresa || item.contacto, item.id, item.leadId, docSnap.id)) {
+          deleteDoc(docSnap.ref).catch(() => {});
+          return;
+        }
+        list.push(item);
       }
     });
     return list;
@@ -326,13 +430,14 @@ export async function getCrmLeadsCloud() {
  */
 export async function saveCrmLeadCloud(lead) {
   if (!lead || !lead.id) return null;
-  if (isExcludedTestRecord(lead.empresa || lead.nombreEmpresa)) return null;
+  if (isExcludedTestRecord(lead.empresa || lead.nombreEmpresa || lead.contacto, lead.id, lead.leadId)) return null;
   try {
     await ensureAuth();
     const docId = String(lead.id).trim();
     const leadRef = doc(db, 'crm_leads', docId);
+    const { _firestoreDocId, ...restLead } = lead;
     const payload = sanitizeForFirestore({
-      ...lead,
+      ...restLead,
       id: docId,
       updatedAt: new Date().toISOString()
     });
@@ -354,8 +459,9 @@ export async function saveCrmLeadCloud(lead) {
 /**
  * Elimina un lead de Firestore
  */
-export async function deleteCrmLeadCloud(leadId) {
+export async function deleteCrmLeadCloud(leadId, extraKeys = []) {
   if (!leadId) return false;
+  markRecordDeleted(leadId, ...(Array.isArray(extraKeys) ? extraKeys : [extraKeys]));
   try {
     await ensureAuth();
     const docId = String(leadId).trim();
@@ -377,7 +483,13 @@ export function subscribeCrmLeadsCloud(onUpdate) {
       const list = [];
       snap.forEach(docSnap => {
         if (docSnap.exists()) {
-          list.push({ id: docSnap.id, ...docSnap.data() });
+          const data = docSnap.data() || {};
+          const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
+          if (isExcludedTestRecord(item.empresa || item.nombreEmpresa || item.contacto, item.id, item.leadId, docSnap.id)) {
+            deleteDoc(docSnap.ref).catch(() => {});
+            return;
+          }
+          list.push(item);
         }
       });
       onUpdate(list);
@@ -404,7 +516,13 @@ export async function getPresupuestosCloud() {
     const list = [];
     snap.forEach(docSnap => {
       if (docSnap.exists()) {
-        list.push({ id: docSnap.id, ...docSnap.data() });
+        const data = docSnap.data() || {};
+        const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
+        if (isExcludedTestRecord(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, docSnap.id)) {
+          deleteDoc(docSnap.ref).catch(() => {});
+          return;
+        }
+        list.push(item);
       }
     });
     return list;
@@ -419,13 +537,14 @@ export async function getPresupuestosCloud() {
  */
 export async function savePresupuestoCloud(presupuesto) {
   if (!presupuesto || !presupuesto.id) return null;
-  if (isExcludedTestRecord(presupuesto.cliente?.empresa)) return null;
+  if (isExcludedTestRecord(presupuesto.cliente?.empresa || presupuesto.cliente?.nombre, presupuesto.id, presupuesto.codigo)) return null;
   try {
     await ensureAuth();
     const docId = String(presupuesto.id).trim();
     const presRef = doc(db, 'presupuestos', docId);
+    const { _firestoreDocId, ...restPresupuesto } = presupuesto;
     const payload = sanitizeForFirestore({
-      ...presupuesto,
+      ...restPresupuesto,
       id: docId,
       updatedAt: new Date().toISOString()
     });
@@ -444,14 +563,33 @@ export async function savePresupuestoCloud(presupuesto) {
 }
 
 /**
- * Elimina un presupuesto de Firestore
+ * Elimina un presupuesto de Firestore y lo registra en la lista de exclusión permanente
  */
-export async function deletePresupuestoCloud(presupuestoId) {
-  if (!presupuestoId) return false;
+export async function deletePresupuestoCloud(presupuestoId, extraKeys = []) {
+  if (!presupuestoId && (!extraKeys || extraKeys.length === 0)) return false;
+  markRecordDeleted(presupuestoId, ...(Array.isArray(extraKeys) ? extraKeys : [extraKeys]));
   try {
     await ensureAuth();
-    const docId = String(presupuestoId).trim();
-    await deleteDoc(doc(db, 'presupuestos', docId));
+    const candidates = new Set([presupuestoId, ...(Array.isArray(extraKeys) ? extraKeys : [])].filter(Boolean).map(x => String(x).trim()));
+    for (const cId of candidates) {
+      await deleteDoc(doc(db, 'presupuestos', cId)).catch(() => {});
+    }
+    const snap = await getDocs(collection(db, 'presupuestos')).catch(() => null);
+    if (snap) {
+      const deletions = [];
+      snap.forEach(docSnap => {
+        const d = docSnap.data() || {};
+        if (
+          candidates.has(docSnap.id) ||
+          (d.id && candidates.has(String(d.id).trim())) ||
+          (d.codigo && candidates.has(String(d.codigo).trim())) ||
+          isExcludedTestRecord(d.cliente?.empresa || d.cliente?.nombre, d.id, d.codigo, docSnap.id)
+        ) {
+          deletions.push(deleteDoc(docSnap.ref).catch(() => {}));
+        }
+      });
+      await Promise.all(deletions);
+    }
     return true;
   } catch (err) {
     console.warn('[FirestoreSync] Error eliminando presupuesto de Firestore:', presupuestoId, err);
@@ -469,7 +607,13 @@ export function subscribePresupuestosCloud(onUpdate) {
       const list = [];
       snap.forEach(docSnap => {
         if (docSnap.exists()) {
-          list.push({ id: docSnap.id, ...docSnap.data() });
+          const data = docSnap.data() || {};
+          const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
+          if (isExcludedTestRecord(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, docSnap.id)) {
+            deleteDoc(docSnap.ref).catch(() => {});
+            return;
+          }
+          list.push(item);
         }
       });
       onUpdate(list);

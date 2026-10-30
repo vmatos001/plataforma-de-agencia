@@ -168,6 +168,56 @@ async function purgeFirestoreCollections(accessToken, projectId) {
   }
 }
 
+async function purgeSpecificTestRecords(accessToken, projectId) {
+  console.log('\n[2/2] Limpiando registros de prueba específicos (TurisRan, TurisRan Dominicana, notable services transfer) en Firestore Cloud...');
+  const collections = ['presupuestos', 'proyectos', 'portales', 'crm_leads'];
+  const bannedPatterns = [
+    'turisran',
+    'notable services transfer',
+    'p-2026-001',
+    'prop-1792978056908',
+    'con-2026-001',
+    'con-2026-002',
+    'p-2026-do-001',
+    'proj-turisran-do',
+    'crm-lead-1792969777629-cjfz'
+  ];
+
+  for (const col of collections) {
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${col}?pageSize=300`;
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      if (!res.ok) continue;
+
+      const data = await res.json();
+      const docs = data.documents || [];
+      let deleted = 0;
+
+      for (const doc of docs) {
+        const serialized = JSON.stringify(doc).toLowerCase();
+        const isTest = bannedPatterns.some(pattern => serialized.includes(pattern));
+        if (isTest) {
+          const delRes = await fetch(`https://firestore.googleapis.com/v1/${doc.name}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+          });
+          if (delRes.ok) {
+            deleted++;
+            console.log(`🗑️ Eliminado documento de prueba en '${col}': ${doc.name.split('/').pop()}`);
+          }
+        }
+      }
+      if (deleted > 0) {
+        console.log(`✅ Colección '${col}': eliminados ${deleted} documentos de prueba.`);
+      }
+    } catch (e) {
+      console.warn(`Error limpiando documentos de prueba en ${col}:`, e.message);
+    }
+  }
+}
+
 async function main() {
   const saPath = process.argv[2] || process.env.GOOGLE_APPLICATION_CREDENTIALS || '/tmp/sa.json';
   if (!fs.existsSync(saPath)) {
@@ -186,6 +236,7 @@ async function main() {
     console.log('Token de acceso obtenido exitosamente.');
 
     await deployFirestoreRules(accessToken, projectId);
+    await purgeSpecificTestRecords(accessToken, projectId);
     if (process.env.PURGE_FIRESTORE_ON_DEPLOY === 'true') {
       await purgeFirestoreCollections(accessToken, projectId);
     }

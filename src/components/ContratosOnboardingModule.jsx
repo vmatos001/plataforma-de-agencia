@@ -62,8 +62,11 @@ import {
   saveProyectoCloud, 
   deleteProyectoCloud,
   subscribeProyectosCloud, 
-  savePortalCloud 
+  savePortalCloud,
+  isExcludedTestRecord,
+  markRecordDeleted
 } from '../services/firestoreSyncService';
+import { apiFetch } from '../services/apiClient';
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 import {
   buildInvoiceFromPresupuesto,
@@ -117,11 +120,14 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
 
     // Suscripción en tiempo real a proyectos en Firestore para actualización instantánea multiplataforma
     const unsubscribeProyectos = subscribeProyectosCloud((cloudList) => {
-      if (Array.isArray(cloudList) && cloudList.length > 0) {
+      if (Array.isArray(cloudList)) {
         setProyectos(prev => {
           const map = new Map();
           [...cloudList, ...prev].forEach(p => {
-            if (p?.id && !map.has(p.id)) map.set(p.id, p);
+            if (!p?.id && !p?.codigo) return;
+            if (isExcludedTestRecord(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p.presupuestoId, p.presupuestoCodigo, p._firestoreDocId)) return;
+            const key = p.id || p.codigo;
+            if (!map.has(key)) map.set(key, p);
           });
           return Array.from(map.values());
         });
@@ -160,13 +166,16 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       console.warn('[Contratos] Error leyendo proyectos de Firestore:', cErr);
     }
 
-    // Auto-generar y vincular contratos para cualquier propuesta que ya haya sido aceptada
+    // Auto-generar y vincular contratos para cualquier propuesta que ya haya sido aceptada (excluyendo eliminadas/prueba)
     try {
       const rawProps = localStorage.getItem('goglite_presupuestos');
       if (rawProps) {
         const parsedProps = JSON.parse(rawProps);
         let createdAny = false;
         parsedProps.forEach(prop => {
+          if (isExcludedTestRecord(prop?.cliente?.empresa || prop?.cliente?.nombre, prop?.id, prop?.codigo, prop?._firestoreDocId)) {
+            return;
+          }
           if (prop?.estado === 'aceptado') {
             const targetEmp = (prop.cliente?.empresa || '').toLowerCase().trim();
             const existingIdx = localList.findIndex(p => 
@@ -179,8 +188,10 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
               createdAny = true;
             } else {
               const newProj = buildProyectoFromPresupuesto(prop, localList);
-              localList.unshift(newProj);
-              createdAny = true;
+              if (newProj && !isExcludedTestRecord(newProj.cliente?.empresa, newProj.id, newProj.codigo, newProj.presupuestoId, newProj.presupuestoCodigo)) {
+                localList.unshift(newProj);
+                createdAny = true;
+              }
             }
           }
         });
@@ -191,7 +202,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     } catch (e) {}
 
     try {
-      const res = await fetch('/api/proyectos');
+      const res = await apiFetch('/api/proyectos');
       const cType = res.headers.get('content-type') || '';
       if (res.ok && cType.includes('application/json')) {
         const data = await res.json();
@@ -207,6 +218,19 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     } catch (err) {
       console.warn('[Contratos] Usando proyectos locales:', err);
     } finally {
+      // Filtrar registros de prueba o eliminados permanentemente
+      localList = localList.filter(p =>
+        p &&
+        !isExcludedTestRecord(
+          p.cliente?.empresa || p.cliente?.nombre,
+          p.id,
+          p.codigo,
+          p.presupuestoId,
+          p.presupuestoCodigo,
+          p._firestoreDocId
+        )
+      );
+
       // Re-evaluar automáticamente hitos con eventos del cliente y sprint de desarrollo
       // y auto-sincronizar datos de comprobante de anticipo desde portalConfig si faltan en pagos
       localList = localList.map(p => {
@@ -353,18 +377,44 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     e?.stopPropagation();
     if (!confirm('¿Seguro que deseas eliminar este proyecto y su contrato?')) return;
     try {
-      deleteProyectoCloud(id).catch(() => {});
-      try {
-        await fetch(`/api/proyectos/${id}`, { method: 'DELETE' });
-      } catch (e) {}
-      const updated = proyectos.filter(p => p.id !== id);
+      const targetProj = proyectos.find(p => p.id === id || p.codigo === id);
+      const extraKeys = [
+        id,
+        targetProj?.id,
+        targetProj?.codigo,
+        targetProj?._firestoreDocId,
+        targetProj?.presupuestoId,
+        targetProj?.presupuestoCodigo,
+        targetProj?.cliente?.empresa
+      ].filter(Boolean);
+
+      markRecordDeleted(...extraKeys);
+
+      const updated = proyectos.filter(
+        p =>
+          p.id !== id &&
+          p.codigo !== id &&
+          !isExcludedTestRecord(
+            p.cliente?.empresa || p.cliente?.nombre,
+            p.id,
+            p.codigo,
+            p.presupuestoId,
+            p.presupuestoCodigo,
+            p._firestoreDocId
+          )
+      );
       setProyectos(updated);
       saveStoredProyectos(updated);
 
-      if (activeProyecto?.id === id) {
+      if (activeProyecto?.id === id || activeProyecto?.codigo === id) {
         setViewMode('list');
         setActiveProyecto(null);
       }
+
+      await deleteProyectoCloud(id, extraKeys).catch(() => {});
+      try {
+        await apiFetch(`/api/proyectos/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      } catch (e) {}
     } catch (err) {
       console.error(err);
     }
@@ -1556,7 +1606,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
                           </span>
 
                           <button
-                            onClick={(e) => handleDeleteProyecto(p.id, e)}
+                            onClick={(e) => handleDeleteProyecto(p.id || p.codigo, e)}
                             className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-slate-800/60 transition-colors"
                             title="Eliminar proyecto"
                           >
