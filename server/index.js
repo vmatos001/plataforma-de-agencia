@@ -53,7 +53,7 @@ import {
 } from './services/googleDriveService.js';
 import { setupMcpRoutes } from './mcp/sseHandler.js';
 import { getAgencySettings, saveAgencySettings } from './services/agencySettingsStorage.js';
-import { getUsers, saveUsers, createCollaborator, registerOrUpdateClientAuth, getUserById, updateUser, deleteCollaborator } from './services/usersStorage.js';
+import { getUsers, saveUsers, createCollaborator, registerOrUpdateClientAuth, getUserById, getUserByEmail, updateUser, deleteCollaborator } from './services/usersStorage.js';
 import { verifyTOTP, generateTOTP, buildOtpAuthUri, generateQrCodeDataUrl } from './services/totpService.js';
 import {
   syncScrapperLeadToCrm,
@@ -302,7 +302,13 @@ app.post('/api/agency/settings', (req, res) => {
 // 1.2 Users, Collaborators & Authentication (RBAC)
 app.get('/api/users', (req, res) => {
   try {
-    const users = getUsers();
+    const users = getUsers().map(u => {
+      const sanitized = { ...u };
+      delete sanitized.totpKeySecret;
+      delete sanitized.password;
+      delete sanitized.passwordHash;
+      return sanitized;
+    });
     res.json(users);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -379,9 +385,14 @@ app.post('/api/auth/login', (req, res) => {
     user.ultimoAcceso = new Date().toISOString();
     saveUsers(users);
 
+    const sanitizedUser = { ...user };
+    delete sanitizedUser.totpKeySecret;
+    delete sanitizedUser.password;
+    delete sanitizedUser.passwordHash;
+
     res.json({
       success: true,
-      user,
+      user: sanitizedUser,
       token: `goglite-jwt-${user.id}-${Date.now()}`
     });
   } catch (err) {
@@ -412,8 +423,18 @@ app.get('/api/auth/2fa/setup', async (req, res) => {
 
 app.post('/api/auth/2fa/verify', (req, res) => {
   try {
-    const { token, secret = process.env.GOGLITE_TOTP_SECRET || 'JBSWY3DPEHPK3PXP' } = req.body;
-    const result = verifyTOTP(token, secret);
+    const { token, email, secret } = req.body;
+    let userSecret = secret;
+    if (!userSecret && email) {
+      const user = getUserByEmail(email);
+      if (user?.totpKeySecret) {
+        userSecret = user.totpKeySecret;
+      }
+    }
+    if (!userSecret) {
+      userSecret = process.env.GOGLITE_TOTP_SECRET || 'JBSWY3DPEHPK3PXP';
+    }
+    const result = verifyTOTP(token, userSecret);
     res.json({
       success: result.valid,
       valid: result.valid,

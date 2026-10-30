@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
+import { getApiUrl } from '../services/apiClient';
 import { 
   User, 
   KeyRound, 
@@ -128,10 +129,13 @@ export default function UserProfileModal({
 
     setVerifying(true);
     try {
-      const res = await fetch('/api/auth/2fa/verify', {
+      const res = await fetch(getApiUrl('/api/auth/2fa/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: totpInput.trim(), secret: totpSecret })
+        body: JSON.stringify({
+          token: totpInput.trim(),
+          email: currentUser?.email
+        })
       });
       const data = await res.json();
       if (data.valid) {
@@ -475,21 +479,25 @@ export default function UserProfileModal({
                       </p>
                       
                       <div className="pt-1">
-                        <label className="text-[10px] font-mono text-slate-400 block mb-1">Llave de respaldo manual (Base32):</label>
+                        <label className="text-[10px] font-mono text-slate-400 block mb-1">Estado de la Llave Secreta:</label>
                         <div className="flex items-center gap-2 bg-[#121725] border border-slate-700 rounded-lg px-2.5 py-1.5">
-                          <code className="text-xs font-mono text-emerald-400 font-bold tracking-wider">{totpSecret}</code>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(totpSecret);
-                              setCopiedKey(true);
-                              setTimeout(() => setCopiedKey(false), 2000);
-                            }}
-                            className="ml-auto text-[10px] text-slate-400 hover:text-white flex items-center gap-1 font-sans"
-                          >
-                            {copiedKey ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                            <span>{copiedKey ? 'Copiada' : 'Copiar'}</span>
-                          </button>
+                          <code className="text-xs font-mono text-emerald-400 font-bold tracking-wider">
+                            {currentUser?.totpKeySecret ? currentUser.totpKeySecret : '•••••••••••••••• (Cifrada en el Servidor)'}
+                          </code>
+                          {currentUser?.totpKeySecret && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(currentUser.totpKeySecret);
+                                setCopiedKey(true);
+                                setTimeout(() => setCopiedKey(false), 2000);
+                              }}
+                              className="ml-auto text-[10px] text-slate-400 hover:text-white flex items-center gap-1 font-sans"
+                            >
+                              {copiedKey ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              <span>{copiedKey ? 'Copiada' : 'Copiar'}</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

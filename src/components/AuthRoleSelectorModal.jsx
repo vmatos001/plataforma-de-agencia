@@ -68,7 +68,7 @@ export default function AuthRoleSelectorModal({
     try {
       const res = await apiClient.post('/api/auth/2fa/verify', {
         token: cleanCode,
-        secret: targetAdminUser?.totpKeySecret || undefined
+        email: targetAdminUser?.email
       });
       const cType = res.headers.get('content-type') || '';
       if (res.ok && cType.includes('application/json')) {
@@ -480,7 +480,6 @@ export default function AuthRoleSelectorModal({
 
               <div className="p-3 rounded-lg bg-[#0c101a] border border-slate-800 text-xs text-slate-300 space-y-1">
                 <div>Abre la aplicación <strong>Google Authenticator</strong> en tu teléfono móvil e introduce el código de 6 dígitos:</div>
-                <div className="text-[10px] text-slate-500 font-mono">Clave secreta simulada: {targetAdminUser.totpKeySecret || 'JBSWY3DPEHPK3PXP'}</div>
               </div>
 
               <div>

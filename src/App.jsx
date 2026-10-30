@@ -165,12 +165,23 @@ export default function App() {
     rol: 'admin',
     avatar: 'VM',
     mfaActivo: true,
-    totpKeySecret: 'JBSWY3DPEHPK3PXP',
     permisos: ['all']
   };
 
   const [currentUser, setCurrentUser] = useState(() => {
-    return getLocalItem(STORAGE_KEYS.CURRENT_USER, defaultMasterAdmin);
+    const stored = getLocalItem(STORAGE_KEYS.CURRENT_USER, defaultMasterAdmin);
+    if (stored) {
+      if (stored.totpKeySecret || stored.password || stored.passwordHash) {
+        const clean = { ...stored };
+        delete clean.totpKeySecret;
+        delete clean.password;
+        delete clean.passwordHash;
+        setLocalItem(STORAGE_KEYS.CURRENT_USER, clean);
+        return clean;
+      }
+      return stored;
+    }
+    return defaultMasterAdmin;
   });
 
   const [usersList, setUsersList] = useState([defaultMasterAdmin]);
@@ -217,8 +228,12 @@ export default function App() {
 
   const handleLoginSuccess = (user) => {
     setSessionExpiredNotice('');
-    setCurrentUser(user);
-    setLocalItem(STORAGE_KEYS.CURRENT_USER, user);
+    const sanitizedUser = { ...user };
+    delete sanitizedUser.totpKeySecret;
+    delete sanitizedUser.password;
+    delete sanitizedUser.passwordHash;
+    setCurrentUser(sanitizedUser);
+    setLocalItem(STORAGE_KEYS.CURRENT_USER, sanitizedUser);
     setIsAuthenticatedSession(true);
   };
 

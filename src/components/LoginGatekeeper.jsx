@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { signInWithGoogle, signOutUser } from '../services/firebase';
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
+import { getApiUrl } from '../services/apiClient';
 
 // Algoritmo RFC 6238 TOTP en cliente usando Web Cryptography API nativa
 function base32ToBytes(base32) {
@@ -202,7 +203,6 @@ export default function LoginGatekeeper({
         rol: 'admin',
         avatar: 'VM',
         mfaActivo: true,
-        totpKeySecret: 'JBSWY3DPEHPK3PXP',
         permisos: ['all']
       };
 
@@ -234,22 +234,31 @@ export default function LoginGatekeeper({
     try {
       setVerifyingMfa(true);
 
-      // 1. Intentar validación en backend si el servidor está online
+      // 1. Validación en backend seguro (Vercel o Express Server)
       let isValid = false;
+      const targetEmail = googleUser?.email || matchedAppUser?.email;
       try {
-        const res = await fetch('/api/auth/2fa/verify', {
+        const verifyEndpoint = getApiUrl('/api/auth/2fa/verify');
+        const res = await fetch(verifyEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: code, secret: totpSecret })
+          body: JSON.stringify({
+            token: code,
+            email: targetEmail,
+            // Solo se envía secreto durante el enrolamiento inicial
+            secret: !isMfaEnrolled ? totpSecret : undefined
+          })
         });
         if (res.ok && (res.headers.get('content-type') || '').includes('application/json')) {
           const data = await res.json();
           if (data.valid) isValid = true;
         }
-      } catch {}
+      } catch (errApi) {
+        console.warn('[MFA] Servidor de autenticación en la nube offline:', errApi);
+      }
 
-      // 2. Si el backend no respondió, validar mediante el motor RFC 6238 en cliente
-      if (!isValid) {
+      // 2. Si el usuario está enrolando por primera vez y el backend está offline, validar en cliente
+      if (!isValid && !isMfaEnrolled && totpSecret) {
         isValid = await verifyClientTotp(code, totpSecret, 1);
       }
 
@@ -259,12 +268,13 @@ export default function LoginGatekeeper({
         // Si el usuario no tenía enrolado el 2FA, activarlo de forma permanente en su perfil
         if (!isMfaEnrolled && matchedAppUser?.id) {
           const updatedUser = { ...matchedAppUser, mfaActivo: true };
+          delete updatedUser.totpKeySecret;
           setMatchedAppUser(updatedUser);
           if (onUpdateUserMfa) {
             onUpdateUserMfa(matchedAppUser.id, true);
           }
           try {
-            fetch(`/api/users/${matchedAppUser.id}`, {
+            fetch(getApiUrl(`/api/users/${matchedAppUser.id}`), {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ mfaActivo: true })
@@ -272,7 +282,7 @@ export default function LoginGatekeeper({
           } catch {}
         }
 
-        // Persistir sesión autenticada en sessionStorage
+        // Persistir sesión autenticada en sessionStorage (sin secretos ni claves)
         try {
           const sessionPayload = {
             id: matchedAppUser.id,
@@ -287,7 +297,11 @@ export default function LoginGatekeeper({
         } catch {}
 
         setTimeout(() => {
-          onLoginSuccess({ ...matchedAppUser, mfaActivo: true });
+          const cleanUser = { ...matchedAppUser, mfaActivo: true };
+          delete cleanUser.totpKeySecret;
+          delete cleanUser.password;
+          delete cleanUser.passwordHash;
+          onLoginSuccess(cleanUser);
         }, 1200);
       } else {
         setErrorMessage('Código incorrecto o expirado. Verifica el código actual de 6 dígitos que muestra tu app de Google Authenticator.');

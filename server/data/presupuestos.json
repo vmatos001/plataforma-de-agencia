@@ -1,1 +1,733 @@
-[]
+[
+  {
+    "cliente": {
+      "actividad": "Transporte Turístico VIP & Traslados Aeropuerto Punta Cana",
+      "email": "",
+      "empresa": "Punta Cana Legacy Transfer",
+      "nombre": "Henry Turbi García",
+      "telefono": "+1 (829) 355-0467",
+      "ubicacion": "Punta Cana, República Dominicana"
+    },
+    "codigo": "P-2026-006",
+    "emisor": {
+      "bandera": "🇩🇴",
+      "cargo": "Director & Estratega Digital",
+      "direccion": "Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana",
+      "email": "v.matos@goglite.com",
+      "empresa": "Goglite Digital Hub",
+      "identificacion": "RNC: 1-32-45678-9",
+      "paisCodigo": "DO",
+      "paisNombre": "República Dominicana",
+      "responsable": "Víctor Matos",
+      "telefono": "+1 (829) 528-4713",
+      "telefonoFijo": "+1 (829) 528-4713",
+      "telefonoWhatsapp": "+1 (829) 528-4713",
+      "ubicacion": "Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana"
+    },
+    "estado": "sin_abrir",
+    "fases": [
+      {
+        "detalle": "Recepción de insumos (logotipo, fotos de flota y rutas base). Configuración de hosting corporativo y arquitectura base.",
+        "fase": "Fase 1",
+        "plazo": "Días 1 a 3"
+      },
+      {
+        "detalle": "Desarrollo Mobile-First de la plataforma, integración de rutas, catálogo de servicios VIP y conexión directa a WhatsApp.",
+        "fase": "Fase 2",
+        "plazo": "Días 4 a 8"
+      },
+      {
+        "detalle": "Pruebas de velocidad móvil, revisión y ajustes conjuntos con el cliente, optimización de Google Maps y entrega oficial con accesos.",
+        "fase": "Fase 3",
+        "plazo": "Días 9 a 12"
+      }
+    ],
+    "fecha": "octubre de 2026",
+    "guardadoEn": "2026-10-30T03:09:18.525Z",
+    "id": "prop-1793329758525",
+    "inversion": {
+      "anticipo": 110,
+      "beneficioExclusivo": "1 mes de soporte técnico, mantenimiento y supervisión gratuita post-lanzamiento. Descuento especial de Cliente Regular válido por 7 días.",
+      "contraEntrega": 110,
+      "descuentoEspecial": 80,
+      "precioMercadoReferencial": 300,
+      "precioTotal": 220,
+      "requisitosInicio": "Logotipo oficial, fotografías de la flota vehicular y rutas base de traslados.",
+      "revisiones": "Dos (2) rondas completas de ajustes de diseño y contenido. Esquema de pago acordado: 50% de anticipo inicial ($110 USD) y 50% ($110 USD) contra entrega final y publicación oficial."
+    },
+    "leadId": "lead-local-1793329758525",
+    "modulos": [
+      {
+        "descripcion": "Diseño exclusivo no plantilla, velocidad de carga ultra-rápida, catálogo de flota vehicular y rutas de traslados VIP (aeropuerto PUJ, hoteles y villas), hosting corporativo de alta velocidad y certificado SSL.",
+        "horas": 10,
+        "id": "mod-1",
+        "numero": "MÓDULO 1",
+        "precio": 140,
+        "tipo": "precio_cerrado",
+        "titulo": "Plataforma Web Premium Mobile-First para Punta Cana Legacy Transfer"
+      },
+      {
+        "descripcion": "Integración de botones inteligentes de cotización por ruta y vehículo hacia WhatsApp Business (+1 829 355-0467) con mensajes precargados para cierre inmediato 24/7 sin comisiones.",
+        "horas": 4,
+        "id": "mod-2",
+        "numero": "MÓDULO 2",
+        "precio": 45,
+        "tipo": "precio_cerrado",
+        "titulo": "Motor de Solicitud y Reservas Directas a WhatsApp Business"
+      },
+      {
+        "descripcion": "Posicionamiento orgánico para transporte VIP y traslados aeropuerto en Punta Cana y Bávaro, diseño de código QR de reputación para vehículos y reseñas 5 estrellas en Google.",
+        "horas": 3,
+        "id": "mod-3",
+        "numero": "MÓDULO 3",
+        "precio": 35,
+        "tipo": "precio_cerrado",
+        "titulo": "SEO Local en Google & Optimización de Ficha Google Maps"
+      }
+    ],
+    "moneda": "USD",
+    "montoTotal": 220,
+    "pais": "DO",
+    "portada": {
+      "enfoqueEstrategico": "Estrategia de conversión directa a WhatsApp Business y reservas sin intermediarios para turistas y viajeros VIP en Punta Cana y traslados de aeropuerto.",
+      "geoSeoLocal": "Optimización local para búsquedas de traslados turísticos en Punta Cana, Bávaro y aeropuertos, sincronizada con Google Maps.",
+      "proyecto": "Crear una plataforma web premium (código limpio, no plantillas) ultra-rápida para Punta Cana Legacy Transfer (Punta Cana Legacy Transfer), optimizada para captar reservas directas de transporte VIP desde móviles y Google.",
+      "tecnologiaMobileFirst": "Arquitectura ultrarrápida Mobile-First con velocidad de carga inferior a 1.2 segundos para turistas internacionales cotizando desde smartphones."
+    },
+    "portalToken": "portal-1793329758525-turbi",
+    "simboloMoneda": "$",
+    "subtitulo": "(SISTEMA MOBILE-FIRST, MOTOR DE RESERVAS WHATSAPP & POSICIONAMIENTO GOOGLE MAPS)",
+    "titulo": "PROPUESTA DE DESARROLLO DIGITAL VIP: PLATAFORMA DE TRANSPORTE TURÍSTICO VIP",
+    "updatedAt": "2026-10-30T03:21:06.492Z",
+    "vigenciaDias": 7
+  },
+  {
+    "cliente": {
+      "actividad": "Alojamientos Airbnb (3 Casas/Villas), Excursiones Turísticas & Transporte Privado",
+      "email": "anaevelyn17@yahoo.com",
+      "empresa": "Jaybest Multi Services SRL",
+      "nombre": "Ana Evelin (Representante General)",
+      "telefono": "+1 (809) 408-8070",
+      "ubicacion": "Punta Cana, República Dominicana"
+    },
+    "codigo": "P-2026-005",
+    "emisor": {
+      "bandera": "🇩🇴",
+      "cargo": "Director & Estratega Digital",
+      "direccion": "Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana",
+      "email": "v.matos@goglite.com",
+      "empresa": "Goglite Digital Hub",
+      "identificacion": "RNC: 1-32-45678-9",
+      "paisCodigo": "DO",
+      "paisNombre": "República Dominicana",
+      "responsable": "Víctor Matos",
+      "telefono": "+1 (829) 528-4713",
+      "telefonoFijo": "+1 (829) 528-4713",
+      "telefonoWhatsapp": "+1 (829) 528-4713",
+      "ubicacion": "Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana"
+    },
+    "estado": "sin_abrir",
+    "fases": [
+      {
+        "detalle": "Configuración de hosting, estructura de marca, optimización del perfil de Google Negocio en Punta Cana, redes sociales y códigos QR.",
+        "fase": "Fase 1",
+        "plazo": "Días 1 a 4"
+      },
+      {
+        "detalle": "Desarrollo de la plataforma web (sección de las 3 casas/villas tipo Airbnb, catálogo de tours y módulo de transporte), integración con WhatsApp/OTAs y SEO para IA.",
+        "fase": "Fase 2",
+        "plazo": "Días 5 a 11"
+      },
+      {
+        "detalle": "Pruebas de velocidad móvil, revisión conjunta con el cliente, ajustes finales, entrega del plan estratégico de publicidad y publicación oficial con accesos.",
+        "fase": "Fase 3",
+        "plazo": "Días 12 a 15"
+      }
+    ],
+    "fecha": "octubre de 2026",
+    "guardadoEn": "2026-10-30T02:47:19.797Z",
+    "id": "prop-1793327900842",
+    "inversion": {
+      "anticipo": 150,
+      "beneficioExclusivo": "1 mes de soporte técnico, mantenimiento y supervisión gratuita tras el lanzamiento oficial, garantizando que su sistema opere a su máximo potencial desde el primer día.",
+      "contraEntrega": 150,
+      "descuentoEspecial": 500,
+      "precioMercadoReferencial": 850,
+      "precioTotal": 300,
+      "requisitosInicio": "Fotografías y detalles de las 3 casas/villas, información de los vehículos/tours, logotipo (si dispone de él) y datos de contacto. Vigencia de la oferta: 15 días calendario.",
+      "revisiones": "Incluye dos (2) rondas completas de ajustes de diseño y contenido. Esquema acordado en negociación: Inversión total de $300 USD ($150 USD de anticipo para inicio y saldo restante de $150 USD contra entrega final, publicación del sistema y traspaso de accesos)."
+    },
+    "leadId": "lead-local-1793327900842",
+    "modulos": [
+      {
+        "descripcion": "Arquitectura 100% optimizada para smartphones con hosting de alta velocidad y certificado SSL. Estructura multi-página: Inicio de alto impacto, Renta Corta & Casas/Villas (catálogo inicial de las 3 propiedades, galería fotográfica, amenidades y reserva directa sin comisiones), Catálogo de Tours y Excursiones (Isla Saona, Buggies, etc.), Módulo de Transporte Turístico Privado (aeropuerto PUJ, hoteles y villas), y sección de Confianza, Reseñas y Contacto.",
+        "horas": 12,
+        "id": "mod-1",
+        "numero": "MÓDULO 1",
+        "precio": 150,
+        "tipo": "precio_cerrado",
+        "titulo": "Plataforma Web Turística Todo-en-Uno con Hosting (Mobile-First)"
+      },
+      {
+        "descripcion": "Botón flotante inteligente de WhatsApp Business en cada casa, tour y traslado para atención 24/7. Sincronización con plataformas turísticas mediante enlaces estratégicos a perfiles oficiales en OTAs y formulario interactivo de cotización rápida con alerta directa al correo.",
+        "horas": 4,
+        "id": "mod-2",
+        "numero": "MÓDULO 2",
+        "precio": 50,
+        "tipo": "precio_cerrado",
+        "titulo": "Reservas Directas por WhatsApp & Conexión con Airbnb, Booking y TripAdvisor"
+      },
+      {
+        "descripcion": "Configuración y optimización de la ficha en Punta Cana categorizando las 3 líneas (Agencia de excursiones, Alojamiento vacacional y Servicio de transporte), fotos de villas y vehículos. Diseño de código QR para vehículos y villas incentivando reseñas 5 estrellas en Google Maps y TripAdvisor.",
+        "horas": 4,
+        "id": "mod-3",
+        "numero": "MÓDULO 3",
+        "precio": 50,
+        "tipo": "precio_cerrado",
+        "titulo": "Optimización del Perfil de Google Negocio (Google Maps) + Sistema QR de Reseñas"
+      },
+      {
+        "descripcion": "Optimización de perfiles en Instagram y Facebook: redacción comercial estratégica para turismo en Punta Cana, unificación visual de identidad de Jaybest Multi Services SRL y configuración de botones de contacto hacia la web y WhatsApp.",
+        "horas": 3,
+        "id": "mod-4",
+        "numero": "MÓDULO 4",
+        "precio": 30,
+        "tipo": "precio_cerrado",
+        "titulo": "Ecosistema de Redes Sociales (Facebook e Instagram)"
+      },
+      {
+        "descripcion": "Entrega de estructura y guía estratégica para campañas de publicidad (Google Ads & Redes) segmentada a viajeros internacionales buscando villas en Punta Cana, transfers de aeropuerto y excursiones, maximizando el retorno de inversión publicitaria.",
+        "horas": 3,
+        "id": "mod-5",
+        "numero": "MÓDULO 5",
+        "precio": 35,
+        "tipo": "precio_cerrado",
+        "titulo": "Plan Estratégico de Publicidad Digital & Captación de Turistas"
+      },
+      {
+        "descripcion": "SEO On-Page para Punta Cana (metadatos, palabras clave de villas, tours y transporte) y GEO (Generative Engine Optimization) con marcado semántico Schema.org VacationRental, TouristTrip y TravelAgency para recomendación en ChatGPT, Gemini y Perplexity.",
+        "horas": 3,
+        "id": "mod-6",
+        "numero": "MÓDULO 6",
+        "precio": 35,
+        "tipo": "precio_cerrado",
+        "titulo": "SEO Integral & GEO (Optimización para Motores de Inteligencia Artificial)"
+      }
+    ],
+    "moneda": "USD",
+    "montoTotal": 350,
+    "pais": "DO",
+    "portada": {
+      "enfoqueEstrategico": "Enfoque Sistémico Todo-en-Uno: Construcción de un ecosistema turístico completo y sincronizado: Plataforma Web con Hosting + Integración Directa con WhatsApp, Airbnb, Booking y TripAdvisor + Optimización en Google Maps + Redes Sociales (Facebook e Instagram) + Plan de Publicidad.",
+      "geoSeoLocal": "GEO & SEO de Nueva Generación (Optimizado para Inteligencia Artificial y Buscadores): Estructura semántica avanzada (Schema.org / Datos estructurados) para posicionar a Jaybest Multi Services SRL en Google y asegurar que los motores de IA (ChatGPT, Gemini, Perplexity, Google AI Overviews) recomienden a la empresa como referente en villas, tours y transporte en Punta Cana.",
+      "proyecto": "Implementación de un Sistema Digital Integral de Negocio y Captación de Clientes para Jaybest Multi Services SRL en Punta Cana, integrando sus tres líneas comerciales (Casas/Villas de Renta Corta tipo Airbnb, Excursiones Turísticas y Transporte Privado) en un motor activo de reservas directas.",
+      "tecnologiaMobileFirst": "Arquitectura moderna con velocidad de carga ultra-rápida (inferior a 1.2 segundos), garantizando una experiencia fluida para turistas internacionales que buscan alojamiento, tours y traslados en Punta Cana desde su celular."
+    },
+    "portalToken": "portal-1793327900842-jaybest",
+    "simboloMoneda": "$",
+    "subtitulo": "(SISTEMA INTEGRAL DE ALOJAMIENTOS AIRBNB, TOURS, TRANSPORTE & CAPTACIÓN DIGITAL)",
+    "titulo": "PROPUESTA DE DESARROLLO DIGITAL VIP",
+    "updatedAt": "2026-10-30T02:47:19.804Z",
+    "vigenciaDias": 15
+  },
+  {
+    "cliente": {
+      "actividad": "Taxis, Traslados Turísticos & Tours (Isla Saona)",
+      "email": "",
+      "empresa": "Lm Tour Taxi",
+      "nombre": "Lm Tour Taxi",
+      "telefono": "+1 (809) 821-0756",
+      "ubicacion": "Friusa, Bávaro, Punta Cana, República Dominicana"
+    },
+    "codigo": "P-2026-004",
+    "emisor": {
+      "bandera": "🇩🇴",
+      "cargo": "Director & Estratega Digital",
+      "direccion": "Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana",
+      "email": "contacto@goglite.com",
+      "empresa": "Goglite Digital Hub",
+      "identificacion": "RNC: 1-32-45678-9",
+      "paisCodigo": "DO",
+      "paisNombre": "República Dominicana",
+      "responsable": "Víctor Matos",
+      "telefono": "+1 (829) 528-4713",
+      "telefonoFijo": "+1 (829) 528-4713",
+      "telefonoWhatsapp": "+1 (829) 528-4713",
+      "ubicacion": "Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana"
+    },
+    "estado": "sin_abrir",
+    "fases": [
+      {
+        "detalle": "Recepción de insumos (fotos de vehículos, rutas y precios de Saona). Configuración de hosting anual, certificado SSL y arquitectura base.",
+        "fase": "Fase 1",
+        "plazo": "Días 1 a 3"
+      },
+      {
+        "detalle": "Desarrollo Mobile-First de la plataforma, montaje del catálogo de traslados/tours y conexión directa a WhatsApp Business.",
+        "fase": "Fase 2",
+        "plazo": "Días 4 a 7"
+      },
+      {
+        "detalle": "Optimización de Google Maps, pruebas de carga móvil, revisión conjunta con el cliente y lanzamiento oficial para temporada alta.",
+        "fase": "Fase 3",
+        "plazo": "Días 8 a 10"
+      }
+    ],
+    "fecha": "octubre de 2026",
+    "guardadoEn": "2026-10-30T02:31:20.542Z",
+    "id": "prop-1793327480542",
+    "inversion": {
+      "anticipo": 125,
+      "beneficioExclusivo": "1 año completo de hosting corporativo de alta velocidad incluido + Certificado SSL + Optimización en Google Maps + 1 mes de supervisión técnica gratuita.",
+      "contraEntrega": 125,
+      "descuentoEspecial": 400,
+      "precioMercadoReferencial": 650,
+      "precioTotal": 250,
+      "requisitosInicio": "Anticipo del 50% ($125 USD), logotipo o fotos de los vehículos y tarifas base de rutas/tours.",
+      "revisiones": "Dos (2) rondas completas de ajustes antes de la publicación final. Forma de pago: 50% de anticipo ($125 USD) al inicio y 50% ($125 USD) contra entrega final y publicación. Vigencia: 15 días calendario."
+    },
+    "leadId": "lead-local-1793327480542",
+    "modulos": [
+      {
+        "descripcion": "Estructura web de alta velocidad diseñada para dispositivos móviles. Exhibición clara de flota vehicular, zonas de cobertura (Friusa, Bávaro, Cap Cana, Aeropuerto PUJ), tarifas referenciales y presentación de confianza del servicio.",
+        "horas": 10,
+        "id": "mod-1",
+        "numero": "MÓDULO 1",
+        "precio": 150,
+        "tipo": "precio_cerrado",
+        "titulo": "Sitio Web Mobile-First de Taxis & Traslados en Bávaro / Punta Cana"
+      },
+      {
+        "descripcion": "Integración de botones interactivos de WhatsApp (+1 809 821-0756) con mensajes precargados según punto de recogida, destino y fecha, agilizando la confirmación inmediata de traslados sin pasarelas complejas.",
+        "horas": 4,
+        "id": "mod-2",
+        "numero": "MÓDULO 2",
+        "precio": 50,
+        "tipo": "precio_cerrado",
+        "titulo": "Motor de Solicitud y Reservas Directas a WhatsApp Business"
+      },
+      {
+        "descripcion": "Sección dedicada para venta de paquetes turísticos (Tour Isla Saona y excursiones), optimización de ficha en Google Maps para captación geolocalizada en Friusa/Bávaro, certificado SSL y hosting corporativo ultra-rápido por 1 año.",
+        "horas": 4,
+        "id": "mod-3",
+        "numero": "MÓDULO 3",
+        "precio": 50,
+        "tipo": "precio_cerrado",
+        "titulo": "Catálogo de Tours (Isla Saona), Ficha Google Maps & Hosting Corporativo (1 Año)"
+      }
+    ],
+    "moneda": "USD",
+    "pais": "DO",
+    "portada": {
+      "enfoqueEstrategico": "Diseño StoryBrand de alta conversión enfocado en resolver la necesidad inmediata de transporte del turista en Punta Cana sin intermediarios ni comisiones abusivas.",
+      "geoSeoLocal": "Optimización SEO local y configuración de ficha en Google Maps para destacar en búsquedas de 'taxi en Friusa', 'transfer Bávaro' y 'excursiones Punta Cana'.",
+      "proyecto": "Implementación de una plataforma web Mobile-First de alta velocidad para captación de turistas y reservas directas de taxi, traslados privados y tours (Isla Saona) en Friusa, Bávaro y Punta Cana.",
+      "tecnologiaMobileFirst": "Arquitectura ultrarrápida Mobile-First optimizada para turistas en hoteles y aeropuertos, con botón inteligente de solicitud de traslados a WhatsApp Business."
+    },
+    "portalToken": "portal-1793327480542-lmtx",
+    "simboloMoneda": "$",
+    "subtitulo": "(PLATAFORMA MOBILE-FIRST, MOTOR DE RESERVAS WHATSAPP, CATÁLOGO DE TOURS & GOOGLE MAPS)",
+    "titulo": "PROPUESTA DE DESARROLLO DIGITAL VIP: PLATAFORMA DE TAXI, TRASLADOS & TOURS PUNTA CANA",
+    "updatedAt": "2026-10-30T02:32:02.222Z",
+    "vigenciaDias": 15
+  },
+  {
+    "cliente": {
+      "actividad": "Espacio Holístico, Arte, Artesanía & Bebidas",
+      "email": "Pendiente",
+      "empresa": "Artesano (Zona Colonial)",
+      "nombre": "Irene Corporán",
+      "telefono": "+1 (809) 984-1958",
+      "ubicacion": "Zona Colonial, Santo Domingo, República Dominicana"
+    },
+    "codigo": "P-2026-003",
+    "emisor": {
+      "bandera": "🇩🇴",
+      "cargo": "Director & Estratega Digital",
+      "direccion": "Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana",
+      "email": "contacto@goglite.com",
+      "empresa": "Goglite Digital Hub",
+      "identificacion": "RNC: 1-32-45678-9",
+      "paisCodigo": "DO",
+      "paisNombre": "República Dominicana",
+      "responsable": "Víctor Matos",
+      "telefono": "+1 (829) 528-4713",
+      "telefonoFijo": "+1 (829) 528-4713",
+      "telefonoWhatsapp": "+1 (829) 528-4713",
+      "ubicacion": "Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana"
+    },
+    "estado": "sin_abrir",
+    "fases": [
+      {
+        "detalle": "Recepción de anticipo y materiales de identidad (fotos, logos y textos). Configuración de plataforma bilingüe, estructura del espacio holístico y mapa interactivo.",
+        "fase": "Fase 1",
+        "plazo": "Días 1 a 5"
+      },
+      {
+        "detalle": "Desarrollo Mobile-First bilingüe, maquetación de Menú Digital de bebidas, diseño de Catálogo Flipbook y generación de códigos QR vectoriales para imprenta.",
+        "fase": "Fase 2",
+        "plazo": "Días 6 a 11"
+      },
+      {
+        "detalle": "Integración de CMS autoadministrable, optimización de Google Business Profile en Zona Colonial, sesión de capacitación de 1 hora, revisión conjunta y entrega final.",
+        "fase": "Fase 3",
+        "plazo": "Días 12 a 15"
+      }
+    ],
+    "fecha": "Sep 11, 2026",
+    "guardadoEn": "2026-10-30T02:10:53.914Z",
+    "id": "prop-1793322467560",
+    "inversion": {
+      "anticipo": 90,
+      "beneficioExclusivo": "1 mes de mantenimiento y supervisión técnica gratuita a partir de la publicación oficial + Paquete de códigos QR vectoriales de alta resolución listos para imprenta + Sesión de capacitación de 1 hora para autoadministración en CMS.",
+      "contraEntrega": 120,
+      "descuentoEspecial": 550,
+      "precioMercadoReferencial": 850,
+      "precioTotal": 300,
+      "requisitosInicio": "Anticipo del 30% ($90 USD) y materiales de identidad (fotos, logos y textos).",
+      "revisiones": "Dos (2) rondas completas de revisiones para ajustes de diseño o contenido. Forma de pago: 30% Anticipo ($90 USD) al inicio, 30% ($90 USD) en última revisión y 40% ($120 USD) contra entrega final y transferencia de accesos. Vigencia: 15 días calendario."
+    },
+    "leadId": "lead-local-1793322445017",
+    "modulos": [
+      {
+        "descripcion": "Inicio / El Espacio (atmósfera holística, historia de Artesano, horarios y mapa interactivo), Menú Digital de Bebidas artesanales, Agenda Cultural y Eventos (talleres y noches artísticas), y Contacto y Reservas directas a WhatsApp Business.",
+        "horas": 10,
+        "id": "mod-1",
+        "numero": "MÓDULO 1",
+        "precio": 150,
+        "tipo": "precio_cerrado",
+        "titulo": "Sitio Web Corporativo Mobile-First Bilingüe (Español / Inglés)"
+      },
+      {
+        "descripcion": "Visualizador Flipbook digital tipo revista táctil con descarga en PDF para merchandising y artesanías. Códigos QR en vasos y tarjetas con historias de artistas dominicanos, QR en merchandising sobre origen artesanal y entrega de paquete de archivos QR vectoriales en alta resolución listos para imprenta.",
+        "horas": 6,
+        "id": "mod-2",
+        "numero": "MÓDULO 2",
+        "precio": 80,
+        "tipo": "precio_cerrado",
+        "titulo": "Catálogo Flipbook Interactivo & Ecosistema de Experiencia QR (Físico a Digital)"
+      },
+      {
+        "descripcion": "Panel intuitivo para que el cliente pueda añadir o rotar artistas, actualizar menús y subir nuevos productos sin depender de soporte técnico (incluye sesión de capacitación de 1 hora). Optimización SEO local y Google Business Profile en Zona Colonial.",
+        "horas": 4,
+        "id": "mod-3",
+        "numero": "MÓDULO 3",
+        "precio": 70,
+        "tipo": "precio_cerrado",
+        "titulo": "Gestor de Contenidos (CMS) Autoadministrable, SEO Local & Google Business"
+      }
+    ],
+    "moneda": "USD",
+    "pais": "DO",
+    "portada": {
+      "enfoqueEstrategico": "Diseño premium e inmersivo proyectado para conectar con turistas y locales, optimizando el retorno de inversión y reservas vía WhatsApp Business.",
+      "geoSeoLocal": "Optimización SEO local y configuración de Google Business Profile para destacar en búsquedas dentro de la Zona Colonial.",
+      "proyecto": "Creación de una plataforma web corporativa y experiencia digital holística para el concepto Artesano en la Zona Colonial donde conviven el arte, la artesanía local y el servicio de bebidas.",
+      "tecnologiaMobileFirst": "Plataforma Mobile-First bilingüe con integración de historias culturales mediante códigos QR y catálogo interactivo Flipbook con descarga en PDF."
+    },
+    "portalToken": "portal-1793322445017-yni3",
+    "simboloMoneda": "$",
+    "subtitulo": "(PLATAFORMA MOBILE-FIRST BILINGÜE, CATÁLOGO FLIPBOOK, EXPERIENCIA QR & CMS)",
+    "titulo": "PROPUESTA DE DESARROLLO DIGITAL VIP (PROYECTO: ARTESANO - ZONA COLONIAL)",
+    "updatedAt": "2026-10-30T02:10:53.915Z",
+    "vigenciaDias": 15
+  },
+  {
+    "cliente": {
+      "actividad": "Servicios Comerciales",
+      "email": "",
+      "empresa": "Rivas transfer Tours",
+      "nombre": "Rivas",
+      "telefono": "+18495207852",
+      "ubicacion": "Santo Domingo, República Dominicana"
+    },
+    "codigo": "P-2026-002",
+    "emisor": {
+      "bandera": "🇩🇴",
+      "cargo": "Director & Estratega Digital",
+      "direccion": "Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana",
+      "email": "contacto@goglite.com",
+      "empresa": "Goglite Digital Hub",
+      "identificacion": "RNC: 1-32-45678-9",
+      "paisCodigo": "DO",
+      "paisNombre": "República Dominicana",
+      "responsable": "Víctor Matos",
+      "telefono": "+1 (829) 528-4713",
+      "telefonoFijo": "+1 (829) 528-4713",
+      "telefonoWhatsapp": "+1 (829) 528-4713",
+      "ubicacion": "Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana"
+    },
+    "estado": "sin_abrir",
+    "fases": [
+      {
+        "detalle": "Recepción de rutas, catálogo de tours, logotipo y fotos. Configuración de hosting anual y estructura base de la plataforma.",
+        "fase": "Fase 1",
+        "plazo": "Días 1 a 3"
+      },
+      {
+        "detalle": "Desarrollo de la plataforma web Mobile-First, montaje de catálogos de traslados/excursiones y conexión del motor de reservas a WhatsApp.",
+        "fase": "Fase 2",
+        "plazo": "Días 4 a 7"
+      },
+      {
+        "detalle": "Optimización de ficha en Google Maps, pruebas de cotización en móviles, revisión conjunta con el cliente y entrega final en producción.",
+        "fase": "Fase 3",
+        "plazo": "Días 8 a 10"
+      }
+    ],
+    "fecha": "octubre de 2026",
+    "guardadoEn": "2026-10-30T01:00:47.590Z",
+    "id": "prop-1793321762392",
+    "inversion": {
+      "anticipo": 125,
+      "beneficioExclusivo": "Hosting web corporativo de alta velocidad incluido por 1 año completo + Certificado SSL + 1 mes de soporte técnico gratuito post-entrega.",
+      "contraEntrega": 125,
+      "descuentoEspecial": 250,
+      "precioMercadoReferencial": 600,
+      "precioTotal": 250,
+      "requisitosInicio": "Logotipo, fotografías del negocio/servicios, número oficial de WhatsApp y datos de contacto.",
+      "revisiones": "Dos (2) rondas completas de ajustes en rutas, tarifas y contenidos antes del lanzamiento oficial."
+    },
+    "leadId": "lead-local-1793321539682",
+    "modulos": [
+      {
+        "descripcion": "Arquitectura responsive ultra-rápida optimizada para turistas en teléfonos celulares. Incluye catálogo interactivo de rutas de traslado (aeropuertos y hoteles), listado de tours y excursiones con galería fotográfica, tarifas y llamados a la acción.",
+        "horas": 10,
+        "id": "mod-1",
+        "numero": "MÓDULO 1",
+        "precio": 150,
+        "tipo": "precio_cerrado",
+        "titulo": "Plataforma Web Mobile-First para Traslados y Excursiones"
+      },
+      {
+        "descripcion": "Integración de cotizador inteligente conectado directamente a su WhatsApp (+1 849 520-7852) con mensaje preconfigurado por ruta o tour, permitiendo al turista solicitar su traslado o excursión al instante sin intermediarios ni comisiones.",
+        "horas": 3,
+        "id": "mod-2",
+        "numero": "MÓDULO 2",
+        "precio": 50,
+        "tipo": "precio_cerrado",
+        "titulo": "Motor de Cotización y Reserva Directa a WhatsApp Business"
+      },
+      {
+        "descripcion": "Optimización y configuración de presencia en Google Maps y SEO local para captación de turistas en República Dominicana, junto con alojamiento web corporativo de alta velocidad y certificado de seguridad SSL incluido por 1 año completo.",
+        "horas": 5,
+        "id": "mod-3",
+        "numero": "MÓDULO 3",
+        "precio": 50,
+        "tipo": "precio_cerrado",
+        "titulo": "Ficha de Google Maps (SEO Local) & Hosting Corporativo por 1 Año"
+      }
+    ],
+    "moneda": "USD",
+    "pais": "DO",
+    "portada": {
+      "enfoqueEstrategico": "Botones de cotización y reserva directa a WhatsApp Business con mensaje preconfigurado por ruta o tour, captando turistas sin intermediarios.",
+      "geoSeoLocal": "Ficha de Google Maps optimizada y estructura semántica (Schema.org LocalBusiness) para captar búsquedas de traslados en República Dominicana.",
+      "proyecto": "Implementación de un Sistema Digital Integral de Captación Inmediata y Posicionamiento Comercial, transformando su presencia digital en un activo que genera clientes y contactos de alta intención las 24 horas del día.",
+      "tecnologiaMobileFirst": "Arquitectura ultra-rápida optimizada al 100% para teléfonos móviles de turistas (carga inferior a 1.2s y Core Web Vitals en verde)."
+    },
+    "portalToken": "portal-1793321539682-f67q",
+    "simboloMoneda": "$",
+    "subtitulo": "(SISTEMA WEB MOBILE-FIRST, CATÁLOGO DE RUTAS Y TOURS, COTIZADOR WHATSAPP & GOOGLE MAPS)",
+    "titulo": "PROPUESTA DE DESARROLLO DIGITAL: PLATAFORMA DE TRASLADOS & EXCURSIONES",
+    "updatedAt": "2026-10-30T01:00:47.592Z",
+    "vigenciaDias": 15
+  },
+  {
+    "abiertoEn": "2026-10-26T01:40:00.651Z",
+    "cliente": {
+      "actividad": "Presencia Digital (TurisRan-Dominicana.com)",
+      "email": "info@TurisRan-Dominicana.com",
+      "empresa": "TurisRan",
+      "nombre": "Ransel",
+      "telefono": "+1 (829) 8980847",
+      "ubicacion": "Santo Domingo / República Dominicana"
+    },
+    "codigo": "P-2026-001",
+    "emisor": {
+      "cargo": "Director & Estratega Digital",
+      "email": "info@goglite.com",
+      "empresa": "Goglite",
+      "responsable": "Víctor Matos",
+      "telefono": "(503) 7756-9828",
+      "ubicacion": "Santa Ana, El Salvador · Santo Domingo, RD"
+    },
+    "estado": "aceptado",
+    "fases": [
+      {
+        "detalle": "Configuración de activos digitales, arquitectura de información StoryBrand, ficha de Google Maps y códigos QR vectoriales.",
+        "fase": "Fase 1",
+        "plazo": "Días 1 a 4"
+      },
+      {
+        "detalle": "Desarrollo de la plataforma web Mobile-First, integración de canales de cierre en WhatsApp y optimización SEO/GEO.",
+        "fase": "Fase 2",
+        "plazo": "Días 5 a 10"
+      },
+      {
+        "detalle": "Auditoría de velocidad móvil, revisión conjunta con el cliente, ajustes finales y despliegue en producción.",
+        "fase": "Fase 3",
+        "plazo": "Días 11 a 15"
+      }
+    ],
+    "fecha": "octubre de 2026",
+    "guardadoEn": "2026-10-29T03:28:36.989Z",
+    "id": "prop-1792978056908",
+    "inversion": {
+      "anticipo": 0,
+      "beneficioExclusivo": "1 mes de soporte técnico, supervisión y acompañamiento gratuito tras el lanzamiento oficial.",
+      "contraEntrega": 0,
+      "descuentoEspecial": 250,
+      "precioMercadoReferencial": 750,
+      "precioTotal": 0,
+      "requisitosInicio": "Logotipo, fotografías del negocio/servicios, número oficial de WhatsApp y datos de contacto.",
+      "revisiones": "Dos (2) rondas completas de ajustes de diseño y contenido."
+    },
+    "leadId": "crm-lead-1792969777629-cjfz",
+    "modulos": [
+      {
+        "descripcion": "Arquitectura responsive optimizada al 100% para dispositivos móviles. Incluye secciones estratégicas StoryBrand, catálogo de servicios, cobertura y llamado a la acción.",
+        "horas": 10,
+        "id": "mod-1",
+        "numero": "MÓDULO 1",
+        "precio": 150,
+        "tipo": "precio_cerrado",
+        "titulo": "Plataforma Web Corporativa de Alta Conversión (Mobile-First)"
+      },
+      {
+        "descripcion": "Integración de botón flotante inteligente de WhatsApp Business con mensaje preconfigurado y marcado directo de un solo toque.",
+        "horas": 3,
+        "id": "mod-2",
+        "numero": "MÓDULO 2",
+        "precio": 50,
+        "tipo": "precio_cerrado",
+        "titulo": "Canales de Cierre y Contacto Directo (WhatsApp & Click-to-Call)"
+      },
+      {
+        "descripcion": "Configuración técnica de Schema.org JSON-LD, categorización en Google Maps y ecosistema de códigos QR para captación de reseñas 5 estrellas.",
+        "horas": 5,
+        "id": "mod-3",
+        "numero": "MÓDULO 3",
+        "precio": 50,
+        "tipo": "precio_cerrado",
+        "titulo": "Optimización del Perfil de Google Negocio & SEO/GEO Local"
+      }
+    ],
+    "moneda": "USD",
+    "pais": "DO",
+    "portada": {
+      "enfoqueEstrategico": "Arquitectura orientada a la conversión directa con botones de llamada instantánea (Click-to-Call), botón flotante de WhatsApp Business y embudo de respuesta inmediata.",
+      "geoSeoLocal": "Estructura semántica avanzada (Schema.org LocalBusiness) para asegurar máxima visibilidad en Google Maps, buscadores y motores de IA (ChatGPT / Perplexity).",
+      "proyecto": "Implementación de un Sistema Digital Integral de Captación Inmediata y Posicionamiento Comercial, transformando su presencia digital en un activo que genera clientes y contactos de alta intención las 24 horas del día.",
+      "tecnologiaMobileFirst": "Arquitectura ultra-rápida optimizada al 100% para teléfonos inteligentes (velocidad de carga inferior a 1.2 segundos y Core Web Vitals en verde)."
+    },
+    "portalToken": "portal-crm-lead-1792969777629-cjfz-dre5xs",
+    "simboloMoneda": "$",
+    "subtitulo": "(SISTEMA INTEGRAL WEB, PLAN GOOGLE ADS, REPUTACIÓN LOCAL & CÓDIGOS QR)",
+    "titulo": "PROPUESTA DE DESARROLLO DIGITAL VIP",
+    "updatedAt": "2026-10-29T03:28:36.991Z",
+    "vigenciaDias": 15
+  },
+  {
+    "cliente": {
+      "actividad": "Transporte Turístico VIP & Traslados Aeropuerto Punta Cana",
+      "email": "",
+      "empresa": "Quisqueya Elegant Transfer",
+      "nombre": "Henry Turbi García",
+      "telefono": "+1 (829) 355-0467",
+      "ubicacion": "Punta Cana, República Dominicana"
+    },
+    "codigo": "P-2026-006",
+    "emisor": {
+      "bandera": "🇩🇴",
+      "cargo": "Director & Estratega Digital",
+      "direccion": "Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana",
+      "email": "v.matos@goglite.com",
+      "empresa": "Goglite Digital Hub",
+      "identificacion": "RNC: 1-32-45678-9",
+      "paisCodigo": "DO",
+      "paisNombre": "República Dominicana",
+      "responsable": "Víctor Matos",
+      "telefono": "+1 (829) 528-4713",
+      "telefonoFijo": "+1 (829) 528-4713",
+      "telefonoWhatsapp": "+1 (829) 528-4713",
+      "ubicacion": "Hermanas Mirabal #1, Plaza Herasme, 3er nivel, 11201, República Dominicana"
+    },
+    "estado": "sin_abrir",
+    "fases": [
+      {
+        "detalle": "Recepción de insumos (logotipo, fotos de flota y rutas base). Configuración de hosting corporativo y arquitectura base.",
+        "fase": "Fase 1",
+        "plazo": "Días 1 a 3"
+      },
+      {
+        "detalle": "Desarrollo Mobile-First de la plataforma, integración de rutas, catálogo de servicios VIP y conexión directa a WhatsApp.",
+        "fase": "Fase 2",
+        "plazo": "Días 4 a 8"
+      },
+      {
+        "detalle": "Pruebas de velocidad móvil, revisión y ajustes conjuntos con el cliente, optimización de Google Maps y entrega oficial con accesos.",
+        "fase": "Fase 3",
+        "plazo": "Días 9 a 12"
+      }
+    ],
+    "fecha": "octubre de 2026",
+    "guardadoEn": "2026-10-30T03:09:18.525Z",
+    "id": "prop-1793329758525",
+    "inversion": {
+      "anticipo": 110,
+      "beneficioExclusivo": "1 mes de soporte técnico, mantenimiento y supervisión gratuita post-lanzamiento. Descuento especial de Cliente Regular válido por 7 días.",
+      "contraEntrega": 110,
+      "descuentoEspecial": 80,
+      "precioMercadoReferencial": 300,
+      "precioTotal": 220,
+      "requisitosInicio": "Logotipo oficial, fotografías de la flota vehicular y rutas base de traslados.",
+      "revisiones": "Dos (2) rondas completas de ajustes de diseño y contenido. Esquema de pago acordado: 50% de anticipo inicial ($110 USD) y 50% ($110 USD) contra entrega final y publicación oficial."
+    },
+    "leadId": "lead-local-1793329758525",
+    "modulos": [
+      {
+        "descripcion": "Diseño exclusivo no plantilla, velocidad de carga ultra-rápida, catálogo de flota vehicular y rutas de traslados VIP (aeropuerto PUJ, hoteles y villas), hosting corporativo de alta velocidad y certificado SSL.",
+        "horas": 10,
+        "id": "mod-1",
+        "numero": "MÓDULO 1",
+        "precio": 140,
+        "tipo": "precio_cerrado",
+        "titulo": "Plataforma Web Premium Mobile-First para Quisqueya Elegant Transfer"
+      },
+      {
+        "descripcion": "Integración de botones inteligentes de cotización por ruta y vehículo hacia WhatsApp Business (+1 829 355-0467) con mensajes precargados para cierre inmediato 24/7 sin comisiones.",
+        "horas": 4,
+        "id": "mod-2",
+        "numero": "MÓDULO 2",
+        "precio": 45,
+        "tipo": "precio_cerrado",
+        "titulo": "Motor de Solicitud y Reservas Directas a WhatsApp Business"
+      },
+      {
+        "descripcion": "Posicionamiento orgánico para transporte VIP y traslados aeropuerto en Punta Cana y Bávaro, diseño de código QR de reputación para vehículos y reseñas 5 estrellas en Google.",
+        "horas": 3,
+        "id": "mod-3",
+        "numero": "MÓDULO 3",
+        "precio": 35,
+        "tipo": "precio_cerrado",
+        "titulo": "SEO Local en Google & Optimización de Ficha Google Maps"
+      }
+    ],
+    "moneda": "USD",
+    "montoTotal": 220,
+    "pais": "DO",
+    "portada": {
+      "enfoqueEstrategico": "Estrategia de conversión directa a WhatsApp Business y reservas sin intermediarios para turistas y viajeros VIP en Punta Cana y traslados de aeropuerto.",
+      "geoSeoLocal": "Optimización local para búsquedas de traslados turísticos en Punta Cana, Bávaro y aeropuertos, sincronizada con Google Maps.",
+      "proyecto": "Crear una plataforma web premium (código limpio, no plantillas) ultra-rápida para Quisqueya Elegant Transfer (Punta Cana Legacy Transfer), optimizada para captar reservas directas de transporte VIP desde móviles y Google.",
+      "tecnologiaMobileFirst": "Arquitectura ultrarrápida Mobile-First con velocidad de carga inferior a 1.2 segundos para turistas internacionales cotizando desde smartphones."
+    },
+    "portalToken": "portal-1793329758525-turbi",
+    "simboloMoneda": "$",
+    "subtitulo": "(SISTEMA MOBILE-FIRST, MOTOR DE RESERVAS WHATSAPP & POSICIONAMIENTO GOOGLE MAPS)",
+    "titulo": "PROPUESTA DE DESARROLLO DIGITAL VIP: PLATAFORMA DE TRANSPORTE TURÍSTICO VIP",
+    "updatedAt": "2026-10-30T03:13:20.276Z",
+    "vigenciaDias": 7
+  }
+]
