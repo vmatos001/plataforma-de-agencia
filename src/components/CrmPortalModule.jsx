@@ -48,7 +48,9 @@ import {
   Layers,
   MapPin,
   Star,
-  Crown
+  Crown,
+  Archive,
+  ArchiveRestore
 } from 'lucide-react';
 import { apiClient } from '../services/apiClient';
 import {
@@ -258,6 +260,17 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     return (typeof window !== 'undefined' && localStorage.getItem('goglite_crm_country')) || 'ALL';
   });
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Filtro de Estado Operativo: 'activos' (por defecto) | 'archivados' | 'todos'
+  const [archiveFilter, setArchiveFilter] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('goglite_crm_archive_filter')) || 'activos';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('goglite_crm_archive_filter', archiveFilter);
+    }
+  }, [archiveFilter]);
   
   const [activeTab, setActiveTab] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('goglite_crm_active_tab')) || 'kanban';
@@ -742,6 +755,53 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       console.warn('Error sincronizando CRM leads:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Archivar / Desarchivar Lead con persistencia inmediata en Local, Firestore Cloud y Backend
+  const handleToggleArchiveLead = async (leadId, nuevoEstadoArchivado, motivo = 'manual', e) => {
+    if (e) e.stopPropagation();
+
+    const nowIso = new Date().toISOString();
+    const nowFormatted = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    updateAndPersistLeads(prev => prev.map(l => {
+      if (l.id === leadId) {
+        return {
+          ...l,
+          archivado: nuevoEstadoArchivado,
+          fechaArchivado: nuevoEstadoArchivado ? nowIso : null,
+          fechaArchivadoFormateada: nuevoEstadoArchivado ? nowFormatted : null,
+          motivoArchivado: nuevoEstadoArchivado ? motivo : null,
+          actualizadoEn: nowIso.split('T')[0]
+        };
+      }
+      return l;
+    }));
+
+    if (activeLeadModal && activeLeadModal.id === leadId) {
+      setActiveLeadModal(prev => ({
+        ...prev,
+        archivado: nuevoEstadoArchivado,
+        fechaArchivado: nuevoEstadoArchivado ? nowIso : null,
+        fechaArchivadoFormateada: nuevoEstadoArchivado ? nowFormatted : null,
+        motivoArchivado: nuevoEstadoArchivado ? motivo : null
+      }));
+    }
+
+    try {
+      await fetch(getBackendEndpoint(`/api/crm/leads/${leadId}`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          archivado: nuevoEstadoArchivado,
+          fechaArchivado: nuevoEstadoArchivado ? nowIso : null,
+          fechaArchivadoFormateada: nuevoEstadoArchivado ? nowFormatted : null,
+          motivoArchivado: nuevoEstadoArchivado ? motivo : null
+        })
+      });
+    } catch (err) {
+      console.warn('Archivado guardado localmente (API offline):', err);
     }
   };
 
@@ -1354,8 +1414,17 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     setTimeout(() => setPortalCopied(false), 2000);
   };
 
-  // Filter leads
+  // Conteo global de estado de archivado
+  const totalLeadsCount = leads.length;
+  const archivedLeadsCount = leads.filter(l => Boolean(l.archivado)).length;
+  const activeLeadsCount = totalLeadsCount - archivedLeadsCount;
+
+  // Filter leads según país, búsqueda y estado operativo (activos vs archivados)
   const filteredLeads = leads.filter(l => {
+    const isArchived = Boolean(l.archivado);
+    if (archiveFilter === 'activos' && isArchived) return false;
+    if (archiveFilter === 'archivados' && !isArchived) return false;
+
     const matchesCountry = selectedCountry === 'ALL' || l.pais === selectedCountry;
     const term = searchTerm.toLowerCase();
     const matchesSearch = !term ||
@@ -1373,22 +1442,41 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   };
 
   // Calculate metrics: Pipeline Activo solo suma cotizaciones emitidas en negociación/propuesta
-  const leadsCotizadosActivos = filteredLeads.filter(l => ['propuesta_enviada', 'propuesta', 'negociacion'].includes(l.etapa));
+  const activePipelineLeads = leads.filter(l => !l.archivado);
+  const leadsCotizadosActivos = activePipelineLeads.filter(l => ['propuesta_enviada', 'propuesta', 'negociacion'].includes(l.etapa));
   const totalPipeline = leadsCotizadosActivos.reduce((acc, l) => acc + (Number(l.presupuestoMonto || l.valorEstimado) || 0), 0);
-  const totalGanado = filteredLeads.filter(l => l.etapa === 'ganado').reduce((acc, l) => acc + (Number(l.presupuestoMonto || l.valorEstimado) || 0), 0);
-  const leadsGanadosCount = filteredLeads.filter(l => l.etapa === 'ganado').length;
-  const tasaConversion = filteredLeads.length > 0 ? Math.round((leadsGanadosCount / filteredLeads.length) * 100) : 0;
-  const leadsEnProspeccion = filteredLeads.filter(l => ['nuevo', 'contactado', 'reunion', 'reunion_demo'].includes(l.etapa)).length;
-  const leadsEnNegociacionCount = filteredLeads.filter(l => ['negociacion', 'propuesta_enviada', 'propuesta'].includes(l.etapa)).length;
+  const totalGanado = leads.filter(l => l.etapa === 'ganado').reduce((acc, l) => acc + (Number(l.presupuestoMonto || l.valorEstimado) || 0), 0);
+  const leadsGanadosCount = leads.filter(l => l.etapa === 'ganado').length;
+  const tasaConversion = totalLeadsCount > 0 ? Math.round((leadsGanadosCount / totalLeadsCount) * 100) : 0;
+  const leadsEnProspeccion = activePipelineLeads.filter(l => ['nuevo', 'contactado', 'reunion', 'reunion_demo'].includes(l.etapa)).length;
+  const leadsEnNegociacionCount = activePipelineLeads.filter(l => ['negociacion', 'propuesta_enviada', 'propuesta'].includes(l.etapa)).length;
   const leadsDeScrapperCount = filteredLeads.filter(l => (l.fuente && l.fuente.toLowerCase().includes('scrapper')) || l.leadId || l.sinWeb).length;
   const leadsManualesCount = Math.max(0, filteredLeads.length - leadsDeScrapperCount);
 
-  // Filtrado de Fichas de Clientes 360°
-  const fichasLeads = filteredLeads.filter(l => {
+  // Filtrado de Fichas de Clientes 360° (soporta píldoras y estado archivado)
+  const fichasLeads = leads.filter(l => {
+    if (fichasFilter === 'archivados') {
+      if (!l.archivado) return false;
+    } else {
+      const isArchived = Boolean(l.archivado);
+      if (archiveFilter === 'activos' && isArchived) return false;
+      if (archiveFilter === 'archivados' && !isArchived) return false;
+    }
+
+    const matchesCountry = selectedCountry === 'ALL' || l.pais === selectedCountry;
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = !term ||
+      l.empresa?.toLowerCase().includes(term) ||
+      l.contacto?.toLowerCase().includes(term) ||
+      l.dominio?.toLowerCase().includes(term) ||
+      l.email?.toLowerCase().includes(term);
+    if (!matchesCountry || !matchesSearch) return false;
+
     if (fichasFilter === 'ganado') return l.etapa === 'ganado';
     if (fichasFilter === 'negociacion') return ['negociacion', 'propuesta_enviada', 'propuesta'].includes(l.etapa);
     if (fichasFilter === 'scrapper') return (l.fuente && l.fuente.toLowerCase().includes('scrapper')) || l.leadId || l.sinWeb;
     if (fichasFilter === 'manual') return !(l.fuente && l.fuente.toLowerCase().includes('scrapper')) && !l.leadId && !l.sinWeb;
+    if (fichasFilter === 'archivados') return Boolean(l.archivado);
     return true; // 'todos'
   });
 
@@ -1493,6 +1581,53 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
               🇩🇴 Rep. Dominicana
             </button>
           </div>
+
+          {/* Selector de Estado Operativo: Activos vs Archivados */}
+          <div className="flex items-center bg-[#131926] border border-slate-800 rounded-lg p-0.5 text-xs">
+            <button
+              onClick={() => setArchiveFilter('activos')}
+              className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+                archiveFilter === 'activos'
+                  ? 'bg-orange-600 text-white font-semibold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Clientes y prospectos en seguimiento activo"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>Activos</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-white/20 text-white font-bold">
+                {activeLeadsCount}
+              </span>
+            </button>
+            <button
+              onClick={() => setArchiveFilter('archivados')}
+              className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 ${
+                archiveFilter === 'archivados'
+                  ? 'bg-amber-600 text-white font-semibold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Clientes finalizados/entregados o prospectos descartados"
+            >
+              <Archive className="w-3.5 h-3.5" />
+              <span>Archivados</span>
+              {archivedLeadsCount > 0 && (
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-amber-500/30 text-amber-200 font-bold">
+                  {archivedLeadsCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setArchiveFilter('todos')}
+              className={`px-2.5 py-1 rounded-md transition-all text-xs ${
+                archiveFilter === 'todos'
+                  ? 'bg-slate-700 text-white font-semibold'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+              title="Ver todo el universo de contactos (activos + archivados)"
+            >
+              Todos ({totalLeadsCount})
+            </button>
+          </div>
         </div>
 
         {/* View Switch & Action */}
@@ -1557,6 +1692,27 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
           </div>
         </div>
       </div>
+
+      {/* Banner Informativo cuando se visualizan Clientes Archivados */}
+      {archiveFilter === 'archivados' && (
+        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-200 shadow-lg">
+          <div className="flex items-center gap-2.5">
+            <Archive className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <span className="font-bold text-white block sm:inline">Modo Histórico de Clientes: </span>
+              <span className="text-amber-200/90">
+                Visualizando registros archivados (proyectos finalizados/entregados o prospectos descartados). Están ocultos del pipeline activo diario pero conservan el 100% de contratos, facturas e historial.
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => setArchiveFilter('activos')}
+            className="px-3.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-semibold text-xs border border-amber-500/40 transition-colors shrink-0 flex items-center gap-1.5 self-start sm:self-auto"
+          >
+            <span>← Ver Clientes Activos</span>
+          </button>
+        </div>
+      )}
 
       {/* 3. MAIN CONTENT: KANBAN VERTICAL CON DRAG & DROP */}
       {activeTab === 'kanban' && (
@@ -1711,6 +1867,20 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                                 </div>
                                 <button
                                   type="button"
+                                  onClick={(e) => {
+                                    handleToggleArchiveLead(lead.id, !lead.archivado, lead.etapa === 'ganado' ? 'entregado' : lead.etapa === 'perdido' ? 'perdido' : 'manual', e);
+                                  }}
+                                  title={lead.archivado ? "Desarchivar cliente (reactivar en pipeline activo)" : "Archivar cliente (ocultar del pipeline activo)"}
+                                  className={`p-1 rounded-lg border transition-colors ${
+                                    lead.archivado
+                                      ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/40'
+                                      : 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border-indigo-500/20 hover:border-indigo-500/40'
+                                  }`}
+                                >
+                                  {lead.archivado ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={(e) => handleDeleteLead(lead.id, lead.empresa, e)}
                                   title="Eliminar Lead"
                                   className="p-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 hover:border-rose-500/40 transition-colors"
@@ -1810,6 +1980,37 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                                 <span>{conPresupuesto ? 'Ver / Modificar Presupuesto →' : 'Generar Presupuesto →'}</span>
                               </button>
                             </div>
+
+                            {/* 6. Acceso Rápido de Archivado (Clientes Finalizados o Perdidos) */}
+                            {lead.archivado ? (
+                              <div className="flex items-center justify-between p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200">
+                                <div className="flex items-center gap-1.5 font-mono text-[11px] truncate">
+                                  <Archive className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                  <span className="truncate">Archivado ({lead.motivoArchivado === 'entregado' ? 'Entregado' : lead.motivoArchivado === 'perdido' ? 'Perdido' : 'Histórico'})</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleToggleArchiveLead(lead.id, false, null, e)}
+                                  className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-semibold text-[10px] border border-amber-500/40 transition-colors shrink-0"
+                                >
+                                  Desarchivar
+                                </button>
+                              </div>
+                            ) : (lead.etapa === 'ganado' || lead.etapa === 'perdido') ? (
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleArchiveLead(lead.id, true, lead.etapa === 'ganado' ? 'entregado' : 'perdido', e)}
+                                className={`w-full py-1.5 px-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                                  lead.etapa === 'ganado'
+                                    ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                    : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/30'
+                                }`}
+                                title="Archivar para retirar del tablero activo y mantener el CRM limpio"
+                              >
+                                <Archive className="w-3.5 h-3.5" />
+                                <span>{lead.etapa === 'ganado' ? '📦 Archivar Cliente Entregado' : '📦 Archivar Lead Perdido'}</span>
+                              </button>
+                            ) : null}
                           </div>
                         );
                       })}
@@ -1902,6 +2103,17 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
               >
                 <UserPlus className="w-3 h-3" />
                 <span>Manuales ({leadsManualesCount})</span>
+              </button>
+              <button
+                onClick={() => setFichasFilter('archivados')}
+                className={`px-3 py-1 rounded-lg transition-all font-medium flex items-center gap-1.5 ${
+                  fichasFilter === 'archivados'
+                    ? 'bg-amber-600 text-white font-semibold shadow-sm'
+                    : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+                }`}
+              >
+                <Archive className="w-3 h-3" />
+                <span>📦 Archivados ({archivedLeadsCount})</span>
               </button>
             </div>
 
@@ -2124,6 +2336,25 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                         </button>
 
                         <button
+                          onClick={(e) => {
+                            handleToggleArchiveLead(lead.id, !lead.archivado, lead.etapa === 'ganado' ? 'entregado' : lead.etapa === 'perdido' ? 'perdido' : 'manual', e);
+                          }}
+                          className={`p-1.5 rounded-lg border text-[11px] font-medium flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                            lead.archivado
+                              ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40'
+                              : 'bg-[#131926] hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border-slate-800 hover:border-amber-500/40'
+                          }`}
+                          title={lead.archivado ? "Desarchivar y reactivar en pipeline" : "Archivar cliente (retirar del pipeline activo)"}
+                        >
+                          {lead.archivado ? (
+                            <ArchiveRestore className="w-3.5 h-3.5 text-amber-400" />
+                          ) : (
+                            <Archive className="w-3.5 h-3.5" />
+                          )}
+                          <span className="text-[9px] uppercase font-mono">{lead.archivado ? 'Reactivar' : 'Archivar'}</span>
+                        </button>
+
+                        <button
                           onClick={(e) => handleDeleteLead(lead.id, lead.empresa, e)}
                           className="p-1.5 rounded-lg bg-[#131926] hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-500/40 text-[11px] font-medium flex flex-col items-center justify-center gap-0.5 transition-colors"
                           title="Eliminar Lead"
@@ -2201,6 +2432,22 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                       Presupuesto
                     </button>
                     
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        handleToggleArchiveLead(lead.id, !lead.archivado, lead.etapa === 'ganado' ? 'entregado' : lead.etapa === 'perdido' ? 'perdido' : 'manual', e);
+                      }}
+                      className={`px-2 py-1.5 rounded-lg text-xs font-medium border transition-colors inline-flex items-center gap-1 align-middle ${
+                        lead.archivado
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                          : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white'
+                      }`}
+                      title={lead.archivado ? "Desarchivar y reactivar en pipeline activo" : "Archivar cliente"}
+                    >
+                      {lead.archivado ? <ArchiveRestore className="w-3.5 h-3.5 text-amber-400" /> : <Archive className="w-3.5 h-3.5" />}
+                      <span>{lead.archivado ? 'Reactivar' : 'Archivar'}</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={(e) => handleDeleteLead(lead.id, lead.empresa, e)}
@@ -2640,8 +2887,14 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                   {activeLeadModal.etapa === 'ganado' ? '👑' : <Building2 className="w-5 h-5" />}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-bold text-lg text-white leading-tight">{activeLeadModal.empresa}</h3>
+                    {activeLeadModal.archivado && (
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold flex items-center gap-1">
+                        <Archive className="w-3 h-3 text-amber-400" />
+                        <span>Archivado ({activeLeadModal.motivoArchivado === 'entregado' ? 'Entregado' : activeLeadModal.motivoArchivado === 'perdido' ? 'Perdido' : 'Histórico'})</span>
+                      </span>
+                    )}
                     <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
                       {activeLeadModal.pais === 'SV' ? '🇸🇻 El Salvador' : '🇩🇴 República Dominicana'}
                     </span>
@@ -2689,6 +2942,36 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                     ))}
                   </select>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    handleToggleArchiveLead(
+                      activeLeadModal.id,
+                      !activeLeadModal.archivado,
+                      activeLeadModal.etapa === 'ganado' ? 'entregado' : activeLeadModal.etapa === 'perdido' ? 'perdido' : 'manual',
+                      e
+                    );
+                  }}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
+                    activeLeadModal.archivado
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
+                  }`}
+                  title={activeLeadModal.archivado ? "Reactivar este cliente en el pipeline activo" : "Archivar cliente (retirar del pipeline activo sin borrar)"}
+                >
+                  {activeLeadModal.archivado ? (
+                    <>
+                      <ArchiveRestore className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Reactivar en CRM</span>
+                    </>
+                  ) : (
+                    <>
+                      <Archive className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Archivar Ficha</span>
+                    </>
+                  )}
+                </button>
 
                 <button
                   onClick={() => {
