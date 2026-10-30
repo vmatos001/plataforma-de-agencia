@@ -62,7 +62,12 @@ import {
   saveProyectoCloud, 
   deleteProyectoCloud,
   subscribeProyectosCloud, 
+  getPresupuestosCloud,
+  subscribePresupuestosCloud,
+  savePresupuestoCloud,
   savePortalCloud,
+  saveAppStateCloud,
+  getAppStateCloud,
   isExcludedProyecto,
   isExcludedPresupuesto,
   markProyectoDeleted
@@ -114,113 +119,100 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
   // Invoice Audit / Preview Modal State (Auditoría, Descarga e Inspección Financiera)
   const [invoiceAuditModal, setInvoiceAuditModal] = useState(null); // { invoice, tipoVista, isEditing: false }
   const [invoiceEditForm, setInvoiceEditForm] = useState(null);
+  const [cloudFacturas, setCloudFacturas] = useState([]);
+  const [finanzasConfig, setFinanzasConfig] = useState(null);
 
   useEffect(() => {
     fetchProyectos();
     fetchPresupuestos();
+
+    // Cargar facturas y configuración de finanzas desde Firestore Cloud
+    getAppStateCloud('finanzas_v1').then(data => {
+      if (data && typeof data === 'object') {
+        if (Array.isArray(data.facturas)) setCloudFacturas(data.facturas);
+        if (data.configuracion) setFinanzasConfig(data.configuracion);
+      }
+    }).catch(() => {});
 
     // Suscripción en tiempo real a proyectos en Firestore para actualización instantánea multiplataforma
     const unsubscribeProyectos = subscribeProyectosCloud((cloudList) => {
       if (Array.isArray(cloudList)) {
         setProyectos(prev => {
           const map = new Map();
-          [...cloudList, ...prev].forEach(p => {
+          cloudList.forEach(p => {
             if (!p?.id && !p?.codigo) return;
             if (isExcludedProyecto(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p.presupuestoId, p.presupuestoCodigo, p._firestoreDocId)) return;
             const key = p.id || p.codigo;
-            if (!map.has(key)) map.set(key, p);
+            map.set(key, p);
           });
           return Array.from(map.values());
         });
       }
     });
 
-    const handleStorageChange = () => {
+    // Suscripción en tiempo real a presupuestos en Firestore
+    const unsubscribePresupuestos = subscribePresupuestosCloud((cloudProps) => {
+      if (Array.isArray(cloudProps)) {
+        setPresupuestos(cloudProps);
+      }
+    });
+
+    const handleSyncUpdate = () => {
       fetchProyectos();
       fetchPresupuestos();
     };
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('goglite_proyectos_synced', handleStorageChange);
-    window.addEventListener('goglite_tasks_updated', handleStorageChange);
+
+    window.addEventListener('goglite_proyectos_synced', handleSyncUpdate);
+    window.addEventListener('goglite_tasks_updated', handleSyncUpdate);
+    window.addEventListener('goglite_presupuestos_updated', handleSyncUpdate);
+
     return () => {
       if (typeof unsubscribeProyectos === 'function') unsubscribeProyectos();
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('goglite_proyectos_synced', handleStorageChange);
-      window.removeEventListener('goglite_tasks_updated', handleStorageChange);
+      if (typeof unsubscribePresupuestos === 'function') unsubscribePresupuestos();
+      window.removeEventListener('goglite_proyectos_synced', handleSyncUpdate);
+      window.removeEventListener('goglite_tasks_updated', handleSyncUpdate);
+      window.removeEventListener('goglite_presupuestos_updated', handleSyncUpdate);
     };
   }, []);
 
   const fetchProyectos = async () => {
-    let localList = getStoredProyectos();
-
-    // 1. Consultar Firestore para proyectos en la nube
     try {
-      const cloudList = await getProyectosCloud();
-      if (Array.isArray(cloudList) && cloudList.length > 0) {
-        const map = new Map();
-        [...cloudList, ...localList].forEach(p => {
-          if (p?.id && !map.has(p.id)) map.set(p.id, p);
-        });
-        localList = Array.from(map.values());
-      }
-    } catch (cErr) {
-      console.warn('[Contratos] Error leyendo proyectos de Firestore:', cErr);
-    }
+      setLoading(true);
+      const [cloudList, cloudProps] = await Promise.all([
+        getProyectosCloud(),
+        getPresupuestosCloud()
+      ]);
 
-    // Auto-generar y vincular contratos para cualquier propuesta que ya haya sido aceptada (excluyendo eliminadas/prueba)
-    try {
-      const rawProps = localStorage.getItem('goglite_presupuestos');
-      if (rawProps) {
-        const parsedProps = JSON.parse(rawProps);
-        let createdAny = false;
-        parsedProps.forEach(prop => {
+      let projects = Array.isArray(cloudList) ? [...cloudList] : [];
+
+      // Auto-generar y vincular contratos para cualquier propuesta que ya haya sido aceptada
+      if (Array.isArray(cloudProps)) {
+        cloudProps.forEach(prop => {
           if (isExcludedPresupuesto(prop?.cliente?.empresa || prop?.cliente?.nombre, prop?.id, prop?.codigo, prop?._firestoreDocId)) {
             return;
           }
           if (prop?.estado === 'aceptado') {
             const targetEmp = (prop.cliente?.empresa || '').toLowerCase().trim();
-            const existingIdx = localList.findIndex(p => 
+            const existingIdx = projects.findIndex(p => 
               (p.presupuestoId && p.presupuestoId === prop.id) ||
               (p.presupuestoCodigo && p.presupuestoCodigo === prop.codigo) ||
               (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
             );
             if (existingIdx >= 0) {
-              localList[existingIdx] = reconcileProyectoWithPresupuesto(localList[existingIdx], prop);
-              createdAny = true;
+              projects[existingIdx] = reconcileProyectoWithPresupuesto(projects[existingIdx], prop);
             } else {
-              const newProj = buildProyectoFromPresupuesto(prop, localList);
+              const newProj = buildProyectoFromPresupuesto(prop, projects);
               if (newProj && !isExcludedProyecto(newProj.cliente?.empresa, newProj.id, newProj.codigo, newProj.presupuestoId, newProj.presupuestoCodigo)) {
-                localList.unshift(newProj);
-                createdAny = true;
+                projects.unshift(newProj);
+                saveProyectoCloud(newProj).catch(() => {});
               }
             }
           }
         });
-        if (createdAny) {
-          saveStoredProyectos(localList);
-        }
       }
-    } catch (e) {}
 
-    try {
-      const res = await apiFetch('/api/proyectos');
-      const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const map = new Map();
-          // localList toma precedencia para preservar firmas y datos offline
-          [...localList, ...data].forEach(p => {
-            if (p?.id && !map.has(p.id)) map.set(p.id, p);
-          });
-          localList = Array.from(map.values());
-        }
-      }
-    } catch (err) {
-      console.warn('[Contratos] Usando proyectos locales:', err);
-    } finally {
       // Filtrar registros de prueba o eliminados permanentemente
-      localList = localList.filter(p =>
+      projects = projects.filter(p =>
         p &&
         !isExcludedProyecto(
           p.cliente?.empresa || p.cliente?.nombre,
@@ -233,81 +225,52 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       );
 
       // Re-evaluar automáticamente hitos con eventos del cliente y sprint de desarrollo
-      // y auto-sincronizar datos de comprobante de anticipo desde portalConfig si faltan en pagos
-      localList = localList.map(p => {
+      projects = projects.map(p => {
         let evaluated = evaluateProjectMilestones(p);
-        try {
-          const tokensToCheck = [evaluated.portalToken, evaluated.presupuestoId, evaluated.id, evaluated.codigo, evaluated.leadId].filter(Boolean);
-          for (const tk of tokensToCheck) {
-            const raw = localStorage.getItem('goglite_portal_' + tk);
-            if (raw) {
-              const pcfg = JSON.parse(raw);
-              if (pcfg.comprobanteAnticipo || pcfg.comprobanteAnticipoImagen) {
-                const currentPagos = evaluated.pagos || {};
-                evaluated = {
-                  ...evaluated,
-                  pagos: {
-                    ...currentPagos,
-                    anticipoComprobante: currentPagos.anticipoComprobante || pcfg.comprobanteAnticipo || '',
-                    anticipoComprobanteImagen: currentPagos.anticipoComprobanteImagen || pcfg.comprobanteAnticipoImagen || '',
-                    anticipoComprobanteNombre: currentPagos.anticipoComprobanteNombre || pcfg.comprobanteAnticipoNombre || 'Comprobante_Anticipo.jpg',
-                    anticipoFecha: currentPagos.anticipoFecha || pcfg.fechaFirmaContrato || '',
-                    anticipoEstado: currentPagos.anticipoEstado === 'confirmado' ? 'confirmado' : 'verificacion'
-                  }
-                };
-                break;
-              }
+        const pcfg = evaluated.portalConfig || {};
+        if (pcfg.comprobanteAnticipo || pcfg.comprobanteAnticipoImagen) {
+          const currentPagos = evaluated.pagos || {};
+          evaluated = {
+            ...evaluated,
+            pagos: {
+              ...currentPagos,
+              anticipoComprobante: currentPagos.anticipoComprobante || pcfg.comprobanteAnticipo || '',
+              anticipoComprobanteImagen: currentPagos.anticipoComprobanteImagen || pcfg.comprobanteAnticipoImagen || '',
+              anticipoComprobanteNombre: currentPagos.anticipoComprobanteNombre || pcfg.comprobanteAnticipoNombre || 'Comprobante_Anticipo.jpg',
+              anticipoFecha: currentPagos.anticipoFecha || pcfg.fechaFirmaContrato || '',
+              anticipoEstado: currentPagos.anticipoEstado === 'confirmado' ? 'confirmado' : 'verificacion'
             }
-          }
-        } catch (e) {}
+          };
+        }
         return evaluated;
       });
-      saveStoredProyectos(localList);
-      // Sincronizar hacia Firestore cualquier proyecto local para disponibilidad inmediata en celulares
-      localList.forEach(p => {
-        if (p?.id) saveProyectoCloud(p).catch(() => {});
-      });
 
-      setProyectos(localList);
+      setProyectos(projects);
       setActiveProyecto(prev => {
         if (!prev) return null;
         const targetEmp = (prev.cliente?.empresa || '').toLowerCase().trim();
-        const found = localList.find(p => 
+        const found = projects.find(p => 
           p.id === prev.id || 
           (prev.presupuestoId && p.presupuestoId === prev.presupuestoId) || 
           (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
         );
         return found ? evaluateProjectMilestones(found) : prev;
       });
+    } catch (cErr) {
+      console.warn('[Contratos] Error leyendo proyectos de Firestore:', cErr);
+    } finally {
       setLoading(false);
     }
   };
 
   const fetchPresupuestos = async () => {
-    let localProps = [];
     try {
-      const raw = localStorage.getItem('goglite_presupuestos');
-      if (raw) localProps = JSON.parse(raw);
-    } catch (e) {}
-
-    try {
-      const res = await fetch('/api/presupuestos');
-      const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const map = new Map();
-          // localProps toma precedencia para preservar estado 'aceptado'
-          [...localProps, ...data].forEach(p => {
-            if (p?.id && !map.has(p.id)) map.set(p.id, p);
-          });
-          localProps = Array.from(map.values());
-        }
+      const cloudProps = await getPresupuestosCloud();
+      if (Array.isArray(cloudProps)) {
+        setPresupuestos(cloudProps);
       }
     } catch (err) {
-      console.warn('[Contratos] Usando presupuestos locales:', err);
-    } finally {
-      setPresupuestos(localProps);
+      console.warn('[Contratos] Error leyendo presupuestos de Firestore:', err);
     }
   };
 
@@ -352,10 +315,9 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
         createdProj = buildProyectoFromPresupuesto(prop, proyectos);
       }
 
-      // 3. Persistir en estado, localStorage y Firestore Cloud
+      // 3. Persistir en estado y Firestore Cloud
       const updatedList = [createdProj, ...proyectos.filter(p => p.id !== createdProj.id)];
       setProyectos(updatedList);
-      saveStoredProyectos(updatedList);
       saveProyectoCloud(createdProj).catch(() => {});
       syncPortalStorageForProyecto(createdProj);
 
@@ -363,7 +325,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       try {
         const updatedPresupuestos = presupuestos.map(p => p.id === propId ? { ...p, estado: 'aceptado' } : p);
         setPresupuestos(updatedPresupuestos);
-        localStorage.setItem('goglite_presupuestos', JSON.stringify(updatedPresupuestos));
+        savePresupuestoCloud({ ...prop, estado: 'aceptado' }).catch(() => {});
       } catch (e) {}
 
       setShowImportModal(false);
@@ -400,7 +362,6 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
           )
       );
       setProyectos(updated);
-      saveStoredProyectos(updated);
 
       if (activeProyecto?.id === id || activeProyecto?.codigo === id) {
         setViewMode('list');
@@ -492,7 +453,6 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     setActiveProyecto(updatedProj);
     setProyectos(prev => {
       const next = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
-      saveStoredProyectos(next);
       return next;
     });
 
@@ -543,7 +503,6 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     setActiveProyecto(updatedProj);
     setProyectos(prev => {
       const next = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
-      saveStoredProyectos(next);
       return next;
     });
 
@@ -594,55 +553,10 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     }));
   };
 
-  // Helper para sincronizar todas las llaves goglite_portal_* asociadas a un proyecto
+  // Helper para sincronizar el portal asociado al proyecto en Firestore Cloud (100% Cloud-First)
   const syncPortalStorageForProyecto = (proj, updates = {}) => {
-    if (!proj || typeof window === 'undefined') return;
+    if (!proj) return;
     try {
-      const targetEmp = (proj.cliente?.empresa || '').toLowerCase().trim();
-      const targetPresId = proj.presupuestoId;
-      const targetProjId = proj.id;
-      const targetToken = proj.portalToken;
-
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('goglite_portal_')) {
-          try {
-            const raw = localStorage.getItem(key);
-            if (raw) {
-              const cfg = JSON.parse(raw);
-              const matches = 
-                (targetToken && key === 'goglite_portal_' + targetToken) ||
-                (targetProjId && key === 'goglite_portal_' + targetProjId) ||
-                (targetPresId && key === 'goglite_portal_' + targetPresId) ||
-                (cfg.proyectoId && cfg.proyectoId === targetProjId) ||
-                (cfg.presupuestoId && cfg.presupuestoId === targetPresId) ||
-                (cfg.leadId && proj.leadId && cfg.leadId === proj.leadId) ||
-                (targetEmp && cfg.empresa && cfg.empresa.toLowerCase().trim() === targetEmp);
-
-              if (matches) {
-                localStorage.setItem(key, JSON.stringify({
-                  ...cfg,
-                  ...updates,
-                  ultimaModificacion: new Date().toISOString()
-                }));
-              }
-            }
-          } catch (e) {}
-        }
-      }
-
-      const directTokens = [proj.portalToken, proj.presupuestoId, proj.id, proj.codigo].filter(Boolean);
-      directTokens.forEach(tk => {
-        const key = 'goglite_portal_' + tk;
-        const raw = localStorage.getItem(key);
-        const prevCfg = raw ? JSON.parse(raw) : {};
-        localStorage.setItem(key, JSON.stringify({
-          ...prevCfg,
-          ...updates,
-          ultimaModificacion: new Date().toISOString()
-        }));
-      });
-
       // Sincronizar en Firestore para acceso inmediato desde celulares y otros dispositivos
       const syncToken = proj.portalToken || (proj.leadId ? 'portal-' + proj.leadId : 'portal-' + proj.id);
       saveProyectoCloud({
@@ -728,11 +642,10 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     setActiveProyecto(updatedProj);
     setProyectos(prev => {
       const next = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
-      saveStoredProyectos(next);
       return next;
     });
 
-    // Sincronizar todas las llaves de portal en localStorage
+    // Sincronizar el portal del cliente en Firestore Cloud
     syncPortalStorageForProyecto(updatedProj, {
       clienteConfirmoInsumos: true,
       fase3InsumosCompletos: shouldValidate100,
@@ -767,27 +680,10 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       list = target.onboarding.archivosRecibidos;
     }
 
-    // Complementar con archivos en portalConfig de localStorage si existen
-    try {
-      if (typeof window !== 'undefined') {
-        const tokensToCheck = [
-          target.portalToken,
-          target.presupuestoId,
-          target.id,
-          target.codigo
-        ].filter(Boolean);
-        for (const tk of tokensToCheck) {
-          const raw = localStorage.getItem('goglite_portal_' + tk);
-          if (raw) {
-            const pcfg = JSON.parse(raw);
-            if (Array.isArray(pcfg.archivosSubidos) && pcfg.archivosSubidos.length > list.length) {
-              list = pcfg.archivosSubidos;
-              break;
-            }
-          }
-        }
-      }
-    } catch (e) {}
+    const pcfg = target.portalConfig || {};
+    if (Array.isArray(pcfg.archivosSubidos) && pcfg.archivosSubidos.length > list.length) {
+      list = pcfg.archivosSubidos;
+    }
 
     return list;
   };
@@ -802,31 +698,13 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     let nombre = target.pagos?.anticipoComprobanteNombre || '';
     let fecha = target.pagos?.anticipoFecha || '';
 
-    // Complementar con datos guardados en el portal del cliente si no están en pagos
-    try {
-      if (typeof window !== 'undefined') {
-        const tokensToCheck = [
-          target.portalToken,
-          target.presupuestoId,
-          target.id,
-          target.codigo,
-          target.leadId
-        ].filter(Boolean);
-        for (const tk of tokensToCheck) {
-          const raw = localStorage.getItem('goglite_portal_' + tk);
-          if (raw) {
-            const pcfg = JSON.parse(raw);
-            if (!texto && pcfg.comprobanteAnticipo) texto = pcfg.comprobanteAnticipo;
-            if (!imagen && pcfg.comprobanteAnticipoImagen) imagen = pcfg.comprobanteAnticipoImagen;
-            if (!nombre && pcfg.comprobanteAnticipoNombre) nombre = pcfg.comprobanteAnticipoNombre;
-            if (!fecha && (pcfg.fechaFirmaContrato || pcfg.fechaAutenticacion)) {
-              fecha = pcfg.fechaFirmaContrato || pcfg.fechaAutenticacion;
-            }
-            if (imagen || texto) break;
-          }
-        }
-      }
-    } catch (e) {}
+    const pcfg = target.portalConfig || {};
+    if (!texto && pcfg.comprobanteAnticipo) texto = pcfg.comprobanteAnticipo;
+    if (!imagen && pcfg.comprobanteAnticipoImagen) imagen = pcfg.comprobanteAnticipoImagen;
+    if (!nombre && pcfg.comprobanteAnticipoNombre) nombre = pcfg.comprobanteAnticipoNombre;
+    if (!fecha && (pcfg.fechaFirmaContrato || pcfg.fechaAutenticacion)) {
+      fecha = pcfg.fechaFirmaContrato || pcfg.fechaAutenticacion;
+    }
 
     return { texto, imagen, nombre, fecha };
   };
@@ -841,28 +719,11 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     let nombre = target.pagos?.saldoComprobanteNombre || '';
     let fecha = target.pagos?.saldoFecha || '';
 
-    try {
-      if (typeof window !== 'undefined') {
-        const tokensToCheck = [
-          target.portalToken,
-          target.presupuestoId,
-          target.id,
-          target.codigo,
-          target.leadId
-        ].filter(Boolean);
-        for (const tk of tokensToCheck) {
-          const raw = localStorage.getItem('goglite_portal_' + tk);
-          if (raw) {
-            const pcfg = JSON.parse(raw);
-            if (!texto && pcfg.comprobanteLiquidacion) texto = pcfg.comprobanteLiquidacion;
-            if (!imagen && pcfg.comprobanteLiquidacionImagen) imagen = pcfg.comprobanteLiquidacionImagen;
-            if (!nombre && pcfg.comprobanteLiquidacionNombre) nombre = pcfg.comprobanteLiquidacionNombre;
-            if (!fecha && pcfg.fechaLiquidacion) fecha = pcfg.fechaLiquidacion;
-            if (imagen || texto) break;
-          }
-        }
-      }
-    } catch (e) {}
+    const pcfg = target.portalConfig || {};
+    if (!texto && pcfg.comprobanteLiquidacion) texto = pcfg.comprobanteLiquidacion;
+    if (!imagen && pcfg.comprobanteLiquidacionImagen) imagen = pcfg.comprobanteLiquidacionImagen;
+    if (!nombre && pcfg.comprobanteLiquidacionNombre) nombre = pcfg.comprobanteLiquidacionNombre;
+    if (!fecha && pcfg.fechaLiquidacion) fecha = pcfg.fechaLiquidacion;
 
     return { texto, imagen, nombre, fecha };
   };
@@ -964,22 +825,10 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     setActiveProyecto(updatedProj);
     setProyectos(prev => {
       const next = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
-      saveStoredProyectos(next);
       return next;
     });
-    try {
-      const tokensToCheck = [activeProyecto.portalToken, activeProyecto.presupuestoId, activeProyecto.id].filter(Boolean);
-      tokensToCheck.forEach(tk => {
-        const raw = localStorage.getItem('goglite_portal_' + tk);
-        if (raw) {
-          const cfg = JSON.parse(raw);
-          localStorage.setItem('goglite_portal_' + tk, JSON.stringify({
-            ...cfg,
-            archivosSubidos: updated
-          }));
-        }
-      });
-    } catch (e) {}
+    saveProyectoCloud(updatedProj).catch(() => {});
+    syncPortalStorageForProyecto(updatedProj, { archivosSubidos: updated });
     window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: [updatedProj] } }));
     window.dispatchEvent(new Event('storage'));
   };
@@ -1016,11 +865,10 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     setActiveProyecto(updatedProj);
     setProyectos(prev => {
       const next = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
-      saveStoredProyectos(next);
       return next;
     });
 
-    // Sincronizar todas las llaves de portal existentes en localStorage
+    // Sincronizar el portal del cliente en Firestore Cloud
     syncPortalStorageForProyecto(updatedProj, {
       clienteConfirmoInsumos: true,
       fase3InsumosCompletos: true,
@@ -1076,30 +924,27 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     setActiveProyecto(updatedProj);
     setProyectos(prev => {
       const next = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
-      saveStoredProyectos(next);
       return next;
     });
 
-    // Sincronizar en tiempo real las facturas de Anticipo y Saldo en goglite_facturas
+    // Sincronizar en tiempo real las facturas de Anticipo y Saldo en Firestore Cloud
     try {
-      let storedFacturas = [];
-      const rawFac = localStorage.getItem('goglite_facturas');
-      if (rawFac) storedFacturas = JSON.parse(rawFac);
-      const reconciled = reconcileMilestoneInvoices(storedFacturas, getInvoiceConfiguracion());
-      localStorage.setItem('goglite_facturas', JSON.stringify(reconciled));
-
-      const rawFin = localStorage.getItem('goglite_finanzas_v1');
-      if (rawFin) {
-        const parsedFin = JSON.parse(rawFin);
-        parsedFin.facturas = reconciled;
-        localStorage.setItem('goglite_finanzas_v1', JSON.stringify(parsedFin));
-      }
+      getAppStateCloud('finanzas_v1').then(cloudFin => {
+        const finObj = (cloudFin && typeof cloudFin === 'object') ? cloudFin : {};
+        const storedFacturas = Array.isArray(finObj.facturas) ? finObj.facturas : cloudFacturas;
+        const reconciled = reconcileMilestoneInvoices(storedFacturas, getInvoiceConfiguracion());
+        setCloudFacturas(reconciled);
+        saveAppStateCloud('finanzas_v1', 'finanzas', {
+          ...finObj,
+          facturas: reconciled
+        }).catch(() => {});
+      }).catch(() => {});
       window.dispatchEvent(new CustomEvent('goglite_facturas_updated', { detail: { proyectoId: updatedProj.id, tipoPago } }));
     } catch (e) {
       console.warn('Error sincronizando facturas por hito en pago:', e);
     }
 
-    // Sincronizar todas las llaves de portal existentes en localStorage
+    // Sincronizar el portal del cliente en Firestore Cloud
     if (tipoPago === 'saldo') {
       syncPortalStorageForProyecto(updatedProj, {
         saldoConfirmadoAgencia: true,
@@ -1149,20 +994,11 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
 
   // Helper para configuración visual e institucional de la factura
   const getInvoiceConfiguracion = () => {
-    let savedFinanzasConfig = null;
-    try {
-      const raw = localStorage.getItem('goglite_finanzas_v1');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.configuracion) savedFinanzasConfig = parsed.configuracion;
-      }
-    } catch (e) {}
-
     const documentBrandLogo = (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo_docs') : null) || 
                               (typeof window !== 'undefined' ? localStorage.getItem('goglite_agency_logo') : null) || 
                               DEFAULT_AGENCY_BRANDING.logoUrl;
 
-    const baseConfig = savedFinanzasConfig || DEFAULT_CONFIGURACION;
+    const baseConfig = finanzasConfig || DEFAULT_CONFIGURACION;
 
     return {
       ...baseConfig,
@@ -1184,11 +1020,7 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
   const getInvoiceForProyecto = (proj = activeProyecto, tipoVista = 'general') => {
     if (!proj) return null;
 
-    let storedFacturas = [];
-    try {
-      const raw = localStorage.getItem('goglite_facturas');
-      if (raw) storedFacturas = JSON.parse(raw);
-    } catch (e) {}
+    let storedFacturas = Array.isArray(cloudFacturas) ? [...cloudFacturas] : [];
 
     // 1. Reconciliar para asegurar que los dos hitos (anticipo y saldo) existen de forma independiente
     storedFacturas = reconcileMilestoneInvoices(storedFacturas, getInvoiceConfiguracion());
@@ -1225,9 +1057,11 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
       }
       if (found) {
         storedFacturas.push(found);
-        try {
-          localStorage.setItem('goglite_facturas', JSON.stringify(storedFacturas));
-        } catch (e) {}
+        setCloudFacturas(storedFacturas);
+        getAppStateCloud('finanzas_v1').then(fin => {
+          const finObj = (fin && typeof fin === 'object') ? fin : {};
+          saveAppStateCloud('finanzas_v1', 'finanzas', { ...finObj, facturas: storedFacturas }).catch(() => {});
+        }).catch(() => {});
       }
     }
 
@@ -1319,28 +1153,26 @@ export default function ContratosOnboardingModule({ selectedCountry = 'SV', onNa
     };
 
     try {
-      let storedFacturas = [];
-      const raw = localStorage.getItem('goglite_facturas');
-      if (raw) storedFacturas = JSON.parse(raw);
+      let storedFacturas = Array.isArray(cloudFacturas) ? [...cloudFacturas] : [];
       const idx = storedFacturas.findIndex(f => f.id === updatedInv.id || f.numeroFactura === updatedInv.numeroFactura);
       if (idx >= 0) {
         storedFacturas[idx] = updatedInv;
       } else {
         storedFacturas.push(updatedInv);
       }
-      localStorage.setItem('goglite_facturas', JSON.stringify(storedFacturas));
+      setCloudFacturas(storedFacturas);
 
-      const rawFinanzas = localStorage.getItem('goglite_finanzas_v1');
-      if (rawFinanzas) {
-        const parsedFin = JSON.parse(rawFinanzas);
-        const fIdx = (parsedFin.facturas || []).findIndex(f => f.id === updatedInv.id || f.numeroFactura === updatedInv.numeroFactura);
+      getAppStateCloud('finanzas_v1').then(cloudFin => {
+        const parsedFin = (cloudFin && typeof cloudFin === 'object') ? cloudFin : {};
+        const fList = Array.isArray(parsedFin.facturas) ? [...parsedFin.facturas] : [];
+        const fIdx = fList.findIndex(f => f.id === updatedInv.id || f.numeroFactura === updatedInv.numeroFactura);
         if (fIdx >= 0) {
-          parsedFin.facturas[fIdx] = updatedInv;
+          fList[fIdx] = updatedInv;
         } else {
-          parsedFin.facturas = [...(parsedFin.facturas || []), updatedInv];
+          fList.push(updatedInv);
         }
-        localStorage.setItem('goglite_finanzas_v1', JSON.stringify(parsedFin));
-      }
+        saveAppStateCloud('finanzas_v1', 'finanzas', { ...parsedFin, facturas: fList }).catch(() => {});
+      }).catch(() => {});
 
       window.dispatchEvent(new CustomEvent('goglite_facturas_updated', { detail: { factura: updatedInv } }));
     } catch (e) {

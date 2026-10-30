@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import apiClient from '../services/apiClient';
-import { getStoredProyectos, saveStoredProyectos } from '../services/contractGenerator';
-import { getAppStateCloud, saveAppStateCloud, saveProyectoCloud } from '../services/firestoreSyncService';
+import { getAppStateCloud, saveAppStateCloud, saveProyectoCloud, getProyectosCloud } from '../services/firestoreSyncService';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -513,7 +512,7 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
   const loadProyectosAndChecklist = async () => {
     try {
       setLoading(true);
-      let list = getStoredProyectos();
+      let list = await getProyectosCloud();
 
       try {
         const res = await apiClient.get('/api/proyectos');
@@ -568,13 +567,8 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
       (proj.cliente?.empresa ? `https://${proj.cliente.empresa.toLowerCase().replace(/[^a-z0-9]/g, '')}.com` : 'https://cliente-oficial.com');
     setSiteUrl(initialUrl);
 
-    // Cargar checklist guardado localmente para este proyecto
-    const storageKey = `goglite_launch_qa_${proj.id}`;
-    let savedData = null;
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) savedData = JSON.parse(raw);
-    } catch (e) {}
+    // Cargar checklist guardado para este proyecto desde Firestore
+    let savedData = proj.launchQa || null;
 
     const extractState = (i) => {
       if (i.estado === 'APROBADO' || i.estado === 'PENDIENTE' || i.estado === 'NO_APLICA') {
@@ -725,25 +719,18 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
     };
 
     try {
-      localStorage.setItem(`goglite_launch_qa_${selectedProyectoId}`, JSON.stringify(dataToSave));
       saveAppStateCloud(`launch_qa_${selectedProyectoId}`, 'qa_audits', dataToSave).catch(() => {});
 
-      // Sincronizar dentro del proyecto local y en Firestore
-      const projs = getStoredProyectos();
-      const updatedProjs = projs.map(p => {
-        if (p.id === selectedProyectoId) {
-          const nextP = {
-            ...p,
-            launchQa: dataToSave
-          };
-          saveProyectoCloud(nextP).catch(() => {});
-          return nextP;
-        }
-        return p;
-      });
-      saveStoredProyectos(updatedProjs);
+      // Sincronizar dentro del proyecto en Firestore
+      const activeProj = proyectos.find(p => p.id === selectedProyectoId);
+      if (activeProj) {
+        saveProyectoCloud({
+          ...activeProj,
+          launchQa: dataToSave
+        }).catch(() => {});
+      }
     } catch (e) {
-      console.warn('Error guardando checklist en localStorage:', e);
+      console.warn('Error guardando checklist en Firestore:', e);
     }
 
     setSavedNotice(true);

@@ -4,8 +4,7 @@
  * para calcular automáticamente el porcentaje de avance y actualizar la Hoja de Ruta del SOW.
  */
 
-import { STORAGE_KEYS } from './localStore';
-import { getStoredProyectos, saveStoredProyectos } from './contractGenerator';
+import { getProyectosCloud, saveProyectoCloud } from './firestoreSyncService';
 
 export const PLAYBOOK_12_FASES_KEYS = [
   { id: 'fase-1', titulo: 'Infraestructura Base, GitHub Privado & Firebase Spark', hitoTarget: 'h-4', faseNum: 1 },
@@ -23,28 +22,10 @@ export const PLAYBOOK_12_FASES_KEYS = [
 ];
 
 /**
- * Obtiene las tareas del Sprint de Desarrollo (Kanban Fase 4) desde localStorage
+ * Obtiene las tareas del Sprint de Desarrollo (Kanban Fase 4) en memoria
  */
 export function getStoredSprintTasks(proyectoId = null) {
-  if (typeof window === 'undefined') return [];
-  try {
-    if (proyectoId) {
-      const byProjRaw = localStorage.getItem('goglite_sprint_tasks_by_project');
-      if (byProjRaw) {
-        const byProj = JSON.parse(byProjRaw);
-        if (byProj && Array.isArray(byProj[proyectoId])) {
-          return byProj[proyectoId];
-        }
-      }
-    }
-    const raw = localStorage.getItem('goglite_sprint_tasks');
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    console.warn('[MilestoneSync] Error leyendo tareas de sprint:', e);
-    return [];
-  }
+  return [];
 }
 
 /**
@@ -233,23 +214,24 @@ export function evaluateProjectMilestones(proyecto, customSprintTasks = null) {
 }
 
 /**
- * Sincroniza todos los proyectos guardados en localStorage con los eventos vigentes
+ * Sincroniza todos los proyectos guardados en Firestore con los eventos vigentes
  */
-export function syncAllProyectosWithEvents(customSprintTasks = null, targetProyectoId = null) {
+export async function syncAllProyectosWithEvents(customSprintTasks = null, targetProyectoId = null) {
   if (typeof window === 'undefined') return [];
   try {
-    const list = getStoredProyectos();
+    const list = await getProyectosCloud();
     if (!Array.isArray(list) || list.length === 0) return [];
 
     const updated = list.map(p => {
       if (targetProyectoId && p.id === targetProyectoId && customSprintTasks) {
         return evaluateProjectMilestones(p, customSprintTasks);
       }
-      const projTasks = getStoredSprintTasks(p.id);
-      return evaluateProjectMilestones(p, projTasks.length > 0 ? projTasks : (!targetProyectoId ? customSprintTasks : null));
+      return evaluateProjectMilestones(p, customSprintTasks);
     });
 
-    saveStoredProyectos(updated);
+    for (const p of updated) {
+      saveProyectoCloud(p).catch(() => {});
+    }
 
     // Notificar al bus de eventos de la aplicación
     window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', {

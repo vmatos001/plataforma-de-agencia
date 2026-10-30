@@ -1,59 +1,88 @@
 /**
- * Módulo unificado de persistencia Local-First y gestión de claves de localStorage
- * Centraliza la definición de claves, reconcilia versiones (goglite_crm_leads_v3 vs v1)
- * y garantiza una limpieza exhaustiva y segura del entorno de demostración.
+ * Módulo unificado de persistencia y configuración de sesión/UI
+ * Arquitectura 100% Cloud-Only (Firebase Firestore como única fuente de verdad)
+ * Los datos de negocio transaccionales ya NO residen en localStorage.
  */
 
-import { INITIAL_PROD_CRM_LEADS } from '../constants/initialCrmData';
 import { isExcludedCrmLead, isExcludedPresupuesto, isExcludedProyecto } from './firestoreSyncService';
 
+// ============================================================================
+// PURGA AUTOMÁTICA DE DATOS DE NEGOCIO LEGACY EN LOCALSTORAGE
+// ============================================================================
+if (typeof window !== 'undefined') {
+  try {
+    const legacyBusinessKeys = [
+      'goglite_outbound_leads',
+      'goglite_crm_leads',
+      'goglite_crm_leads_v3',
+      'goglite_crm_leads_v4_prod',
+      'goglite_presupuestos',
+      'goglite_contratos',
+      'goglite_proyectos',
+      'goglite_finanzas_v1',
+      'goglite_live_timer_v1',
+      'goglite_sprint_tasks',
+      'goglite_sprint_tasks_by_project',
+      'goglite_repo_vault',
+      'goglite_repo_vault_by_project',
+      'goglite_prd_by_project',
+      'goglite_storybrand_by_project',
+      'goglite_wireframes_v1',
+      'goglite_facturas',
+      'goglite_cms_sites',
+      'goglite_cms_hub_v1',
+      'goglite_seo_launch_qa_v1',
+      'goglite_seo_geo_v1',
+      'goglite_deleted_records_v1',
+      'goglite_deleted_crm_leads_v2',
+      'goglite_deleted_presupuestos_v2',
+      'goglite_deleted_proyectos_v2'
+    ];
+    legacyBusinessKeys.forEach(k => {
+      try { localStorage.removeItem(k); } catch {}
+    });
+
+    const prefixList = [
+      'goglite_portal_',
+      'goglite_launch_qa_',
+      'goglite_gbp_',
+      'goglite_sitekit_',
+      'goglite_pagespeed_',
+      'goglite_ga4_',
+      'goglite_invoice_',
+      'goglite_comprobante_',
+      'goglite_lead_'
+    ];
+    const dynamicKeysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && prefixList.some(p => k.startsWith(p))) {
+        dynamicKeysToRemove.push(k);
+      }
+    }
+    dynamicKeysToRemove.forEach(k => {
+      try { localStorage.removeItem(k); } catch {}
+    });
+  } catch (e) {
+    console.warn('[LocalStore] Error purgando llaves legacy de negocio:', e);
+  }
+}
+
 export const STORAGE_KEYS = {
-  // Navegación y estado global
+  // Navegación y preferencias de UI exclusivamente
   ACTIVE_MODULE: 'goglite_active_module',
   SIDEBAR_COLLAPSED: 'goglite_sidebar_collapsed',
-
-  // Módulo 1: Prospección & Outbound
-  OUTBOUND_LEADS: 'goglite_outbound_leads',
-
-  // Módulo 2: CRM & WhatsApp (Clave v4 de Producción Limpia)
-  CRM_LEADS: 'goglite_crm_leads_v4_prod',
-  CRM_LEADS_LEGACY: 'goglite_crm_leads_v3',
-  CRM_COUNTRY: 'goglite_crm_country',
   CRM_ACTIVE_TAB: 'goglite_crm_active_tab',
-  CRM_SELECTED_WA_ID: 'goglite_crm_selected_wa_id',
+  CRM_COUNTRY: 'goglite_crm_country',
+  CRM_ARCHIVE_FILTER: 'goglite_crm_archive_filter',
 
-  // Módulo 3: Presupuestos & Contratos
-  PRESUPUESTOS: 'goglite_presupuestos',
-  CONTRATOS: 'goglite_contratos',
-  PROYECTOS: 'goglite_proyectos',
-
-  // Módulo 4: Rentabilidad & Finanzas
-  FINANZAS: 'goglite_finanzas_v1',
-  LIVE_TIMER: 'goglite_live_timer_v1',
-
-  // Módulo 5: Wireframes & StoryBrand
-  WIREFRAMES: 'goglite_wireframes_v1',
-  STORYBRAND: 'goglite_storybrand',
-
-  // Módulo 6: SEO & Launch QA
-  SEO_LAUNCH_QA: 'goglite_seo_launch_qa_v1',
-  SEO_GEO: 'goglite_seo_geo_v1',
-
-  // Módulo 7: Headless CMS
-  CMS_SITES: 'goglite_cms_sites',
-  CMS_HUB: 'goglite_cms_hub_v1',
-
-  // Desarrollo & Tareas de Playbook
-  SPRINT_TASKS: 'goglite_sprint_tasks',
-  REPO_VAULT: 'goglite_repo_vault',
-
-  // Configuración institucional (Preservada en resets)
+  // Configuración institucional / branding
   AGENCY_SETTINGS: 'goglite_agency_settings',
   CURRENT_USER: 'goglite_current_user'
 };
 
 /**
- * Lee un valor serializado de localStorage con fallback seguro
+ * Lee un valor de preferencia de UI desde localStorage con fallback seguro
  */
 export function getLocalItem(key, defaultValue = null) {
   if (typeof window === 'undefined') return defaultValue;
@@ -68,7 +97,7 @@ export function getLocalItem(key, defaultValue = null) {
 }
 
 /**
- * Escribe un valor en localStorage serializado automáticamente
+ * Escribe un valor de preferencia de UI en localStorage
  */
 export function setLocalItem(key, value) {
   if (typeof window === 'undefined') return false;
@@ -95,11 +124,11 @@ export function removeLocalItem(key) {
 }
 
 /**
- * Sincroniza dinámicamente los leads del CRM con los presupuestos emitidos en Fase 3
- * y normaliza cualquier etapa legacy 'nuevo' hacia 'contactado' (ya que 'nuevo' vive en Leads Guardados de Fase 1)
+ * Sincroniza en memoria los leads del CRM con la lista de presupuestos activos en Firestore.
+ * NO lee localStorage y NO modifica lead.archivado.
  */
-export function syncCrmLeadsWithPresupuestos(crmLeads) {
-  if (typeof window === 'undefined' || !Array.isArray(crmLeads)) return crmLeads;
+export function syncCrmLeadsWithPresupuestos(crmLeads, presupuestosList = []) {
+  if (!Array.isArray(crmLeads)) return crmLeads;
   try {
     const filteredLeads = crmLeads.filter(
       l => l && !isExcludedCrmLead(l.empresa || l.nombreEmpresa || l.contacto, l.id, l.leadId, l._firestoreDocId)
@@ -109,10 +138,8 @@ export function syncCrmLeadsWithPresupuestos(crmLeads) {
       etapa: (!l.etapa || l.etapa === 'nuevo') ? 'contactado' : l.etapa
     }));
 
-    const rawP = localStorage.getItem(STORAGE_KEYS.PRESUPUESTOS);
-    const parsedP = rawP ? JSON.parse(rawP) : [];
-    const presupuestos = Array.isArray(parsedP)
-      ? parsedP.filter(p => p && !isExcludedPresupuesto(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p._firestoreDocId))
+    const presupuestos = Array.isArray(presupuestosList)
+      ? presupuestosList.filter(p => p && !isExcludedPresupuesto(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p._firestoreDocId))
       : [];
 
     return normalizedLeads.map(lead => {
@@ -141,15 +168,12 @@ export function syncCrmLeadsWithPresupuestos(crmLeads) {
         };
       }
 
-      // Si el lead apuntaba a una propuesta o contrato eliminado, desvincularlo sin eliminar el lead
-      const wasDeletedProp =
-        isExcludedPresupuesto(null, lead.presupuestoId, lead.presupuestoCodigo) ||
-        (rawP !== null && presupuestos.length > 0 && Boolean(lead.presupuestoId || lead.presupuestoCodigo));
-      const wasDeletedProj = isExcludedProyecto(null, lead.proyectoId, lead.portalConfig?.proyectoId);
-
-      if (wasDeletedProp || wasDeletedProj) {
-        const cleanedLead = { ...lead };
-        if (wasDeletedProp) {
+      // Si el lead tenía propuesta y la lista de propuestas en la nube ya no la contiene,
+      // limpiar los campos vinculados de propuesta sin tocar el lead ni modificar lead.archivado
+      if (presupuestos.length > 0 && Boolean(lead.presupuestoId || lead.presupuestoCodigo)) {
+        const stillExists = presupuestos.some(p => p.id === lead.presupuestoId || p.codigo === lead.presupuestoCodigo);
+        if (!stillExists) {
+          const cleanedLead = { ...lead };
           cleanedLead.presupuestoId = null;
           cleanedLead.presupuestoCodigo = null;
           cleanedLead.presupuestoMonto = null;
@@ -162,20 +186,8 @@ export function syncCrmLeadsWithPresupuestos(crmLeads) {
               fase1Aprobada: false
             };
           }
+          return cleanedLead;
         }
-        if (wasDeletedProj) {
-          cleanedLead.proyectoId = null;
-          if (cleanedLead.etapa === 'cerrado_ganado') {
-            cleanedLead.etapa = 'ganado';
-          }
-          if (cleanedLead.portalConfig) {
-            cleanedLead.portalConfig = {
-              ...cleanedLead.portalConfig,
-              proyectoId: null
-            };
-          }
-        }
-        return cleanedLead;
       }
 
       return lead;
@@ -187,67 +199,43 @@ export function syncCrmLeadsWithPresupuestos(crmLeads) {
 }
 
 /**
- * Obtiene los leads de CRM con migración transparente de goglite_crm_leads a goglite_crm_leads_v3
- * y reconciliación automática con propuestas emitidas
+ * 100% Cloud-Only: getStoredCrmLeads devuelve []
  */
 export function getStoredCrmLeads() {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.CRM_LEADS);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        return syncCrmLeadsWithPresupuestos(parsed);
-      }
-    }
-    return [];
-  } catch (e) {
-    console.warn('[LocalStore] Error leyendo leads de CRM:', e);
-  }
   return [];
 }
 
-const INITIAL_PROD_PROD_LEADS_SAFE = [];
-
 /**
- * Guarda los leads de CRM en la clave estandarizada v3 normalizando etapas legacy
+ * 100% Cloud-Only: saveStoredCrmLeads es un no-op
  */
-export function saveStoredCrmLeads(leads) {
-  const normalized = Array.isArray(leads)
-    ? leads.map(l => ({ ...l, etapa: (!l.etapa || l.etapa === 'nuevo') ? 'contactado' : l.etapa }))
-    : leads;
-  setLocalItem(STORAGE_KEYS.CRM_LEADS, normalized);
-  // Mantener legacy sincronizado temporalmente para componentes en transición
-  setLocalItem(STORAGE_KEYS.CRM_LEADS_LEGACY, normalized);
+export function saveStoredCrmLeads() {
+  // No-op en arquitectura Cloud-First
 }
 
 /**
- * Limpieza exhaustiva de todas las claves de datos transaccionales y de prueba de las Fases 1 a 7.
- * Preserva estrictamente la configuración institucional (goglite_agency_settings) y el perfil activo.
+ * Limpieza de entorno y purga de claves legacy
  */
 export function clearAllPlatformData() {
   if (typeof window === 'undefined') return;
 
   const keysToDelete = [
-    STORAGE_KEYS.OUTBOUND_LEADS,
-    STORAGE_KEYS.CRM_LEADS,
-    STORAGE_KEYS.CRM_LEADS_LEGACY,
-    STORAGE_KEYS.CRM_COUNTRY,
-    STORAGE_KEYS.CRM_ACTIVE_TAB,
-    STORAGE_KEYS.CRM_SELECTED_WA_ID,
-    STORAGE_KEYS.PRESUPUESTOS,
-    STORAGE_KEYS.CONTRATOS,
-    STORAGE_KEYS.PROYECTOS,
-    STORAGE_KEYS.FINANZAS,
-    STORAGE_KEYS.LIVE_TIMER,
-    STORAGE_KEYS.WIREFRAMES,
-    STORAGE_KEYS.STORYBRAND,
-    STORAGE_KEYS.SEO_LAUNCH_QA,
-    STORAGE_KEYS.SEO_GEO,
-    STORAGE_KEYS.CMS_SITES,
-    STORAGE_KEYS.CMS_HUB,
-    STORAGE_KEYS.SPRINT_TASKS,
-    STORAGE_KEYS.REPO_VAULT
+    'goglite_outbound_leads',
+    'goglite_crm_leads',
+    'goglite_crm_leads_v3',
+    'goglite_crm_leads_v4_prod',
+    'goglite_presupuestos',
+    'goglite_contratos',
+    'goglite_proyectos',
+    'goglite_finanzas_v1',
+    'goglite_live_timer_v1',
+    'goglite_wireframes_v1',
+    'goglite_storybrand',
+    'goglite_seo_launch_qa_v1',
+    'goglite_seo_geo_v1',
+    'goglite_cms_sites',
+    'goglite_cms_hub_v1',
+    'goglite_sprint_tasks',
+    'goglite_repo_vault'
   ];
 
   for (const k of keysToDelete) {
@@ -256,20 +244,27 @@ export function clearAllPlatformData() {
     } catch {}
   }
 
-  // Limpiar cualquier clave dinámica generada (portales individuales, facturas, comprobantes)
   try {
     const dynamicKeys = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key.startsWith('goglite_portal_') || key.startsWith('goglite_invoice_') || key.startsWith('goglite_comprobante_') || key.startsWith('goglite_lead_'))) {
+      if (key && (
+        key.startsWith('goglite_portal_') || 
+        key.startsWith('goglite_invoice_') || 
+        key.startsWith('goglite_comprobante_') || 
+        key.startsWith('goglite_lead_') ||
+        key.startsWith('goglite_gbp_') ||
+        key.startsWith('goglite_sitekit_') ||
+        key.startsWith('goglite_pagespeed_') ||
+        key.startsWith('goglite_ga4_')
+      )) {
         dynamicKeys.push(key);
       }
     }
     dynamicKeys.forEach(k => localStorage.removeItem(k));
   } catch {}
 
-  // Devolver el módulo activo a la Fase 1
   try {
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_MODULE, 'lead_scrapper');
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_MODULE, 'prospector');
   } catch {}
 }

@@ -8,92 +8,18 @@ import { isExcludedProyecto } from './firestoreSyncService';
 export const STORAGE_KEY_PROYECTOS = 'goglite_proyectos';
 export const STORAGE_KEY_PRESUPUESTOS = 'goglite_presupuestos';
 
+/**
+ * 100% Cloud-Only: getStoredProyectos devuelve []
+ */
 export function getStoredProyectos() {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_PROYECTOS);
-    if (!raw) return [];
-    let list = JSON.parse(raw);
-    if (!Array.isArray(list)) return [];
-
-    let modified = false;
-    const beforeCount = list.length;
-    list = list.filter(proj => !isExcludedProyecto(
-      proj?.cliente?.empresa || proj?.cliente?.nombre,
-      proj?.id,
-      proj?.codigo,
-      proj?.presupuestoId,
-      proj?.presupuestoCodigo,
-      proj?._firestoreDocId
-    ));
-    if (list.length !== beforeCount) {
-      modified = true;
-    }
-    list = list.map(proj => {
-      if (!proj?.contrato) return proj;
-      let projChanged = false;
-
-      // Limpiar precios entre paréntesis en las cláusulas existentes
-      const cleanClausulas = (proj.contrato.clausulas || []).map(c => {
-        if (!c.texto) return c;
-        const cleaned = c.texto
-          .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '')
-          .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\)/gi, '');
-        if (cleaned !== c.texto) {
-          projChanged = true;
-          return { ...c, texto: cleaned };
-        }
-        return c;
-      });
-
-      // Limpiar precios entre paréntesis en los títulos de módulos
-      const cleanModulos = (proj.contrato.modulos || []).map(m => {
-        if (!m.titulo) return m;
-        const cleaned = m.titulo
-          .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\s*USD\)/gi, '')
-          .replace(/\s*\(\$\s*[\d,]+(?:\.\d+)?\)/gi, '')
-          .trim();
-        if (cleaned !== m.titulo) {
-          projChanged = true;
-          return { ...m, titulo: cleaned };
-        }
-        return m;
-      });
-
-      if (projChanged) {
-        modified = true;
-        return {
-          ...proj,
-          contrato: {
-            ...proj.contrato,
-            clausulas: cleanClausulas,
-            modulos: cleanModulos
-          }
-        };
-      }
-      return proj;
-    });
-
-    if (modified) {
-      saveStoredProyectos(list);
-    }
-
-    return list;
-  } catch (e) {
-    console.warn('[ContractGenerator] Error leyendo proyectos locales:', e);
-    return [];
-  }
+  return [];
 }
 
-export function saveStoredProyectos(list) {
-  if (typeof window === 'undefined') return false;
-  try {
-    localStorage.setItem(STORAGE_KEY_PROYECTOS, JSON.stringify(list));
-    return true;
-  } catch (e) {
-    console.warn('[ContractGenerator] Error guardando proyectos locales:', e);
-    return false;
-  }
+/**
+ * 100% Cloud-Only: saveStoredProyectos es un no-op
+ */
+export function saveStoredProyectos() {
+  // No-op en arquitectura Cloud-First
 }
 
 /**
@@ -347,10 +273,9 @@ export function reconcileProyectoWithPresupuesto(proyecto, presupuesto) {
  * Asegura que exista un proyecto formal para un presupuesto dado.
  * Si ya existe, lo reconcilia con los valores vigentes y actualiza el almacén.
  */
-export function ensureProyectoForPresupuesto(presupuesto) {
+export function ensureProyectoForPresupuesto(presupuesto, existingProyectos = []) {
   if (!presupuesto) return null;
 
-  const existingProyectos = getStoredProyectos();
   const targetEmpresa = (presupuesto.cliente?.empresa || '').toLowerCase().trim();
   const targetCodigo = (presupuesto.codigo || '').toLowerCase().trim();
 
@@ -363,12 +288,8 @@ export function ensureProyectoForPresupuesto(presupuesto) {
   let proj = null;
   if (projIndex >= 0) {
     proj = reconcileProyectoWithPresupuesto(existingProyectos[projIndex], presupuesto);
-    existingProyectos[projIndex] = proj;
-    saveStoredProyectos(existingProyectos);
   } else {
     proj = buildProyectoFromPresupuesto(presupuesto, existingProyectos);
-    const updated = [proj, ...existingProyectos];
-    saveStoredProyectos(updated);
   }
 
   // Intentar sincronizar con backend API si está en línea

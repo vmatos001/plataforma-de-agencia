@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../services/apiClient';
-import { getStoredProyectos } from '../services/contractGenerator';
-import { getAppStateCloud, saveAppStateCloud } from '../services/firestoreSyncService';
+import { getAppStateCloud, saveAppStateCloud, getProyectosCloud } from '../services/firestoreSyncService';
 import {
   Sparkles,
   Copy,
@@ -50,7 +49,7 @@ export default function WireframesStoryBrandModule({ selectedCountry = 'SV', ext
   }, []);
 
   const fetchInitialData = async () => {
-    let projs = getStoredProyectos();
+    let projs = await getProyectosCloud();
     try {
       const resProj = await apiClient.get('/api/proyectos');
       const cType = resProj.headers.get('content-type') || '';
@@ -73,38 +72,18 @@ export default function WireframesStoryBrandModule({ selectedCountry = 'SV', ext
     }
   };
 
-  // Local storage management
-  const getStoredStoryBrandsMap = () => {
-    try {
-      const raw = localStorage.getItem('goglite_storybrand_by_project');
-      return raw ? JSON.parse(raw) : {};
-    } catch {
-      return {};
-    }
-  };
+  const [storyBrandsMap, setStoryBrandsMap] = useState({});
 
   const saveStoredStoryBrand = (sbData) => {
     if (!sbData || !sbData.proyectoId) return;
     try {
-      const map = getStoredStoryBrandsMap();
-      map[sbData.proyectoId] = sbData;
-      localStorage.setItem('goglite_storybrand_by_project', JSON.stringify(map));
-      saveAppStateCloud('storybrand_by_project', 'storybrand', map).catch(() => {});
-
-      // Also mirror into legacy goglite_wireframes_v1 for backward compatibility
-      try {
-        const legacyRaw = localStorage.getItem('goglite_wireframes_v1');
-        let legacyList = legacyRaw ? JSON.parse(legacyRaw) : [];
-        const idx = legacyList.findIndex(w => w.proyectoId === sbData.proyectoId);
-        if (idx !== -1) {
-          legacyList[idx] = sbData;
-        } else {
-          legacyList.unshift(sbData);
-        }
-        localStorage.setItem('goglite_wireframes_v1', JSON.stringify(legacyList));
-      } catch (e) {}
+      setStoryBrandsMap(prev => {
+        const updated = { ...prev, [sbData.proyectoId]: sbData };
+        saveAppStateCloud('storybrand_by_project', 'storybrand', updated).catch(() => {});
+        return updated;
+      });
     } catch (e) {
-      console.warn('Error saving StoryBrand to localStorage:', e);
+      console.warn('Error saving StoryBrand to cloud:', e);
     }
   };
 
@@ -126,49 +105,31 @@ export default function WireframesStoryBrandModule({ selectedCountry = 'SV', ext
     );
   };
 
-  // Load from local storage, backend or generate dynamically
+  // Load from in-memory map, Firestore Cloud or generate dynamically
   const loadOrGenerateStoryBrand = async (projId, currentProjs = null) => {
     if (!projId) return;
     const list = currentProjs || proyectos;
     const proj = list.find(p => p.id === projId) || { id: projId };
 
-    // 0. Check Firestore Cloud first
+    if (storyBrandsMap[projId] && !isStaleDentalMockup(storyBrandsMap[projId], proj)) {
+      setActiveStoryBrand(storyBrandsMap[projId]);
+      return;
+    }
+
+    // 0. Check Firestore Cloud
     try {
       const cloudMap = await getAppStateCloud('storybrand_by_project');
       if (cloudMap && typeof cloudMap === 'object' && cloudMap[projId] && !isStaleDentalMockup(cloudMap[projId], proj)) {
-        const cur = getStoredStoryBrandsMap();
-        localStorage.setItem('goglite_storybrand_by_project', JSON.stringify({ ...cur, ...cloudMap }));
+        setStoryBrandsMap(prev => ({ ...prev, ...cloudMap }));
         setActiveStoryBrand(cloudMap[projId]);
         return;
       }
     } catch (e) {}
 
-    // 1. Check local dedicated map
-    const map = getStoredStoryBrandsMap();
-    const saved = map[projId];
-
-    if (saved && !isStaleDentalMockup(saved, proj)) {
-      setActiveStoryBrand(saved);
-      return;
-    }
-
-    // 2. Check legacy storage
-    try {
-      const legacyRaw = localStorage.getItem('goglite_wireframes_v1');
-      if (legacyRaw) {
-        const legacyList = JSON.parse(legacyRaw);
-        const legacyFound = legacyList.find(w => w.proyectoId === projId);
-        if (legacyFound && !isStaleDentalMockup(legacyFound, proj)) {
-          setActiveStoryBrand(legacyFound);
-          saveStoredStoryBrand(legacyFound);
-          return;
-        }
-      }
-    } catch (e) {}
-
-    // 3. Fallback: generate fresh context-aware StoryBrand for this project
+    // Fallback: generate fresh context-aware StoryBrand for this project
     const freshStoryBrand = buildContextualStoryBrand(proj);
     setActiveStoryBrand(freshStoryBrand);
+    saveStoredStoryBrand(freshStoryBrand);
     saveStoredStoryBrand(freshStoryBrand);
   };
 

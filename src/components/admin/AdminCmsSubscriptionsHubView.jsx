@@ -30,8 +30,7 @@ import {
   Gift,
   Copy
 } from 'lucide-react';
-import { getStoredProyectos, saveStoredProyectos } from '../../services/contractGenerator';
-import { saveProyectoCloud, savePortalCloud, saveAppStateCloud, saveCmsSiteCloud } from '../../services/firestoreSyncService';
+import { saveProyectoCloud, savePortalCloud, saveAppStateCloud, saveCmsSiteCloud, getProyectosCloud, getAppStateCloud } from '../../services/firestoreSyncService';
 import {
   CorporateInvoiceDocument,
   buildCorporateInvoiceHtml,
@@ -143,21 +142,18 @@ export default function AdminCmsSubscriptionsHubView({
   });
 
   // Cargar proyectos y facturas de membresía CMS
-  const loadData = () => {
+  const loadData = async () => {
     try {
       setLoading(true);
-      const stored = getStoredProyectos();
+      const stored = await getProyectosCloud();
       setProyectos(Array.isArray(stored) ? stored : []);
 
-      const rawFin = localStorage.getItem('goglite_finanzas_v1');
-      if (rawFin) {
-        const parsedFin = JSON.parse(rawFin);
-        if (Array.isArray(parsedFin.facturas)) {
-          const filteredCmsFacs = parsedFin.facturas.filter(
-            f => f.tipoHito === 'recurrente_cms' || (f.origenModulo || '').toLowerCase().includes('cms')
-          );
-          setCmsInvoices(filteredCmsFacs);
-        }
+      const parsedFin = await getAppStateCloud('finanzas_v1');
+      if (parsedFin && Array.isArray(parsedFin.facturas)) {
+        const filteredCmsFacs = parsedFin.facturas.filter(
+          f => f.tipoHito === 'recurrente_cms' || (f.origenModulo || '').toLowerCase().includes('cms')
+        );
+        setCmsInvoices(filteredCmsFacs);
       }
     } catch (e) {
       console.warn('Error cargando proyectos para suscripciones CMS:', e);
@@ -453,8 +449,8 @@ export default function AdminCmsSubscriptionsHubView({
         progresoPorcentaje: 100
       };
 
-      // 1. Actualizar en goglite_proyectos
-      const allProjs = getStoredProyectos();
+      // 1. Actualizar en proyectos
+      const allProjs = Array.isArray(proyectos) && proyectos.length > 0 ? proyectos : ((await getProyectosCloud()) || []);
       const existingProjIdx = allProjs.findIndex(
         p => p.id === sub.id || p.portalToken === sub.portalToken || p.cmsSlug === sub.slug
       );
@@ -479,7 +475,6 @@ export default function AdminCmsSubscriptionsHubView({
 
         const nextProjs = [...allProjs];
         nextProjs[existingProjIdx] = updatedProyecto;
-        saveStoredProyectos(nextProjs);
         setProyectos(nextProjs);
 
         if (targetProj.id) {
@@ -487,23 +482,16 @@ export default function AdminCmsSubscriptionsHubView({
         }
       }
 
-      // 2. Actualizar en localStorage goglite_cms_sites
-      const localSites = JSON.parse(localStorage.getItem('goglite_cms_sites') || '[]');
-      const updatedSites = localSites.map(s => {
-        if (s.slug === sub.slug || s.slug === sub.portalToken) {
-          const prevHist = Array.isArray(s.portalConfig?.historialRecargas) ? s.portalConfig.historialRecargas : [];
-          return {
-            ...s,
-            portalConfig: {
-              ...(s.portalConfig || {}),
-              ...updatedPortalConfigBase,
-              historialRecargas: [nuevoRegistroRecarga, ...prevHist]
-            }
-          };
+      // 2. Actualizar en Firestore cms_sites
+      if (sub.slug) {
+        try {
+          await saveCmsSiteCloud(sub.slug, {
+            portalConfig: updatedPortalConfigBase
+          });
+        } catch (e) {
+          console.warn('Error sincronizando recarga en cms_sites Firestore:', e);
         }
-        return s;
-      });
-      localStorage.setItem('goglite_cms_sites', JSON.stringify(updatedSites));
+      }
 
       // 3. Sincronizar con Firestore Portal Cloud para que /cms-cliente/:token refleje el contador al instante
       const tokensToSync = Array.from(new Set([sub.portalToken, sub.slug].filter(Boolean)));
@@ -613,7 +601,7 @@ export default function AdminCmsSubscriptionsHubView({
 
     let rawFin = {};
     try {
-      rawFin = JSON.parse(localStorage.getItem('goglite_finanzas_v1') || '{}');
+      rawFin = (await getAppStateCloud('finanzas_v1')) || {};
     } catch (err) {
       rawFin = {};
     }
@@ -674,8 +662,6 @@ export default function AdminCmsSubscriptionsHubView({
     };
 
     try {
-      localStorage.setItem('goglite_finanzas_v1', JSON.stringify(updatedFinanzasState));
-      localStorage.setItem('goglite_facturas', JSON.stringify(updatedFacturas));
       await saveAppStateCloud('finanzas_v1', 'finanzas', updatedFinanzasState);
     } catch (err) {
       console.warn('Error sincronizando factura CMS con Módulo 7:', err);
@@ -800,8 +786,8 @@ export default function AdminCmsSubscriptionsHubView({
     const cleanUrlProd = (urlProduccion || `https://${cleanDomain}`).trim();
 
     try {
-      // 1. Actualizar en goglite_proyectos si existe
-      const allProjs = getStoredProyectos();
+      // 1. Actualizar en proyectos si existe
+      const allProjs = Array.isArray(proyectos) && proyectos.length > 0 ? proyectos : ((await getProyectosCloud()) || []);
       const idx = allProjs.findIndex(p => p.id === sub.id || p.portalToken === sub.portalToken || p.cmsSlug === sub.slug);
       if (idx !== -1) {
         const updatedProj = {
@@ -825,68 +811,11 @@ export default function AdminCmsSubscriptionsHubView({
         };
         const nextProjs = [...allProjs];
         nextProjs[idx] = updatedProj;
-        saveStoredProyectos(nextProjs);
         setProyectos(nextProjs);
         await saveProyectoCloud(updatedProj.id, updatedProj);
       }
 
-      // 2. Actualizar en goglite_cms_sites y notificar al componente padre HeadlessCmsHubModule
-      const localSites = JSON.parse(localStorage.getItem('goglite_cms_sites') || '[]');
-      const siteExists = localSites.some(s => s.slug === sub.slug);
-      let nextSites = [];
-
-      if (siteExists) {
-        nextSites = localSites.map(s => {
-          if (s.slug === sub.slug) {
-            return {
-              ...s,
-              dominio: cleanDomain,
-              urlProduccion: cleanUrlProd,
-              planMensual: Number(planMensual) || 99,
-              cliente: {
-                ...(s.cliente || {}),
-                email: emailClienteCms,
-                telefono
-              },
-              portalConfig: {
-                ...(s.portalConfig || {}),
-                dominio: cleanDomain,
-                urlProduccion: cleanUrlProd,
-                cuentaCmsSitioRegistrada: emailClienteCms,
-                cuentaAdminDelegada: cuentaAdminDelegada || 'sitesgoglite@gmail.com',
-                delegacionGoogleActiva: true,
-                planMensual: Number(planMensual) || 99
-              }
-            };
-          }
-          return s;
-        });
-      } else {
-        nextSites = [
-          ...localSites,
-          {
-            id: sub.id,
-            slug: sub.slug,
-            nombre: sub.empresa,
-            pais: sub.pais || 'DO',
-            dominio: cleanDomain,
-            urlProduccion: cleanUrlProd,
-            estado: 'publicado',
-            planMensual: Number(planMensual) || 99,
-            portalConfig: {
-              dominio: cleanDomain,
-              urlProduccion: cleanUrlProd,
-              cuentaCmsSitioRegistrada: emailClienteCms,
-              cuentaAdminDelegada: cuentaAdminDelegada || 'sitesgoglite@gmail.com',
-              delegacionGoogleActiva: true,
-              planMensual: Number(planMensual) || 99,
-              careVenceAt: sub.careVenceAt
-            }
-          }
-        ];
-      }
-
-      localStorage.setItem('goglite_cms_sites', JSON.stringify(nextSites));
+      // 2. Notificar al componente padre HeadlessCmsHubModule si aplica
       if (typeof onUpdateSiteConfig === 'function') {
         onUpdateSiteConfig(sub.slug, {
           dominio: cleanDomain,

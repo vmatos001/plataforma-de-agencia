@@ -50,85 +50,51 @@ if (typeof window !== 'undefined') {
   } catch {}
 }
 
-const DELETED_CRM_LEADS_KEY = 'goglite_deleted_crm_leads_v2';
-const DELETED_PRESUPUESTOS_KEY = 'goglite_deleted_presupuestos_v2';
-const DELETED_PROYECTOS_KEY = 'goglite_deleted_proyectos_v2';
-
-const PERMANENTLY_EXCLUDED_COMPANIES = [
-  'multiservicios gisselle',
-  'clínica dental escalón'
-];
-
-const PERMANENTLY_EXCLUDED_PRESUPUESTO_IDS = new Set([
-  'prop-1792978056908',
-  'p-2026-001'
-]);
-
-const PERMANENTLY_EXCLUDED_PROYECTO_IDS = new Set([
-  'con-2026-001',
-  'con-2026-002',
-  'p-2026-do-001',
-  'proj-turisran-do',
-  'proj-prop-1792978056908',
-  'prop-1792978056908'
-]);
-
-function readSetFromStorage(storageKey, baseSet = new Set()) {
-  const set = new Set(baseSet);
-  if (typeof window !== 'undefined') {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const arr = JSON.parse(raw);
-        if (Array.isArray(arr)) {
-          arr.forEach(k => {
-            if (k) set.add(String(k).toLowerCase().trim());
-          });
-        }
-      }
-    } catch {}
-  }
-  return set;
-}
-
-function writeSetToStorage(storageKey, baseSet, ...keys) {
-  const set = readSetFromStorage(storageKey, baseSet);
-  for (const k of keys) {
-    if (k && typeof k === 'string') {
-      const clean = k.toLowerCase().trim();
-      if (clean) set.add(clean);
-    }
-  }
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(Array.from(set)));
-    } catch {}
-  }
-  return set;
-}
+// Sets en memoria para exclusión defensiva de registros eliminados (sin usar localStorage)
+const deletedCrmLeadsMemory = new Set();
+const deletedPresupuestosMemory = new Set(PERMANENTLY_EXCLUDED_PRESUPUESTO_IDS);
+const deletedProyectosMemory = new Set(PERMANENTLY_EXCLUDED_PROYECTO_IDS);
 
 export function getDeletedCrmLeadsSet() {
-  return readSetFromStorage(DELETED_CRM_LEADS_KEY);
+  return new Set(deletedCrmLeadsMemory);
 }
 
 export function markCrmLeadDeleted(...leadIds) {
-  return writeSetToStorage(DELETED_CRM_LEADS_KEY, new Set(), ...leadIds);
+  for (const k of leadIds) {
+    if (k && typeof k === 'string') {
+      const clean = k.toLowerCase().trim();
+      if (clean) deletedCrmLeadsMemory.add(clean);
+    }
+  }
+  return new Set(deletedCrmLeadsMemory);
 }
 
 export function getDeletedPresupuestosSet() {
-  return readSetFromStorage(DELETED_PRESUPUESTOS_KEY, PERMANENTLY_EXCLUDED_PRESUPUESTO_IDS);
+  return new Set(deletedPresupuestosMemory);
 }
 
 export function markPresupuestoDeleted(...presupuestoIds) {
-  return writeSetToStorage(DELETED_PRESUPUESTOS_KEY, PERMANENTLY_EXCLUDED_PRESUPUESTO_IDS, ...presupuestoIds);
+  for (const k of presupuestoIds) {
+    if (k && typeof k === 'string') {
+      const clean = k.toLowerCase().trim();
+      if (clean) deletedPresupuestosMemory.add(clean);
+    }
+  }
+  return new Set(deletedPresupuestosMemory);
 }
 
 export function getDeletedProyectosSet() {
-  return readSetFromStorage(DELETED_PROYECTOS_KEY, PERMANENTLY_EXCLUDED_PROYECTO_IDS);
+  return new Set(deletedProyectosMemory);
 }
 
 export function markProyectoDeleted(...proyectoIds) {
-  return writeSetToStorage(DELETED_PROYECTOS_KEY, PERMANENTLY_EXCLUDED_PROYECTO_IDS, ...proyectoIds);
+  for (const k of proyectoIds) {
+    if (k && typeof k === 'string') {
+      const clean = k.toLowerCase().trim();
+      if (clean) deletedProyectosMemory.add(clean);
+    }
+  }
+  return new Set(deletedProyectosMemory);
 }
 
 function isBannedDemoCompany(empresaOrName) {
@@ -426,6 +392,35 @@ export async function deleteProyectoCloud(proyectoId, extraKeys = []) {
       });
       await Promise.all(deletions);
     }
+
+    // Desacoplamiento estricto: Desvincular proyectoId en crm_leads en Firestore sin eliminar el Lead ni la Propuesta
+    const leadsSnap = await getDocs(collection(db, 'crm_leads')).catch(() => null);
+    if (leadsSnap) {
+      const leadUpdates = [];
+      leadsSnap.forEach(lSnap => {
+        if (lSnap.exists()) {
+          const lData = lSnap.data() || {};
+          const hasMatchingProj = (lData.proyectoId && candidates.has(String(lData.proyectoId).trim())) ||
+                                  (lData.portalConfig?.proyectoId && candidates.has(String(lData.portalConfig.proyectoId).trim()));
+          if (hasMatchingProj) {
+            const nextEtapa = lData.etapa === 'cerrado_ganado' ? 'ganado' : lData.etapa;
+            leadUpdates.push(
+              setDoc(lSnap.ref, {
+                proyectoId: null,
+                etapa: nextEtapa,
+                portalConfig: {
+                  ...(lData.portalConfig || {}),
+                  proyectoId: null
+                },
+                updatedAt: new Date().toISOString()
+              }, { merge: true }).catch(() => {})
+            );
+          }
+        }
+      });
+      await Promise.all(leadUpdates);
+    }
+
     return true;
   } catch (err) {
     console.warn('[FirestoreSync] Error eliminando proyecto de Firestore:', proyectoId, err);
@@ -657,6 +652,38 @@ export async function deletePresupuestoCloud(presupuestoId, extraKeys = []) {
       });
       await Promise.all(deletions);
     }
+
+    // Desacoplamiento estricto: Desvincular propuesta en crm_leads en Firestore sin eliminar el Lead
+    const leadsSnap = await getDocs(collection(db, 'crm_leads')).catch(() => null);
+    if (leadsSnap) {
+      const leadUpdates = [];
+      leadsSnap.forEach(lSnap => {
+        if (lSnap.exists()) {
+          const lData = lSnap.data() || {};
+          const hasMatchingProp = (lData.presupuestoId && candidates.has(String(lData.presupuestoId).trim())) ||
+                                  (lData.presupuestoCodigo && candidates.has(String(lData.presupuestoCodigo).trim()));
+          if (hasMatchingProp) {
+            leadUpdates.push(
+              setDoc(lSnap.ref, {
+                presupuestoId: null,
+                presupuestoCodigo: null,
+                presupuestoMonto: null,
+                presupuestoEstado: null,
+                portalConfig: {
+                  ...(lData.portalConfig || {}),
+                  presupuestoId: null,
+                  estadoPropuesta: null,
+                  fase1Aprobada: false
+                },
+                updatedAt: new Date().toISOString()
+              }, { merge: true }).catch(() => {})
+            );
+          }
+        }
+      });
+      await Promise.all(leadUpdates);
+    }
+
     return true;
   } catch (err) {
     console.warn('[FirestoreSync] Error eliminando presupuesto de Firestore:', presupuestoId, err);

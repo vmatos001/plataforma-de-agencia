@@ -152,17 +152,6 @@ export default function GoogleSiteKitView({ currentSite }) {
   const getInitialSiteKitMetrics = (site) => {
     const slug = site?.slug || 'goglite';
     const isTuris = slug.includes('turisra') || (site?.nombre || '').toLowerCase().includes('turisra');
-    try {
-      const saved = localStorage.getItem(`goglite_sitekit_metrics_${slug}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Si es TurisRan y tenía valores en 0 del estado vacío anterior, cargar sus datos reales verificados
-        if (isTuris && (!parsed.clicsBusqueda || Number(parsed.clicsBusqueda) === 0) && (!parsed.usuariosUnicos || Number(parsed.usuariosUnicos) === 0)) {
-          return { ...REAL_TURISRAN_SITEKIT_METRICS };
-        }
-        return parsed;
-      }
-    } catch (e) {}
     if (site?.siteKitMetrics && (site.siteKitMetrics.clicsBusqueda > 0 || site.siteKitMetrics.usuariosUnicos > 0)) {
       return site.siteKitMetrics;
     }
@@ -187,14 +176,7 @@ export default function GoogleSiteKitView({ currentSite }) {
   };
 
   // Estado de Autenticación de Google Site Kit (Administrador Delegado: sitesgoglite@gmail.com)
-  const [googleUser, setGoogleUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem('goglite_sitekit_user');
-      return saved ? JSON.parse(saved) : { email: 'sitesgoglite@gmail.com', displayName: 'Goglite Agencia Admin' };
-    } catch (e) {
-      return { email: 'sitesgoglite@gmail.com', displayName: 'Goglite Agencia Admin' };
-    }
-  });
+  const [googleUser, setGoogleUser] = useState({ email: 'sitesgoglite@gmail.com', displayName: 'Goglite Agencia Admin' });
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
@@ -211,6 +193,7 @@ export default function GoogleSiteKitView({ currentSite }) {
         adminDelegadoGoogle: googleUser?.email || 'sitesgoglite@gmail.com',
         siteKitMetrics: nextMetrics,
         speedAnalysis: nextSpeed,
+        ga4Id,
         ultimaActualizacionSiteKit: new Date().toISOString()
       });
     } catch (e) {
@@ -228,8 +211,7 @@ export default function GoogleSiteKitView({ currentSite }) {
 
   // ID de Medición de GA4 editable
   const getInitialGa4Id = (slug) => {
-    const saved = localStorage.getItem(`goglite_ga4_${slug}`);
-    if (saved) return saved;
+    if (currentSite?.ga4Id) return currentSite.ga4Id;
     if (slug && slug.includes('turisra')) return 'GTM-KJ43JPFT';
     if (slug === 'goglite') return 'G-GOGLITE01';
     return '';
@@ -241,15 +223,7 @@ export default function GoogleSiteKitView({ currentSite }) {
 
   // ESTADO DE PAGESPEED
   const loadSpeedForSlug = (slug) => {
-    try {
-      const saved = localStorage.getItem(`goglite_pagespeed_${slug}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed?.mobile?.metrics && Array.isArray(parsed?.mobile?.estadisticas)) {
-          return parsed;
-        }
-      }
-    } catch (e) {}
+    if (currentSite?.speedAnalysis?.mobile?.metrics) return currentSite.speedAnalysis;
     if (slug === 'goglite') return REAL_GOGLITE_PAGESPEED;
     if (slug && slug.includes('turisra')) return REAL_TURISRAN_PAGESPEED;
     return null;
@@ -270,11 +244,6 @@ export default function GoogleSiteKitView({ currentSite }) {
     setGa4Id(nextGa4);
     setTempGa4Input(nextGa4);
     setSpeedAnalysis(nextSpeed);
-    try {
-      localStorage.setItem(`goglite_sitekit_metrics_${slug}`, JSON.stringify(nextMetrics));
-      if (nextSpeed) localStorage.setItem(`goglite_pagespeed_${slug}`, JSON.stringify(nextSpeed));
-      if (nextGa4) localStorage.setItem(`goglite_ga4_${slug}`, nextGa4);
-    } catch (e) {}
     syncSiteKitToClientPortalCloud(nextMetrics, nextSpeed);
   }, [currentSite?.slug]);
 
@@ -292,9 +261,6 @@ export default function GoogleSiteKitView({ currentSite }) {
       conversionesAds: Number(metricsForm.conversionesAds) || 0
     };
     setSiteKitMetrics(updated);
-    try {
-      localStorage.setItem(`goglite_sitekit_metrics_${currentSite?.slug}`, JSON.stringify(updated));
-    } catch (err) {}
     syncSiteKitToClientPortalCloud(updated, speedAnalysis);
     setShowInjectModal(false);
   };
@@ -436,9 +402,6 @@ export default function GoogleSiteKitView({ currentSite }) {
 
     setSiteKitMetrics(updatedMetrics);
     setMetricsForm(updatedMetrics);
-    try {
-      localStorage.setItem(`goglite_sitekit_metrics_${slug}`, JSON.stringify(updatedMetrics));
-    } catch (e) {}
     await syncSiteKitToClientPortalCloud(updatedMetrics, speedAnalysis);
     setSyncing(false);
   };
@@ -456,7 +419,6 @@ export default function GoogleSiteKitView({ currentSite }) {
           connectedAt: new Date().toISOString()
         };
         setGoogleUser(userData);
-        localStorage.setItem('goglite_sitekit_user', JSON.stringify(userData));
         if (res.token) {
           sessionStorage.setItem('goglite_sitekit_oauth_token', res.token);
         }
@@ -471,7 +433,6 @@ export default function GoogleSiteKitView({ currentSite }) {
 
   const handleDisconnectGoogle = () => {
     setGoogleUser(null);
-    localStorage.removeItem('goglite_sitekit_user');
     sessionStorage.removeItem('goglite_sitekit_oauth_token');
   };
 
@@ -479,11 +440,7 @@ export default function GoogleSiteKitView({ currentSite }) {
     const clean = tempGa4Input.trim().toUpperCase();
     setGa4Id(clean);
     setIsEditingGa4(false);
-    if (clean) {
-      localStorage.setItem(`goglite_ga4_${currentSite?.slug}`, clean);
-    } else {
-      localStorage.removeItem(`goglite_ga4_${currentSite?.slug}`);
-    }
+    syncSiteKitToClientPortalCloud(siteKitMetrics, speedAnalysis);
   };
 
   // EJECUCIÓN REAL DE ANÁLISIS DE VELOCIDAD CON DATOS OFICIALES DE GOOGLE
@@ -520,9 +477,6 @@ export default function GoogleSiteKitView({ currentSite }) {
           };
 
       setSpeedAnalysis(data);
-      try {
-        localStorage.setItem(`goglite_pagespeed_${currentSite?.slug}`, JSON.stringify(data));
-      } catch (e) {}
       syncSiteKitToClientPortalCloud(siteKitMetrics, data);
 
       setAnalyzingSpeed(false);

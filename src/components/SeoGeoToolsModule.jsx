@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../services/apiClient';
+import { getCrmLeadsCloud } from '../services/firestoreSyncService';
 import {
   Search,
   Sparkles,
@@ -75,17 +76,16 @@ export default function SeoGeoToolsModule({ selectedCountry = 'SV' }) {
   const [showAddDomain, setShowAddDomain] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('goglite_crm_leads');
-      if (raw) {
-        const leads = JSON.parse(raw);
+    (async () => {
+      try {
+        const leads = await getCrmLeadsCloud();
         if (Array.isArray(leads)) {
           setCrmClients(leads);
         }
+      } catch (e) {
+        console.error('Error loading cloud CRM leads for GSC:', e);
       }
-    } catch (e) {
-      console.error('Error loading CRM leads for GSC:', e);
-    }
+    })();
   }, []);
 
   const fetchGscMetrics = async () => {

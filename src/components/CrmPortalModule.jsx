@@ -54,8 +54,6 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../services/apiClient';
 import {
-  getStoredCrmLeads,
-  saveStoredCrmLeads,
   syncCrmLeadsWithPresupuestos
 } from '../services/localStore';
 import {
@@ -63,6 +61,8 @@ import {
   saveCrmLeadCloud,
   deleteCrmLeadCloud,
   subscribeCrmLeadsCloud,
+  subscribePresupuestosCloud,
+  getPresupuestosCloud,
   savePortalCloud
 } from '../services/firestoreSyncService';
 
@@ -244,18 +244,12 @@ const WHATSAPP_SCRIPTS = [
 const SEED_CRM_LEADS = [];
 
 export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato, onOpenPrd }) {
-  // Persistencia local resiliente: Si recargas (F5), se lee de localStorage
-  const [leads, setLeads] = useState(() => {
-    try {
-      const cached = getStoredCrmLeads();
-      if (Array.isArray(cached) && cached.length > 0) return cached;
-    } catch (e) {
-      console.warn('Error leyendo leads de CRM:', e);
-    }
-    return SEED_CRM_LEADS;
-  });
-
+  // 100% Cloud-First: Los leads se cargan exclusivamente desde Firestore
+  const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(false);
+  const presupuestosRef = useRef([]);
+  const [, setPresupuestosVersion] = useState(0);
+
   const [selectedCountry, setSelectedCountry] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('goglite_crm_country')) || 'ALL';
   });
@@ -276,7 +270,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     return (typeof window !== 'undefined' && localStorage.getItem('goglite_crm_active_tab')) || 'kanban';
   });
   
-  // Guardar pestaña en localStorage
+  // Guardar pestaña en preferencias visuales
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('goglite_crm_active_tab', activeTab);
@@ -289,13 +283,27 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     }
   }, [selectedCountry]);
 
-  // Sincronizar automáticamente CRM con presupuestos de Fase 3
+  // Suscripción en tiempo real a presupuestos en la nube para reconciliación en memoria
   useEffect(() => {
-    setLeads(prev => {
-      const synced = syncCrmLeadsWithPresupuestos(prev);
-      saveStoredCrmLeads(synced);
-      return synced;
+    const unsubPres = subscribePresupuestosCloud((cloudProps) => {
+      if (Array.isArray(cloudProps)) {
+        presupuestosRef.current = cloudProps;
+        setPresupuestosVersion(v => v + 1);
+        setLeads(prev => syncCrmLeadsWithPresupuestos(prev, cloudProps));
+      }
     });
+
+    getPresupuestosCloud().then(props => {
+      if (Array.isArray(props)) {
+        presupuestosRef.current = props;
+        setPresupuestosVersion(v => v + 1);
+        setLeads(prev => syncCrmLeadsWithPresupuestos(prev, props));
+      }
+    }).catch(() => {});
+
+    return () => {
+      if (typeof unsubPres === 'function') unsubPres();
+    };
   }, []);
 
   // Estados para Base de Datos & Fichas de Clientes 360°
@@ -305,12 +313,12 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   const [selectedScrapperIds, setSelectedScrapperIds] = useState(new Set());
   const [scrapperAvailableCount, setScrapperAvailableCount] = useState(0);
 
-  const refreshScrapperAvailableCount = () => {
+  const refreshScrapperAvailableCount = async () => {
     try {
-      if (typeof window !== 'undefined') {
-        const raw = localStorage.getItem('goglite_outbound_leads');
-        const parsed = raw ? JSON.parse(raw) : [];
-        setScrapperAvailableCount(parsed.length);
+      const res = await apiClient.get('/api/leads');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setScrapperAvailableCount(data.length);
       }
     } catch (e) {}
   };
@@ -319,10 +327,16 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     refreshScrapperAvailableCount();
   }, []);
 
-  const handleOpenImportScrapperModal = () => {
+  const handleOpenImportScrapperModal = async () => {
     try {
-      const raw = localStorage.getItem('goglite_outbound_leads');
-      const parsed = raw ? JSON.parse(raw) : [];
+      let parsed = [];
+      try {
+        const res = await apiClient.get('/api/leads');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) parsed = data;
+        }
+      } catch (e) {}
       setScrapperLeadsList(parsed);
       
       const existingPhones = new Set(leads.map(l => (l.telefono || '').replace(/\D/g, '')).filter(Boolean));
@@ -640,13 +654,12 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     };
   }, [isQrModalOpen]);
 
-  // Helper para persistir leads tanto en localStorage como en Firestore Cloud (solo sincroniza los leads que cambiaron)
+  // Helper para persistir leads en Firestore Cloud
   const updateAndPersistLeads = (updater) => {
     setLeads(prev => {
       const prevMap = new Map((Array.isArray(prev) ? prev : []).map(l => [l?.id, l]));
       const rawNext = typeof updater === 'function' ? updater(prev) : updater;
-      const nextLeads = syncCrmLeadsWithPresupuestos(rawNext);
-      saveStoredCrmLeads(nextLeads);
+      const nextLeads = syncCrmLeadsWithPresupuestos(rawNext, presupuestosRef.current);
       if (Array.isArray(nextLeads)) {
         nextLeads.forEach(lead => {
           if (lead && lead.id) {
@@ -661,13 +674,13 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
     });
   };
 
-  // Fetch leads de API y Firestore en tiempo real (Cloud-First + SSE + Listeners)
+  // Fetch leads de API y Firestore en tiempo real (100% Cloud-First)
   useEffect(() => {
     fetchCrmLeads();
 
-    // Listener en tiempo real desde Firestore Cloud (respeta ediciones locales más recientes)
+    // Listener en tiempo real desde Firestore Cloud
     const unsubscribeCloud = subscribeCrmLeadsCloud((cloudLeads) => {
-      if (Array.isArray(cloudLeads) && cloudLeads.length > 0) {
+      if (Array.isArray(cloudLeads)) {
         setLeads(prev => {
           const map = new Map(prev.map(l => [l.id, l]));
           cloudLeads.forEach(cl => {
@@ -680,9 +693,10 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
               }
             }
           });
-          const merged = syncCrmLeadsWithPresupuestos(Array.from(map.values()));
-          saveStoredCrmLeads(merged);
-          return merged;
+          // Las identificaciones en cloudLeads son la autoridad de existencia
+          const cloudIds = new Set(cloudLeads.map(c => c.id));
+          const list = Array.from(map.values()).filter(l => cloudIds.has(l.id));
+          return syncCrmLeadsWithPresupuestos(list, presupuestosRef.current);
         });
       }
     });
@@ -699,9 +713,8 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
           } else {
             updated = [item, ...prev];
           }
-          saveStoredCrmLeads(updated);
           if (item?.id) saveCrmLeadCloud(item).catch(() => {});
-          return updated;
+          return syncCrmLeadsWithPresupuestos(updated, presupuestosRef.current);
         });
       } else {
         fetchCrmLeads();
@@ -731,25 +744,13 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       const cloudLeads = await getCrmLeadsCloud();
       const mergedMap = new Map();
 
-      // 1. Memoria local previa
-      const local = getStoredCrmLeads();
-      if (Array.isArray(local)) {
-        local.forEach(l => { if (l?.id) mergedMap.set(l.id, l); });
-      }
-      // 2. API Backend
+      // 1. API Backend (si está en línea)
       if (Array.isArray(apiData)) {
         apiData.forEach(l => {
-          if (l?.id) {
-            const existing = mergedMap.get(l.id);
-            if (existing?.updatedAt && l?.updatedAt && existing.updatedAt > l.updatedAt) {
-              mergedMap.set(l.id, { ...l, ...existing });
-            } else {
-              mergedMap.set(l.id, { ...(existing || {}), ...l });
-            }
-          }
+          if (l?.id) mergedMap.set(l.id, l);
         });
       }
-      // 3. Firestore Nube (respeta cambios locales con updatedAt más reciente)
+      // 2. Firestore Cloud (fuente de verdad soberana)
       if (Array.isArray(cloudLeads)) {
         cloudLeads.forEach(l => {
           if (l?.id) {
@@ -763,17 +764,9 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
         });
       }
 
-      const finalLeads = syncCrmLeadsWithPresupuestos(Array.from(mergedMap.values()));
+      const finalLeads = syncCrmLeadsWithPresupuestos(Array.from(mergedMap.values()), presupuestosRef.current);
       if (finalLeads.length > 0) {
         setLeads(finalLeads);
-        saveStoredCrmLeads(finalLeads);
-        // Asegurar que los leads locales estén respaldados en Firestore Cloud
-        const cloudIds = new Set((cloudLeads || []).map(cl => cl?.id));
-        finalLeads.forEach(fl => {
-          if (fl?.id && !cloudIds.has(fl.id)) {
-            saveCrmLeadCloud(fl).catch(() => {});
-          }
-        });
         if (!selectedPortalLeadId) setSelectedPortalLeadId(finalLeads[0].id);
         if (!selectedWaLeadId) setSelectedWaLeadId(finalLeads[0].id);
       } else if (SEED_CRM_LEADS.length > 0) {
@@ -841,7 +834,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       return;
     }
 
-    // 1. Eliminar de inmediato en estado local y localStorage
+    // 1. Eliminar de inmediato en estado local y Firestore Cloud
     updateAndPersistLeads(prev => prev.filter(l => l.id !== leadId));
     deleteCrmLeadCloud(leadId).catch(() => {});
 
@@ -878,7 +871,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
       leido: true
     };
 
-    // 1. Guardar de inmediato en memoria y localStorage
+    // 1. Guardar de inmediato en memoria y Firestore Cloud
     updateAndPersistLeads(prev => prev.map(l => {
       if (l.id === selectedWaLeadId) {
         const wa = l.whatsappData || { mensajes: [] };
@@ -919,7 +912,7 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
   };
 
   const handleUpdateWaMeta = async (leadId, metaUpdate) => {
-    // 1. Guardar de inmediato en memoria y localStorage
+    // 1. Guardar de inmediato en memoria y Firestore Cloud
     updateAndPersistLeads(prev => prev.map(l => {
       if (l.id === leadId) {
         return {

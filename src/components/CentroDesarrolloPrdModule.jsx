@@ -37,7 +37,6 @@ import {
 } from 'lucide-react';
 import WireframesStoryBrandModule from './WireframesStoryBrandModule';
 import apiClient from '../services/apiClient';
-import { getStoredProyectos, saveStoredProyectos } from '../services/contractGenerator';
 import { syncAllProyectosWithEvents } from '../services/projectMilestoneSync';
 import { getAppStateCloud, saveAppStateCloud, getProyectosCloud, saveProyectoCloud } from '../services/firestoreSyncService';
 
@@ -268,43 +267,26 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   const [prdConfig, setPrdConfig] = useState(DEFAULT_PRD_CONFIG);
   const [copiedPrdMarkdown, setCopiedPrdMarkdown] = useState(false);
   const [savedPrdNotice, setSavedPrdNotice] = useState(false);
+  const [prdByProjMap, setPrdByProjMap] = useState({});
+  const [sprintTasksByProjMap, setSprintTasksByProjMap] = useState({});
+  const [repoVaultByProjMap, setRepoVaultByProjMap] = useState({});
 
   const updatePrdConfig = (updater) => {
     setPrdConfig(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
       if (selectedProyectoId) {
-        try {
-          const prdByProjRaw = localStorage.getItem('goglite_prd_by_project');
-          const prdByProj = prdByProjRaw ? JSON.parse(prdByProjRaw) : {};
-          prdByProj[selectedProyectoId] = next;
-          localStorage.setItem('goglite_prd_by_project', JSON.stringify(prdByProj));
-        } catch (e) {}
+        setPrdByProjMap(m => {
+          const updated = { ...m, [selectedProyectoId]: next };
+          saveAppStateCloud('prd_by_project', 'prd', updated).catch(() => {});
+          return updated;
+        });
       }
       return next;
     });
   };
 
   // Estado del Sprint Kanban (Todas las tareas inician en Backlog ordenadas 1..12 con 0h)
-  const [sprintTasks, setSprintTasks] = useState(() => {
-    try {
-      const cached = localStorage.getItem('goglite_sprint_tasks');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
-          // Detectar si era el antiguo mockup ilustrativo donde las primeras fases estaban completadas
-          const isOldMock = parsed.some(t => t.id === 'fase-1' && t.columna === 'completado');
-          if (!isOldMock) {
-            const playbookMap = new Map(PLAYBOOK_12_FASES_TASKS.map(p => [p.id, p]));
-            return parsed.map(t => {
-              const official = playbookMap.get(t.id);
-              return official ? { ...t, titulo: official.titulo, descripcion: official.descripcion } : t;
-            });
-          }
-        }
-      }
-    } catch (e) {}
-    return DEFAULT_SPRINT_TASKS;
-  });
+  const [sprintTasks, setSprintTasks] = useState(DEFAULT_SPRINT_TASKS);
 
   // Tarea en cronómetro activo
   const [activeTimerTaskId, setActiveTimerTaskId] = useState(null);
@@ -322,29 +304,12 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   });
 
   // Estado de Bóveda de Repositorios & URLs (Configuración limpia y Google Stitch)
-  const [repoVault, setRepoVault] = useState(() => {
-    try {
-      const cached = localStorage.getItem('goglite_repo_vault');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed.figmaBoard && !parsed.googleStitchUrl) {
-          parsed.googleStitchUrl = '';
-          delete parsed.figmaBoard;
-        }
-        if (parsed.githubRepo === 'https://github.com/goglite-agency/cliente-web-platform') parsed.githubRepo = '';
-        if (parsed.stagingUrl === 'https://goglite-client-staging.web.app') parsed.stagingUrl = '';
-        if (parsed.productionUrl === 'https://www.gruasandreasv.com') parsed.productionUrl = '';
-        if (parsed.driveAssets === 'https://drive.google.com/drive/folders/goglite-client-assets') parsed.driveAssets = '';
-        return parsed;
-      }
-    } catch (e) {}
-    return {
-      googleStitchUrl: '',
-      driveAssets: '',
-      stagingUrl: '',
-      githubRepo: '',
-      productionUrl: ''
-    };
+  const [repoVault, setRepoVault] = useState({
+    googleStitchUrl: '',
+    driveAssets: '',
+    stagingUrl: '',
+    githubRepo: '',
+    productionUrl: ''
   });
   const [copiedField, setCopiedField] = useState(null);
   const [savedVaultNotice, setSavedVaultNotice] = useState(false);
@@ -352,13 +317,12 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
 
   const handleSaveVault = () => {
     try {
-      localStorage.setItem('goglite_repo_vault', JSON.stringify(repoVault));
       if (selectedProyectoId) {
-        const vaultByProjRaw = localStorage.getItem('goglite_repo_vault_by_project');
-        const vaultByProj = vaultByProjRaw ? JSON.parse(vaultByProjRaw) : {};
-        vaultByProj[selectedProyectoId] = repoVault;
-        localStorage.setItem('goglite_repo_vault_by_project', JSON.stringify(vaultByProj));
-        saveAppStateCloud('repo_vault_by_project', 'repo_vault', vaultByProj).catch(() => {});
+        setRepoVaultByProjMap(prev => {
+          const updated = { ...prev, [selectedProyectoId]: repoVault };
+          saveAppStateCloud('repo_vault_by_project', 'repo_vault', updated).catch(() => {});
+          return updated;
+        });
 
         const bovedaData = {
           googleStitchUrl: repoVault.googleStitchUrl || '',
@@ -454,16 +418,13 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
           getAppStateCloud('repo_vault_by_project')
         ]);
         if (cloudPrd && typeof cloudPrd === 'object') {
-          const cur = JSON.parse(localStorage.getItem('goglite_prd_by_project') || '{}');
-          localStorage.setItem('goglite_prd_by_project', JSON.stringify({ ...cur, ...cloudPrd }));
+          setPrdByProjMap(prev => ({ ...prev, ...cloudPrd }));
         }
         if (cloudTasks && typeof cloudTasks === 'object') {
-          const cur = JSON.parse(localStorage.getItem('goglite_sprint_tasks_by_project') || '{}');
-          localStorage.setItem('goglite_sprint_tasks_by_project', JSON.stringify({ ...cur, ...cloudTasks }));
+          setSprintTasksByProjMap(prev => ({ ...prev, ...cloudTasks }));
         }
         if (cloudVault && typeof cloudVault === 'object') {
-          const cur = JSON.parse(localStorage.getItem('goglite_repo_vault_by_project') || '{}');
-          localStorage.setItem('goglite_repo_vault_by_project', JSON.stringify({ ...cur, ...cloudVault }));
+          setRepoVaultByProjMap(prev => ({ ...prev, ...cloudVault }));
         }
       } catch (e) {}
     })();
@@ -479,39 +440,32 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   useEffect(() => {
     if (!selectedProyectoId) return;
     try {
-      const byProjRaw = localStorage.getItem('goglite_sprint_tasks_by_project');
-      if (byProjRaw) {
-        const byProj = JSON.parse(byProjRaw);
-        if (byProj && Array.isArray(byProj[selectedProyectoId])) {
-          const tasks = byProj[selectedProyectoId];
-          const isOldMock = tasks.some(t => t.id === 'fase-1' && t.columna === 'completado');
-          if (isOldMock) {
-            byProj[selectedProyectoId] = DEFAULT_SPRINT_TASKS;
-            localStorage.setItem('goglite_sprint_tasks_by_project', JSON.stringify(byProj));
-            setSprintTasks(DEFAULT_SPRINT_TASKS);
-          } else {
-            const playbookMap = new Map(PLAYBOOK_12_FASES_TASKS.map(p => [p.id, p]));
-            const synced = tasks.map(t => {
-              const official = playbookMap.get(t.id);
-              if (official) {
-                return {
-                  ...t,
-                  titulo: official.titulo,
-                  descripcion: official.descripcion,
-                  horasEstimadas: t.horasEstimadas || official.horasEstimadas,
-                  prioridad: t.prioridad || official.prioridad
-                };
-              }
-              return t;
-            });
-            setSprintTasks(synced);
-          }
-        } else {
+      const tasks = sprintTasksByProjMap[selectedProyectoId];
+      if (Array.isArray(tasks)) {
+        const isOldMock = tasks.some(t => t.id === 'fase-1' && t.columna === 'completado');
+        if (isOldMock) {
           setSprintTasks(DEFAULT_SPRINT_TASKS);
+        } else {
+          const playbookMap = new Map(PLAYBOOK_12_FASES_TASKS.map(p => [p.id, p]));
+          const synced = tasks.map(t => {
+            const official = playbookMap.get(t.id);
+            if (official) {
+              return {
+                ...t,
+                titulo: official.titulo,
+                descripcion: official.descripcion,
+                horasEstimadas: t.horasEstimadas || official.horasEstimadas,
+                prioridad: t.prioridad || official.prioridad
+              };
+            }
+            return t;
+          });
+          setSprintTasks(synced);
         }
       } else {
         setSprintTasks(DEFAULT_SPRINT_TASKS);
       }
+
       const proj = proyectos.find(p => p.id === selectedProyectoId);
       const boveda = proj?.bovedaRepos || proj?.repoVault || {};
       const baseVault = {
@@ -522,32 +476,23 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         productionUrl: boveda.urlProduccion || boveda.productionUrl || ''
       };
 
-      const vaultByProjRaw = localStorage.getItem('goglite_repo_vault_by_project');
-      if (vaultByProjRaw) {
-        const vaultByProj = JSON.parse(vaultByProjRaw);
-        if (vaultByProj && vaultByProj[selectedProyectoId]) {
-          const pVault = { ...baseVault, ...vaultByProj[selectedProyectoId] };
-          if (pVault.figmaBoard && !pVault.googleStitchUrl) {
-            delete pVault.figmaBoard;
-          }
-          if (pVault.githubRepo === 'https://github.com/goglite-agency/cliente-web-platform') pVault.githubRepo = '';
-          if (pVault.stagingUrl === 'https://goglite-client-staging.web.app') pVault.stagingUrl = '';
-          if (pVault.productionUrl === 'https://www.gruasandreasv.com') pVault.productionUrl = '';
-          if (pVault.driveAssets === 'https://drive.google.com/drive/folders/goglite-client-assets') pVault.driveAssets = '';
-          setRepoVault(pVault);
-        } else {
-          setRepoVault(baseVault);
+      if (repoVaultByProjMap[selectedProyectoId]) {
+        const pVault = { ...baseVault, ...repoVaultByProjMap[selectedProyectoId] };
+        if (pVault.figmaBoard && !pVault.googleStitchUrl) {
+          delete pVault.figmaBoard;
         }
+        if (pVault.githubRepo === 'https://github.com/goglite-agency/cliente-web-platform') pVault.githubRepo = '';
+        if (pVault.stagingUrl === 'https://goglite-client-staging.web.app') pVault.stagingUrl = '';
+        if (pVault.productionUrl === 'https://www.gruasandreasv.com') pVault.productionUrl = '';
+        if (pVault.driveAssets === 'https://drive.google.com/drive/folders/goglite-client-assets') pVault.driveAssets = '';
+        setRepoVault(pVault);
       } else {
         setRepoVault(baseVault);
       }
 
       // Cargar o generar PRD específico del proyecto seleccionado
-      const prdByProjRaw = localStorage.getItem('goglite_prd_by_project');
-      const prdByProj = prdByProjRaw ? JSON.parse(prdByProjRaw) : {};
-
-      if (prdByProj && prdByProj[selectedProyectoId]) {
-        const savedPrd = prdByProj[selectedProyectoId];
+      if (prdByProjMap[selectedProyectoId]) {
+        const savedPrd = prdByProjMap[selectedProyectoId];
         setPrdConfig({
           ...savedPrd,
           clienteEmpresa: proj?.cliente?.empresa || savedPrd.clienteEmpresa,
@@ -561,8 +506,11 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
       } else if (proj) {
         const fresh = generatePrdForProyecto(proj, selectedCountry);
         setPrdConfig(fresh);
-        prdByProj[selectedProyectoId] = fresh;
-        localStorage.setItem('goglite_prd_by_project', JSON.stringify(prdByProj));
+        setPrdByProjMap(prev => {
+          const updated = { ...prev, [selectedProyectoId]: fresh };
+          saveAppStateCloud('prd_by_project', 'prd', updated).catch(() => {});
+          return updated;
+        });
       } else {
         const fresh = generatePrdForProyecto(null, selectedCountry);
         setPrdConfig(fresh);
@@ -572,16 +520,15 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     }
   }, [selectedProyectoId, proyectos, selectedCountry]);
 
-  // Persistir tareas y bóveda en localStorage + Firestore Cloud (aislado por proyecto) y sincronizar hitos
+  // Persistir tareas y bóveda en Firestore Cloud (aislado por proyecto) y sincronizar hitos
   useEffect(() => {
     try {
-      localStorage.setItem('goglite_sprint_tasks', JSON.stringify(sprintTasks));
       if (selectedProyectoId) {
-        const byProjRaw = localStorage.getItem('goglite_sprint_tasks_by_project');
-        const byProj = byProjRaw ? JSON.parse(byProjRaw) : {};
-        byProj[selectedProyectoId] = sprintTasks;
-        localStorage.setItem('goglite_sprint_tasks_by_project', JSON.stringify(byProj));
-        saveAppStateCloud('sprint_tasks_by_project', 'sprint_tasks', byProj).catch(() => {});
+        setSprintTasksByProjMap(prev => {
+          const updated = { ...prev, [selectedProyectoId]: sprintTasks };
+          saveAppStateCloud('sprint_tasks_by_project', 'sprint_tasks', updated).catch(() => {});
+          return updated;
+        });
       }
       syncAllProyectosWithEvents(sprintTasks, selectedProyectoId || null);
     } catch (e) {}
@@ -589,13 +536,12 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem('goglite_repo_vault', JSON.stringify(repoVault));
       if (selectedProyectoId) {
-        const vaultByProjRaw = localStorage.getItem('goglite_repo_vault_by_project');
-        const vaultByProj = vaultByProjRaw ? JSON.parse(vaultByProjRaw) : {};
-        vaultByProj[selectedProyectoId] = repoVault;
-        localStorage.setItem('goglite_repo_vault_by_project', JSON.stringify(vaultByProj));
-        saveAppStateCloud('repo_vault_by_project', 'repo_vault', vaultByProj).catch(() => {});
+        setRepoVaultByProjMap(prev => {
+          const updated = { ...prev, [selectedProyectoId]: repoVault };
+          saveAppStateCloud('repo_vault_by_project', 'repo_vault', updated).catch(() => {});
+          return updated;
+        });
       }
     } catch (e) {}
   }, [repoVault, selectedProyectoId]);
@@ -615,7 +561,7 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   }, [activeTimerTaskId]);
 
   const fetchProyectos = async () => {
-    let list = getStoredProyectos();
+    let list = await getProyectosCloud();
     try {
       const res = await fetch('/api/proyectos');
       const cType = res.headers.get('content-type') || '';
@@ -630,7 +576,7 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         }
       }
     } catch (err) {
-      console.warn('Usando proyectos locales en demo:', err);
+      console.warn('Usando proyectos cloud:', err);
     } finally {
       setProyectos(list);
       if (list.length > 0) {
@@ -675,25 +621,22 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
       const costoHoraEst = 30;
       const fechaHoy = new Date().toISOString().split('T')[0];
 
-      // Sincronizar con estado local de Finanzas (goglite_finanzas_v1) para modo estático/offline
+      // Sincronizar con Firestore finanzas_v1
       try {
-        const rawFin = localStorage.getItem('goglite_finanzas_v1');
-        if (rawFin) {
-          const parsedFin = JSON.parse(rawFin);
-          const localTimeEntry = {
-            id: 'time-' + Date.now(),
-            proyectoId: proyectoActivo.id,
-            cliente: clienteEmpresa,
-            concepto: conceptoTarea,
-            categoria: 'frontend_astro',
-            horas: horasIncremento,
-            costoHora: costoHoraEst,
-            costoTotal: Number((horasIncremento * costoHoraEst).toFixed(2)),
-            fecha: fechaHoy
-          };
-          parsedFin.timeEntries = [localTimeEntry, ...(parsedFin.timeEntries || [])];
-          localStorage.setItem('goglite_finanzas_v1', JSON.stringify(parsedFin));
-        }
+        const parsedFin = (await getAppStateCloud('finanzas_v1')) || {};
+        const localTimeEntry = {
+          id: 'time-' + Date.now(),
+          proyectoId: proyectoActivo.id,
+          cliente: clienteEmpresa,
+          concepto: conceptoTarea,
+          categoria: 'frontend_astro',
+          horas: horasIncremento,
+          costoHora: costoHoraEst,
+          costoTotal: Number((horasIncremento * costoHoraEst).toFixed(2)),
+          fecha: fechaHoy
+        };
+        parsedFin.timeEntries = [localTimeEntry, ...(parsedFin.timeEntries || [])];
+        saveAppStateCloud('finanzas_v1', 'finanzas', parsedFin).catch(() => {});
       } catch (e) {}
 
       try {
@@ -768,12 +711,12 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   const handleResetToPlaybook12Fases = () => {
     setSprintTasks(PLAYBOOK_12_FASES_TASKS);
     try {
-      localStorage.setItem('goglite_sprint_tasks', JSON.stringify(PLAYBOOK_12_FASES_TASKS));
       if (selectedProyectoId) {
-        const byProjRaw = localStorage.getItem('goglite_sprint_tasks_by_project');
-        const byProj = byProjRaw ? JSON.parse(byProjRaw) : {};
-        byProj[selectedProyectoId] = PLAYBOOK_12_FASES_TASKS;
-        localStorage.setItem('goglite_sprint_tasks_by_project', JSON.stringify(byProj));
+        setSprintTasksByProjMap(prev => {
+          const updated = { ...prev, [selectedProyectoId]: PLAYBOOK_12_FASES_TASKS };
+          saveAppStateCloud('sprint_tasks_by_project', 'sprint_tasks', updated).catch(() => {});
+          return updated;
+        });
       }
     } catch (e) {}
     alert('✓ Las 12 Fases Oficiales han sido cargadas en orden cronológico en Por Iniciar (Backlog) con 0 horas registradas.');

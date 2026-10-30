@@ -66,7 +66,20 @@ import {
 import { DEFAULT_AGENCY_BRANDING, getAgencyContactForCountry } from '../constants/defaultAgencyBranding';
 import { apiClient, getApiUrl } from '../services/apiClient';
 import { auth } from '../services/firebase';
-import { getPortalCloud, savePortalCloud, subscribePortalCloud, saveProyectoCloud, uploadReceiptToCloudStorage } from '../services/firestoreSyncService';
+import { 
+  getPortalCloud, 
+  savePortalCloud, 
+  subscribePortalCloud, 
+  saveProyectoCloud, 
+  uploadReceiptToCloudStorage,
+  getPresupuestosCloud,
+  savePresupuestoCloud,
+  getProyectosCloud,
+  getCrmLeadsCloud,
+  saveCrmLeadCloud,
+  getAppStateCloud,
+  saveAppStateCloud
+} from '../services/firestoreSyncService';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import WarrantyCountdownTimer from './portal/WarrantyCountdownTimer';
 import GogliteCareCard from './portal/GogliteCareCard';
@@ -364,30 +377,22 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
   const [subiendoInsumo, setSubiendoInsumo] = useState(false);
 
   useEffect(() => {
-    const loadFacturas = () => {
+    let isMounted = true;
+    const loadFacturas = async () => {
       try {
-        if (typeof window !== 'undefined') {
-          let list = [];
-          const raw = localStorage.getItem('goglite_facturas');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
-          }
-          if (list.length === 0) {
-            const rawFinanzas = localStorage.getItem('goglite_finanzas_pnl');
-            if (rawFinanzas) {
-              const finanzas = JSON.parse(rawFinanzas);
-              if (Array.isArray(finanzas?.facturas)) list = finanzas.facturas;
-            }
-          }
-          if (Array.isArray(list)) setClientFacturaList(list);
+        const finState = await getAppStateCloud('finanzas_v1');
+        if (isMounted && finState && Array.isArray(finState.facturas)) {
+          setClientFacturaList(finState.facturas);
         }
-      } catch {}
+      } catch (err) {
+        console.warn('[Portal] Error cargando facturas de Firestore app_state:', err);
+      }
     };
     loadFacturas();
     window.addEventListener('goglite_facturas_updated', loadFacturas);
     window.addEventListener('goglite_proyectos_synced', loadFacturas);
     return () => {
+      isMounted = false;
       window.removeEventListener('goglite_facturas_updated', loadFacturas);
       window.removeEventListener('goglite_proyectos_synced', loadFacturas);
     };
@@ -1116,15 +1121,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                 };
 
                 let storedPortalConfig = {};
-                try {
-                  const c = localStorage.getItem('goglite_portal_' + token) || localStorage.getItem('goglite_portal_' + (parsedProp.leadId || parsedProp.id));
-                  if (c) storedPortalConfig = JSON.parse(c);
-                } catch (e) {}
 
-                // Vincular o generar contrato/proyecto para este cliente
+                // Vincular o generar contrato/proyecto para este cliente en la nube
                 let matchedProj = null;
                 try {
-                  const projs = getStoredProyectos();
+                  const projs = await getProyectosCloud();
                   const targetEmp = clientEmpresa.toLowerCase().trim();
                   matchedProj = projs.find(p => 
                     (p.presupuestoId && (p.presupuestoId === parsedProp.id || p.presupuestoId === parsedProp.leadId)) ||
@@ -1151,15 +1152,16 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                         }
                       };
                     }
+                    saveProyectoCloud(matchedProj).catch(() => {});
                   } else if (parsedProp.proyecto) {
                     matchedProj = {
                       ...buildProyectoFromPresupuesto(parsedProp, projs),
                       ...parsedProp.proyecto
                     };
-                    saveStoredProyectos([matchedProj, ...projs]);
+                    saveProyectoCloud(matchedProj).catch(() => {});
                   } else if (storedPortalConfig.fase1Aprobada || parsedProp.estado === 'aceptado') {
                     matchedProj = buildProyectoFromPresupuesto(parsedProp, projs);
-                    saveStoredProyectos([matchedProj, ...projs]);
+                    saveProyectoCloud(matchedProj).catch(() => {});
                   }
                 } catch (e) {}
 
@@ -1174,35 +1176,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   proyecto: matchedProj || parsedProp.proyecto
                 };
 
-                // Actualizar únicamente la propuesta existente sin duplicar registros
+                // Actualizar propuesta en Firestore si cambió de estado
                 try {
-                  const rawP = localStorage.getItem('goglite_presupuestos');
-                  let curP = rawP ? JSON.parse(rawP) : [];
-                  const targetEmp = clientEmpresa.toLowerCase().trim();
-                  const existIdx = curP.findIndex(p =>
-                    (parsedProp.id && p.id === parsedProp.id) ||
-                    (parsedProp.codigo && p.codigo === parsedProp.codigo) ||
-                    (token && p.portalToken === token) ||
-                    (parsedProp.leadId && p.leadId === parsedProp.leadId) ||
-                    (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
-                  );
-                  if (existIdx !== -1) {
-                    const prevEstado = curP[existIdx].estado;
-                    const finalEstado = (prevEstado === 'aceptado' || prevEstado === 'rechazado') ? prevEstado : 'visto';
-                    curP[existIdx] = {
-                      ...curP[existIdx],
-                      estado: finalEstado,
-                      abiertoEn: curP[existIdx].abiertoEn || new Date().toISOString()
-                    };
-                    parsedProp.estado = finalEstado;
-                  } else if (curP.length === 0 && parsedProp.id && parsedProp.codigo) {
-                    // Solo insertar en caché si el navegador del cliente externo no tenía ninguna propuesta local
-                    const finalEstado = (parsedProp.estado === 'aceptado' || parsedProp.estado === 'rechazado') ? parsedProp.estado : 'visto';
-                    parsedProp.estado = finalEstado;
-                    parsedProp.abiertoEn = new Date().toISOString();
-                    curP.push(parsedProp);
-                  }
-                  localStorage.setItem('goglite_presupuestos', JSON.stringify(curP));
+                  const finalEstado = (parsedProp.estado === 'aceptado' || parsedProp.estado === 'rechazado') ? parsedProp.estado : 'visto';
+                  parsedProp.estado = finalEstado;
+                  if (!parsedProp.abiertoEn) parsedProp.abiertoEn = new Date().toISOString();
+                  savePresupuestoCloud(parsedProp).catch(() => {});
                 } catch (e) {}
               }
             } catch (innerDecodeErr) {
@@ -1271,12 +1250,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         console.warn('API portal fetch warning, falling back to local storage:', err);
       }
 
-      // 2. Buscar en presupuestos guardados localmente
+      // 2. Buscar en presupuestos guardados en la nube
       if (!loadedData) {
         try {
-          const rawP = typeof window !== 'undefined' ? localStorage.getItem('goglite_presupuestos') : null;
-          if (rawP) {
-            const presupuestos = JSON.parse(rawP);
+          const presupuestos = await getPresupuestosCloud();
+          if (Array.isArray(presupuestos) && presupuestos.length > 0) {
             const matchedPresupuesto = presupuestos.find(p => 
               p.portalToken === token ||
               p.codigo === token ||
@@ -1286,7 +1264,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             );
 
             if (matchedPresupuesto) {
-              const leads = getStoredCrmLeads();
+              const leads = await getCrmLeadsCloud();
               const pEmpresa = (matchedPresupuesto.cliente?.empresa || '').toLowerCase().trim();
               const pPhone = (matchedPresupuesto.cliente?.telefono || '').replace(/\D/g, '');
               let foundLead = leads.find(l => 
@@ -1312,9 +1290,8 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               // Auto-actualizar estado a visto
               if (matchedPresupuesto.estado === 'enviado' || matchedPresupuesto.estado === 'sin_abrir' || matchedPresupuesto.estado === 'borrador') {
                 try {
-                  const updatedP = presupuestos.map(p => p.id === matchedPresupuesto.id ? { ...p, estado: 'visto' } : p);
-                  localStorage.setItem('goglite_presupuestos', JSON.stringify(updatedP));
                   matchedPresupuesto.estado = 'visto';
+                  savePresupuestoCloud(matchedPresupuesto).catch(() => {});
                 } catch (e) {}
               }
 
@@ -1327,14 +1304,14 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             }
           }
         } catch (pErr) {
-          console.warn('[Portal] Error buscando en presupuestos locales:', pErr);
+          console.warn('[Portal] Error buscando en presupuestos cloud:', pErr);
         }
       }
 
-      // 3. Buscar en leads de CRM guardados localmente
+      // 3. Buscar en leads de CRM guardados en la nube
       if (!loadedData) {
         try {
-          const leads = getStoredCrmLeads();
+          const leads = await getCrmLeadsCloud();
           let found = leads.find(l => 
             l.portalToken === token || 
             l.id === token || 
@@ -1344,9 +1321,8 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
           if (found) {
             let matchedPresupuesto = null;
-            const rawP = typeof window !== 'undefined' ? localStorage.getItem('goglite_presupuestos') : null;
-            if (rawP) {
-              const presupuestos = JSON.parse(rawP);
+            const presupuestos = await getPresupuestosCloud();
+            if (Array.isArray(presupuestos)) {
               const fEmpresa = (found.empresa || '').toLowerCase().trim();
               matchedPresupuesto = presupuestos.find(p => 
                 p.id === found.presupuestoId || 
@@ -1363,35 +1339,32 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             };
           }
         } catch (e) {
-          console.error('Error parsing local leads:', e);
+          console.error('[Portal] Error fetching cloud leads:', e);
         }
       }
 
       // 4. Si aún no hay data pero existe al menos un presupuesto real en el sistema, usar el más reciente
       if (!loadedData) {
         try {
-          const rawP = typeof window !== 'undefined' ? localStorage.getItem('goglite_presupuestos') : null;
-          if (rawP) {
-            const presupuestos = JSON.parse(rawP);
-            if (Array.isArray(presupuestos) && presupuestos.length > 0) {
-              const latestP = presupuestos[0];
-              loadedData = {
-                lead: {
-                  id: latestP.leadId || latestP.id,
-                  empresa: latestP.cliente?.empresa || 'Cliente VIP',
-                  contacto: latestP.cliente?.nombre || 'Representante Legal',
-                  telefono: latestP.cliente?.telefono || '',
-                  email: latestP.cliente?.email || '',
-                  pais: latestP.pais || 'SV',
-                  presupuestoMonto: Number(latestP.inversion?.precioTotal) || 0,
-                  presupuestoCodigo: latestP.codigo,
-                  portalToken: token
-                },
-                portalConfig: {},
-                presupuesto: latestP,
-                proyecto: null
-              };
-            }
+          const presupuestos = await getPresupuestosCloud();
+          if (Array.isArray(presupuestos) && presupuestos.length > 0) {
+            const latestP = presupuestos[0];
+            loadedData = {
+              lead: {
+                id: latestP.leadId || latestP.id,
+                empresa: latestP.cliente?.empresa || 'Cliente VIP',
+                contacto: latestP.cliente?.nombre || 'Representante Legal',
+                telefono: latestP.cliente?.telefono || '',
+                email: latestP.cliente?.email || '',
+                pais: latestP.pais || 'SV',
+                presupuestoMonto: Number(latestP.inversion?.precioTotal) || 0,
+                presupuestoCodigo: latestP.codigo,
+                portalToken: token
+              },
+              portalConfig: {},
+              presupuesto: latestP,
+              proyecto: null
+            };
           }
         } catch (e) {}
       }
@@ -1410,9 +1383,9 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         setSelectedBankTab('SV');
       }
 
-      // Enlazar con proyecto formal si existe (en localStorage o desde Firestore) y reconciliar progreso por eventos y sprint
+      // Enlazar con proyecto formal si existe desde Firestore y reconciliar progreso por eventos y sprint
       try {
-        const storedProjs = getStoredProyectos();
+        const storedProjs = await getProyectosCloud();
         const leadEmp = (loadedData?.lead?.empresa || '').toLowerCase().trim();
         const localProj = storedProjs.find(p => 
           (loadedData.proyecto && p.id === loadedData.proyecto.id) ||
@@ -1484,7 +1457,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         console.warn('[Portal] Error sincronizando con proyectos:', projSyncErr);
       }
 
-      // 6. Marcar dinámicamente la propuesta como 'visto' (Abierto por el cliente) al abrir el enlace del portal
+      // 6. Marcar dinámicamente la propuesta como 'visto' (Abierto por el cliente) en Firestore
       try {
         const currentProp = loadedData?.presupuesto;
         const isAlreadyFinal = currentProp?.estado === 'aceptado' || currentProp?.estado === 'rechazado' || loadedData?.portalConfig?.fase1Aprobada;
@@ -1493,58 +1466,17 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         if (currentProp) {
           currentProp.estado = resolvedStatus;
           if (!currentProp.abiertoEn) currentProp.abiertoEn = new Date().toISOString();
+          savePresupuestoCloud(currentProp).catch(() => {});
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('goglite_presupuestos_updated'));
+          }
         }
 
-        if (typeof window !== 'undefined') {
-          const rawP = localStorage.getItem('goglite_presupuestos');
-          if (rawP) {
-            const listP = JSON.parse(rawP);
-            const targetEmp = (loadedData?.lead?.empresa || currentProp?.cliente?.empresa || '').toLowerCase().trim();
-            let pChanged = false;
-            const nextListP = listP.map(p => {
-              const pEmp = (p.cliente?.empresa || '').toLowerCase().trim();
-              const isMatch = (currentProp?.id && p.id === currentProp.id) ||
-                              (currentProp?.codigo && p.codigo === currentProp.codigo) ||
-                              (token && p.portalToken === token) ||
-                              (targetEmp && pEmp === targetEmp);
-              if (isMatch) {
-                const nextEst = (p.estado === 'aceptado' || p.estado === 'rechazado') ? p.estado : resolvedStatus;
-                if (p.estado !== nextEst) {
-                  pChanged = true;
-                  return {
-                    ...p,
-                    estado: nextEst,
-                    abiertoEn: p.abiertoEn || new Date().toISOString(),
-                    vecesAbierto: (Number(p.vecesAbierto) || 0) + 1
-                  };
-                }
-              }
-              return p;
-            });
-
-            if (pChanged) {
-              localStorage.setItem('goglite_presupuestos', JSON.stringify(nextListP));
-              window.dispatchEvent(new CustomEvent('goglite_presupuestos_updated'));
-            }
-          }
-
-          // Sincronizar también en CRM Leads
-          const crmLeads = getStoredCrmLeads();
-          const targetEmp = (loadedData?.lead?.empresa || currentProp?.cliente?.empresa || '').toLowerCase().trim();
-          let crmChanged = false;
-          const nextCrm = crmLeads.map(cl => {
-            const clEmp = (cl.empresa || '').toLowerCase().trim();
-            if (cl.portalToken === token || (loadedData?.lead?.id && cl.id === loadedData.lead.id) || (targetEmp && clEmp === targetEmp)) {
-              const nextEst = (cl.presupuestoEstado === 'aceptado') ? 'aceptado' : resolvedStatus;
-              if (cl.presupuestoEstado !== nextEst) {
-                crmChanged = true;
-                return { ...cl, presupuestoEstado: nextEst };
-              }
-            }
-            return cl;
-          });
-          if (crmChanged) {
-            saveStoredCrmLeads(nextCrm);
+        if (loadedData?.lead?.id) {
+          const nextEst = (loadedData.lead.presupuestoEstado === 'aceptado') ? 'aceptado' : resolvedStatus;
+          if (loadedData.lead.presupuestoEstado !== nextEst) {
+            loadedData.lead.presupuestoEstado = nextEst;
+            saveCrmLeadCloud(loadedData.lead).catch(() => {});
           }
         }
 
@@ -1561,38 +1493,6 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       } catch (openTrackErr) {
         console.warn('[Portal] Error registrando apertura de propuesta:', openTrackErr);
       }
-
-      // Fusionar siempre cualquier configuración persistida localmente en goglite_portal_<token>
-      try {
-        if (typeof window !== 'undefined' && loadedData) {
-          const rawLocalPortal = localStorage.getItem('goglite_portal_' + token) ||
-            (loadedData.lead?.id ? localStorage.getItem('goglite_portal_' + loadedData.lead.id) : null);
-          if (rawLocalPortal) {
-            const parsedLocalPortal = JSON.parse(rawLocalPortal);
-            const isValidadosEnProj = Boolean(
-              loadedData.proyecto?.onboarding?.insumosValidados100 ||
-              loadedData.proyecto?.portalConfig?.fase3InsumosCompletos ||
-              loadedData.proyecto?.faseActual >= 4
-            );
-            const isSaldoLiquidadoEnProj = Boolean(
-              loadedData.proyecto?.pagos?.saldoEstado === 'confirmado' ||
-              loadedData.proyecto?.portalConfig?.fase4Liquidada ||
-              loadedData.proyecto?.portalConfig?.liquidacionPagada ||
-              loadedData.proyecto?.estado === 'entregado' ||
-              loadedData.proyecto?.faseActual >= 5
-            );
-            loadedData.portalConfig = {
-              ...(loadedData.portalConfig || {}),
-              ...parsedLocalPortal,
-              fase3InsumosCompletos: isValidadosEnProj || Boolean(parsedLocalPortal.fase3InsumosCompletos) || Boolean(loadedData.portalConfig?.fase3InsumosCompletos),
-              fase4Liquidada: isSaldoLiquidadoEnProj || Boolean(parsedLocalPortal.fase4Liquidada) || Boolean(loadedData.portalConfig?.fase4Liquidada),
-              liquidacionPagada: isSaldoLiquidadoEnProj || Boolean(parsedLocalPortal.liquidacionPagada) || Boolean(loadedData.portalConfig?.liquidacionPagada),
-              faseActual: isSaldoLiquidadoEnProj ? 5 : (isValidadosEnProj ? Math.max(4, parsedLocalPortal.faseActual || loadedData.portalConfig?.faseActual || 4) : (parsedLocalPortal.faseActual || loadedData.portalConfig?.faseActual || 1)),
-              progresoPorcentaje: isSaldoLiquidadoEnProj ? 100 : (parsedLocalPortal.progresoPorcentaje || loadedData.portalConfig?.progresoPorcentaje || 80)
-            };
-          }
-        }
-      } catch (e) {}
 
       // Sincronizar automáticamente el estado consolidado hacia Firestore si no es el portal demo
       if (loadedData && loadedData.lead && loadedData.lead.id !== 'lead-demo-portal') {
@@ -1656,23 +1556,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       portalConfig: newPortalConfig
     }));
 
-    // Sync with localStore
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('goglite_portal_' + (token || data.lead.id), JSON.stringify(newPortalConfig));
-      }
-      const leads = getStoredCrmLeads();
-      const idx = leads.findIndex(l => l.portalToken === token || l.id === data.lead.id);
-      if (idx !== -1) {
-        leads[idx] = { ...leads[idx], ...newLead };
-        saveStoredCrmLeads(leads);
-      }
-    } catch (e) {
-      console.error('Error saving to localStore:', e);
-    }
-
     // Sync con Firestore Cloud para persistencia multiplataforma inmediata (Móvil <-> PC)
     try {
+      if (newLead?.id) {
+        saveCrmLeadCloud(newLead).catch(() => {});
+      }
       const activeToken = token || data.lead.portalToken || data.lead.id;
       savePortalCloud(activeToken, {
         token: activeToken,
@@ -1841,25 +1729,14 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       console.warn('Portal update err:', err);
     }
 
-    // 3. Actualizar también el estado en presupuestos a 'aceptado'
+    // 3. Actualizar también el estado en presupuestos a 'aceptado' en Firestore
     try {
-      const rawP = localStorage.getItem('goglite_presupuestos');
-      let presupuestos = rawP ? JSON.parse(rawP) : [];
-      const targetEmpresa = (data?.lead?.empresa || data?.presupuesto?.cliente?.empresa || '').toLowerCase().trim();
-      let foundProp = false;
-      const updated = presupuestos.map(p => {
-        const pName = (p.cliente?.empresa || '').toLowerCase().trim();
-        if ((data?.presupuesto?.id && p.id === data.presupuesto.id) || (data?.presupuesto?.codigo && p.codigo === data.presupuesto.codigo) || (targetEmpresa && pName === targetEmpresa)) {
-          foundProp = true;
-          return { ...p, ...(data.presupuesto || {}), estado: 'aceptado' };
+      if (data?.presupuesto) {
+        savePresupuestoCloud({ ...data.presupuesto, estado: 'aceptado' }).catch(() => {});
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('goglite_presupuestos_updated'));
         }
-        return p;
-      });
-      if (!foundProp && data?.presupuesto) {
-        updated.unshift({ ...data.presupuesto, estado: 'aceptado' });
       }
-      localStorage.setItem('goglite_presupuestos', JSON.stringify(updated));
-      window.dispatchEvent(new Event('storage'));
     } catch (e) {}
   };
 
@@ -1991,25 +1868,18 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       console.warn('Error guardando proyecto firmado:', e);
     }
 
-    // 2. Actualizar estado del presupuesto en localStorage a 'aceptado'
+    // 2. Actualizar estado del presupuesto en Firestore a 'aceptado'
     try {
-      const rawP = localStorage.getItem('goglite_presupuestos');
-      if (rawP) {
-        const presupuestos = JSON.parse(rawP);
-        const targetEmp = (clientEmpresa || '').toLowerCase().trim();
-        const updatedProps = presupuestos.map(p => {
-          const pEmp = (p.cliente?.empresa || '').toLowerCase().trim();
-          if ((data?.presupuesto?.id && p.id === data.presupuesto.id) || (data?.presupuesto?.codigo && p.codigo === data.presupuesto.codigo) || (targetEmp && pEmp === targetEmp)) {
-            return {
-              ...p,
-              estado: 'aceptado',
-              contratoFirmado: true,
-              fechaFirma: fechaFirma
-            };
-          }
-          return p;
-        });
-        localStorage.setItem('goglite_presupuestos', JSON.stringify(updatedProps));
+      if (data?.presupuesto) {
+        savePresupuestoCloud({
+          ...data.presupuesto,
+          estado: 'aceptado',
+          contratoFirmado: true,
+          fechaFirma: fechaFirma
+        }).catch(() => {});
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('goglite_presupuestos_updated'));
+        }
       }
     } catch (e) {}
 
@@ -2328,7 +2198,16 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               saldoFecha: new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
             }
           });
-          saveStoredProyectos(storedProjs);
+          if (data?.proyecto) {
+            saveProyectoCloud({
+              ...data.proyecto,
+              pagos: {
+                ...(data.proyecto.pagos || {}),
+                saldoEstado: 'confirmado',
+                saldoFecha: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+              }
+            }).catch(() => {});
+          }
           window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: storedProjs } }));
         }
       } catch (err) {
@@ -2336,9 +2215,8 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       }
 
       try {
-        let storedFacturas = [];
-        const rawFac = localStorage.getItem('goglite_facturas');
-        if (rawFac) storedFacturas = JSON.parse(rawFac);
+        const parsedFin = await getAppStateCloud('finanzas_v1');
+        let storedFacturas = parsedFin?.facturas || [];
         if (Array.isArray(storedFacturas) && storedFacturas.length > 0) {
           const leadEmp = (data?.lead?.empresa || '').toLowerCase().trim();
           let facUpdated = false;
@@ -2365,20 +2243,16 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
             return f;
           });
           if (facUpdated) {
-            localStorage.setItem('goglite_facturas', JSON.stringify(storedFacturas));
-            const rawFin = localStorage.getItem('goglite_finanzas_v1');
-            if (rawFin) {
-              try {
-                const parsedFin = JSON.parse(rawFin);
-                parsedFin.facturas = storedFacturas;
-                localStorage.setItem('goglite_finanzas_v1', JSON.stringify(parsedFin));
-              } catch {}
-            }
+            setClientFacturaList(storedFacturas);
+            saveAppStateCloud('finanzas_v1', 'finanzas', {
+              ...(parsedFin || {}),
+              facturas: storedFacturas
+            }).catch(() => {});
             window.dispatchEvent(new CustomEvent('goglite_facturas_updated'));
           }
         }
       } catch (errFac) {
-        console.warn('Error sync settlement with invoice:', errFac);
+        console.warn('Error sync settlement with cloud invoice:', errFac);
       }
 
       await savePortalUpdates({
@@ -2522,24 +2396,6 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         return c.trim();
       }
     }
-    try {
-      if (typeof window !== 'undefined') {
-        const projId = activeProyecto?.id || lead?.proyectoId || lead?.id;
-        const rawVault = localStorage.getItem('goglite_repo_vault_by_project');
-        if (rawVault && projId) {
-          const parsed = JSON.parse(rawVault);
-          const pVal = parsed[projId]?.productionUrl || parsed[projId]?.urlProduccion;
-          if (pVal && pVal.trim() && pVal.trim() !== 'https://www.gruasandreasv.com') return pVal.trim();
-        }
-        const globalVault = localStorage.getItem('goglite_repo_vault');
-        if (globalVault) {
-          const parsedG = JSON.parse(globalVault);
-          const gVal = parsedG?.productionUrl || parsedG?.urlProduccion;
-          if (gVal && gVal.trim() && gVal.trim() !== 'https://www.gruasandreasv.com') return gVal.trim();
-        }
-      }
-    } catch {}
-
     const defaultSlug = (lead?.empresa || clientEmpresa || 'empresa').toLowerCase().replace(/\s+/g, '');
     return `https://${defaultSlug}.com`;
   })();
@@ -2558,23 +2414,6 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
         return c.trim();
       }
     }
-    try {
-      if (typeof window !== 'undefined') {
-        const projId = activeProyecto?.id || lead?.proyectoId || lead?.id;
-        const rawVault = localStorage.getItem('goglite_repo_vault_by_project');
-        if (rawVault && projId) {
-          const parsed = JSON.parse(rawVault);
-          const pVal = parsed[projId]?.githubRepo;
-          if (pVal && pVal.trim() && !pVal.includes('cliente-web-platform')) return pVal.trim();
-        }
-        const globalVault = localStorage.getItem('goglite_repo_vault');
-        if (globalVault) {
-          const parsedG = JSON.parse(globalVault);
-          const gVal = parsedG?.githubRepo;
-          if (gVal && gVal.trim() && !gVal.includes('cliente-web-platform')) return gVal.trim();
-        }
-      }
-    } catch {}
 
     const defaultSlug = (lead?.empresa || clientEmpresa || 'cliente').toLowerCase().replace(/\s+/g, '-');
     return `github.com/goglite-clients/${defaultSlug}`;

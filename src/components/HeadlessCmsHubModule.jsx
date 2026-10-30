@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import apiClient from '../services/apiClient';
 import { saveCmsSiteToFirestore, getCmsSiteFromFirestore } from '../services/firebase';
-import { getStoredProyectos, saveStoredProyectos } from '../services/contractGenerator';
-import { saveProyectoCloud, savePortalCloud } from '../services/firestoreSyncService';
+import { saveProyectoCloud, savePortalCloud, getProyectosCloud, getAppStateCloud, saveAppStateCloud } from '../services/firestoreSyncService';
 import GoogleBusinessProfileView from './GoogleBusinessProfileView';
 import GoogleSiteKitView from './GoogleSiteKitView';
 import AdminCmsSubscriptionsHubView from './admin/AdminCmsSubscriptionsHubView';
@@ -288,7 +287,7 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
     const seenSlugs = new Set(result.map(s => s.slug));
 
     try {
-      const storedProjs = getStoredProyectos();
+      const storedProjs = projsList;
       if (Array.isArray(storedProjs)) {
         storedProjs.forEach(proj => {
           const empresa = proj.cliente?.empresa || proj.lead?.empresa || 'Cliente VIP';
@@ -351,14 +350,15 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
     return result;
   };
 
-  const syncProjectsIntoSites = () => {
-    setSites(prev => {
-      const merged = mergeProjectsWithSites(prev);
-      try {
-        localStorage.setItem('goglite_cms_sites', JSON.stringify(merged));
-      } catch (e) {}
-      return merged;
-    });
+  const syncProjectsIntoSites = async () => {
+    try {
+      const projs = await getProyectosCloud();
+      setSites(prev => {
+        const merged = mergeProjectsWithSites(prev, projs);
+        saveAppStateCloud('cms_sites_master', 'cms_sites', { sites: merged }).catch(() => {});
+        return merged;
+      });
+    } catch (e) {}
   };
 
   const fetchSites = async () => {
@@ -377,12 +377,12 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
       }
 
       if (!loaded || !Array.isArray(loaded) || loaded.length === 0) {
-        const local = localStorage.getItem('goglite_cms_sites');
-        if (local) {
-          try {
-            loaded = JSON.parse(local);
-          } catch (e) {}
-        }
+        try {
+          const cloudState = await getAppStateCloud('cms_sites_master');
+          if (cloudState && Array.isArray(cloudState.sites)) {
+            loaded = cloudState.sites;
+          }
+        } catch (e) {}
       }
 
       if (!Array.isArray(loaded)) loaded = [];
@@ -402,8 +402,13 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
         };
       }
 
-      // Unificar todos los clientes/proyectos registrados
-      loaded = mergeProjectsWithSites(loaded);
+      // Unificar todos los clientes/proyectos registrados en Firestore
+      try {
+        const cloudProjs = await getProyectosCloud();
+        loaded = mergeProjectsWithSites(loaded, cloudProjs);
+      } catch (e) {
+        loaded = mergeProjectsWithSites(loaded, []);
+      }
 
       // Intentar sincronizar datos en vivo desde Firestore
       try {
@@ -419,9 +424,7 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
       }
 
       setSites(loaded);
-      try {
-        localStorage.setItem('goglite_cms_sites', JSON.stringify(loaded));
-      } catch (e) {}
+      saveAppStateCloud('cms_sites_master', 'cms_sites', { sites: loaded }).catch(() => {});
 
       const target = loaded.find(s => s.slug === selectedSlug) || loaded[0];
       setSelectedSlug(target.slug);
@@ -483,9 +486,7 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
       };
       setSites(prev => {
         const next = [...prev, newSiteEntry];
-        try {
-          localStorage.setItem('goglite_cms_sites', JSON.stringify(next));
-        } catch (e) {}
+        saveAppStateCloud('cms_sites_master', 'cms_sites', { sites: next }).catch(() => {});
         return next;
       });
       setSelectedSlug(targetSlug);
@@ -515,9 +516,7 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
         }
         return s;
       });
-      try {
-        localStorage.setItem('goglite_cms_sites', JSON.stringify(next));
-      } catch (e) {}
+      saveAppStateCloud('cms_sites_master', 'cms_sites', { sites: next }).catch(() => {});
       return next;
     });
   };
@@ -539,7 +538,7 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
         await apiClient.patch(`/api/cms/content/${selectedSlug}`, editableContent);
       } catch (e) {}
 
-      // 3. Sincronizar en memoria y localStorage
+      // 3. Sincronizar en memoria y Firestore app_state
       setSites(prev => {
         const next = prev.map(s => {
           if (s.slug === selectedSlug) {
@@ -552,9 +551,7 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
           }
           return s;
         });
-        try {
-          localStorage.setItem('goglite_cms_sites', JSON.stringify(next));
-        } catch (err) {}
+        saveAppStateCloud('cms_sites_master', 'cms_sites', { sites: next }).catch(() => {});
         return next;
       });
 
@@ -632,12 +629,10 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
         })
       };
 
-      // 1. Guardar en goglite_cms_sites y Firestore CMS
+      // 1. Guardar en Firestore CMS y app_state
       setSites(prev => {
         const next = [...prev.filter(s => s.slug !== slug), created];
-        try {
-          localStorage.setItem('goglite_cms_sites', JSON.stringify(next));
-        } catch (e) {}
+        saveAppStateCloud('cms_sites_master', 'cms_sites', { sites: next }).catch(() => {});
         return next;
       });
 
@@ -645,9 +640,8 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
         await saveCmsSiteToFirestore(slug, created, created.contenido);
       } catch (fErr) {}
 
-      // 2. Registrar también en goglite_proyectos para que quede unificado en Suscripciones y Portal del Cliente
+      // 2. Registrar también en proyectos de Firestore para que quede unificado en Suscripciones y Portal del Cliente
       try {
-        const allProjs = getStoredProyectos();
         const newProj = {
           id: created.id,
           cmsSlug: slug,
@@ -666,9 +660,7 @@ export default function HeadlessCmsHubModule({ onOpenInvoiceModal }) {
           },
           portalConfig
         };
-        const nextProjs = [newProj, ...allProjs.filter(p => p.portalToken !== slug)];
-        saveStoredProyectos(nextProjs);
-        await saveProyectoCloud(newProj.id, newProj);
+        await saveProyectoCloud(newProj);
         await savePortalCloud(slug, { token: slug, portalConfig });
         window.dispatchEvent(new CustomEvent('goglite_proyectos_synced'));
       } catch (pErr) {

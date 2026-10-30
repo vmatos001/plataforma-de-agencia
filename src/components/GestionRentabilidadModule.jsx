@@ -40,9 +40,15 @@ import {
   Calendar
 } from 'lucide-react';
 
-import { getStoredCrmLeads } from '../services/localStore';
-import { getAppStateCloud, saveAppStateCloud, saveProyectoCloud, savePortalCloud } from '../services/firestoreSyncService';
-import { getStoredProyectos, saveStoredProyectos } from '../services/contractGenerator';
+import { 
+  getAppStateCloud, 
+  saveAppStateCloud, 
+  saveProyectoCloud, 
+  savePortalCloud, 
+  getProyectosCloud, 
+  getPresupuestosCloud, 
+  getCrmLeadsCloud 
+} from '../services/firestoreSyncService';
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 
 const STORAGE_KEY_FINANZAS = 'goglite_finanzas_v1';
@@ -749,33 +755,29 @@ export function reconcileInvoiceWithPresupuesto(fac, prop, extraContext = {}) {
     extraContext?.proyecto?.pagos?.saldoEstado === 'verificacion'
   );
 
-  if (typeof window !== 'undefined' && (!isAnticipoPaid || !isSaldoPaid)) {
+  if (Array.isArray(extraContext?.proyectos) && (!isAnticipoPaid || !isSaldoPaid)) {
     try {
-      const rawProj = localStorage.getItem('goglite_proyectos');
-      if (rawProj) {
-        const projs = JSON.parse(rawProj);
-        const targetProj = projs.find(p => 
-          (fac.proyectoId && (p.id === fac.proyectoId || p.id === `proj-${fac.proyectoId}`)) ||
-          (prop.id && (p.presupuestoId === prop.id || p.id === prop.id)) ||
-          (prop.codigo && (p.codigo === prop.codigo || p.presupuestoCodigo === prop.codigo)) ||
-          (fac.codigoPresupuesto && (p.codigo === fac.codigoPresupuesto || p.presupuestoCodigo === fac.codigoPresupuesto)) ||
-          (fac.cliente?.empresa && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === fac.cliente.empresa.toLowerCase().trim())
-        );
-        if (targetProj) {
-          if (targetProj.pagos?.anticipoEstado === 'confirmado' || targetProj.portalConfig?.anticipoConfirmadoAgencia) {
-            isAnticipoPaid = true;
-          }
-          if (
-            targetProj.pagos?.saldoEstado === 'confirmado' ||
-            targetProj.pagos?.saldoEstado === 'verificacion' ||
-            targetProj.portalConfig?.fase4Liquidada ||
-            targetProj.portalConfig?.liquidacionPagada ||
-            targetProj.portalConfig?.liquidacionReportada ||
-            targetProj.portalConfig?.saldoConfirmadoAgencia ||
-            targetProj.portalConfig?.comprobanteLiquidacion
-          ) {
-            isSaldoPaid = true;
-          }
+      const targetProj = extraContext.proyectos.find(p => 
+        (fac.proyectoId && (p.id === fac.proyectoId || p.id === `proj-${fac.proyectoId}`)) ||
+        (prop.id && (p.presupuestoId === prop.id || p.id === prop.id)) ||
+        (prop.codigo && (p.codigo === prop.codigo || p.presupuestoCodigo === prop.codigo)) ||
+        (fac.codigoPresupuesto && (p.codigo === fac.codigoPresupuesto || p.presupuestoCodigo === fac.codigoPresupuesto)) ||
+        (fac.cliente?.empresa && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === fac.cliente.empresa.toLowerCase().trim())
+      );
+      if (targetProj) {
+        if (targetProj.pagos?.anticipoEstado === 'confirmado' || targetProj.portalConfig?.anticipoConfirmadoAgencia) {
+          isAnticipoPaid = true;
+        }
+        if (
+          targetProj.pagos?.saldoEstado === 'confirmado' ||
+          targetProj.pagos?.saldoEstado === 'verificacion' ||
+          targetProj.portalConfig?.fase4Liquidada ||
+          targetProj.portalConfig?.liquidacionPagada ||
+          targetProj.portalConfig?.liquidacionReportada ||
+          targetProj.portalConfig?.saldoConfirmadoAgencia ||
+          targetProj.portalConfig?.comprobanteLiquidacion
+        ) {
+          isSaldoPaid = true;
         }
       }
     } catch {}
@@ -1024,19 +1026,8 @@ export function buildMilestoneInvoices(propOrProj, existingFacturasCount = 0, co
  * cualquier proyecto con esquema de pagos (Anticipo 50% + Cierre 50%) tenga sus
  * dos facturas individuales e independientes en el historial del cliente.
  */
-export function reconcileMilestoneInvoices(currentFacturas = [], configuracion = DEFAULT_CONFIGURACION) {
+export function reconcileMilestoneInvoices(currentFacturas = [], configuracion = DEFAULT_CONFIGURACION, proyectos = [], presupuestos = []) {
   if (!Array.isArray(currentFacturas)) return [];
-
-  let proyectos = [];
-  let presupuestos = [];
-  try {
-    if (typeof window !== 'undefined') {
-      const rawProj = localStorage.getItem('goglite_proyectos');
-      if (rawProj) proyectos = JSON.parse(rawProj);
-      const rawPres = localStorage.getItem('goglite_presupuestos');
-      if (rawPres) presupuestos = JSON.parse(rawPres);
-    }
-  } catch (e) {}
 
   let facturas = [...currentFacturas];
   let modified = false;
@@ -1240,15 +1231,9 @@ export function reconcileMilestoneInvoices(currentFacturas = [], configuracion =
     });
   }
 
-  if (modified && typeof window !== 'undefined') {
+  if (modified) {
     try {
-      localStorage.setItem('goglite_facturas', JSON.stringify(facturas));
-      const rawFin = localStorage.getItem('goglite_finanzas_v1');
-      if (rawFin) {
-        const parsed = JSON.parse(rawFin);
-        parsed.facturas = facturas;
-        localStorage.setItem('goglite_finanzas_v1', JSON.stringify(parsed));
-      }
+      saveAppStateCloud('finanzas_v1', 'finanzas', { facturas }).catch(() => {});
     } catch (e) {}
   }
 
@@ -1716,33 +1701,8 @@ export default function GestionRentabilidadModule({
   onClearPresupuestoToBill,
   onNavigateToPresupuestos
 }) {
-  // 1. Estado Local-First persistido en localStorage (0ms latency, 100% offline/static resilient)
-  const [finanzasState, setFinanzasState] = useState(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem(STORAGE_KEY_FINANZAS);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && typeof parsed === 'object') {
-            const rawFacturas = Array.isArray(parsed.facturas) ? parsed.facturas.map(normalizeFacturaItems) : [];
-            const reconciledFacturas = reconcileMilestoneInvoices(rawFacturas, parsed.configuracion || DEFAULT_CONFIGURACION);
-            return {
-              facturas: reconciledFacturas,
-              gastos: Array.isArray(parsed.gastos) ? parsed.gastos : [],
-              timeEntries: Array.isArray(parsed.timeEntries) ? parsed.timeEntries : [],
-              configuracion: {
-                ...DEFAULT_CONFIGURACION,
-                ...(parsed.configuracion || {})
-              }
-            };
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Error leyendo caché de finanzas:', e);
-    }
-    return INITIAL_SEED_STATE;
-  });
+  // 1. Estado en memoria sincronizado 100% con Cloud Firestore
+  const [finanzasState, setFinanzasState] = useState(INITIAL_SEED_STATE);
 
   const [activeTab, setActiveTab] = useState('resumen'); // 'resumen' | 'facturas' | 'gastos' | 'horas' | 'config'
 
@@ -1821,48 +1781,20 @@ export default function GestionRentabilidadModule({
   // Clientes consolidados para selección ágil en Facturas Libres y CMS
   const cmsClientsList = useMemo(() => {
     const map = new Map();
-    try {
-      const projs = getStoredProyectos();
-      if (Array.isArray(projs)) {
-        projs.forEach(p => {
-          const emp = p.cliente?.empresa || p.lead?.empresa;
-          if (emp && !map.has(emp.toLowerCase())) {
-            map.set(emp.toLowerCase(), {
-              id: p.id,
-              empresa: emp,
-              contacto: p.cliente?.contacto || p.lead?.contacto || 'Administrador',
-              email: p.cliente?.email || p.lead?.email || '',
-              telefono: p.cliente?.telefono || p.lead?.telefono || '',
-              pais: p.cliente?.pais || p.lead?.pais || p.pais || 'DO',
-              dominio: p.dominio || p.portalConfig?.dominio || ''
-            });
-          }
+    (m3Presupuestos || []).forEach(p => {
+      const emp = p.cliente?.empresa;
+      if (emp && !map.has(emp.toLowerCase())) {
+        map.set(emp.toLowerCase(), {
+          id: p.id,
+          empresa: emp,
+          contacto: p.cliente?.nombre || 'Administrador',
+          email: p.cliente?.email || '',
+          telefono: p.cliente?.telefono || '',
+          pais: p.pais || 'SV',
+          dominio: ''
         });
       }
-    } catch (e) {}
-
-    try {
-      const raw = localStorage.getItem('goglite_cms_sites');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          parsed.forEach(s => {
-            const emp = s.nombre || s.contenido?.branding?.nombreMarca;
-            if (emp && !map.has(emp.toLowerCase())) {
-              map.set(emp.toLowerCase(), {
-                id: s.slug || s.id,
-                empresa: emp,
-                contacto: 'Webmaster',
-                email: '',
-                telefono: s.contenido?.branding?.telefonoWhatsApp || '',
-                pais: s.pais || 'SV',
-                dominio: s.dominio || ''
-              });
-            }
-          });
-        }
-      }
-    } catch (e) {}
+    });
 
     (m2CrmLeads || []).forEach(l => {
       if (l.empresa && !map.has(l.empresa.toLowerCase())) {
@@ -1929,20 +1861,7 @@ export default function GestionRentabilidadModule({
   });
 
   // Live 1-Click Interactive Stopwatch State (Option 2)
-  const [activeTimer, setActiveTimer] = useState(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem(STORAGE_KEY_TIMER);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && typeof parsed === 'object') {
-            return { ...DEFAULT_TIMER_STATE, ...parsed };
-          }
-        }
-      }
-    } catch {}
-    return DEFAULT_TIMER_STATE;
-  });
+  const [activeTimer, setActiveTimer] = useState(DEFAULT_TIMER_STATE);
 
   const [displaySeconds, setDisplaySeconds] = useState(() => getElapsedSeconds(activeTimer));
   const [stopTimerModalOpen, setStopTimerModalOpen] = useState(false);
@@ -1967,15 +1886,6 @@ export default function GestionRentabilidadModule({
     return () => clearInterval(interval);
   }, [activeTimer]);
 
-  // Persist Stopwatch State in localStorage
-  useEffect(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_TIMER, JSON.stringify(activeTimer));
-      }
-    } catch {}
-  }, [activeTimer]);
-
   const CLOUD_API_URL = import.meta.env.VITE_API_URL || 'https://goglite-agency.vercel.app';
   const getBackendEndpoint = (endpoint) => {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -1992,18 +1902,14 @@ export default function GestionRentabilidadModule({
     setTimeout(() => setToastMsg(''), 3200);
   };
 
-  // Persistir automáticamente en localStorage y Firestore Cloud cada vez que cambie finanzasState
+  // Persistir automáticamente en Firestore Cloud cada vez que cambie finanzasState
   useEffect(() => {
     try {
-      if (typeof window !== 'undefined' && finanzasState) {
-        localStorage.setItem(STORAGE_KEY_FINANZAS, JSON.stringify(finanzasState));
-        if (Array.isArray(finanzasState.facturas)) {
-          localStorage.setItem('goglite_facturas', JSON.stringify(finanzasState.facturas));
-        }
+      if (finanzasState) {
         saveAppStateCloud('finanzas_v1', 'finanzas', finanzasState).catch(() => {});
       }
     } catch (e) {
-      console.warn('Error guardando finanzas en localStorage:', e);
+      console.warn('Error guardando finanzas en cloud:', e);
     }
   }, [finanzasState]);
 
@@ -2027,20 +1933,17 @@ export default function GestionRentabilidadModule({
     })();
   }, []);
 
-  const loadRetrospectiveModules = () => {
+  const loadRetrospectiveModules = async () => {
     try {
-      if (typeof window === 'undefined') return;
+      const [cloudPres, cloudLeads] = await Promise.all([
+        getPresupuestosCloud(),
+        getCrmLeadsCloud()
+      ]);
+      const parsedM3 = Array.isArray(cloudPres) ? cloudPres : [];
+      setM3Presupuestos(parsedM3);
 
-      const rawM3 = localStorage.getItem('goglite_presupuestos');
-      const parsedM3 = rawM3 ? JSON.parse(rawM3) : [];
-      if (Array.isArray(parsedM3)) setM3Presupuestos(parsedM3);
-
-      const parsedM2 = getStoredCrmLeads();
-      if (Array.isArray(parsedM2)) setM2CrmLeads(parsedM2);
-
-      const rawM1 = localStorage.getItem('goglite_outbound_leads');
-      const parsedM1 = rawM1 ? JSON.parse(rawM1) : [];
-      if (Array.isArray(parsedM1)) setM1ScrapperLeads(parsedM1);
+      const parsedM2 = Array.isArray(cloudLeads) ? cloudLeads : [];
+      setM2CrmLeads(parsedM2);
 
       // Auto-importar presupuestos aceptados del Módulo 3 y asegurar dos facturas por hito (Anticipo 50% + Saldo 50%)
       if (Array.isArray(parsedM3) && parsedM3.length > 0) {
@@ -2078,15 +1981,13 @@ export default function GestionRentabilidadModule({
 
   // Escuchar eventos en vivo desde Módulo 4 (Contratos & Pagos) para sincronizar facturas por hito en 0ms
   useEffect(() => {
-    const handleSyncFromEvents = () => {
+    const handleSyncFromEvents = async () => {
       try {
-        let stored = [];
-        const raw = localStorage.getItem('goglite_facturas');
-        if (raw) stored = JSON.parse(raw);
-        if (Array.isArray(stored)) {
+        const cloudFin = await getAppStateCloud('finanzas_v1');
+        if (cloudFin && Array.isArray(cloudFin.facturas)) {
           setFinanzasState(prev => ({
             ...prev,
-            facturas: reconcileMilestoneInvoices(stored.map(normalizeFacturaItems), prev.configuracion)
+            facturas: reconcileMilestoneInvoices(cloudFin.facturas.map(normalizeFacturaItems), prev.configuracion)
           }));
         }
       } catch (e) {}
@@ -2210,12 +2111,8 @@ export default function GestionRentabilidadModule({
     setFinanzasState(prev => {
       const currentFacturas = [...(prev.facturas || [])];
 
-      // 1. Revisar presupuestos en Módulo 3
-      let listM3 = m3Presupuestos;
-      try {
-        const raw = localStorage.getItem('goglite_presupuestos');
-        if (raw) listM3 = JSON.parse(raw);
-      } catch {}
+      // 1. Revisar presupuestos de Firestore
+      const listM3 = m3Presupuestos || [];
 
       if (Array.isArray(listM3)) {
         listM3.forEach(prop => {
@@ -2453,55 +2350,53 @@ export default function GestionRentabilidadModule({
     } catch {}
   };
 
-  // Sincronizar factura con el proyecto del cliente en goglite_proyectos (Habilita el acceso en el portal del cliente)
-  const syncInvoiceWithClientProject = (invoice) => {
-    if (typeof window === 'undefined' || !invoice) return;
+  // Sincronizar factura con el proyecto del cliente en Cloud Firestore (Habilita el acceso en el portal del cliente)
+  const syncInvoiceWithClientProject = async (invoice) => {
+    if (!invoice) return;
     try {
-      const rawProjs = localStorage.getItem('goglite_proyectos');
-      if (rawProjs) {
-        const projs = JSON.parse(rawProjs);
-        if (Array.isArray(projs)) {
-          let modified = false;
-          const isAnticipoApproved = Number(invoice.montoCobrado) >= (Number(invoice.total) * 0.45);
-          const isLiquidated = Number(invoice.montoCobrado) >= Number(invoice.total);
-          const nowStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+      const projs = await getProyectosCloud();
+      if (Array.isArray(projs) && projs.length > 0) {
+        let modified = false;
+        const isAnticipoApproved = Number(invoice.montoCobrado) >= (Number(invoice.total) * 0.45);
+        const isLiquidated = Number(invoice.montoCobrado) >= Number(invoice.total);
+        const nowStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
 
-          const updatedProjs = projs.map(p => {
-            const match = 
-              (invoice.presupuestoId && (p.presupuestoId === invoice.presupuestoId || p.id === invoice.presupuestoId)) ||
-              (invoice.codigoPresupuesto && (p.presupuestoCodigo === invoice.codigoPresupuesto || p.codigo === invoice.codigoPresupuesto)) ||
-              (invoice.cliente?.empresa && p.cliente?.empresa && invoice.cliente.empresa.toLowerCase().trim() === p.cliente.empresa.toLowerCase().trim());
+        const updatedProjs = projs.map(p => {
+          const match = 
+            (invoice.presupuestoId && (p.presupuestoId === invoice.presupuestoId || p.id === invoice.presupuestoId)) ||
+            (invoice.codigoPresupuesto && (p.presupuestoCodigo === invoice.codigoPresupuesto || p.codigo === invoice.codigoPresupuesto)) ||
+            (invoice.cliente?.empresa && p.cliente?.empresa && invoice.cliente.empresa.toLowerCase().trim() === p.cliente.empresa.toLowerCase().trim());
 
-            if (match) {
-              modified = true;
-              const curPagos = p.pagos || {};
-              return {
-                ...p,
-                anticipoPagado: isAnticipoApproved || p.anticipoPagado,
-                saldoPagado: isLiquidated || p.saldoPagado,
+          if (match) {
+            modified = true;
+            const curPagos = p.pagos || {};
+            const updatedP = {
+              ...p,
+              anticipoPagado: isAnticipoApproved || p.anticipoPagado,
+              saldoPagado: isLiquidated || p.saldoPagado,
+              facturaNumero: invoice.numeroFactura,
+              facturaId: invoice.id,
+              pagos: {
+                ...curPagos,
+                anticipoMonto: Math.round(Number(invoice.total) * 0.5),
+                anticipoEstado: isAnticipoApproved ? 'confirmado' : (curPagos.anticipoEstado || 'pendiente'),
+                anticipoFecha: isAnticipoApproved ? (curPagos.anticipoFecha || nowStr) : curPagos.anticipoFecha,
+                saldoMonto: Math.max(0, Number(invoice.total) - Math.round(Number(invoice.total) * 0.5)),
+                saldoEstado: isLiquidated ? 'confirmado' : (curPagos.saldoEstado || 'pendiente'),
+                saldoFecha: isLiquidated ? (curPagos.saldoFecha || nowStr) : curPagos.saldoFecha,
+                facturaEmitida: true,
                 facturaNumero: invoice.numeroFactura,
-                facturaId: invoice.id,
-                pagos: {
-                  ...curPagos,
-                  anticipoMonto: Math.round(Number(invoice.total) * 0.5),
-                  anticipoEstado: isAnticipoApproved ? 'confirmado' : (curPagos.anticipoEstado || 'pendiente'),
-                  anticipoFecha: isAnticipoApproved ? (curPagos.anticipoFecha || nowStr) : curPagos.anticipoFecha,
-                  saldoMonto: Math.max(0, Number(invoice.total) - Math.round(Number(invoice.total) * 0.5)),
-                  saldoEstado: isLiquidated ? 'confirmado' : (curPagos.saldoEstado || 'pendiente'),
-                  saldoFecha: isLiquidated ? (curPagos.saldoFecha || nowStr) : curPagos.saldoFecha,
-                  facturaEmitida: true,
-                  facturaNumero: invoice.numeroFactura,
-                  facturaUrlHabilitada: true
-                }
-              };
-            }
-            return p;
-          });
-
-          if (modified) {
-            localStorage.setItem('goglite_proyectos', JSON.stringify(updatedProjs));
-            window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: updatedProjs } }));
+                facturaUrlHabilitada: true
+              }
+            };
+            saveProyectoCloud(updatedP).catch(() => {});
+            return updatedP;
           }
+          return p;
+        });
+
+        if (modified) {
+          window.dispatchEvent(new CustomEvent('goglite_proyectos_synced', { detail: { proyectos: updatedProjs } }));
         }
       }
 
@@ -2677,16 +2572,6 @@ export default function GestionRentabilidadModule({
       return { ...prev, facturas: nextFacturas };
     });
 
-    try {
-      let stored = [];
-      const raw = localStorage.getItem('goglite_facturas');
-      if (raw) stored = JSON.parse(raw);
-      const idx = stored.findIndex(f => f.id === toSave.id || f.numeroFactura === toSave.numeroFactura);
-      if (idx >= 0) stored[idx] = toSave;
-      else stored.push(toSave);
-      localStorage.setItem('goglite_facturas', JSON.stringify(stored));
-    } catch (e) {}
-
     syncInvoiceWithClientProject(toSave);
     showToast(`✓ Factura ${toSave.numeroFactura} guardada con cobrado de $${effectiveMonto.toLocaleString()} USD.`);
 
@@ -2809,7 +2694,7 @@ export default function GestionRentabilidadModule({
         const now = Date.now();
         const nowStr = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
 
-        const projs = getStoredProyectos();
+        const projs = await getProyectosCloud();
         const targetProj = projs.find(p =>
           (p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === newInvoiceForm.empresa.toLowerCase().trim()) ||
           (p.lead?.empresa && p.lead.empresa.toLowerCase().trim() === newInvoiceForm.empresa.toLowerCase().trim())
@@ -2845,10 +2730,7 @@ export default function GestionRentabilidadModule({
           };
 
           const updatedProj = { ...targetProj, portalConfig: updatedConfig };
-          const nextProjs = projs.map(p => p.id === targetProj.id ? updatedProj : p);
-          saveStoredProyectos(nextProjs);
-
-          if (targetProj.id) saveProyectoCloud(targetProj.id, updatedProj).catch(() => {});
+          if (targetProj.id) saveProyectoCloud(updatedProj).catch(() => {});
           const token = targetProj.portalToken || targetProj.presupuestoId || targetProj.id;
           if (token) savePortalCloud(token, { token, portalConfig: updatedConfig }).catch(() => {});
           window.dispatchEvent(new CustomEvent('goglite_proyectos_synced'));
@@ -3320,10 +3202,7 @@ export default function GestionRentabilidadModule({
     };
     setFinanzasState(cleanState);
     try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_FINANZAS, JSON.stringify(cleanState));
-        localStorage.removeItem(STORAGE_KEY_TIMER);
-      }
+      saveAppStateCloud('finanzas_v1', 'finanzas', cleanState).catch(() => {});
     } catch {}
     setActiveTimer(DEFAULT_TIMER_STATE);
     showToast('✓ Módulo 7 (Rentabilidad & P&L) limpio para tu prueba manual.');

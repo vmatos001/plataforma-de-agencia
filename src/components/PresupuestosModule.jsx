@@ -315,58 +315,31 @@ export default function PresupuestosModule({
     return Array.from(seen.values());
   };
 
-  // Sincronización dinámica en tiempo real con localStorage y Portal del Cliente
-  const syncPresupuestosFromStorage = () => {
-    try {
-      if (typeof window !== 'undefined') {
-        const cached = localStorage.getItem('goglite_presupuestos');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const clean = deduplicatePresupuestos(parsed);
-            if (JSON.stringify(clean) !== JSON.stringify(parsed)) {
-              localStorage.setItem('goglite_presupuestos', JSON.stringify(clean));
-            }
-            setPresupuestos(clean);
-            setActivePresupuesto(prev => {
-              if (!prev) return prev;
-              const matched = clean.find(p =>
-                (prev.id && p.id === prev.id) ||
-                (prev.codigo && p.codigo === prev.codigo) ||
-                (prev.portalToken && p.portalToken === prev.portalToken) ||
-                (prev.cliente?.empresa && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === prev.cliente.empresa.toLowerCase().trim())
-              );
-              if (matched && (matched.estado !== prev.estado || matched.abiertoEn !== prev.abiertoEn)) {
-                return { ...prev, estado: matched.estado, abiertoEn: matched.abiertoEn, vecesAbierto: matched.vecesAbierto };
-              }
-              return prev;
-            });
-          }
-        }
-      }
-    } catch (e) {}
-  };
-
   useEffect(() => {
-    syncPresupuestosFromStorage();
     fetchPresupuestos();
     fetchPlantillas();
 
-    // Suscripción en tiempo real a Firestore Cloud
+    // Suscripción en tiempo real a Firestore Cloud (100% Cloud-First)
     const unsubscribeCloud = subscribePresupuestosCloud((cloudProps) => {
-      if (Array.isArray(cloudProps) && cloudProps.length > 0) {
-        setPresupuestos(prev => {
-          const merged = deduplicatePresupuestos([...prev, ...cloudProps]);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('goglite_presupuestos', JSON.stringify(merged));
+      if (Array.isArray(cloudProps)) {
+        const clean = deduplicatePresupuestos(cloudProps);
+        setPresupuestos(clean);
+        setActivePresupuesto(prev => {
+          if (!prev) return prev;
+          const matched = clean.find(p =>
+            (prev.id && p.id === prev.id) ||
+            (prev.codigo && p.codigo === prev.codigo) ||
+            (prev.portalToken && p.portalToken === prev.portalToken)
+          );
+          if (matched && (matched.estado !== prev.estado || matched.abiertoEn !== prev.abiertoEn || matched.vecesAbierto !== prev.vecesAbierto)) {
+            return { ...prev, estado: matched.estado, abiertoEn: matched.abiertoEn, vecesAbierto: matched.vecesAbierto };
           }
-          return merged;
+          return prev;
         });
       }
     });
 
     const handleRealtimeUpdate = () => {
-      syncPresupuestosFromStorage();
       fetchPresupuestos();
     };
 
@@ -376,23 +349,15 @@ export default function PresupuestosModule({
       }
     };
 
-    window.addEventListener('storage', handleRealtimeUpdate);
     window.addEventListener('focus', handleRealtimeUpdate);
     window.addEventListener('goglite_presupuestos_updated', handleRealtimeUpdate);
     document.addEventListener('visibilitychange', handleVisibility);
 
-    // Polling ligero para detectar aperturas del enlace por parte del cliente en tiempo real
-    const pollInterval = setInterval(() => {
-      syncPresupuestosFromStorage();
-    }, 2500);
-
     return () => {
       unsubscribeCloud();
-      window.removeEventListener('storage', handleRealtimeUpdate);
       window.removeEventListener('focus', handleRealtimeUpdate);
       window.removeEventListener('goglite_presupuestos_updated', handleRealtimeUpdate);
       document.removeEventListener('visibilitychange', handleVisibility);
-      clearInterval(pollInterval);
     };
   }, []);
 
@@ -403,13 +368,7 @@ export default function PresupuestosModule({
       const targetTelefono = (leadToConvert.telefono || '').replace(/\D/g, '');
 
       // Verificar en la lista actual de presupuestos si este cliente ya tiene propuesta
-      let currentList = presupuestos;
-      if (typeof window !== 'undefined') {
-        try {
-          const raw = localStorage.getItem('goglite_presupuestos');
-          if (raw) currentList = JSON.parse(raw);
-        } catch (e) {}
-      }
+      const currentList = presupuestos;
 
       const existingProp = currentList.find(p => {
         const pEmpresa = (p.cliente?.empresa || '').toLowerCase().trim();
@@ -491,18 +450,7 @@ export default function PresupuestosModule({
         // Backend offline
       }
 
-      // 3. Local storage caché
-      const local = [];
-      try {
-        const cached = localStorage.getItem('goglite_presupuestos');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed)) local.push(...parsed);
-        }
-      } catch (e) {}
-
       const combined = [
-        ...local,
         ...(Array.isArray(apiData) ? apiData : []),
         ...(Array.isArray(cloudProps) ? cloudProps : [])
       ];
@@ -510,16 +458,8 @@ export default function PresupuestosModule({
       if (combined.length > 0) {
         const clean = deduplicatePresupuestos(combined);
         setPresupuestos(clean);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('goglite_presupuestos', JSON.stringify(clean));
-        }
-        // Asegurar que las propuestas locales estén respaldadas en Firestore Cloud
-        const cloudIds = new Set((cloudProps || []).map(cp => cp?.id));
-        clean.forEach(p => {
-          if (p?.id && !cloudIds.has(p.id)) {
-            savePresupuestoCloud(p).catch(() => {});
-          }
-        });
+      } else if (Array.isArray(cloudProps)) {
+        setPresupuestos(deduplicatePresupuestos(cloudProps));
       }
     } catch (err) {
       console.warn('Error al sincronizar presupuestos:', err);
@@ -634,7 +574,7 @@ export default function PresupuestosModule({
       const url = exists ? getBackendEndpoint(`/api/presupuestos/${targetId}`) : getBackendEndpoint('/api/presupuestos');
       const method = exists ? 'PATCH' : 'POST';
 
-      // 1. Persistir de inmediato en el estado local y en localStorage deduplicando
+      // 1. Persistir de inmediato en el estado local deduplicando
       setPresupuestos(prev => {
         let updated;
         if (exists) {
@@ -642,11 +582,7 @@ export default function PresupuestosModule({
         } else {
           updated = [propToSave, ...prev];
         }
-        updated = deduplicatePresupuestos(updated);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('goglite_presupuestos', JSON.stringify(updated));
-        }
-        return updated;
+        return deduplicatePresupuestos(updated);
       });
 
       // 2. Persistir en Firestore Cloud (Multiplataforma PC / Móvil)
@@ -753,56 +689,8 @@ export default function PresupuestosModule({
             p.codigo !== id &&
             !isExcludedPresupuesto(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p._firestoreDocId)
         );
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('goglite_presupuestos', JSON.stringify(updated));
-        }
         return updated;
       });
-
-      // Desvincular únicamente la referencia de esta propuesta en el Lead del CRM (sin eliminar el Lead)
-      if (typeof window !== 'undefined') {
-        try {
-          const rawCrm = localStorage.getItem('goglite_crm_leads_v4_prod');
-          if (rawCrm) {
-            const parsedCrm = JSON.parse(rawCrm);
-            if (Array.isArray(parsedCrm)) {
-              let crmChanged = false;
-              const updatedCrm = parsedCrm.map(cl => {
-                if (!cl) return cl;
-                const matchesProp =
-                  (cl.presupuestoId && (cl.presupuestoId === id || cl.presupuestoId === targetProp?.id)) ||
-                  (cl.presupuestoCodigo && (cl.presupuestoCodigo === id || cl.presupuestoCodigo === targetProp?.codigo));
-                if (matchesProp) {
-                  crmChanged = true;
-                  const unlinkedLead = {
-                    ...cl,
-                    presupuestoId: null,
-                    presupuestoCodigo: null,
-                    presupuestoMonto: null,
-                    presupuestoEstado: null,
-                    portalConfig: cl.portalConfig
-                      ? {
-                          ...cl.portalConfig,
-                          presupuestoId: null,
-                          estadoPropuesta: null,
-                          fase1Aprobada: false
-                        }
-                      : cl.portalConfig
-                  };
-                  saveCrmLeadCloud(unlinkedLead).catch(() => {});
-                  return unlinkedLead;
-                }
-                return cl;
-              });
-              if (crmChanged) {
-                saveStoredCrmLeads(updatedCrm);
-              }
-            }
-          }
-        } catch (unlinkErr) {
-          console.warn('[Presupuestos] Error desvinculando propuesta del lead:', unlinkErr);
-        }
-      }
 
       if (activePresupuesto?.id === id || activePresupuesto?.codigo === id) {
         setViewMode('list');

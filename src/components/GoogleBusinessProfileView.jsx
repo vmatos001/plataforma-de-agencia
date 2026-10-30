@@ -192,27 +192,7 @@ export default function GoogleBusinessProfileView({ currentSite }) {
   const getInitialProfileData = (site) => {
     const slug = site?.slug || 'goglite';
     const isTuris = slug.includes('turisra') || (site?.nombre || '').toLowerCase().includes('turisra');
-    try {
-      const saved = localStorage.getItem(`goglite_gbp_profile_${slug}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Si es TurisRan pero tenía métricas en 0 del placeholder anterior, actualizar a los datos reales de su ficha
-        if (isTuris && (!parsed?.metricas?.interaccionesTotales || parsed.metricas.interaccionesTotales === 0)) {
-          return {
-            nombre: REAL_TURISRAN_PROFILE_DATA.nombre,
-            categoria: REAL_TURISRAN_PROFILE_DATA.categoria,
-            direccion: REAL_TURISRAN_PROFILE_DATA.direccion,
-            telefono: REAL_TURISRAN_PROFILE_DATA.telefono,
-            calificacion: REAL_TURISRAN_PROFILE_DATA.calificacion,
-            periodo: REAL_TURISRAN_PROFILE_DATA.periodo,
-            mapsUrl: REAL_TURISRAN_PROFILE_DATA.mapsUrl,
-            reviewUrl: REAL_TURISRAN_PROFILE_DATA.reviewUrl,
-            metricas: { ...REAL_TURISRAN_PROFILE_DATA.metricas }
-          };
-        }
-        return parsed;
-      }
-    } catch (e) {}
+    if (site?.gbpProfile) return site.gbpProfile;
     if (site?.gbpData) return site.gbpData;
     if (slug === 'goglite') {
       return {
@@ -261,13 +241,6 @@ export default function GoogleBusinessProfileView({ currentSite }) {
   const getInitialReviews = (site) => {
     const slug = site?.slug || 'goglite';
     const isTuris = slug.includes('turisra') || (site?.nombre || '').toLowerCase().includes('turisra');
-    try {
-      const saved = localStorage.getItem(`goglite_gbp_reviews_${slug}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {}
     if (Array.isArray(site?.reseñasCliente) && site.reseñasCliente.length > 0) return site.reseñasCliente;
     if (slug === 'goglite') return REAL_GOGLITE_PROFILE_DATA.resenas;
     if (isTuris) return REAL_TURISRAN_PROFILE_DATA.resenas;
@@ -284,10 +257,6 @@ export default function GoogleBusinessProfileView({ currentSite }) {
     setProfileData(nextProf);
     setReviews(nextRevs);
     setActiveReplyReviewId(null);
-    try {
-      localStorage.setItem(`goglite_gbp_profile_${currentSite.slug}`, JSON.stringify(nextProf));
-      localStorage.setItem(`goglite_gbp_reviews_${currentSite.slug}`, JSON.stringify(nextRevs));
-    } catch (e) {}
     syncGbpToClientPortalCloud(nextProf, nextRevs);
   }, [currentSite.slug]);
 
@@ -359,12 +328,6 @@ export default function GoogleBusinessProfileView({ currentSite }) {
     }
   };
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(`goglite_gbp_reviews_${currentSite.slug}`, JSON.stringify(reviews));
-    } catch (e) {}
-  }, [reviews, currentSite.slug]);
-
   const handleSaveInjectedProfile = (e) => {
     e.preventDefault();
     const updated = {
@@ -380,9 +343,6 @@ export default function GoogleBusinessProfileView({ currentSite }) {
       }
     };
     setProfileData(updated);
-    try {
-      localStorage.setItem(`goglite_gbp_profile_${currentSite.slug}`, JSON.stringify(updated));
-    } catch (err) {}
     syncGbpToClientPortalCloud(updated, reviews);
     setShowInjectProfileModal(false);
     setLastSyncTime('Sincronizado con el Portal del Cliente');
@@ -493,10 +453,6 @@ export default function GoogleBusinessProfileView({ currentSite }) {
 
     setProfileData(nextProf);
     setReviews(nextRevs);
-    try {
-      localStorage.setItem(`goglite_gbp_profile_${currentSite.slug}`, JSON.stringify(nextProf));
-      localStorage.setItem(`goglite_gbp_reviews_${currentSite.slug}`, JSON.stringify(nextRevs));
-    } catch (e) {}
     await syncGbpToClientPortalCloud(nextProf, nextRevs);
     setLastSyncTime(`Sincronizado (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}) vía ${googleAccountEmail}`);
     setSyncingApi(false);

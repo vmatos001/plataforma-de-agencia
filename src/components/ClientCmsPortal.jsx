@@ -41,7 +41,8 @@ import {
   subscribePortalCloud,
   getCmsSiteCloud,
   saveCmsSiteCloud,
-  subscribeCmsSiteCloud
+  subscribeCmsSiteCloud,
+  getProyectosCloud
 } from '../services/firestoreSyncService';
 
 const AGENCY_BLOCKED_EMAILS = ['sitesgoglite@gmail.com', 'info@goglite.com'];
@@ -351,43 +352,26 @@ export default function ClientCmsPortal({ token }) {
         let localProj = null;
         let localSite = null;
 
-        if (typeof window !== 'undefined') {
-          try {
-            const projs = JSON.parse(localStorage.getItem('goglite_proyectos') || '[]');
-            localProj = projs.find(
-              p =>
-                p.portalToken === token ||
-                p.cmsSlug === token ||
-                p.id === token ||
-                (p.cliente?.empresa || '').toLowerCase().replace(/[^a-z0-9]+/g, '-') === token
-            );
-          } catch (e) {}
+        try {
+          const projs = await getProyectosCloud();
+          localProj = projs.find(
+            p =>
+              p.portalToken === token ||
+              p.cmsSlug === token ||
+              p.id === token ||
+              (p.cliente?.empresa || '').toLowerCase().replace(/[^a-z0-9]+/g, '-') === token
+          );
+        } catch (e) {}
 
-          try {
-            const sites = JSON.parse(localStorage.getItem('goglite_cms_sites') || '[]');
-            localSite = sites.find(s => s.slug === token || s.id === token);
-          } catch (e) {}
-
-          if (!pData) {
-            const rawLocal = localStorage.getItem('goglite_portal_' + token);
-            if (rawLocal) {
-              try {
-                pData = { token, portalConfig: JSON.parse(rawLocal) };
-              } catch (e) {}
-            }
-          }
-        }
-
-        if (localProj || localSite) {
+        if (localProj) {
           pData = {
             ...(pData || {}),
             token,
-            cmsSlug: localSite?.slug || localProj?.cmsSlug || token,
-            dominio: localSite?.dominio || localProj?.dominio || pData?.portalConfig?.dominio,
-            cliente: localProj?.cliente || localSite?.cliente || pData?.cliente,
+            cmsSlug: localProj?.cmsSlug || token,
+            dominio: localProj?.dominio || pData?.portalConfig?.dominio,
+            cliente: localProj?.cliente || pData?.cliente,
             proyecto: localProj || pData?.proyecto,
             portalConfig: {
-              ...(localSite?.portalConfig || {}),
               ...(localProj?.portalConfig || {}),
               ...(pData?.portalConfig || {})
             }
@@ -459,43 +443,15 @@ export default function ClientCmsPortal({ token }) {
           const isTuris = slug.includes('turisra');
           const baseline = isGog ? GOGLITE_BASELINE : isTuris ? TURISRAN_BASELINE : null;
 
-          let localGbpReviews = null;
-          let localGbpProfile = null;
-          let localSiteKitMetrics = null;
-          let localSpeed = null;
-
-          if (typeof window !== 'undefined') {
-            try {
-              const r = localStorage.getItem(`goglite_gbp_reviews_${slug}`);
-              if (r) localGbpReviews = JSON.parse(r);
-            } catch (e) {}
-            try {
-              const p = localStorage.getItem(`goglite_gbp_profile_${slug}`);
-              if (p) localGbpProfile = JSON.parse(p);
-            } catch (e) {}
-            try {
-              const m = localStorage.getItem(`goglite_sitekit_metrics_${slug}`);
-              if (m) localSiteKitMetrics = JSON.parse(m);
-            } catch (e) {}
-            try {
-              const sp = localStorage.getItem(`goglite_pagespeed_${slug}`);
-              if (sp) localSpeed = JSON.parse(sp);
-            } catch (e) {}
-          }
-
           // Resolver GBP Profile asegurando que nunca aparezca en 0 si tenemos línea base
           const resolvedGbp = (existingCms?.gbpProfile?.metricas?.interaccionesTotales > 0)
             ? existingCms.gbpProfile
-            : (localGbpProfile?.metricas?.interaccionesTotales > 0)
-              ? localGbpProfile
-              : (baseline?.gbpProfile || existingCms?.gbpProfile || null);
+            : (baseline?.gbpProfile || existingCms?.gbpProfile || null);
 
           // Resolver Site Kit asegurando que nunca aparezca en 0 si tenemos línea base
           const resolvedSiteKit = (existingCms?.siteKitMetrics?.clicsBusqueda > 0 || existingCms?.siteKitMetrics?.usuariosUnicos > 0)
             ? existingCms.siteKitMetrics
-            : (localSiteKitMetrics?.clicsBusqueda > 0 || localSiteKitMetrics?.usuariosUnicos > 0)
-              ? localSiteKitMetrics
-              : (baseline?.siteKitMetrics || existingCms?.siteKitMetrics || null);
+            : (baseline?.siteKitMetrics || existingCms?.siteKitMetrics || null);
 
           // Resolver Reseñas con la mayor fidelidad posible
           const resolvedReviews = (Array.isArray(existingCms?.reseñasCliente) && existingCms.reseñasCliente.length > 0)
@@ -803,13 +759,6 @@ export default function ClientCmsPortal({ token }) {
       ultimaSincronizacionOAuthCliente: new Date().toISOString()
     };
     setCmsSite(updatedCms);
-    try {
-      localStorage.setItem(`goglite_sitekit_metrics_${slug}`, JSON.stringify(nextSiteKit));
-      localStorage.setItem(`goglite_gbp_profile_${slug}`, JSON.stringify(nextGbpProfile));
-      if (nextGbpProfile.reseñasCliente) {
-        localStorage.setItem(`goglite_gbp_reviews_${slug}`, JSON.stringify(nextGbpProfile.reseñasCliente));
-      }
-    } catch (e) {}
     await saveCmsSiteCloud(slug, updatedCms);
   };
 
@@ -1036,9 +985,6 @@ INSTRUCCIONES CLAVE:
 
     setCmsSite(updatedSite);
     setReplyDrafts(prev => ({ ...prev, [reviewId]: '' }));
-    try {
-      localStorage.setItem(`goglite_gbp_reviews_${slug}`, JSON.stringify(updatedReviews));
-    } catch (e) {}
     await saveCmsSiteCloud(slug, updatedSite);
     showToast('✓ Respuesta oficial enviada a Google Maps con éxito.');
   };
