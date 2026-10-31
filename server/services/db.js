@@ -25,13 +25,13 @@ export const pool = connectionString
  */
 export async function initDb() {
   if (!pool) {
-    console.log('[DB] Modo local activo (sin DATABASE_URL).');
+    console.error('[DB] Modo local activo (sin DATABASE_URL).');
     return false;
   }
 
   try {
     const client = await pool.connect();
-    console.log('[DB] Conexión establecida con Neon PostgreSQL (AWS US-East).');
+    console.error('[DB] Conexión establecida con Neon PostgreSQL (AWS US-East).');
 
     // Tabla Módulo 1: Leads
     await client.query(`
@@ -167,7 +167,7 @@ export async function initDb() {
     `);
 
     client.release();
-    console.log('[DB] Esquema completo de tablas (leads, crm, presupuestos, proyectos, wireframes, seo, cms, finanzas) verificado en Neon.');
+    console.error('[DB] Esquema completo de tablas (leads, crm, presupuestos, proyectos, wireframes, seo, cms, finanzas) verificado en Neon.');
     return true;
   } catch (err) {
     console.error('[DB] Error conectando o verificando esquema en Neon:', err.message);

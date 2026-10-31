@@ -47,7 +47,7 @@ export async function syncLeadToCloud(lead) {
         updatedAt: new Date().toISOString()
       }, { merge: true });
     }
-    console.log(`[CloudSync] Lead '${cleanLead.empresa || cleanLead.id}' sincronizado con Cloud Firestore.`);
+    console.error(`[CloudSync] Lead '${cleanLead.empresa || cleanLead.id}' sincronizado con Cloud Firestore.`);
   } catch (err) {
     console.warn(`[CloudSync] Advertencia Firestore lead '${cleanLead.id}':`, err.message);
   }
@@ -99,7 +99,7 @@ export async function syncLeadToCloud(lead) {
           JSON.stringify(cleanLead.whatsappData || {}),
           JSON.stringify(cleanLead.portalConfig || {})
         ]);
-        console.log(`[CloudSync] Lead '${cleanLead.empresa || cleanLead.id}' sincronizado con Neon PostgreSQL.`);
+        console.error(`[CloudSync] Lead '${cleanLead.empresa || cleanLead.id}' sincronizado con Neon PostgreSQL.`);
       } finally {
         client.release();
       }
@@ -121,7 +121,7 @@ export async function deleteLeadFromCloud(leadId) {
   try {
     await ensureAuth();
     await deleteDoc(doc(db, 'crm_leads', idStr));
-    console.log(`[CloudSync] Lead '${idStr}' eliminado de Cloud Firestore.`);
+    console.error(`[CloudSync] Lead '${idStr}' eliminado de Cloud Firestore.`);
   } catch (err) {
     console.warn(`[CloudSync] Advertencia eliminando Firestore lead '${idStr}':`, err.message);
   }
@@ -131,7 +131,7 @@ export async function deleteLeadFromCloud(leadId) {
       const client = await pool.connect();
       try {
         await client.query('DELETE FROM crm_leads WHERE id = $1', [idStr]);
-        console.log(`[CloudSync] Lead '${idStr}' eliminado de Neon PostgreSQL.`);
+        console.error(`[CloudSync] Lead '${idStr}' eliminado de Neon PostgreSQL.`);
       } finally {
         client.release();
       }
@@ -166,7 +166,7 @@ export async function syncPresupuestoToCloud(presupuesto) {
         updatedAt: new Date().toISOString()
       }, { merge: true });
     }
-    console.log(`[CloudSync] Presupuesto '${clean.codigo || clean.id}' sincronizado con Cloud Firestore.`);
+    console.error(`[CloudSync] Presupuesto '${clean.codigo || clean.id}' sincronizado con Cloud Firestore.`);
   } catch (err) {
     console.warn(`[CloudSync] Advertencia Firestore presupuesto '${clean.id}':`, err.message);
   }
@@ -197,7 +197,7 @@ export async function syncProyectoToCloud(proyecto) {
         updatedAt: new Date().toISOString()
       }, { merge: true });
     }
-    console.log(`[CloudSync] Proyecto '${clean.codigo || clean.id}' sincronizado con Cloud Firestore.`);
+    console.error(`[CloudSync] Proyecto '${clean.codigo || clean.id}' sincronizado con Cloud Firestore.`);
   } catch (err) {
     console.warn(`[CloudSync] Advertencia Firestore proyecto '${clean.id}':`, err.message);
   }

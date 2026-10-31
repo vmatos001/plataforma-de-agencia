@@ -38,7 +38,15 @@ import {
 import WireframesStoryBrandModule from './WireframesStoryBrandModule';
 import apiClient from '../services/apiClient';
 import { syncAllProyectosWithEvents } from '../services/projectMilestoneSync';
-import { getAppStateCloud, saveAppStateCloud, getProyectosCloud, saveProyectoCloud } from '../services/firestoreSyncService';
+import { buildProyectoFromPresupuesto } from '../services/contractGenerator';
+import {
+  getAppStateCloud,
+  saveAppStateCloud,
+  getProyectosCloud,
+  saveProyectoCloud,
+  getPresupuestosCloud,
+  isExcludedProyecto
+} from '../services/firestoreSyncService';
 
 // Generador dinámico de PRD Técnico adaptado al proyecto específico (Playbook Maestro 2026)
 export function generatePrdForProyecto(proyecto, defaultCountry = 'DO') {
@@ -432,7 +440,13 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
       fetchProyectos();
     };
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    window.addEventListener('goglite_proyectos_synced', handleStorageChange);
+    window.addEventListener('goglite_presupuestos_updated', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('goglite_proyectos_synced', handleStorageChange);
+      window.removeEventListener('goglite_presupuestos_updated', handleStorageChange);
+    };
   }, []);
 
   // Cargar tareas y bóveda específicas cuando cambia el proyecto seleccionado
@@ -560,39 +574,131 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   }, [activeTimerTaskId]);
 
   const fetchProyectos = async () => {
-    let list = await getProyectosCloud();
     try {
-      const res = await fetch('/api/proyectos');
-      const cType = res.headers.get('content-type') || '';
-      if (res.ok && cType.includes('application/json')) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const map = new Map();
-          [...list, ...data].forEach(p => {
-            if (p?.id && !map.has(p.id)) map.set(p.id, p);
-          });
-          list = Array.from(map.values());
+      const [cloudProjs, cloudProps] = await Promise.all([
+        getProyectosCloud().catch(() => []),
+        getPresupuestosCloud().catch(() => [])
+      ]);
+
+      let list = Array.isArray(cloudProjs) ? [...cloudProjs] : [];
+
+      // 1. Reconciliar proyectos existentes que carezcan de cliente completo con presupuestos
+      list = list.map(p => {
+        if (!p.cliente || !p.cliente.empresa) {
+          const matchedProp = (cloudProps || []).find(pr =>
+            pr.id === p.presupuestoId ||
+            pr.codigo === p.presupuestoCodigo ||
+            pr.leadId === p.leadId ||
+            pr.leadId === p.id ||
+            pr.id === p.id ||
+            (p.nombre && pr.cliente?.empresa && p.nombre.toLowerCase().includes(pr.cliente.empresa.toLowerCase()))
+          );
+          if (matchedProp && matchedProp.cliente) {
+            return {
+              ...p,
+              codigo: p.codigo || matchedProp.codigo || 'P-2026',
+              presupuestoId: p.presupuestoId || matchedProp.id,
+              presupuestoCodigo: p.presupuestoCodigo || matchedProp.codigo,
+              portalToken: p.portalToken || matchedProp.portalToken,
+              pais: p.pais || matchedProp.pais || 'DO',
+              cliente: {
+                empresa: matchedProp.cliente.empresa,
+                nombre: matchedProp.cliente.nombre,
+                telefono: matchedProp.cliente.telefono,
+                email: matchedProp.cliente.email,
+                ubicacion: matchedProp.cliente.ubicacion,
+                actividad: matchedProp.cliente.actividad
+              },
+              contrato: {
+                ...(p.contrato || {}),
+                totalInversion: p.contrato?.totalInversion || Number(matchedProp.inversion?.precioTotal) || 300
+              }
+            };
+          }
         }
+        return p;
+      });
+
+      // 2. Incorporar propuestas/presupuestos aprobados que aún no estén en la lista
+      if (Array.isArray(cloudProps) && cloudProps.length > 0) {
+        cloudProps.forEach(prop => {
+          if (!prop || !prop.id) return;
+          const targetEmp = (prop.cliente?.empresa || '').toLowerCase().trim();
+          const exists = list.some(p =>
+            p.id === prop.id ||
+            p.presupuestoId === prop.id ||
+            p.codigo === prop.codigo ||
+            p.presupuestoCodigo === prop.codigo ||
+            (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
+          );
+          if (!exists) {
+            const built = buildProyectoFromPresupuesto(prop, list);
+            if (built && !isExcludedProyecto(built.cliente?.empresa, built.id, built.codigo, built.presupuestoId, built.presupuestoCodigo)) {
+              list.push(built);
+            }
+          }
+        });
       }
-    } catch (err) {
-      console.warn('Usando proyectos cloud:', err);
-    } finally {
+
+      // 3. Consultar API local si responde
+      try {
+        const res = await fetch('/api/proyectos');
+        const cType = res.headers.get('content-type') || '';
+        if (res.ok && cType.includes('application/json')) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            const map = new Map();
+            [...list, ...data].forEach(p => {
+              if (p?.id && !map.has(p.id)) map.set(p.id, p);
+            });
+            list = Array.from(map.values());
+          }
+        }
+      } catch (err) {
+        console.warn('Usando proyectos cloud:', err);
+      }
+
+      // Filtrar proyectos excluidos
+      list = list.filter(p =>
+        p && !isExcludedProyecto(p.cliente?.empresa || p.cliente?.nombre, p.id, p.codigo, p.presupuestoId, p.presupuestoCodigo, p._firestoreDocId)
+      );
+
       setProyectos(list);
       if (list.length > 0) {
-        setSelectedProyectoId(prev => prev || list[0].id);
+        setSelectedProyectoId(prev => {
+          if (prev && list.some(p => p.id === prev)) return prev;
+          // Si hay proyectos para el país seleccionado, preferirlos
+          const matchCountry = list.find(p => p.pais === selectedCountry);
+          return matchCountry ? matchCountry.id : list[0].id;
+        });
       }
+    } catch (err) {
+      console.warn('Error fetching proyectos in PRD:', err);
+    } finally {
       setLoading(false);
     }
   };
 
-  const proyectoActivo = proyectos.find(p => p.id === selectedProyectoId) || {
+  const rawProyectoActivo = proyectos.find(p => p.id === selectedProyectoId) || proyectos[0] || null;
+  const proyectoActivo = rawProyectoActivo ? {
+    ...rawProyectoActivo,
+    codigo: rawProyectoActivo.codigo || rawProyectoActivo.presupuestoCodigo || 'PRD-ACTIVO',
+    cliente: {
+      empresa: rawProyectoActivo.cliente?.empresa || rawProyectoActivo.nombre?.split(' - ')?.[0] || (selectedCountry === 'DO' ? 'L&M Tours Punta Cana' : 'Grúas Andrea San Salvador'),
+      nombre: rawProyectoActivo.cliente?.nombre || 'Representante Autorizado',
+      actividad: rawProyectoActivo.cliente?.actividad || (selectedCountry === 'DO' ? 'Transporte Turístico & Excursiones' : 'Grúas Plataforma y Auxilio Vial 24 Horas'),
+      telefono: rawProyectoActivo.cliente?.telefono || (selectedCountry === 'DO' ? '+1 (829) 528-4713' : '+503 7756-9828'),
+      ubicacion: rawProyectoActivo.cliente?.ubicacion || (selectedCountry === 'DO' ? 'Punta Cana, República Dominicana' : 'San Salvador, El Salvador')
+    }
+  } : {
     id: 'demo-proj-1',
     codigo: 'PRD-2026-001',
     cliente: {
       empresa: selectedCountry === 'DO' ? 'L&M Tours Punta Cana' : 'Grúas Andrea San Salvador',
       nombre: 'Víctor Matos',
       actividad: selectedCountry === 'DO' ? 'Transporte Turístico & Excursiones' : 'Grúas Plataforma y Auxilio Vial 24 Horas',
-      telefono: selectedCountry === 'DO' ? '+1 (829) 528-4713' : '+503 7756-9828'
+      telefono: selectedCountry === 'DO' ? '+1 (829) 528-4713' : '+503 7756-9828',
+      ubicacion: selectedCountry === 'DO' ? 'Punta Cana, República Dominicana' : 'San Salvador, El Salvador'
     }
   };
 
@@ -826,7 +932,7 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
             {proyectos.length > 0 ? (
               proyectos.map(p => (
                 <option key={p.id} value={p.id} className="bg-slate-900 text-slate-200">
-                  {p.codigo} · {p.cliente?.empresa || 'Cliente'}
+                  {p.codigo || p.presupuestoCodigo || 'PROY'} · {p.cliente?.empresa || p.nombre || 'Cliente'}
                 </option>
               ))
             ) : (
