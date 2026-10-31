@@ -879,6 +879,16 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   // Synchronize state when data is loaded
   useEffect(() => {
+    if (data) {
+      const defaultName = data.portalConfig?.nombreFirmante || data.presupuesto?.cliente?.nombre || data.lead?.contacto || '';
+      if (defaultName) {
+        setSignerName(prev => (prev && prev.trim() ? prev : defaultName));
+      }
+      const defaultDoc = data.portalConfig?.documentoFirmante || data.lead?.documento || '';
+      if (defaultDoc) {
+        setSignerDoc(prev => (prev && prev.trim() ? prev : defaultDoc));
+      }
+    }
     if (data?.portalConfig) {
       const cfg = data.portalConfig;
       if (cfg.nombreFirmante) setSignerName(cfg.nombreFirmante);
@@ -1742,18 +1752,36 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
 
   const handleFirmarContrato = async (e) => {
     e?.preventDefault?.();
-    if (!signerName.trim()) {
+    const effectiveSignerName = (signerName || '').trim() || clientContacto || lead?.contacto || presupuesto?.cliente?.nombre || data?.portalConfig?.nombreFirmante || '';
+    if (!effectiveSignerName) {
+      const nameInput = document.getElementById('input-nombre-firmante');
+      if (nameInput) {
+        nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        nameInput.focus();
+      }
       alert('Por favor indica el nombre completo del firmante autorizado.');
       return;
     }
+    if (!signerName.trim() && effectiveSignerName) {
+      setSignerName(effectiveSignerName);
+    }
     if (!hasSignature && !data.portalConfig?.firmaDigital) {
+      const signCanvas = document.getElementById('canvas-firma-digital') || canvasRef.current;
+      if (signCanvas) {
+        signCanvas.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       alert('Por favor realiza tu firma digital manuscrita en el recuadro interactivo.');
       return;
     }
     const finalReceiptImage = advanceReceiptImage || data.portalConfig?.comprobanteAnticipoImagen || data.proyecto?.pagos?.anticipoComprobanteImagen || '';
     const finalReceiptFileName = advanceReceiptFileName || data.portalConfig?.comprobanteAnticipoNombre || data.proyecto?.pagos?.anticipoComprobanteNombre || '';
     if (!finalReceiptImage) {
-      alert('Por favor sube la captura o imagen del comprobante de pago generado por tu aplicación bancaria.');
+      const receiptSection = document.getElementById('seccion-comprobante-anticipo') || advanceReceiptInputRef.current;
+      if (receiptSection) {
+        receiptSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      showNotification('Por favor adjunta la captura o foto del comprobante de transferencia bancaria (50%) en la sección indicada', 'warning');
+      alert('Por favor sube la captura o imagen del comprobante de transferencia bancaria (50%) en la sección correspondiente antes de confirmar.');
       return;
     }
 
@@ -1790,7 +1818,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               ...(p.contrato || {}),
               firmaCliente: {
                 firmado: true,
-                nombreFirmante: signerName.trim(),
+                nombreFirmante: effectiveSignerName,
                 identificacion: signerDoc.trim() || 'Identificación Oficial Registrada',
                 timestampUtc: new Date().toISOString(),
                 ipAddress: 'Portal Seguro SSL 256-bit',
@@ -1836,7 +1864,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
               ...(baseProj.contrato || {}),
               firmaCliente: {
                 firmado: true,
-                nombreFirmante: signerName.trim(),
+                nombreFirmante: effectiveSignerName,
                 identificacion: signerDoc.trim() || 'Identificación Oficial Registrada',
                 timestampUtc: new Date().toISOString(),
                 ipAddress: 'Portal Seguro SSL 256-bit',
@@ -1890,7 +1918,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
       fase2Firmada: true,
       fechaFirmaContrato: fechaFirma,
       firmaDigital: signatureUrl,
-      nombreFirmante: signerName.trim(),
+      nombreFirmante: effectiveSignerName,
       documentoFirmante: signerDoc.trim() || 'Identificación Oficial Registrada',
       comprobanteAnticipo: textoComprobante,
       comprobanteAnticipoImagen: finalReceiptImage,
@@ -3551,6 +3579,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     ) : (
                       <div className="border-2 border-dashed border-slate-300 rounded-xl overflow-hidden bg-white relative">
                         <canvas
+                          id="canvas-firma-digital"
                           ref={canvasRef}
                           width={520}
                           height={140}
@@ -3575,11 +3604,12 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                       <div>
                         <label className="text-[11px] text-slate-400 font-mono block mb-1">Nombre Completo del Firmante</label>
                         <input
+                          id="input-nombre-firmante"
                           type="text"
-                          value={signerName}
+                          value={signerName || clientContacto || ''}
                           onChange={(e) => setSignerName(e.target.value)}
                           disabled={portalConfig?.fase2Firmada}
-                          placeholder={lead.contacto}
+                          placeholder={clientContacto || lead.contacto}
                           className="w-full bg-[#141b2b] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 disabled:opacity-60"
                         />
                       </div>
@@ -3708,7 +3738,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   </div>
 
                   {/* Proof of Deposit Input (Number + Screenshot Upload) */}
-                  <div className="space-y-3.5 pt-1 border-t border-slate-800/80">
+                  <div id="seccion-comprobante-anticipo" className="space-y-3.5 pt-1 border-t border-slate-800/80 scroll-mt-24">
                     <div>
                       <label className="text-[11px] text-slate-300 font-mono block mb-1.5">
                         1. Captura o Imagen del Comprobante Bancario (50%):
@@ -3767,13 +3797,21 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                         </div>
                       ) : (
                         <div
-                          onClick={() => !portalConfig?.fase2Firmada && advanceReceiptInputRef.current?.click()}
-                          className={`p-4 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center text-center gap-1.5 ${
+                          className={`relative p-4 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center text-center gap-1.5 ${
                             portalConfig?.fase2Firmada
                               ? 'border-slate-800 bg-[#111622] opacity-60'
                               : 'border-orange-500/40 hover:border-orange-500 bg-[#141b2b]/80 hover:bg-[#141b2b] cursor-pointer'
                           }`}
                         >
+                          {!portalConfig?.fase2Firmada && (
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              onChange={(e) => handleReceiptImageSelect(e, 'advance')}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                              title="Seleccionar captura o comprobante bancario"
+                            />
+                          )}
                           <div className="w-9 h-9 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-400 flex items-center justify-center">
                             <FileUp className="w-5 h-5" />
                           </div>
@@ -3785,7 +3823,7 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                               ? 'Adjunta la captura generada por tu app bancaria (Banco Agrícola, Transfer365 o uglyCash)'
                               : 'Adjunta la captura generada por tu app bancaria (Banreservas, Banco BHD, ACH o uglyCash)'}
                           </p>
-                          <span className="mt-1 px-3 py-1 rounded-lg bg-orange-600/20 border border-orange-500/30 text-orange-300 text-[11px] font-mono font-bold">
+                          <span className="mt-1 px-3 py-1 rounded-lg bg-orange-600/20 border border-orange-500/30 text-orange-300 text-[11px] font-mono font-bold pointer-events-none">
                             Seleccionar Imagen / Captura
                           </span>
                         </div>
@@ -3855,7 +3893,11 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                   className="w-full py-3.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-orange-950/60 transition-all active:scale-[0.99]"
                 >
                   <PenTool className="w-4 h-4" />
-                  <span>Confirmar Firma y Reportar Anticipo</span>
+                  <span>
+                    {!(advanceReceiptImage || portalConfig?.comprobanteAnticipoImagen || activeProyecto?.pagos?.anticipoComprobanteImagen)
+                      ? 'Subir Captura de Anticipo y Firmar'
+                      : 'Confirmar Firma y Reportar Anticipo'}
+                  </span>
                 </button>
               )}
             </div>
@@ -4740,16 +4782,24 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                             </div>
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => settlementReceiptInputRef.current?.click()}
-                            className="w-full py-3.5 px-3 rounded-xl bg-[#141b2b] hover:bg-slate-800 border-2 border-dashed border-orange-500/40 hover:border-orange-500 text-xs text-orange-300 font-bold flex items-center justify-center gap-2 transition-all cursor-pointer min-h-[46px]"
-                          >
-                            <FileUp className="w-4 h-4 text-orange-400 shrink-0" />
-                            <span className="truncate">
-                              Subir Captura de la Transferencia Bancaria
-                            </span>
-                          </button>
+                          <div className="relative">
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              onChange={(e) => handleReceiptImageSelect(e, 'settlement')}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                              title="Seleccionar captura de liquidación bancaria"
+                            />
+                            <button
+                              type="button"
+                              className="w-full py-3.5 px-3 rounded-xl bg-[#141b2b] hover:bg-slate-800 border-2 border-dashed border-orange-500/40 hover:border-orange-500 text-xs text-orange-300 font-bold flex items-center justify-center gap-2 transition-all cursor-pointer min-h-[46px] pointer-events-none"
+                            >
+                              <FileUp className="w-4 h-4 text-orange-400 shrink-0" />
+                              <span className="truncate">
+                                Subir Captura de la Transferencia Bancaria
+                              </span>
+                            </button>
+                          </div>
                         )}
                       </div>
 
