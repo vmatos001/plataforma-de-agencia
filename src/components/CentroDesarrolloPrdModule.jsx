@@ -45,6 +45,8 @@ import {
   getProyectosCloud,
   saveProyectoCloud,
   getPresupuestosCloud,
+  getPortalCloud,
+  savePortalCloud,
   isExcludedProyecto
 } from '../services/firestoreSyncService';
 
@@ -394,6 +396,24 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
 
           const token = currentP.portalToken || currentP.presupuestoId || currentP.id;
           if (token) {
+            getPortalCloud(token).then(portalData => {
+              if (portalData) {
+                savePortalCloud(token, {
+                  ...portalData,
+                  proyecto: {
+                    ...(portalData.proyecto || {}),
+                    bovedaRepos: bovedaData,
+                    repoVault: { ...repoVault }
+                  },
+                  portalConfig: {
+                    ...(portalData.portalConfig || {}),
+                    driveVaultUrl: bovedaData.driveAssets,
+                    enlaceDriveArchivos: bovedaData.driveAssets
+                  }
+                }).catch(() => {});
+              }
+            }).catch(() => {});
+
             apiClient.post(`/api/portal/${token}/update`, {
               bovedaRepos: bovedaData,
               productionUrl: repoVault.productionUrl,
@@ -520,19 +540,22 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         productionUrl: boveda.urlProduccion || boveda.productionUrl || ''
       };
 
-      if (repoVaultByProjMap[selectedProyectoId]) {
-        const pVault = { ...baseVault, ...repoVaultByProjMap[selectedProyectoId] };
-        if (pVault.figmaBoard && !pVault.googleStitchUrl) {
-          delete pVault.figmaBoard;
-        }
-        if (pVault.githubRepo === 'https://github.com/goglite-agency/cliente-web-platform') pVault.githubRepo = '';
-        if (pVault.stagingUrl === 'https://goglite-client-staging.web.app') pVault.stagingUrl = '';
-        if (pVault.productionUrl === 'https://www.gruasandreasv.com') pVault.productionUrl = '';
-        if (pVault.driveAssets === 'https://drive.google.com/drive/folders/goglite-client-assets') pVault.driveAssets = '';
-        setRepoVault(pVault);
-      } else {
-        setRepoVault(baseVault);
+      const mapVault = repoVaultByProjMap[selectedProyectoId] || {};
+      const pVault = {
+        googleStitchUrl: (mapVault.googleStitchUrl || baseVault.googleStitchUrl || '').trim(),
+        driveAssets: (mapVault.driveAssets || baseVault.driveAssets || '').trim(),
+        stagingUrl: (mapVault.stagingUrl || baseVault.stagingUrl || '').trim(),
+        githubRepo: (mapVault.githubRepo || baseVault.githubRepo || '').trim(),
+        productionUrl: (mapVault.productionUrl || baseVault.productionUrl || '').trim()
+      };
+      if (pVault.figmaBoard && !pVault.googleStitchUrl) {
+        delete pVault.figmaBoard;
       }
+      if (pVault.githubRepo === 'https://github.com/goglite-agency/cliente-web-platform') pVault.githubRepo = '';
+      if (pVault.stagingUrl === 'https://goglite-client-staging.web.app') pVault.stagingUrl = '';
+      if (pVault.productionUrl === 'https://www.gruasandreasv.com') pVault.productionUrl = '';
+      if (pVault.driveAssets === 'https://drive.google.com/drive/folders/goglite-client-assets') pVault.driveAssets = '';
+      setRepoVault(pVault);
 
       // Cargar o generar PRD específico del proyecto seleccionado
       if (prdByProjMap[selectedProyectoId]) {
@@ -578,17 +601,6 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     } catch (e) {}
   }, [sprintTasks, selectedProyectoId]);
 
-  useEffect(() => {
-    try {
-      if (selectedProyectoId) {
-        setRepoVaultByProjMap(prev => {
-          const updated = { ...prev, [selectedProyectoId]: repoVault };
-          saveAppStateCloud('repo_vault_by_project', 'repo_vault', updated).catch(() => {});
-          return updated;
-        });
-      }
-    } catch (e) {}
-  }, [repoVault, selectedProyectoId]);
 
   // Manejo del cronómetro en vivo
   // Recuperar cronómetro guardado en la nube al montar
