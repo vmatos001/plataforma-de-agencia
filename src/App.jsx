@@ -248,8 +248,29 @@ export default function App() {
       lastRecordedActivity = Date.now();
     };
 
+    const isAnyTimerRunning = () => {
+      try {
+        const sprintTimerStr = localStorage.getItem('goglite_active_sprint_timer_state');
+        if (sprintTimerStr) {
+          const t = JSON.parse(sprintTimerStr);
+          if (t && t.isRunning && t.startTime) return true;
+        }
+        const finTimerStr = localStorage.getItem('goglite_live_timer_v1');
+        if (finTimerStr) {
+          const t = JSON.parse(finTimerStr);
+          if (t && t.isRunning && !t.isPaused && t.startTime) return true;
+        }
+      } catch {}
+      return false;
+    };
+
+    const handleTimerHeartbeat = () => {
+      lastRecordedActivity = Date.now();
+    };
+
     const monitoredEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
     monitoredEvents.forEach(evt => window.addEventListener(evt, handleUserInteraction, { passive: true }));
+    window.addEventListener('goglite_timer_heartbeat', handleTimerHeartbeat);
 
     const sessionWatcher = setInterval(() => {
       const now = Date.now();
@@ -261,7 +282,10 @@ export default function App() {
       }
 
       // 2. Verificación de Inactividad (15 min Admin / 30 min Colaborador)
-      if (now - lastRecordedActivity > idleLimit) {
+      // Si el usuario tiene un cronómetro de trabajo/sprint activo, está en desarrollo y la sesión se mantiene activa
+      if (isAnyTimerRunning()) {
+        lastRecordedActivity = now;
+      } else if (now - lastRecordedActivity > idleLimit) {
         handleLogout(`Sesión suspendida por inactividad (${idleMinutes} minutos sin interacción). Valida tus credenciales para continuar.`);
         return;
       }
@@ -269,6 +293,7 @@ export default function App() {
 
     return () => {
       monitoredEvents.forEach(evt => window.removeEventListener(evt, handleUserInteraction));
+      window.removeEventListener('goglite_timer_heartbeat', handleTimerHeartbeat);
       clearInterval(sessionWatcher);
     };
   }, [isAuthenticatedSession, currentUser]);

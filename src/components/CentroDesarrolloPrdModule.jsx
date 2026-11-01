@@ -261,6 +261,37 @@ const PLAYBOOK_12_FASES_TASKS = [
 
 const DEFAULT_SPRINT_TASKS = PLAYBOOK_12_FASES_TASKS;
 
+const SPRINT_TIMER_STORAGE_KEY = 'goglite_active_sprint_timer_state';
+
+const DEFAULT_SPRINT_TIMER = {
+  isRunning: false,
+  taskId: null,
+  proyectoId: null,
+  startTime: null,
+  accumulatedSeconds: 0
+};
+
+function getSprintTimerFromStorage() {
+  if (typeof window === 'undefined') return DEFAULT_SPRINT_TIMER;
+  try {
+    const raw = localStorage.getItem(SPRINT_TIMER_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+  } catch {}
+  return DEFAULT_SPRINT_TIMER;
+}
+
+function calculateSprintSeconds(timer) {
+  if (!timer || !timer.isRunning) return Number(timer?.accumulatedSeconds) || 0;
+  let secs = Number(timer.accumulatedSeconds) || 0;
+  if (timer.startTime) {
+    const delta = Math.floor((Date.now() - timer.startTime) / 1000);
+    if (delta > 0) secs += delta;
+  }
+  return Math.max(0, secs);
+}
 
 export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   // Pestañas principales de Fase 4: 'storybrand' | 'prd_tecnico' | 'sprint_kanban' | 'repositorios'
@@ -296,10 +327,10 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   // Estado del Sprint Kanban (Todas las tareas inician en Backlog ordenadas 1..12 con 0h)
   const [sprintTasks, setSprintTasks] = useState(DEFAULT_SPRINT_TASKS);
 
-  // Tarea en cronómetro activo
-  const [activeTimerTaskId, setActiveTimerTaskId] = useState(null);
-  const [timerSeconds, setTimerSeconds] = useState(0);
-  const timerRef = useRef(null);
+  // Tarea en cronómetro activo (Persistente en segundo plano)
+  const [sprintTimer, setSprintTimer] = useState(() => getSprintTimerFromStorage());
+  const [timerSeconds, setTimerSeconds] = useState(() => calculateSprintSeconds(getSprintTimerFromStorage()));
+  const activeTimerTaskId = sprintTimer.isRunning ? sprintTimer.taskId : null;
 
   // Modal para agregar nueva tarea
   const [showNewTaskModal, setShowNewTaskModal] = useState(false);
@@ -560,18 +591,53 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   }, [repoVault, selectedProyectoId]);
 
   // Manejo del cronómetro en vivo
+  // Recuperar cronómetro guardado en la nube al montar
   useEffect(() => {
-    if (activeTimerTaskId) {
-      timerRef.current = setInterval(() => {
-        setTimerSeconds(prev => prev + 1);
-      }, 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-    }
+    (async () => {
+      try {
+        const cloudTimer = await getAppStateCloud('sprint_timer_active');
+        if (cloudTimer && cloudTimer.isRunning && cloudTimer.startTime) {
+          const localTimer = getSprintTimerFromStorage();
+          const chosen = (!localTimer.isRunning || (cloudTimer.startTime > (localTimer.startTime || 0)))
+            ? cloudTimer
+            : localTimer;
+          setSprintTimer(chosen);
+          setTimerSeconds(calculateSprintSeconds(chosen));
+          localStorage.setItem(SPRINT_TIMER_STORAGE_KEY, JSON.stringify(chosen));
+          window.dispatchEvent(new CustomEvent('goglite_timer_heartbeat', { detail: chosen }));
+        }
+      } catch {}
+    })();
+  }, []);
+
+  // Manejo del cronómetro en vivo persistente en segundo plano (recalculado por hora real)
+  useEffect(() => {
+    setTimerSeconds(calculateSprintSeconds(sprintTimer));
+    if (!sprintTimer.isRunning) return;
+
+    // Recalcular el tiempo exacto cada 1 segundo con base en Date.now()
+    const interval = setInterval(() => {
+      setTimerSeconds(calculateSprintSeconds(sprintTimer));
+    }, 1000);
+
+    // Heartbeat cada 30 segundos: auto-guardar en la nube y mantener la sesión viva
+    const heartbeat = setInterval(() => {
+      try {
+        const updated = {
+          ...sprintTimer,
+          lastHeartbeat: Date.now()
+        };
+        localStorage.setItem(SPRINT_TIMER_STORAGE_KEY, JSON.stringify(updated));
+        saveAppStateCloud('sprint_timer_active', 'timer', updated).catch(() => {});
+        window.dispatchEvent(new CustomEvent('goglite_timer_heartbeat', { detail: updated }));
+      } catch {}
+    }, 30000);
+
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      clearInterval(interval);
+      clearInterval(heartbeat);
     };
-  }, [activeTimerTaskId]);
+  }, [sprintTimer]);
 
   const fetchProyectos = async () => {
     try {
@@ -702,13 +768,14 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     }
   };
 
-  // Cronómetro: Iniciar / Detener
+  // Cronómetro: Iniciar / Detener (Persistente con cálculo de hora real en segundo plano)
   const handleToggleTimer = async (taskId) => {
     if (activeTimerTaskId === taskId) {
-      // Detener y guardar horas acumuladas
-      const horasIncremento = Math.max(0.1, Number((timerSeconds / 3600).toFixed(2)));
-      
-      // 1. Actualizar tarea local
+      // 1. Detener y calcular el tiempo exacto transcurrido en base al reloj real
+      const totalSecs = calculateSprintSeconds(sprintTimer);
+      const horasIncremento = Math.max(0.1, Number((totalSecs / 3600).toFixed(2)));
+
+      // 2. Actualizar tarea localmente
       setSprintTasks(prev => prev.map(t => {
         if (t.id === taskId) {
           return {
@@ -719,7 +786,23 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         return t;
       }));
 
-      // 2. Enviar automáticamente al Time Tracker de Finanzas (Módulo 7) en API y LocalStorage
+      // 3. Limpiar timer persistente en local y nube
+      const stoppedTimer = {
+        isRunning: false,
+        taskId: null,
+        proyectoId: null,
+        startTime: null,
+        accumulatedSeconds: 0
+      };
+      setSprintTimer(stoppedTimer);
+      setTimerSeconds(0);
+      try {
+        localStorage.removeItem(SPRINT_TIMER_STORAGE_KEY);
+        saveAppStateCloud('sprint_timer_active', 'timer', stoppedTimer).catch(() => {});
+        window.dispatchEvent(new CustomEvent('goglite_timer_heartbeat', { detail: stoppedTimer }));
+      } catch {}
+
+      // 4. Enviar automáticamente al Time Tracker de Finanzas (Módulo 7)
       const tareaObj = sprintTasks.find(t => t.id === taskId);
       const clienteEmpresa = proyectoActivo.cliente?.empresa || 'Cliente de Agencia';
       const conceptoTarea = tareaObj ? tareaObj.titulo : 'Desarrollo en Sprint';
@@ -752,7 +835,7 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
           concepto: conceptoTarea,
           tarea: conceptoTarea,
           categoria: 'frontend_astro',
-          descripcion: `Tiempo registrado en vivo desde Sprint Kanban (${timerSeconds}s)`,
+          descripcion: `Tiempo registrado en vivo desde Sprint Kanban (${totalSecs}s / ${horasIncremento}h)`,
           horas: horasIncremento,
           costoHora: costoHoraEst,
           costoPorHora: costoHoraEst,
@@ -763,12 +846,39 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         console.warn('Horas guardadas en local');
       }
 
-      setActiveTimerTaskId(null);
-      setTimerSeconds(0);
+      window.dispatchEvent(new CustomEvent('goglite_tasks_updated'));
+      window.dispatchEvent(new CustomEvent('goglite_proyectos_synced'));
     } else {
-      // Iniciar en la nueva tarea
-      setActiveTimerTaskId(taskId);
+      // Si ya había otro timer corriendo, acumular sus horas antes de cambiar
+      if (sprintTimer.isRunning && sprintTimer.taskId) {
+        const prevTotalSecs = calculateSprintSeconds(sprintTimer);
+        const prevHoras = Math.max(0.1, Number((prevTotalSecs / 3600).toFixed(2)));
+        setSprintTasks(prev => prev.map(t => {
+          if (t.id === sprintTimer.taskId) {
+            return {
+              ...t,
+              horasRegistradas: Number(((t.horasRegistradas || 0) + prevHoras).toFixed(2))
+            };
+          }
+          return t;
+        }));
+      }
+
+      // Iniciar en la nueva tarea guardando el startTime real absoluto
+      const newTimer = {
+        isRunning: true,
+        taskId,
+        proyectoId: proyectoActivo.id,
+        startTime: Date.now(),
+        accumulatedSeconds: 0
+      };
+      setSprintTimer(newTimer);
       setTimerSeconds(0);
+      try {
+        localStorage.setItem(SPRINT_TIMER_STORAGE_KEY, JSON.stringify(newTimer));
+        saveAppStateCloud('sprint_timer_active', 'timer', newTimer).catch(() => {});
+        window.dispatchEvent(new CustomEvent('goglite_timer_heartbeat', { detail: newTimer }));
+      } catch {}
     }
   };
 
@@ -780,8 +890,14 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   // Eliminar tarea
   const handleDeleteTask = (taskId) => {
     if (activeTimerTaskId === taskId) {
-      setActiveTimerTaskId(null);
+      const stoppedTimer = { isRunning: false, taskId: null, proyectoId: null, startTime: null, accumulatedSeconds: 0 };
+      setSprintTimer(stoppedTimer);
       setTimerSeconds(0);
+      try {
+        localStorage.removeItem(SPRINT_TIMER_STORAGE_KEY);
+        saveAppStateCloud('sprint_timer_active', 'timer', stoppedTimer).catch(() => {});
+        window.dispatchEvent(new CustomEvent('goglite_timer_heartbeat', { detail: stoppedTimer }));
+      } catch {}
     }
     setSprintTasks(prev => prev.filter(t => t.id !== taskId));
   };
