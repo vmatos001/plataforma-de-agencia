@@ -499,6 +499,28 @@ function computeFinanzasSummary(rawState) {
     projectGroups.get(groupKey).push(f);
   });
 
+  // Asegurar que proyectos con horas registradas en Time Tracking pero sin facturas aún también se auditen
+  timeEntries.forEach(t => {
+    const empNormalized = (t.cliente || '').toLowerCase().trim();
+    const groupKey = t.proyectoId || (empNormalized ? `client_${empNormalized}` : null);
+    if (groupKey && !projectGroups.has(groupKey)) {
+      const virtualFac = {
+        id: `fac-virtual-${groupKey}`,
+        numeroFactura: 'DEV-TRACK',
+        proyectoId: t.proyectoId || groupKey,
+        presupuestoId: null,
+        cliente: { empresa: t.cliente || 'Proyecto en Desarrollo', pais: 'DO' },
+        concepto: t.concepto || 'Desarrollo en Progreso (Fase 4)',
+        total: Number((t.horas * (t.costoHora || costoHora)).toFixed(2)),
+        montoCobrado: 0,
+        horasInvertidasEstimadas: t.horas || 10,
+        origenModulo: 'Control de Horas (Fase 4)',
+        items: []
+      };
+      projectGroups.set(groupKey, [virtualFac]);
+    }
+  });
+
   const proyectosRentabilidad = Array.from(projectGroups.values()).map(groupFacturas => {
     const primaryFac = groupFacturas[0];
     const empLower = (primaryFac.cliente?.empresa || '').toLowerCase().trim();
@@ -509,27 +531,27 @@ function computeFinanzasSummary(rawState) {
     // Gastos directos vinculados a este proyecto o cliente (no duplicar)
     const gastosProyecto = gastos
       .filter(g => {
-        if (g.proyectoId && primaryFac.proyectoId && g.proyectoId === primaryFac.proyectoId) return true;
+        if (g.proyectoId && primaryFac.proyectoId && (g.proyectoId === primaryFac.proyectoId || String(g.proyectoId).includes(String(primaryFac.proyectoId)))) return true;
         if (g.facturaId && facturaIds.includes(g.facturaId)) return true;
-        if (g.clienteAsociado && empLower && g.clienteAsociado.toLowerCase().trim() === empLower) return true;
+        if (g.clienteAsociado && empLower && (g.clienteAsociado.toLowerCase().trim() === empLower || g.clienteAsociado.toLowerCase().includes(empLower))) return true;
         return false;
       })
       .reduce((acc, g) => acc + (Number(g.monto) || 0), 0);
 
     // Horas registradas en Time Tracking para este proyecto o cliente
     const entriesProj = timeEntries.filter(t => {
-      if (t.proyectoId && primaryFac.proyectoId && t.proyectoId === primaryFac.proyectoId) return true;
+      if (t.proyectoId && primaryFac.proyectoId && (t.proyectoId === primaryFac.proyectoId || String(t.proyectoId).includes(String(primaryFac.proyectoId)) || String(primaryFac.proyectoId).includes(String(t.proyectoId)))) return true;
       if (t.facturaId && facturaIds.includes(t.facturaId)) return true;
-      if (t.cliente && empLower && t.cliente.toLowerCase().trim() === empLower) return true;
+      if (t.cliente && empLower && (t.cliente.toLowerCase().trim() === empLower || t.cliente.toLowerCase().includes(empLower) || empLower.includes(t.cliente.toLowerCase().trim()))) return true;
       return false;
     });
 
-    const horasRegistradas = entriesProj.reduce((acc, t) => acc + (Number(t.horas) || 0), 0);
+    const horasRegistradas = Number(entriesProj.reduce((acc, t) => acc + (Number(t.horas) || 0), 0).toFixed(2));
     const horasEstimadas = Number(primaryFac.horasInvertidasEstimadas) || 10;
     const horasInvertidas = horasRegistradas > 0 ? horasRegistradas : horasEstimadas;
 
-    const costeHoras = horasInvertidas * costoHora;
-    const costeTotalProyecto = gastosProyecto + costeHoras;
+    const costeHoras = Number((horasInvertidas * costoHora).toFixed(2));
+    const costeTotalProyecto = Number((gastosProyecto + costeHoras).toFixed(2));
     const precioVenta = groupFacturas.reduce((acc, f) => acc + (Number(f.total) || 0), 0);
     const cobrado = groupFacturas.reduce((acc, f) => acc + (Number(f.montoCobrado) || 0), 0);
     const saldoPendiente = Math.max(0, precioVenta - cobrado);
@@ -945,7 +967,7 @@ export function buildMilestoneInvoices(propOrProj, existingFacturasCount = 0, co
     tipoHito: 'anticipo',
     presupuestoId: presId,
     codigoPresupuesto: presCode,
-    proyectoId: `proj-${projId}`,
+    proyectoId: projId,
     codigoProyecto: projCode,
     origenModulo: `Módulo 4 · Contrato ${projCode} (Anticipo 50%)`,
     cliente: {
@@ -988,7 +1010,7 @@ export function buildMilestoneInvoices(propOrProj, existingFacturasCount = 0, co
     tipoHito: 'saldo',
     presupuestoId: presId,
     codigoPresupuesto: presCode,
-    proyectoId: `proj-${projId}`,
+    proyectoId: projId,
     codigoProyecto: projCode,
     origenModulo: `Módulo 4 · Contrato ${projCode} (Saldo 50%)`,
     cliente: { ...facAnticipo.cliente },
@@ -1072,7 +1094,14 @@ export function reconcileMilestoneInvoices(currentFacturas = [], configuracion =
         return false;
       });
 
-      if (matched.length === 1) {
+      if (matched.length === 0) {
+        // No existía factura para este proyecto: generamos las 2 facturas de hito (Anticipo 50% + Saldo 50%)
+        const milestoneInvoices = buildMilestoneInvoices(proj, facturas.length, configuracion);
+        if (milestoneInvoices.length > 0) {
+          facturas.push(...milestoneInvoices);
+          modified = true;
+        }
+      } else if (matched.length === 1) {
         // Había 1 sola factura monolítica (el caso exacto del usuario): la dividimos en Anticipo y Saldo
         const f1 = matched[0];
         const f1Idx = facturas.findIndex(f => f.id === f1.id);
@@ -1185,7 +1214,7 @@ export function reconcileMilestoneInvoices(currentFacturas = [], configuracion =
   // 2. Reconciliar también presupuestos aceptados si no están en proyectos
   if (Array.isArray(presupuestos)) {
     presupuestos.forEach(prop => {
-      if (prop.estado !== 'aceptado') return;
+      if (prop.estado !== 'aceptado' && prop.estado !== 'aprobado') return;
       const propEmp = (prop.cliente?.empresa || '').toLowerCase().trim();
       const matched = facturas.filter(f => 
         (prop.id && f.presupuestoId === prop.id) ||
@@ -1193,7 +1222,13 @@ export function reconcileMilestoneInvoices(currentFacturas = [], configuracion =
         (propEmp && f.cliente?.empresa && f.cliente.empresa.toLowerCase().trim() === propEmp)
       );
 
-      if (matched.length === 1 && (Number(matched[0].total) > (Number(prop.inversion?.anticipo) || 150))) {
+      if (matched.length === 0) {
+        const milestoneInvoices = buildMilestoneInvoices(prop, facturas.length, configuracion);
+        if (milestoneInvoices.length > 0) {
+          facturas.push(...milestoneInvoices);
+          modified = true;
+        }
+      } else if (matched.length === 1 && (Number(matched[0].total) > (Number(prop.inversion?.anticipo) || 150))) {
         // Monolítica: dividirla
         const f1 = matched[0];
         const f1Idx = facturas.findIndex(f => f.id === f1.id);
@@ -1703,6 +1738,7 @@ export default function GestionRentabilidadModule({
 }) {
   // 1. Estado en memoria sincronizado 100% con Cloud Firestore
   const [finanzasState, setFinanzasState] = useState(INITIAL_SEED_STATE);
+  const [isCloudLoaded, setIsCloudLoaded] = useState(false);
 
   const [activeTab, setActiveTab] = useState('resumen'); // 'resumen' | 'facturas' | 'gastos' | 'horas' | 'config'
 
@@ -1902,8 +1938,9 @@ export default function GestionRentabilidadModule({
     setTimeout(() => setToastMsg(''), 3200);
   };
 
-  // Persistir automáticamente en Firestore Cloud cada vez que cambie finanzasState
+  // Persistir automáticamente en Firestore Cloud cada vez que cambie finanzasState (solo tras hidratar desde la nube)
   useEffect(() => {
+    if (!isCloudLoaded) return;
     try {
       if (finanzasState) {
         saveAppStateCloud('finanzas_v1', 'finanzas', finanzasState).catch(() => {});
@@ -1911,7 +1948,7 @@ export default function GestionRentabilidadModule({
     } catch (e) {
       console.warn('Error guardando finanzas en cloud:', e);
     }
-  }, [finanzasState]);
+  }, [finanzasState, isCloudLoaded]);
 
   // Cargar datos retrospectivos de Módulos 1, 2 y 3 + sincronizar con Firestore Cloud y backend
   useEffect(() => {
@@ -1921,23 +1958,37 @@ export default function GestionRentabilidadModule({
       try {
         const cloudFin = await getAppStateCloud('finanzas_v1');
         if (cloudFin && typeof cloudFin === 'object') {
+          const loadedTimes = Array.isArray(cloudFin.timeEntries) && cloudFin.timeEntries.length > 0
+            ? cloudFin.timeEntries
+            : (Array.isArray(cloudFin.registroHoras) && cloudFin.registroHoras.length > 0 ? cloudFin.registroHoras : []);
+
           setFinanzasState(prev => ({
             ...prev,
             facturas: Array.isArray(cloudFin.facturas) && cloudFin.facturas.length > 0 ? cloudFin.facturas.map(normalizeFacturaItems) : prev.facturas,
             gastos: Array.isArray(cloudFin.gastos) && cloudFin.gastos.length > 0 ? cloudFin.gastos : prev.gastos,
             suscripciones: Array.isArray(cloudFin.suscripciones) && cloudFin.suscripciones.length > 0 ? cloudFin.suscripciones : prev.suscripciones,
-            registroHoras: Array.isArray(cloudFin.registroHoras) && cloudFin.registroHoras.length > 0 ? cloudFin.registroHoras : prev.registroHoras
+            timeEntries: loadedTimes.length > 0 ? loadedTimes : prev.timeEntries,
+            configuracion: {
+              ...DEFAULT_CONFIGURACION,
+              ...(cloudFin.configuracion || {}),
+              ...(prev.configuracion || {})
+            }
           }));
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('Error cargando finanzas_v1 desde Firestore:', e);
+      } finally {
+        setIsCloudLoaded(true);
+      }
     })();
   }, []);
 
   const loadRetrospectiveModules = async () => {
     try {
-      const [cloudPres, cloudLeads] = await Promise.all([
-        getPresupuestosCloud(),
-        getCrmLeadsCloud()
+      const [cloudPres, cloudLeads, cloudProjs] = await Promise.all([
+        getPresupuestosCloud().catch(() => []),
+        getCrmLeadsCloud().catch(() => []),
+        getProyectosCloud().catch(() => [])
       ]);
       const parsedM3 = Array.isArray(cloudPres) ? cloudPres : [];
       setM3Presupuestos(parsedM3);
@@ -1945,60 +1996,69 @@ export default function GestionRentabilidadModule({
       const parsedM2 = Array.isArray(cloudLeads) ? cloudLeads : [];
       setM2CrmLeads(parsedM2);
 
-      // Auto-importar presupuestos aceptados del Módulo 3 y asegurar dos facturas por hito (Anticipo 50% + Saldo 50%)
-      if (Array.isArray(parsedM3) && parsedM3.length > 0) {
-        setFinanzasState(prev => {
-          let currentFacturas = [...(prev.facturas || [])];
+      const parsedProjs = Array.isArray(cloudProjs) ? cloudProjs : [];
 
-          parsedM3.forEach(prop => {
-            if (prop.estado === 'aceptado') {
-              const alreadyExists = currentFacturas.some(
-                f => f.presupuestoId === prop.id ||
-                     f.codigoPresupuesto === prop.codigo ||
-                     (f.cliente?.empresa && prop.cliente?.empresa &&
-                      f.cliente.empresa.toLowerCase().trim() === prop.cliente.empresa.toLowerCase().trim())
-              );
-              if (!alreadyExists) {
-                const milestoneInvoices = buildMilestoneInvoices(prop, currentFacturas.length, prev.configuracion);
-                currentFacturas.unshift(...milestoneInvoices);
-              }
+      // Auto-importar presupuestos aceptados/aprobados del Módulo 3 y asegurar dos facturas por hito (Anticipo 50% + Saldo 50%)
+      setFinanzasState(prev => {
+        let currentFacturas = [...(prev.facturas || [])];
+
+        parsedM3.forEach(prop => {
+          if (prop.estado === 'aceptado' || prop.estado === 'aprobado') {
+            const alreadyExists = currentFacturas.some(
+              f => f.presupuestoId === prop.id ||
+                   f.codigoPresupuesto === prop.codigo ||
+                   (f.cliente?.empresa && prop.cliente?.empresa &&
+                    f.cliente.empresa.toLowerCase().trim() === prop.cliente.empresa.toLowerCase().trim())
+            );
+            if (!alreadyExists) {
+              const milestoneInvoices = buildMilestoneInvoices(prop, currentFacturas.length, prev.configuracion);
+              currentFacturas.push(...milestoneInvoices);
             }
-          });
-
-          const reconciled = reconcileMilestoneInvoices(currentFacturas, prev.configuracion);
-          return { ...prev, facturas: reconciled };
+          }
         });
-      } else {
-        setFinanzasState(prev => ({
-          ...prev,
-          facturas: reconcileMilestoneInvoices(prev.facturas || [], prev.configuracion)
-        }));
-      }
+
+        const reconciled = reconcileMilestoneInvoices(currentFacturas, prev.configuracion, parsedProjs, parsedM3);
+        return { ...prev, facturas: reconciled };
+      });
     } catch (e) {
       console.warn('Error cargando módulos retrospectivos 1-3:', e);
     }
   };
 
-  // Escuchar eventos en vivo desde Módulo 4 (Contratos & Pagos) para sincronizar facturas por hito en 0ms
+  // Escuchar eventos en vivo desde Módulo 4 (Contratos, Pagos y Tareas de Kanban) para sincronizar facturas y horas en 0ms
   useEffect(() => {
     const handleSyncFromEvents = async () => {
       try {
         const cloudFin = await getAppStateCloud('finanzas_v1');
-        if (cloudFin && Array.isArray(cloudFin.facturas)) {
-          setFinanzasState(prev => ({
-            ...prev,
-            facturas: reconcileMilestoneInvoices(cloudFin.facturas.map(normalizeFacturaItems), prev.configuracion)
-          }));
+        if (cloudFin && typeof cloudFin === 'object') {
+          const loadedTimes = Array.isArray(cloudFin.timeEntries) && cloudFin.timeEntries.length > 0
+            ? cloudFin.timeEntries
+            : (Array.isArray(cloudFin.registroHoras) && cloudFin.registroHoras.length > 0 ? cloudFin.registroHoras : []);
+
+          setFinanzasState(prev => {
+            const updatedTimes = loadedTimes.length > 0 ? loadedTimes : prev.timeEntries;
+            const updatedFacturas = Array.isArray(cloudFin.facturas) && cloudFin.facturas.length > 0
+              ? reconcileMilestoneInvoices(cloudFin.facturas.map(normalizeFacturaItems), prev.configuracion)
+              : prev.facturas;
+
+            return {
+              ...prev,
+              facturas: updatedFacturas,
+              timeEntries: updatedTimes
+            };
+          });
         }
       } catch (e) {}
     };
 
     window.addEventListener('goglite_facturas_updated', handleSyncFromEvents);
     window.addEventListener('goglite_proyectos_synced', handleSyncFromEvents);
+    window.addEventListener('goglite_tasks_updated', handleSyncFromEvents);
     window.addEventListener('storage', handleSyncFromEvents);
     return () => {
       window.removeEventListener('goglite_facturas_updated', handleSyncFromEvents);
       window.removeEventListener('goglite_proyectos_synced', handleSyncFromEvents);
+      window.removeEventListener('goglite_tasks_updated', handleSyncFromEvents);
       window.removeEventListener('storage', handleSyncFromEvents);
     };
   }, []);
@@ -4594,9 +4654,9 @@ export default function GestionRentabilidadModule({
                       className="bg-[#131926] border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 max-w-[190px]"
                     >
                       <option value="">Seleccionar Proyecto...</option>
-                      {facturas.map(f => (
-                        <option key={f.id} value={f.cliente?.empresa}>
-                          {f.cliente?.empresa || 'Cliente'} ({f.numeroFactura})
+                      {proyectosRentabilidad.map(p => (
+                        <option key={p.facturaId || p.proyectoId} value={p.cliente}>
+                          {p.cliente} ({p.numerosFactura || p.numeroFactura})
                         </option>
                       ))}
                       <option value="General Agencia">General Agencia / I+D</option>

@@ -874,6 +874,34 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
           }
           return t;
         }));
+
+        // Sincronizar con el Time Tracker de Finanzas (Fase 7)
+        try {
+          const prevTarea = sprintTasks.find(t => t.id === sprintTimer.taskId);
+          const clienteEmp = proyectoActivo.cliente?.empresa || 'Cliente de Agencia';
+          const conceptoTarea = prevTarea ? prevTarea.titulo : 'Desarrollo en Sprint';
+          const costoHoraEst = 30;
+          const fechaHoy = new Date().toISOString().split('T')[0];
+
+          getAppStateCloud('finanzas_v1').then(parsedFin => {
+            parsedFin = parsedFin || {};
+            const entry = {
+              id: 'time-' + Date.now(),
+              proyectoId: proyectoActivo.id,
+              cliente: clienteEmp,
+              concepto: conceptoTarea,
+              categoria: 'frontend_astro',
+              horas: prevHoras,
+              costoHora: costoHoraEst,
+              costoTotal: Number((prevHoras * costoHoraEst).toFixed(2)),
+              fecha: fechaHoy
+            };
+            parsedFin.timeEntries = [entry, ...(parsedFin.timeEntries || [])];
+            saveAppStateCloud('finanzas_v1', 'finanzas', parsedFin).catch(() => {});
+          }).catch(() => {});
+        } catch (e) {}
+
+        window.dispatchEvent(new CustomEvent('goglite_tasks_updated'));
       }
 
       // Iniciar en la nueva tarea guardando el startTime real absoluto
