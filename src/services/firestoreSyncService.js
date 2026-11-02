@@ -52,7 +52,11 @@ if (typeof window !== 'undefined') {
 
 const PERMANENTLY_EXCLUDED_COMPANIES = [
   'multiservicios gisselle',
-  'clínica dental escalón'
+  'clínica dental escalón',
+  'turisran',
+  'turisran dominicana',
+  'inmobiliaria punta cana prime',
+  'clínicas dentales san salvador don pedro'
 ];
 
 const PERMANENTLY_EXCLUDED_PRESUPUESTO_IDS = new Set([
@@ -66,11 +70,16 @@ const PERMANENTLY_EXCLUDED_PROYECTO_IDS = new Set([
   'p-2026-do-001',
   'proj-turisran-do',
   'proj-prop-1792978056908',
-  'prop-1792978056908'
+  'prop-1792978056908',
+  'proj-demo-1'
+]);
+
+const PERMANENTLY_EXCLUDED_CRM_LEAD_IDS = new Set([
+  'crm-lead-1792969777629-cjfz'
 ]);
 
 // Sets en memoria para exclusión defensiva de registros eliminados (sin usar localStorage)
-const deletedCrmLeadsMemory = new Set();
+const deletedCrmLeadsMemory = new Set(PERMANENTLY_EXCLUDED_CRM_LEAD_IDS);
 const deletedPresupuestosMemory = new Set(PERMANENTLY_EXCLUDED_PRESUPUESTO_IDS);
 const deletedProyectosMemory = new Set(PERMANENTLY_EXCLUDED_PROYECTO_IDS);
 
@@ -325,7 +334,13 @@ export async function getProyectosCloud() {
       if (docSnap.exists()) {
         const data = docSnap.data() || {};
         const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
-        if (isExcludedProyecto(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, item.presupuestoId, item.presupuestoCodigo, docSnap.id)) {
+        if (
+          item.deleted === true ||
+          item.isDemo === true ||
+          item.estado === 'eliminado' ||
+          item.hidden === true ||
+          isExcludedProyecto(item.cliente?.empresa || item.cliente?.nombre || item.onboarding?.datos?.nombreComercial || item.nombre, item.id, item.codigo, item.presupuestoId, item.presupuestoCodigo, docSnap.id)
+        ) {
           deleteDoc(docSnap.ref).catch(() => {});
           return;
         }

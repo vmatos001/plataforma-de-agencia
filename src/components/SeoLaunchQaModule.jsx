@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import apiClient from '../services/apiClient';
-import { getAppStateCloud, saveAppStateCloud, saveProyectoCloud, getProyectosCloud } from '../services/firestoreSyncService';
+import { getAppStateCloud, saveAppStateCloud, saveProyectoCloud, getProyectosCloud, isExcludedProyecto } from '../services/firestoreSyncService';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -512,7 +512,17 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
   const loadProyectosAndChecklist = async () => {
     try {
       setLoading(true);
-      let list = await getProyectosCloud();
+
+      const filterValidProjects = (rawList) => {
+        return (rawList || []).filter(p => {
+          if (!p) return false;
+          if (p.deleted === true || p.isDemo === true || p.estado === 'eliminado' || p.hidden === true) return false;
+          const emp = p.cliente?.empresa || p.cliente?.nombre || p.nombre || p.onboarding?.datos?.nombreComercial;
+          return !isExcludedProyecto(emp, p.id, p.codigo, p.presupuestoId, p.presupuestoCodigo);
+        });
+      };
+
+      let list = filterValidProjects(await getProyectosCloud());
 
       try {
         const res = await apiClient.get('/api/proyectos');
@@ -520,36 +530,25 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
         if (res.ok && cType.includes('application/json')) {
           const apiList = await res.json();
           if (Array.isArray(apiList) && apiList.length > 0) {
-            list = apiList;
+            const validApi = filterValidProjects(apiList);
+            if (validApi.length > 0) {
+              list = validApi;
+            }
           }
         }
       } catch (err) {
         console.warn('Cargando proyectos desde almacenamiento local:', err);
       }
 
-      // Si no hay proyectos creados aún, generar proyecto de muestra
-      if (!list || list.length === 0) {
-        list = [
-          {
-            id: 'proj-demo-1',
-            codigo: 'P-2026-001',
-            cliente: {
-              empresa: selectedCountry === 'DO' ? 'Inmobiliaria Punta Cana Prime' : 'Clínicas Dentales San Salvador Don Pedro',
-              nombre: selectedCountry === 'DO' ? 'Lic. Carlos Morales' : 'Dr. Pedro Ramírez',
-              pais: selectedCountry
-            },
-            bovedaRepos: {
-              stagingUrl: selectedCountry === 'DO' ? 'https://puntacanaprime.web.app' : 'https://donpedrodental.web.app',
-              urlProduccion: selectedCountry === 'DO' ? 'https://puntacanaprime.com' : 'https://donpedrodental.com'
-            }
-          }
-        ];
-      }
+      list = filterValidProjects(list);
 
       setProyectos(list);
-      const initialProjId = list[0]?.id || '';
+      const currentExists = list.some(p => p.id === selectedProyectoId);
+      const initialProjId = currentExists ? selectedProyectoId : (list[0]?.id || '');
       setSelectedProyectoId(initialProjId);
-      loadChecklistForProject(initialProjId, list);
+      if (initialProjId) {
+        loadChecklistForProject(initialProjId, list);
+      }
     } finally {
       setLoading(false);
     }
@@ -919,11 +918,15 @@ export default function SeoLaunchQaModule({ selectedCountry = 'SV' }) {
               onChange={(e) => handleSelectProject(e.target.value)}
               className="px-3.5 py-2.5 rounded-xl bg-[#080b11] border border-slate-700 text-xs font-bold text-white focus:outline-none focus:border-orange-500 shadow-inner"
             >
-              {proyectos.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.codigo || 'PROJ'} · {p.cliente?.empresa || p.cliente?.nombre || 'Cliente'}
-                </option>
-              ))}
+              {proyectos.length === 0 ? (
+                <option value="">Sin proyectos activos</option>
+              ) : (
+                proyectos.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.codigo || 'PROJ'} · {p.cliente?.empresa || p.cliente?.nombre || 'Cliente'}
+                  </option>
+                ))
+              )}
             </select>
 
             <button

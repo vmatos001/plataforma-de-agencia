@@ -47,7 +47,9 @@ import {
   savePortalCloud, 
   getProyectosCloud, 
   getPresupuestosCloud, 
-  getCrmLeadsCloud 
+  getCrmLeadsCloud,
+  isExcludedProyecto,
+  isExcludedPresupuesto
 } from '../services/firestoreSyncService';
 import { DEFAULT_AGENCY_BRANDING } from '../constants/defaultAgencyBranding';
 
@@ -97,42 +99,6 @@ export const DEFAULT_CUENTAS_BANCARIAS = [
     instrucciones: 'Transferencia directa Transferencia365 o ACH interbancario en El Salvador',
     activa: true,
     predeterminada: true
-  },
-  {
-    id: 'cta-do-popular',
-    pais: 'DO',
-    banco: 'Banco Popular Dominicano',
-    tipo: 'Cuenta Corriente Comercial (LBTR / ACH)',
-    numero: '7829-1928-3011',
-    titular: 'Goglite Digital DO · Víctor Matos',
-    moneda: 'USD',
-    instrucciones: 'Transferencia LBTR en USD o ACH interbancario',
-    activa: true,
-    predeterminada: true
-  },
-  {
-    id: 'cta-do-banreservas',
-    pais: 'DO',
-    banco: 'Banreservas (Banco de Reservas)',
-    tipo: 'Cuenta de Ahorros / Corriente',
-    numero: '960-0012948-1',
-    titular: 'Víctor Matos',
-    moneda: 'DOP',
-    instrucciones: 'Transferencia local en pesos dominicanos (DOP) vía red ACH / Banreservas',
-    activa: true,
-    predeterminada: false
-  },
-  {
-    id: 'cta-us-uglycash',
-    pais: 'US',
-    banco: 'uglyCash (Remesas Instantáneas EE.UU.)',
-    tipo: 'uglyCash Tag / Billetera Digital',
-    numero: '$victormatos',
-    titular: 'Víctor Matos',
-    moneda: 'USD',
-    instrucciones: 'Envío instantáneo de remesas sin comisiones desde EE.UU. a través de la app uglyCash con tag $victormatos',
-    activa: true,
-    predeterminada: true
   }
 ];
 
@@ -141,33 +107,16 @@ export function normalizeCuentasBancarias(raw) {
   if (Array.isArray(raw) && raw.length > 0) {
     list = raw.map(c => ({
       id: c.id || `cta-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      pais: c.pais || 'DO',
-      banco: c.banco || 'Banco Comercial',
+      pais: c.pais || 'SV',
+      banco: c.banco || 'Banco Agrícola El Salvador',
       tipo: c.tipo || 'Cuenta Bancaria',
       numero: c.numero || '',
-      titular: c.titular || 'Víctor Matos',
-      moneda: c.moneda || (c.pais === 'DO' && c.banco?.toLowerCase().includes('reservas') ? 'DOP' : 'USD'),
+      titular: c.titular || 'Goglite Agency SV · Víctor Matos',
+      moneda: c.moneda || 'USD',
       instrucciones: c.instrucciones || '',
       activa: c.activa !== undefined ? c.activa : true,
       predeterminada: !!c.predeterminada
     }));
-
-    // Asegurar que uglyCash siempre esté incluido si aún no existe
-    const hasUglyCash = list.some(c => c.pais === 'US' || (c.banco && c.banco.toLowerCase().includes('uglycash')));
-    if (!hasUglyCash) {
-      list.push({
-        id: 'cta-us-uglycash',
-        pais: 'US',
-        banco: 'uglyCash (Remesas Instantáneas EE.UU.)',
-        tipo: 'uglyCash Tag / Billetera Digital',
-        numero: '$victormatos',
-        titular: 'Víctor Matos',
-        moneda: 'USD',
-        instrucciones: 'Envío instantáneo de remesas sin comisiones desde EE.UU. a través de la app uglyCash con tag $victormatos',
-        activa: true,
-        predeterminada: true
-      });
-    }
   } else if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
     list = [
       {
@@ -178,43 +127,7 @@ export function normalizeCuentasBancarias(raw) {
         numero: raw.SV?.numero || '0031-0029-4821',
         titular: raw.SV?.titular || 'Goglite Agency SV · Víctor Matos',
         moneda: 'USD',
-        instrucciones: 'Transferencia directa Transferencia365 o ACH',
-        activa: true,
-        predeterminada: true
-      },
-      {
-        id: 'cta-do-popular',
-        pais: 'DO',
-        banco: raw.DO?.banco || 'Banco Popular Dominicano',
-        tipo: raw.DO?.tipo || 'Cuenta Corriente Comercial (LBTR / ACH)',
-        numero: raw.DO?.numero || '7829-1928-3011',
-        titular: raw.DO?.titular || 'Goglite Digital DO · Víctor Matos',
-        moneda: 'USD',
-        instrucciones: 'Transferencia LBTR en USD o ACH',
-        activa: true,
-        predeterminada: true
-      },
-      {
-        id: 'cta-do-banreservas',
-        pais: 'DO',
-        banco: raw.DO?.banco || 'Banreservas (Banco de Reservas)',
-        tipo: 'Cuenta de Ahorros / Corriente',
-        numero: '960-0012948-1',
-        titular: 'Víctor Matos',
-        moneda: 'DOP',
-        instrucciones: 'Transferencia local en pesos dominicanos (DOP) vía red ACH',
-        activa: true,
-        predeterminada: false
-      },
-      {
-        id: 'cta-us-uglycash',
-        pais: 'US',
-        banco: 'uglyCash (Remesas Instantáneas EE.UU.)',
-        tipo: 'uglyCash Tag / Billetera Digital',
-        numero: '$victormatos',
-        titular: 'Víctor Matos',
-        moneda: 'USD',
-        instrucciones: 'Envío instantáneo de remesas sin comisiones desde EE.UU. a través de la app uglyCash con tag $victormatos',
+        instrucciones: 'Transferencia directa Transferencia365 o ACH interbancario en El Salvador',
         activa: true,
         predeterminada: true
       }
@@ -1070,10 +983,12 @@ export function reconcileMilestoneInvoices(currentFacturas = [], configuracion =
   if (Array.isArray(proyectos)) {
     proyectos.forEach(proj => {
       if (!proj) return;
-      const projEmp = (proj.cliente?.empresa || '').toLowerCase().trim();
+      if (proj.deleted || proj.isDemo || proj.estado === 'eliminado' || proj.hidden) return;
+      const projEmp = (proj.cliente?.empresa || proj.onboarding?.datos?.nombreComercial || proj.nombre || '').toLowerCase().trim();
       const projId = proj.id;
       const projCode = proj.codigo || proj.presupuestoCodigo;
       const presId = proj.presupuestoId;
+      if (isExcludedProyecto(projEmp, projId, projCode, presId)) return;
 
       const totalInversion = Number(proj.contrato?.totalInversion) || 300;
       const anticipoMonto = Number(proj.pagos?.anticipoMonto) || Math.round(totalInversion * 0.5);
@@ -1214,8 +1129,11 @@ export function reconcileMilestoneInvoices(currentFacturas = [], configuracion =
   // 2. Reconciliar también presupuestos aceptados si no están en proyectos
   if (Array.isArray(presupuestos)) {
     presupuestos.forEach(prop => {
+      if (!prop) return;
+      if (prop.deleted || prop.isDemo || prop.estado === 'eliminado' || prop.hidden) return;
       if (prop.estado !== 'aceptado' && prop.estado !== 'aprobado') return;
-      const propEmp = (prop.cliente?.empresa || '').toLowerCase().trim();
+      const propEmp = (prop.cliente?.empresa || prop.cliente?.nombre || '').toLowerCase().trim();
+      if (isExcludedPresupuesto(propEmp, prop.id, prop.codigo)) return;
       const matched = facturas.filter(f => 
         (prop.id && f.presupuestoId === prop.id) ||
         (prop.codigo && f.codigoPresupuesto === prop.codigo) ||
@@ -1265,6 +1183,15 @@ export function reconcileMilestoneInvoices(currentFacturas = [], configuracion =
       }
     });
   }
+
+  facturas = facturas.filter(f => !isExcludedProyecto(
+    f.cliente?.empresa || f.cliente?.nombre,
+    f.proyectoId,
+    f.codigoProyecto,
+    f.presupuestoId,
+    f.codigoPresupuesto,
+    f.id
+  ));
 
   if (modified) {
     try {
@@ -4996,20 +4923,8 @@ export default function GestionRentabilidadModule({
                 <span>Configuración de Finanzas & Cuentas Bancarias</span>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Cuentas receptoras oficiales (El Salvador, Rep. Dominicana y uglyCash EE.UU.) y parámetros de coste horario.
+                Cuentas bancarias receptoras oficiales y parámetros de coste horario y rentabilidad.
               </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleClearFinanzasData}
-                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700 hover:border-rose-500/40"
-                title="Vaciar facturas, gastos y horas para prueba manual limpia"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                <span>Limpiar Pruebas</span>
-              </button>
             </div>
           </div>
 
