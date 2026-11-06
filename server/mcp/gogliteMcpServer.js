@@ -1131,7 +1131,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             estado: activeProp.estado,
             modulosCount: activeProp.modulos?.length || 0,
             modulos: activeProp.modulos?.map(m => `${m.numero}: ${m.titulo}`),
-            portalUrl: `https://agencia.goglite.com/?token=${activeProp.id}`
+            portalUrl: `https://agencia.goglite.com/portal/${activeProp.portalToken || activeProp.id}`
           }, null, 2)
         }]
       };

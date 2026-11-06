@@ -26,10 +26,14 @@ export function ensureAuth() {
       if (user) {
         resolve(user);
       } else {
+        const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
         const isPublicPortal =
           typeof window !== 'undefined' &&
           (window.location.pathname.startsWith('/portal/') ||
-           window.location.pathname.startsWith('/cms-cliente/'));
+           window.location.pathname.startsWith('/cms-cliente/') ||
+           Boolean(searchParams?.get('token')) ||
+           Boolean(searchParams?.get('portal')) ||
+           Boolean(searchParams?.get('cms')));
         if (isPublicPortal) {
           signInAnonymously(auth)
             .then((cred) => resolve(cred.user))

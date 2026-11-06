@@ -486,6 +486,7 @@ export function getUnifiedPortalPayload(rawToken, { allowInternalIds = false } =
   // 2. Buscar en Presupuestos
   let presupuesto = presupuestos.find(p =>
     p.portalToken === token ||
+    p.id === token ||
     (allowInternalIds && (p.id === token || p.codigo === token)) ||
     (lead && (p.id === lead.presupuestoId || p.id === lead.portalConfig?.presupuestoId || p.leadId === lead.id))
   ) || null;

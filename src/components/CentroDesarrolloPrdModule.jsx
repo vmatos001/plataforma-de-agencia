@@ -33,12 +33,20 @@ import {
   Flame,
   RefreshCw,
   Sliders,
-  Share2
+  Share2,
+  Bell,
+  Hourglass
 } from 'lucide-react';
 import WireframesStoryBrandModule from './WireframesStoryBrandModule';
 import apiClient from '../services/apiClient';
 import { syncAllProyectosWithEvents } from '../services/projectMilestoneSync';
 import { buildProyectoFromPresupuesto } from '../services/contractGenerator';
+import {
+  requestNotificationPermission,
+  sendTimerNotification,
+  playTimerChime,
+  formatSecondsCountdown
+} from '../services/timerNotificationService';
 import {
   getAppStateCloud,
   saveAppStateCloud,
@@ -270,7 +278,11 @@ const DEFAULT_SPRINT_TIMER = {
   taskId: null,
   proyectoId: null,
   startTime: null,
-  accumulatedSeconds: 0
+  targetDurationSeconds: 45 * 60,
+  targetMinutes: 45,
+  targetEndTime: null,
+  accumulatedSeconds: 0,
+  warned5Min: false
 };
 
 function getSprintTimerFromStorage() {
@@ -279,18 +291,28 @@ function getSprintTimerFromStorage() {
     const raw = localStorage.getItem(SPRINT_TIMER_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') return parsed;
+      if (parsed && typeof parsed === 'object') return { ...DEFAULT_SPRINT_TIMER, ...parsed };
     }
   } catch {}
   return DEFAULT_SPRINT_TIMER;
 }
 
-function calculateSprintSeconds(timer) {
+// Calcula los segundos restantes en cuenta regresiva hacia atrás
+function calculateRemainingSprintSeconds(timer) {
+  if (!timer || !timer.isRunning || !timer.targetEndTime) return 0;
+  const remaining = Math.ceil((timer.targetEndTime - Date.now()) / 1000);
+  return Math.max(0, remaining);
+}
+
+// Calcula los segundos transcurridos reales para facturación (Con tope seguro)
+function calculateElapsedSprintSeconds(timer) {
   if (!timer || !timer.isRunning) return Number(timer?.accumulatedSeconds) || 0;
   let secs = Number(timer.accumulatedSeconds) || 0;
   if (timer.startTime) {
     const delta = Math.floor((Date.now() - timer.startTime) / 1000);
-    if (delta > 0) secs += delta;
+    // TOPE DE SEGURIDAD: Nunca excede la duración programada para evitar horas irreales
+    const maxSecs = timer.targetDurationSeconds || 45 * 60;
+    secs += Math.min(Math.max(0, delta), maxSecs);
   }
   return Math.max(0, secs);
 }
@@ -329,10 +351,17 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   // Estado del Sprint Kanban (Todas las tareas inician en Backlog ordenadas 1..12 con 0h)
   const [sprintTasks, setSprintTasks] = useState(DEFAULT_SPRINT_TASKS);
 
-  // Tarea en cronómetro activo (Persistente en segundo plano)
+  // Tarea en temporizador activo de cuenta regresiva (Timeboxing blindado)
   const [sprintTimer, setSprintTimer] = useState(() => getSprintTimerFromStorage());
-  const [timerSeconds, setTimerSeconds] = useState(() => calculateSprintSeconds(getSprintTimerFromStorage()));
+  const [timerSeconds, setTimerSeconds] = useState(() => calculateRemainingSprintSeconds(getSprintTimerFromStorage()));
   const activeTimerTaskId = sprintTimer.isRunning ? sprintTimer.taskId : null;
+
+  // Modales de control de tiempo
+  const [showTimeboxSelectModal, setShowTimeboxSelectModal] = useState(false);
+  const [timeboxTargetTaskId, setTimeboxTargetTaskId] = useState(null);
+  const [timeboxDurationMinutes, setTimeboxDurationMinutes] = useState(45);
+  const [showExpiredModal, setShowExpiredModal] = useState(false);
+  const [expiredAutoCommitSeconds, setExpiredAutoCommitSeconds] = useState(90);
 
   // Modal para agregar nueva tarea
   const [showNewTaskModal, setShowNewTaskModal] = useState(false);
@@ -602,19 +631,40 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   }, [sprintTasks, selectedProyectoId]);
 
 
-  // Manejo del cronómetro en vivo
-  // Recuperar cronómetro guardado en la nube al montar
+  // Manejo del temporizador blindado al montar
   useEffect(() => {
     (async () => {
       try {
         const cloudTimer = await getAppStateCloud('sprint_timer_active');
-        if (cloudTimer && cloudTimer.isRunning && cloudTimer.startTime) {
-          const localTimer = getSprintTimerFromStorage();
-          const chosen = (!localTimer.isRunning || (cloudTimer.startTime > (localTimer.startTime || 0)))
-            ? cloudTimer
-            : localTimer;
+        const localTimer = getSprintTimerFromStorage();
+        const chosen = (cloudTimer && cloudTimer.isRunning && (!localTimer.isRunning || (cloudTimer.startTime > (localTimer.startTime || 0))))
+          ? cloudTimer
+          : localTimer;
+
+        if (chosen && chosen.isRunning) {
+          // Si el timer venció en el pasado (mientras el usuario no estaba o la plataforma se cerró):
+          // Asentar automáticamente el bloque pactado y detenerlo limpiamente
+          if (chosen.targetEndTime && Date.now() >= chosen.targetEndTime) {
+            const scheduledSecs = chosen.targetDurationSeconds || (chosen.targetMinutes ? chosen.targetMinutes * 60 : 45 * 60);
+            const horasIncremento = Math.max(0.1, Number((scheduledSecs / 3600).toFixed(2)));
+            setSprintTasks(prev => prev.map(t => {
+              if (t.id === chosen.taskId) {
+                return {
+                  ...t,
+                  horasRegistradas: Number(((t.horasRegistradas || 0) + horasIncremento).toFixed(2))
+                };
+              }
+              return t;
+            }));
+            const stopped = { ...DEFAULT_SPRINT_TIMER };
+            setSprintTimer(stopped);
+            localStorage.removeItem(SPRINT_TIMER_STORAGE_KEY);
+            saveAppStateCloud('sprint_timer_active', 'timer', stopped).catch(() => {});
+            return;
+          }
+
           setSprintTimer(chosen);
-          setTimerSeconds(calculateSprintSeconds(chosen));
+          setTimerSeconds(calculateRemainingSprintSeconds(chosen));
           localStorage.setItem(SPRINT_TIMER_STORAGE_KEY, JSON.stringify(chosen));
           window.dispatchEvent(new CustomEvent('goglite_timer_heartbeat', { detail: chosen }));
         }
@@ -622,17 +672,49 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     })();
   }, []);
 
-  // Manejo del cronómetro en vivo persistente en segundo plano (recalculado por hora real)
+  // Ticking continuo de cuenta regresiva (1s) con aviso 5 min antes y alerta a los 0s
   useEffect(() => {
-    setTimerSeconds(calculateSprintSeconds(sprintTimer));
+    const currentRemaining = calculateRemainingSprintSeconds(sprintTimer);
+    setTimerSeconds(currentRemaining);
     if (!sprintTimer.isRunning) return;
 
-    // Recalcular el tiempo exacto cada 1 segundo con base en Date.now()
     const interval = setInterval(() => {
-      setTimerSeconds(calculateSprintSeconds(sprintTimer));
+      const remaining = calculateRemainingSprintSeconds(sprintTimer);
+      setTimerSeconds(remaining);
+
+      const tareaActual = sprintTasks.find(t => t.id === sprintTimer.taskId);
+      const taskTitle = tareaActual ? tareaActual.titulo : 'Tarea de Desarrollo';
+
+      // 1. Alerta preventiva 5 minutos antes (T - 5 min = 300 segundos)
+      if (remaining <= 300 && remaining > 0 && !sprintTimer.warned5Min) {
+        setSprintTimer(prev => {
+          const updated = { ...prev, warned5Min: true };
+          localStorage.setItem(SPRINT_TIMER_STORAGE_KEY, JSON.stringify(updated));
+          return updated;
+        });
+        playTimerChime('warning');
+        sendTimerNotification(
+          '⏳ Goglite · Faltan 5 minutos',
+          `Tu bloque en "${taskTitle}" está por concluir. Haz clic para extender el tiempo si lo requieres.`,
+          'timer-5min-warning'
+        );
+      }
+
+      // 2. Tiempo Cumplido (T = 0)
+      if (remaining <= 0) {
+        clearInterval(interval);
+        playTimerChime('completed');
+        sendTimerNotification(
+          '⏰ Goglite · ¡Bloque de Tiempo Cumplido!',
+          `Has completado los ${sprintTimer.targetMinutes || 45} min asignados a "${taskTitle}". Confirma si deseas extender o finalizar la tarea.`,
+          'timer-expired-alert'
+        );
+        setShowExpiredModal(true);
+        setExpiredAutoCommitSeconds(90);
+      }
     }, 1000);
 
-    // Heartbeat cada 30 segundos: auto-guardar en la nube y mantener la sesión viva
+    // Heartbeat cada 30 segundos
     const heartbeat = setInterval(() => {
       try {
         const updated = {
@@ -649,7 +731,26 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
       clearInterval(interval);
       clearInterval(heartbeat);
     };
-  }, [sprintTimer]);
+  }, [sprintTimer, sprintTasks]);
+
+  // Auto-cierre de seguridad si el modal de tiempo cumplido queda sin respuesta durante 90 segundos
+  useEffect(() => {
+    if (!showExpiredModal || !sprintTimer.isRunning) return;
+
+    const countdown = setInterval(() => {
+      setExpiredAutoCommitSeconds(prev => {
+        if (prev <= 1) {
+          clearInterval(countdown);
+          handleCommitTimer(sprintTimer.taskId, false);
+          setShowExpiredModal(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(countdown);
+  }, [showExpiredModal, sprintTimer]);
 
   const fetchProyectos = async () => {
     try {
@@ -780,145 +881,164 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     }
   };
 
-  // Cronómetro: Iniciar / Detener (Persistente con cálculo de hora real en segundo plano)
-  const handleToggleTimer = async (taskId) => {
-    if (activeTimerTaskId === taskId) {
-      // 1. Detener y calcular el tiempo exacto transcurrido en base al reloj real
-      const totalSecs = calculateSprintSeconds(sprintTimer);
-      const horasIncremento = Math.max(0.1, Number((totalSecs / 3600).toFixed(2)));
+  // Iniciar un nuevo bloque de tiempo (Timeboxing blindado)
+  const handleStartTimeboxTimer = async (taskId, minutes = 45) => {
+    requestNotificationPermission().catch(() => {});
 
-      // 2. Actualizar tarea localmente
-      setSprintTasks(prev => prev.map(t => {
-        if (t.id === taskId) {
-          return {
-            ...t,
-            horasRegistradas: Number(((t.horasRegistradas || 0) + horasIncremento).toFixed(2))
-          };
-        }
-        return t;
-      }));
+    // Si ya había otro timer corriendo en otra tarea, acumular sus horas antes de cambiar
+    if (sprintTimer.isRunning && sprintTimer.taskId && sprintTimer.taskId !== taskId) {
+      await handleCommitTimer(sprintTimer.taskId, true);
+    }
 
-      // 3. Limpiar timer persistente en local y nube
-      const stoppedTimer = {
-        isRunning: false,
-        taskId: null,
-        proyectoId: null,
-        startTime: null,
-        accumulatedSeconds: 0
-      };
-      setSprintTimer(stoppedTimer);
-      setTimerSeconds(0);
-      try {
-        localStorage.removeItem(SPRINT_TIMER_STORAGE_KEY);
-        saveAppStateCloud('sprint_timer_active', 'timer', stoppedTimer).catch(() => {});
-        window.dispatchEvent(new CustomEvent('goglite_timer_heartbeat', { detail: stoppedTimer }));
-      } catch {}
+    const durationSecs = minutes * 60;
+    const now = Date.now();
+    const newTimer = {
+      isRunning: true,
+      taskId,
+      proyectoId: proyectoActivo?.id || null,
+      startTime: now,
+      targetDurationSeconds: durationSecs,
+      targetMinutes: minutes,
+      targetEndTime: now + (durationSecs * 1000),
+      accumulatedSeconds: 0,
+      warned5Min: false
+    };
 
-      // 4. Enviar automáticamente al Time Tracker de Finanzas (Módulo 7)
-      const tareaObj = sprintTasks.find(t => t.id === taskId);
-      const clienteEmpresa = proyectoActivo.cliente?.empresa || 'Cliente de Agencia';
-      const conceptoTarea = tareaObj ? tareaObj.titulo : 'Desarrollo en Sprint';
-      const costoHoraEst = 30;
-      const fechaHoy = new Date().toISOString().split('T')[0];
+    setSprintTimer(newTimer);
+    setTimerSeconds(durationSecs);
+    setShowTimeboxSelectModal(false);
+    setShowExpiredModal(false);
 
-      // Sincronizar con Firestore finanzas_v1
-      try {
-        const parsedFin = (await getAppStateCloud('finanzas_v1')) || {};
-        const localTimeEntry = {
-          id: 'time-' + Date.now(),
-          proyectoId: proyectoActivo.id,
-          cliente: clienteEmpresa,
-          concepto: conceptoTarea,
-          categoria: 'frontend_astro',
-          horas: horasIncremento,
-          costoHora: costoHoraEst,
-          costoTotal: Number((horasIncremento * costoHoraEst).toFixed(2)),
-          fecha: fechaHoy
-        };
-        parsedFin.timeEntries = [localTimeEntry, ...(parsedFin.timeEntries || [])];
-        saveAppStateCloud('finanzas_v1', 'finanzas', parsedFin).catch(() => {});
-      } catch (e) {}
+    try {
+      localStorage.setItem(SPRINT_TIMER_STORAGE_KEY, JSON.stringify(newTimer));
+      saveAppStateCloud('sprint_timer_active', 'timer', newTimer).catch(() => {});
+      window.dispatchEvent(new CustomEvent('goglite_timer_heartbeat', { detail: newTimer }));
+    } catch {}
+  };
 
-      try {
-        await apiClient.post('/api/finanzas/horas', {
-          proyectoId: proyectoActivo.id,
-          cliente: clienteEmpresa,
-          proyectoNombre: clienteEmpresa,
-          concepto: conceptoTarea,
-          tarea: conceptoTarea,
-          categoria: 'frontend_astro',
-          descripcion: `Tiempo registrado en vivo desde Sprint Kanban (${totalSecs}s / ${horasIncremento}h)`,
-          horas: horasIncremento,
-          costoHora: costoHoraEst,
-          costoPorHora: costoHoraEst,
-          moneda: 'USD',
-          fecha: fechaHoy
-        });
-      } catch (err) {
-        console.warn('Horas guardadas en local');
-      }
+  // Extender tiempo de la tarea actual (+15, +30, +60 min)
+  const handleExtendTimer = (extraMinutes = 15) => {
+    const extraSecs = extraMinutes * 60;
+    const now = Date.now();
+    const baseRemaining = calculateRemainingSprintSeconds(sprintTimer);
+    const newRemaining = baseRemaining + extraSecs;
+    const newEndTime = now + (newRemaining * 1000);
 
-      window.dispatchEvent(new CustomEvent('goglite_tasks_updated'));
-      window.dispatchEvent(new CustomEvent('goglite_proyectos_synced'));
+    const updated = {
+      ...sprintTimer,
+      isRunning: true,
+      targetDurationSeconds: (sprintTimer.targetDurationSeconds || 0) + extraSecs,
+      targetMinutes: (sprintTimer.targetMinutes || 0) + extraMinutes,
+      targetEndTime: newEndTime,
+      warned5Min: false,
+      lastHeartbeat: now
+    };
+
+    setSprintTimer(updated);
+    setTimerSeconds(newRemaining);
+    setShowExpiredModal(false);
+
+    try {
+      localStorage.setItem(SPRINT_TIMER_STORAGE_KEY, JSON.stringify(updated));
+      saveAppStateCloud('sprint_timer_active', 'timer', updated).catch(() => {});
+      window.dispatchEvent(new CustomEvent('goglite_timer_heartbeat', { detail: updated }));
+    } catch {}
+  };
+
+  // Asentar y registrar las horas al P&L / Finanzas y a la tarea
+  const handleCommitTimer = async (taskId, isEarlyStop = false) => {
+    const targetTaskId = taskId || sprintTimer.taskId;
+    if (!targetTaskId) return;
+
+    let totalSecs = 0;
+    if (isEarlyStop) {
+      totalSecs = calculateElapsedSprintSeconds(sprintTimer);
     } else {
-      // Si ya había otro timer corriendo, acumular sus horas antes de cambiar
-      if (sprintTimer.isRunning && sprintTimer.taskId) {
-        const prevTotalSecs = calculateSprintSeconds(sprintTimer);
-        const prevHoras = Math.max(0.1, Number((prevTotalSecs / 3600).toFixed(2)));
-        setSprintTasks(prev => prev.map(t => {
-          if (t.id === sprintTimer.taskId) {
-            return {
-              ...t,
-              horasRegistradas: Number(((t.horasRegistradas || 0) + prevHoras).toFixed(2))
-            };
-          }
-          return t;
-        }));
+      totalSecs = sprintTimer.targetDurationSeconds || (sprintTimer.targetMinutes ? sprintTimer.targetMinutes * 60 : 45 * 60);
+    }
 
-        // Sincronizar con el Time Tracker de Finanzas (Fase 7)
-        try {
-          const prevTarea = sprintTasks.find(t => t.id === sprintTimer.taskId);
-          const clienteEmp = proyectoActivo.cliente?.empresa || 'Cliente de Agencia';
-          const conceptoTarea = prevTarea ? prevTarea.titulo : 'Desarrollo en Sprint';
-          const costoHoraEst = 30;
-          const fechaHoy = new Date().toISOString().split('T')[0];
+    const horasIncremento = Math.max(0.1, Number((totalSecs / 3600).toFixed(2)));
 
-          getAppStateCloud('finanzas_v1').then(parsedFin => {
-            parsedFin = parsedFin || {};
-            const entry = {
-              id: 'time-' + Date.now(),
-              proyectoId: proyectoActivo.id,
-              cliente: clienteEmp,
-              concepto: conceptoTarea,
-              categoria: 'frontend_astro',
-              horas: prevHoras,
-              costoHora: costoHoraEst,
-              costoTotal: Number((prevHoras * costoHoraEst).toFixed(2)),
-              fecha: fechaHoy
-            };
-            parsedFin.timeEntries = [entry, ...(parsedFin.timeEntries || [])];
-            saveAppStateCloud('finanzas_v1', 'finanzas', parsedFin).catch(() => {});
-          }).catch(() => {});
-        } catch (e) {}
-
-        window.dispatchEvent(new CustomEvent('goglite_tasks_updated'));
+    // 1. Actualizar horas en tarea local
+    setSprintTasks(prev => prev.map(t => {
+      if (t.id === targetTaskId) {
+        return {
+          ...t,
+          horasRegistradas: Number(((t.horasRegistradas || 0) + horasIncremento).toFixed(2))
+        };
       }
+      return t;
+    }));
 
-      // Iniciar en la nueva tarea guardando el startTime real absoluto
-      const newTimer = {
-        isRunning: true,
-        taskId,
+    // 2. Limpiar timer persistente
+    const stoppedTimer = { ...DEFAULT_SPRINT_TIMER };
+    setSprintTimer(stoppedTimer);
+    setTimerSeconds(0);
+    setShowExpiredModal(false);
+
+    try {
+      localStorage.removeItem(SPRINT_TIMER_STORAGE_KEY);
+      saveAppStateCloud('sprint_timer_active', 'timer', stoppedTimer).catch(() => {});
+      window.dispatchEvent(new CustomEvent('goglite_timer_heartbeat', { detail: stoppedTimer }));
+    } catch {}
+
+    // 3. Registrar en Finanzas Cloud (finanzas_v1)
+    const tareaObj = sprintTasks.find(t => t.id === targetTaskId);
+    const clienteEmpresa = proyectoActivo.cliente?.empresa || 'Cliente de Agencia';
+    const conceptoTarea = tareaObj ? tareaObj.titulo : 'Desarrollo en Sprint';
+    const costoHoraEst = 30;
+    const fechaHoy = new Date().toISOString().split('T')[0];
+
+    try {
+      const parsedFin = (await getAppStateCloud('finanzas_v1')) || {};
+      const localTimeEntry = {
+        id: 'time-' + Date.now(),
         proyectoId: proyectoActivo.id,
-        startTime: Date.now(),
-        accumulatedSeconds: 0
+        cliente: clienteEmpresa,
+        concepto: conceptoTarea,
+        categoria: 'frontend_astro',
+        horas: horasIncremento,
+        costoHora: costoHoraEst,
+        costoTotal: Number((horasIncremento * costoHoraEst).toFixed(2)),
+        fecha: fechaHoy
       };
-      setSprintTimer(newTimer);
-      setTimerSeconds(0);
-      try {
-        localStorage.setItem(SPRINT_TIMER_STORAGE_KEY, JSON.stringify(newTimer));
-        saveAppStateCloud('sprint_timer_active', 'timer', newTimer).catch(() => {});
-        window.dispatchEvent(new CustomEvent('goglite_timer_heartbeat', { detail: newTimer }));
-      } catch {}
+      parsedFin.timeEntries = [localTimeEntry, ...(parsedFin.timeEntries || [])];
+      saveAppStateCloud('finanzas_v1', 'finanzas', parsedFin).catch(() => {});
+    } catch (e) {}
+
+    try {
+      await apiClient.post('/api/finanzas/horas', {
+        proyectoId: proyectoActivo.id,
+        cliente: clienteEmpresa,
+        proyectoNombre: clienteEmpresa,
+        concepto: conceptoTarea,
+        tarea: conceptoTarea,
+        categoria: 'frontend_astro',
+        descripcion: `Tiempo Timebox registrado desde Sprint (${totalSecs}s / ${horasIncremento}h)`,
+        horas: horasIncremento,
+        costoHora: costoHoraEst,
+        costoPorHora: costoHoraEst,
+        moneda: 'USD',
+        fecha: fechaHoy
+      });
+    } catch (err) {
+      console.warn('Horas guardadas en local/cloud');
+    }
+
+    window.dispatchEvent(new CustomEvent('goglite_tasks_updated'));
+    window.dispatchEvent(new CustomEvent('goglite_proyectos_synced'));
+  };
+
+  // Clic en el botón de cronómetro de la tarjeta
+  const handleTaskPlayClick = (taskId) => {
+    if (activeTimerTaskId === taskId) {
+      // Si ya está corriendo en ESTA tarea, ofrecer finalizar y asentar
+      handleCommitTimer(taskId, true);
+    } else {
+      // Abrir selector de bloque
+      setTimeboxTargetTaskId(taskId);
+      setTimeboxDurationMinutes(45);
+      setShowTimeboxSelectModal(true);
     }
   };
 
@@ -930,7 +1050,7 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   // Eliminar tarea
   const handleDeleteTask = (taskId) => {
     if (activeTimerTaskId === taskId) {
-      const stoppedTimer = { isRunning: false, taskId: null, proyectoId: null, startTime: null, accumulatedSeconds: 0 };
+      const stoppedTimer = { ...DEFAULT_SPRINT_TIMER };
       setSprintTimer(stoppedTimer);
       setTimerSeconds(0);
       try {
@@ -1157,15 +1277,31 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
 
         {/* Timer Bar Flotante si hay una tarea en ejecución */}
         {activeTimerTaskId && (
-          <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-bold animate-pulse">
-            <Clock className="w-3.5 h-3.5" />
-            <span>Cronómetro Activo: {formatSeconds(timerSeconds)}</span>
-            <button
-              onClick={() => handleToggleTimer(activeTimerTaskId)}
-              className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-sans font-semibold transition-colors"
-            >
-              Guardar y Pausar
-            </button>
+          <div className="flex items-center gap-3 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-emerald-500/40 text-emerald-300 text-xs font-mono shadow-xl backdrop-blur-sm">
+            <div className="flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
+              <span className="text-[11px] text-slate-400 font-sans hidden sm:inline">Restante:</span>
+              <span className="text-xs font-extrabold text-white bg-black/40 px-2 py-0.5 rounded border border-emerald-500/30">
+                {formatSecondsCountdown(timerSeconds)}
+              </span>
+              <span className="text-[10px] text-slate-400">({sprintTimer.targetMinutes || 45}m tope)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => handleExtendTimer(15)}
+                className="px-2 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-300 text-[10px] font-sans font-bold transition-colors border border-emerald-500/30"
+                title="Añadir 15 minutos al bloque actual"
+              >
+                +15m
+              </button>
+              <button
+                onClick={() => handleCommitTimer(activeTimerTaskId, true)}
+                className="px-2.5 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-sans font-semibold transition-colors shadow-sm"
+                title="Finalizar tarea anticipadamente con el tiempo real transcurrido"
+              >
+                Finalizar Ahora
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1289,23 +1425,23 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
 
                               {/* Botón de Iniciar / Pausar Cronómetro */}
                               <button
-                                onClick={() => handleToggleTimer(task.id)}
+                                onClick={() => handleTaskPlayClick(task.id)}
                                 className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${
                                   isTimerRunning
                                     ? 'bg-rose-600 text-white animate-pulse'
                                     : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30'
                                 }`}
-                                title={isTimerRunning ? 'Pausar y Registrar Horas al P&L' : 'Iniciar Cronómetro en Vivo'}
+                                title={isTimerRunning ? 'Finalizar anticipadamente y registrar tiempo transcurrido' : 'Iniciar Temporizador con Bloque Seguro'}
                               >
                                 {isTimerRunning ? (
                                   <>
                                     <Square className="w-2.5 h-2.5 fill-current" />
-                                    <span>{formatSeconds(timerSeconds)}</span>
+                                    <span>{formatSecondsCountdown(timerSeconds)}</span>
                                   </>
                                 ) : (
                                   <>
                                     <Play className="w-2.5 h-2.5 fill-current" />
-                                    <span>Cronómetro</span>
+                                    <span>Iniciar Bloque</span>
                                   </>
                                 )}
                               </button>
@@ -1992,6 +2128,175 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: SELECCIÓN DE BLOQUE TIMEBOXING                                      */}
+      {/* ========================================================================= */}
+      {showTimeboxSelectModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#0f1422] border border-slate-800 rounded-2xl p-5 space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Clock className="w-4 h-4 text-emerald-400" />
+                <span>Iniciar Temporizador Blindado (Timeboxing)</span>
+              </h3>
+              <button
+                onClick={() => setShowTimeboxSelectModal(false)}
+                className="text-slate-500 hover:text-slate-300"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/80">
+                <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block mb-0.5">Tarea a Desarrollar:</span>
+                <p className="text-xs font-semibold text-slate-200">
+                  {sprintTasks.find(t => t.id === timeboxTargetTaskId)?.titulo || 'Tarea de Sprint'}
+                </p>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-mono text-slate-300 block mb-2">
+                  Selecciona la duración estimada del bloque:
+                </label>
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  {[15, 30, 45, 60].map(mins => (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => setTimeboxDurationMinutes(mins)}
+                      className={`py-2 rounded-xl text-xs font-bold transition-all border ${
+                        timeboxDurationMinutes === mins
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-md scale-[1.02]'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200'
+                      }`}
+                    >
+                      {mins} min
+                      {mins === 45 && <span className="block text-[8px] font-normal text-emerald-400">Recomendado</span>}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-400 font-mono">O personalizar:</span>
+                  <input
+                    type="number"
+                    min="5"
+                    max="180"
+                    step="5"
+                    value={timeboxDurationMinutes}
+                    onChange={(e) => setTimeboxDurationMinutes(Math.max(5, Number(e.target.value) || 5))}
+                    className="w-20 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white text-center font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                  <span className="text-[11px] text-slate-400 font-mono">minutos</span>
+                </div>
+              </div>
+
+              {/* Caja informativa de seguridad */}
+              <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/20 flex items-start gap-2 text-[11px] text-emerald-300/90 leading-relaxed">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <p>
+                  <strong>Tope de Seguridad Activo:</strong> El reloj contará hacia atrás. Te avisará 5 minutos antes con alerta auditiva y notificación nativa. Si no estás al finalizar, <strong>se cerrará automáticamente registrando únicamente este bloque</strong>, blindando tus métricas contra horas irreales.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowTimeboxSelectModal(false)}
+                  className="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleStartTimeboxTimer(timeboxTargetTaskId, timeboxDurationMinutes)}
+                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Iniciar {timeboxDurationMinutes} min</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: TIEMPO CUMPLIDO (EXTENSIÓN O FINALIZACIÓN)                          */}
+      {/* ========================================================================= */}
+      {showExpiredModal && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#0f1422] border-2 border-amber-500/40 rounded-2xl p-5 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                <Bell className="w-5 h-5 animate-bounce" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">¡Bloque de Tiempo Cumplido!</h3>
+                <p className="text-[11px] text-amber-400/90 font-mono">
+                  Completaste los {sprintTimer.targetMinutes || 45} min pactados
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block mb-0.5">Tarea:</span>
+                <p className="text-xs font-semibold text-slate-200">
+                  {sprintTasks.find(t => t.id === sprintTimer.taskId)?.titulo || 'Tarea en Sprint'}
+                </p>
+              </div>
+
+              <p className="text-xs text-slate-300">
+                ¿Ya finalizaste el trabajo de esta tarea o requieres añadir más tiempo de concentración?
+              </p>
+
+              <div>
+                <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1.5">Añadir más tiempo a esta tarea:</span>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => handleExtendTimer(15)}
+                    className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 font-bold text-xs border border-emerald-500/30 hover:border-emerald-500/60 transition-all flex items-center justify-center gap-1"
+                  >
+                    <span>+15 min</span>
+                  </button>
+                  <button
+                    onClick={() => handleExtendTimer(30)}
+                    className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 font-bold text-xs border border-emerald-500/30 hover:border-emerald-500/60 transition-all flex items-center justify-center gap-1"
+                  >
+                    <span>+30 min</span>
+                  </button>
+                  <button
+                    onClick={() => handleExtendTimer(60)}
+                    className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 font-bold text-xs border border-emerald-500/30 hover:border-emerald-500/60 transition-all flex items-center justify-center gap-1"
+                  >
+                    <span>+60 min</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Botón de Finalización */}
+              <button
+                type="button"
+                onClick={() => handleCommitTimer(sprintTimer.taskId, false)}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Terminar Tarea y Asentar {sprintTimer.targetMinutes || 45} min</span>
+              </button>
+
+              {/* Indicador de Auto-asentado por inactividad */}
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 text-center">
+                <p className="text-[10px] text-slate-400 font-mono">
+                  Salvaguarda de inactividad: Asentando y cerrando automáticamente en <span className="text-amber-400 font-bold">{expiredAutoCommitSeconds}s</span> si no hay respuesta.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       )}

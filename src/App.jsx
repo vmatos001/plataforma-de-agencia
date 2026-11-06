@@ -94,7 +94,15 @@ export default function App() {
   const [clientPortalToken, setClientPortalToken] = useState(() => {
     if (typeof window !== 'undefined') {
       const match = window.location.pathname.match(/^\/portal\/([a-zA-Z0-9_-]+)/);
-      return match ? match[1] : null;
+      if (match) return match[1];
+      const params = new URLSearchParams(window.location.search);
+      const qToken = params.get('token') || params.get('portal');
+      if (qToken) {
+        try {
+          window.history.replaceState({}, '', `/portal/${qToken}`);
+        } catch {}
+        return qToken;
+      }
     }
     return null;
   });
@@ -102,7 +110,15 @@ export default function App() {
   const [clientCmsToken, setClientCmsToken] = useState(() => {
     if (typeof window !== 'undefined') {
       const match = window.location.pathname.match(/^\/cms-cliente\/([a-zA-Z0-9_-]+)/);
-      return match ? match[1] : null;
+      if (match) return match[1];
+      const params = new URLSearchParams(window.location.search);
+      const qCms = params.get('cms') || params.get('cmsSlug');
+      if (qCms) {
+        try {
+          window.history.replaceState({}, '', `/cms-cliente/${qCms}`);
+        } catch {}
+        return qCms;
+      }
     }
     return null;
   });
@@ -253,7 +269,14 @@ export default function App() {
         const sprintTimerStr = localStorage.getItem('goglite_active_sprint_timer_state');
         if (sprintTimerStr) {
           const t = JSON.parse(sprintTimerStr);
-          if (t && t.isRunning && t.startTime) return true;
+          if (t && t.isRunning && t.startTime) {
+            // Si el temporizador tiene una hora de fin programada y ya venció (+2 min de gracia),
+            // no mantiene la sesión viva indefinidamente por seguridad.
+            if (t.targetEndTime && (Date.now() > t.targetEndTime + 120000)) {
+              return false;
+            }
+            return true;
+          }
         }
         const finTimerStr = localStorage.getItem('goglite_live_timer_v1');
         if (finTimerStr) {
