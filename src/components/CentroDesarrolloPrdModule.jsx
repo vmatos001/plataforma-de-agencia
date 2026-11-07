@@ -333,6 +333,7 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   const [prdByProjMap, setPrdByProjMap] = useState({});
   const [sprintTasksByProjMap, setSprintTasksByProjMap] = useState({});
   const [repoVaultByProjMap, setRepoVaultByProjMap] = useState({});
+  const [isCloudLoaded, setIsCloudLoaded] = useState(false);
 
   const updatePrdConfig = (updater) => {
     setPrdConfig(prev => {
@@ -513,7 +514,11 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         if (cloudVault && typeof cloudVault === 'object') {
           setRepoVaultByProjMap(prev => ({ ...prev, ...cloudVault }));
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('Error cargando estado inicial cloud:', e);
+      } finally {
+        setIsCloudLoaded(true);
+      }
     })();
 
     const handleStorageChange = () => {
@@ -529,37 +534,55 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     };
   }, []);
 
-  // Cargar tareas y bóveda específicas cuando cambia el proyecto seleccionado
+  // Cargar tareas y bóveda específicas cuando cambia el proyecto seleccionado o se carga la nube
   useEffect(() => {
-    if (!selectedProyectoId) return;
+    if (!selectedProyectoId || !isCloudLoaded) return;
     try {
       const tasks = sprintTasksByProjMap[selectedProyectoId];
-      if (Array.isArray(tasks)) {
-        const isOldMock = tasks.some(t => t.id === 'fase-1' && t.columna === 'completado');
-        if (isOldMock) {
-          setSprintTasks(DEFAULT_SPRINT_TASKS);
-        } else {
-          const playbookMap = new Map(PLAYBOOK_12_FASES_TASKS.map(p => [p.id, p]));
-          const synced = tasks.map(t => {
-            const official = playbookMap.get(t.id);
-            if (official) {
-              return {
-                ...t,
-                titulo: official.titulo,
-                descripcion: official.descripcion,
-                horasEstimadas: t.horasEstimadas || official.horasEstimadas,
-                prioridad: t.prioridad || official.prioridad
-              };
-            }
-            return t;
-          });
-          setSprintTasks(synced);
+      const proj = proyectos.find(p => p.id === selectedProyectoId);
+      const registroHoras = Array.isArray(proj?.seguimiento?.registroHoras) ? proj.seguimiento.registroHoras : [];
+
+      let rawTasks = Array.isArray(tasks) && tasks.length > 0 ? tasks : DEFAULT_SPRINT_TASKS;
+      const playbookMap = new Map(PLAYBOOK_12_FASES_TASKS.map(p => [p.id, p]));
+      let synced = rawTasks.map(t => {
+        const official = playbookMap.get(t.id);
+        if (official) {
+          return {
+            ...t,
+            titulo: official.titulo,
+            descripcion: official.descripcion,
+            horasEstimadas: t.horasEstimadas || official.horasEstimadas,
+            prioridad: t.prioridad || official.prioridad
+          };
         }
-      } else {
-        setSprintTasks(DEFAULT_SPRINT_TASKS);
+        return t;
+      });
+
+      // Auto-reconciliar con las horas del proyecto (seguimiento.registroHoras) para proteger contra reseteos
+      if (registroHoras.length > 0) {
+        synced = synced.map(t => {
+          if (t.horasRegistradas > 0 && t.columna !== 'backlog') return t;
+          const matched = registroHoras.filter(r => {
+            const f = (r.fase || '').toLowerCase();
+            return f.includes(t.id) ||
+                   (t.id === 'fase-1' && (f.includes('fase 1') || f.includes('infraestructura'))) ||
+                   (t.id === 'fase-2' && (f.includes('fase 2') || f.includes('identidad') || f.includes('arquitectura'))) ||
+                   (t.id === 'fase-3' && (f.includes('fase 3') || f.includes('diseño') || f.includes('optimización')));
+          });
+          if (matched.length > 0) {
+            const sum = matched.reduce((a, b) => a + (Number(b.horas) || 0), 0);
+            return {
+              ...t,
+              horasRegistradas: Math.max(t.horasRegistradas || 0, Number(sum.toFixed(2))),
+              columna: t.columna === 'backlog' ? 'completado' : t.columna
+            };
+          }
+          return t;
+        });
       }
 
-      const proj = proyectos.find(p => p.id === selectedProyectoId);
+      setSprintTasks(synced);
+
       const boveda = proj?.bovedaRepos || proj?.repoVault || {};
       const baseVault = {
         googleStitchUrl: boveda.googleStitchUrl || '',
@@ -614,21 +637,20 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     } catch (e) {
       console.warn('Error en sincronización de proyecto:', e);
     }
-  }, [selectedProyectoId, proyectos, selectedCountry]);
+  }, [selectedProyectoId, sprintTasksByProjMap, prdByProjMap, repoVaultByProjMap, proyectos, selectedCountry, isCloudLoaded]);
 
-  // Persistir tareas y bóveda en Firestore Cloud (aislado por proyecto) y sincronizar hitos
+  // Persistir tareas y bóveda en Firestore Cloud (aislado por proyecto) y sincronizar hitos (solo tras hidratar desde la nube)
   useEffect(() => {
+    if (!isCloudLoaded || !selectedProyectoId) return;
     try {
-      if (selectedProyectoId) {
-        setSprintTasksByProjMap(prev => {
-          const updated = { ...prev, [selectedProyectoId]: sprintTasks };
-          saveAppStateCloud('sprint_tasks_by_project', 'sprint_tasks', updated).catch(() => {});
-          return updated;
-        });
-      }
+      setSprintTasksByProjMap(prev => {
+        const updated = { ...prev, [selectedProyectoId]: sprintTasks };
+        saveAppStateCloud('sprint_tasks_by_project', 'sprint_tasks', updated).catch(() => {});
+        return updated;
+      });
       syncAllProyectosWithEvents(sprintTasks, selectedProyectoId || null);
     } catch (e) {}
-  }, [sprintTasks, selectedProyectoId]);
+  }, [sprintTasks, selectedProyectoId, isCloudLoaded]);
 
 
   // Manejo del temporizador blindado al montar
@@ -1090,6 +1112,9 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
 
   // Cargar las 12 Fases Oficiales del Playbook Maestro Goglite 2026 (Todas en Backlog con 0h)
   const handleResetToPlaybook12Fases = () => {
+    if (!window.confirm('¿Seguro que deseas reiniciar las 12 fases oficiales? Esto reemplazará las tareas y horas registradas por la plantilla inicial.')) {
+      return;
+    }
     setSprintTasks(PLAYBOOK_12_FASES_TASKS);
     try {
       if (selectedProyectoId) {
