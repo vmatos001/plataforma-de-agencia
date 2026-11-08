@@ -270,9 +270,10 @@ export default function App() {
         if (sprintTimerStr) {
           const t = JSON.parse(sprintTimerStr);
           if (t && t.isRunning && t.startTime) {
-            // Si el temporizador tiene una hora de fin programada y ya venció (+2 min de gracia),
-            // no mantiene la sesión viva indefinidamente por seguridad.
-            if (t.targetEndTime && (Date.now() > t.targetEndTime + 120000)) {
+            // Protección activa: mientras el cronómetro esté corriendo en desarrollo, mantiene la sesión viva
+            // Tope de jornada máxima de 12 horas consecutivas para evitar sesiones huérfanas
+            const maxSessionLifeMs = 12 * 60 * 60 * 1000;
+            if (Date.now() - t.startTime > maxSessionLifeMs) {
               return false;
             }
             return true;

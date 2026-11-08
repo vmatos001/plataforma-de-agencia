@@ -210,16 +210,34 @@ export async function getPortalCloud(token) {
           item.portalToken === cleanToken ||
           item.id === cleanToken ||
           item.leadId === cleanToken ||
+          item.presupuestoId === cleanToken ||
+          item.portalConfig?.presupuestoId === cleanToken ||
           item.codigo === cleanToken ||
           (item.id && cleanToken.includes(item.id)) ||
           (item.leadId && cleanToken.includes(item.leadId))
         );
       };
 
-      const matchedLead = portalData?.lead || cloudLeads.find(matchToken) || null;
-      const targetEmp = (matchedLead?.empresa || portalData?.proyecto?.cliente?.empresa || portalData?.presupuesto?.cliente?.empresa || '').toLowerCase().trim();
+      const matchedPropFirst = portalData?.presupuesto || cloudProps.find(matchToken) || null;
+      const propEmp = (matchedPropFirst?.cliente?.empresa || portalData?.proyecto?.cliente?.empresa || '').toLowerCase().trim();
+      const propPhone = (matchedPropFirst?.cliente?.telefono || portalData?.proyecto?.cliente?.telefono || '').replace(/\D/g, '');
 
-      const matchedProp = portalData?.presupuesto || cloudProps.find(p =>
+      const matchedLead = portalData?.lead || cloudLeads.find(l => {
+        if (matchToken(l)) return true;
+        const lEmp = (l.empresa || '').toLowerCase().trim();
+        const lPhone = (l.telefono || '').replace(/\D/g, '');
+        if (propPhone && lPhone && propPhone.length >= 8 && (lPhone === propPhone || lPhone.endsWith(propPhone.slice(-8)) || propPhone.endsWith(lPhone.slice(-8)))) {
+          return true;
+        }
+        if (propEmp && lEmp && propEmp.length >= 5 && lEmp === propEmp) {
+          return true;
+        }
+        return false;
+      }) || null;
+
+      const targetEmp = (matchedLead?.empresa || propEmp || '').toLowerCase().trim();
+
+      const matchedProp = matchedPropFirst || cloudProps.find(p =>
         matchToken(p) || (targetEmp && p.cliente?.empresa && p.cliente.empresa.toLowerCase().trim() === targetEmp)
       ) || null;
 
@@ -240,6 +258,7 @@ export async function getPortalCloud(token) {
           token: cleanToken,
           lead: matchedLead || (matchedProj?.cliente ? {
             id: matchedProj.leadId || matchedProj.id,
+            _syntheticPortalLead: !matchedProj.leadId,
             empresa: matchedProj.cliente.empresa,
             contacto: matchedProj.cliente.nombre,
             telefono: matchedProj.cliente.telefono,
@@ -248,6 +267,7 @@ export async function getPortalCloud(token) {
             portalToken: cleanToken
           } : (matchedProp?.cliente ? {
             id: matchedProp.leadId || matchedProp.id,
+            _syntheticPortalLead: !matchedProp.leadId,
             empresa: matchedProp.cliente.empresa,
             contacto: matchedProp.cliente.nombre,
             telefono: matchedProp.cliente.telefono,
@@ -341,7 +361,6 @@ export async function getProyectosCloud() {
           item.hidden === true ||
           isExcludedProyecto(item.cliente?.empresa || item.cliente?.nombre || item.onboarding?.datos?.nombreComercial || item.nombre, item.id, item.codigo, item.presupuestoId, item.presupuestoCodigo, docSnap.id)
         ) {
-          deleteDoc(docSnap.ref).catch(() => {});
           return;
         }
         list.push(item);
@@ -477,8 +496,13 @@ export function subscribeProyectosCloud(onUpdate) {
         if (docSnap.exists()) {
           const data = docSnap.data() || {};
           const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
-          if (isExcludedProyecto(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, item.presupuestoId, item.presupuestoCodigo, docSnap.id)) {
-            deleteDoc(docSnap.ref).catch(() => {});
+          if (
+            item.deleted === true ||
+            item.isDemo === true ||
+            item.estado === 'eliminado' ||
+            item.hidden === true ||
+            isExcludedProyecto(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, item.presupuestoId, item.presupuestoCodigo, docSnap.id)
+          ) {
             return;
           }
           list.push(item);
@@ -499,6 +523,79 @@ export function subscribeProyectosCloud(onUpdate) {
 // ============================================================================
 
 /**
+ * Deduplica leads del CRM por teléfono normalizado (últimos 8-10 dígitos) o nombre exacto de empresa,
+ * priorizando el registro maestro (crm-lead-* / lead-local-*) sobre registros sintéticos (prop-*).
+ */
+export function deduplicateCrmLeadsList(leadsList = []) {
+  if (!Array.isArray(leadsList)) return [];
+  const valid = leadsList.filter(l => l && l.id && !String(l.id).startsWith('prop-') && !l._syntheticPortalLead);
+  const byKey = new Map();
+
+  const scoreLead = (l) => {
+    let score = 0;
+    const idStr = String(l.id || '');
+    if (idStr.startsWith('lead-local-') || idStr.startsWith('crm-lead-')) score += 50;
+    if (Array.isArray(l.interacciones) && l.interacciones.length > 0) score += l.interacciones.length * 5;
+    if (l.whatsappData?.mensajes?.length > 0) score += l.whatsappData.mensajes.length * 3;
+    if (l.resumenEjecutivo) score += 10;
+    if (l.presupuestoId) score += 10;
+    if (l.etapa && l.etapa !== 'nuevo' && l.etapa !== 'contactado') score += 8;
+    return score;
+  };
+
+  for (const item of valid) {
+    const digits = String(item.telefono || item.whatsappData?.telefono || '').replace(/\D/g, '');
+    const phoneKey = digits.length >= 8 ? `phone:${digits.slice(-8)}` : null;
+    const empNorm = String(item.empresa || item.nombreEmpresa || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const empKey = empNorm.length >= 5 ? `emp:${empNorm}` : null;
+
+    let matchKey = null;
+    if (phoneKey && byKey.has(phoneKey)) matchKey = phoneKey;
+    else if (empKey && byKey.has(empKey)) matchKey = empKey;
+
+    if (!matchKey) {
+      const primaryKey = phoneKey || empKey || `id:${item.id}`;
+      byKey.set(primaryKey, item);
+      if (phoneKey && empKey) byKey.set(empKey, item);
+    } else {
+      const existing = byKey.get(matchKey);
+      if (existing.id === item.id) continue;
+      const keepExisting = scoreLead(existing) >= scoreLead(item);
+      const winner = keepExisting ? existing : item;
+      const loser = keepExisting ? item : existing;
+
+      // Fusionar interacciones sin duplicar IDs
+      const interMap = new Map();
+      [...(winner.interacciones || []), ...(loser.interacciones || [])].forEach(i => {
+        if (i && i.id && !interMap.has(i.id)) interMap.set(i.id, i);
+      });
+
+      const merged = {
+        ...loser,
+        ...winner,
+        id: winner.id,
+        leadId: winner.leadId || winner.id,
+        presupuestoId: winner.presupuestoId || loser.presupuestoId || null,
+        presupuestoCodigo: winner.presupuestoCodigo || loser.presupuestoCodigo || null,
+        presupuestoMonto: winner.presupuestoMonto || loser.presupuestoMonto || null,
+        presupuestoEstado: winner.presupuestoEstado || loser.presupuestoEstado || null,
+        interacciones: Array.from(interMap.values())
+      };
+
+      if (phoneKey) byKey.set(phoneKey, merged);
+      if (empKey) byKey.set(empKey, merged);
+    }
+  }
+
+  // Extraer valores únicos por id
+  const uniqueById = new Map();
+  for (const val of byKey.values()) {
+    if (val && val.id) uniqueById.set(val.id, val);
+  }
+  return Array.from(uniqueById.values());
+}
+
+/**
  * Obtiene los leads comerciales desde Firestore
  */
 export async function getCrmLeadsCloud() {
@@ -510,14 +607,20 @@ export async function getCrmLeadsCloud() {
       if (docSnap.exists()) {
         const data = docSnap.data() || {};
         const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
-        if (isExcludedCrmLead(item.empresa || item.nombreEmpresa || item.contacto, item.id, item.leadId, docSnap.id)) {
-          deleteDoc(docSnap.ref).catch(() => {});
+        if (
+          item.deleted === true ||
+          item.hidden === true ||
+          item.estado === 'eliminado' ||
+          String(docSnap.id).startsWith('prop-') ||
+          String(item.id).startsWith('prop-') ||
+          isExcludedCrmLead(item.empresa || item.nombreEmpresa || item.contacto, item.id, item.leadId, docSnap.id)
+        ) {
           return;
         }
         list.push(item);
       }
     });
-    return list;
+    return deduplicateCrmLeadsList(list);
   } catch (err) {
     console.warn('[FirestoreSync] Error obteniendo crm_leads:', err);
     return [];
@@ -529,12 +632,13 @@ export async function getCrmLeadsCloud() {
  */
 export async function saveCrmLeadCloud(lead) {
   if (!lead || !lead.id) return null;
+  if (lead._syntheticPortalLead || String(lead.id).startsWith('prop-')) return null;
   if (isExcludedCrmLead(lead.empresa || lead.nombreEmpresa || lead.contacto, lead.id, lead.leadId)) return null;
   try {
     await ensureAuth();
     const docId = String(lead.id).trim();
     const leadRef = doc(db, 'crm_leads', docId);
-    const { _firestoreDocId, ...restLead } = lead;
+    const { _firestoreDocId, _syntheticPortalLead, ...restLead } = lead;
     const payload = sanitizeForFirestore({
       ...restLead,
       id: docId,
@@ -564,7 +668,12 @@ export async function deleteCrmLeadCloud(leadId, extraKeys = []) {
   try {
     await ensureAuth();
     const docId = String(leadId).trim();
-    await deleteDoc(doc(db, 'crm_leads', docId));
+    await setDoc(doc(db, 'crm_leads', docId), {
+      deleted: true,
+      hidden: true,
+      estado: 'eliminado',
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
     return true;
   } catch (err) {
     console.warn('[FirestoreSync] Error eliminando lead de Firestore:', leadId, err);
@@ -584,14 +693,20 @@ export function subscribeCrmLeadsCloud(onUpdate) {
         if (docSnap.exists()) {
           const data = docSnap.data() || {};
           const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
-          if (isExcludedCrmLead(item.empresa || item.nombreEmpresa || item.contacto, item.id, item.leadId, docSnap.id)) {
-            deleteDoc(docSnap.ref).catch(() => {});
+          if (
+            item.deleted === true ||
+            item.hidden === true ||
+            item.estado === 'eliminado' ||
+            String(docSnap.id).startsWith('prop-') ||
+            String(item.id).startsWith('prop-') ||
+            isExcludedCrmLead(item.empresa || item.nombreEmpresa || item.contacto, item.id, item.leadId, docSnap.id)
+          ) {
             return;
           }
           list.push(item);
         }
       });
-      onUpdate(list);
+      onUpdate(deduplicateCrmLeadsList(list));
     }, (err) => {
       console.warn('[FirestoreSync] Error en listener de crm_leads:', err);
     });
@@ -617,8 +732,12 @@ export async function getPresupuestosCloud() {
       if (docSnap.exists()) {
         const data = docSnap.data() || {};
         const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
-        if (isExcludedPresupuesto(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, docSnap.id)) {
-          deleteDoc(docSnap.ref).catch(() => {});
+        if (
+          item.deleted === true ||
+          item.hidden === true ||
+          item.estado === 'eliminado' ||
+          isExcludedPresupuesto(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, docSnap.id)
+        ) {
           return;
         }
         list.push(item);
@@ -740,8 +859,12 @@ export function subscribePresupuestosCloud(onUpdate) {
         if (docSnap.exists()) {
           const data = docSnap.data() || {};
           const item = { ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id };
-          if (isExcludedPresupuesto(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, docSnap.id)) {
-            deleteDoc(docSnap.ref).catch(() => {});
+          if (
+            item.deleted === true ||
+            item.hidden === true ||
+            item.estado === 'eliminado' ||
+            isExcludedPresupuesto(item.cliente?.empresa || item.cliente?.nombre, item.id, item.codigo, docSnap.id)
+          ) {
             return;
           }
           list.push(item);

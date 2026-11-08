@@ -1198,33 +1198,29 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
 
   // Change lead stage con persistencia inmediata
   const handleStageChange = async (leadId, newStage) => {
-    // 1. Persistencia inmediata local
+    const nowIso = new Date().toISOString();
+    const todayStr = nowIso.split('T')[0];
+
+    // 1. Persistencia inmediata local y hacia Firestore Cloud
     updateAndPersistLeads(prev => prev.map(l => {
       if (l.id === leadId) {
-        return { ...l, etapa: newStage };
+        return { ...l, etapa: newStage, updatedAt: nowIso, actualizadoEn: todayStr };
       }
       return l;
     }));
     if (activeLeadModal && activeLeadModal.id === leadId) {
-      setActiveLeadModal(prev => ({ ...prev, etapa: newStage }));
+      setActiveLeadModal(prev => ({ ...prev, etapa: newStage, updatedAt: nowIso, actualizadoEn: todayStr }));
     }
 
-    // 2. Sincronizar en segundo plano con el backend
+    // 2. Sincronizar en segundo plano con el backend sin pisar el estado local ya actualizado
     try {
-      const res = await fetch(`/api/crm/leads/${leadId}/stage`, {
+      await fetch(`/api/crm/leads/${leadId}/stage`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ etapa: newStage })
       });
-      if (res.ok) {
-        const updated = await res.json();
-        updateAndPersistLeads(prev => prev.map(l => l.id === leadId ? updated : l));
-        if (activeLeadModal && activeLeadModal.id === leadId) {
-          setActiveLeadModal(updated);
-        }
-      }
     } catch (err) {
-      console.warn('Etapa guardada localmente (backend offline):', err);
+      console.warn('Etapa guardada en Firestore Cloud (backend local offline):', err);
     }
   };
 
@@ -1850,15 +1846,15 @@ export default function CrmPortalModule({ onConvertToPresupuesto, onOpenContrato
                             onDragStart={(e) => {
                               e.dataTransfer.setData('text/plain', lead.id);
                               e.dataTransfer.effectAllowed = 'move';
-                              setDraggingLeadId(lead.id);
+                              setTimeout(() => setDraggingLeadId(lead.id), 0);
                             }}
                             onDragEnd={() => {
                               setDraggingLeadId(null);
                               setDragOverStage(null);
                             }}
-                            className={`p-4 rounded-xl bg-[#101524] border transition-all duration-150 shadow-md flex flex-col gap-3 cursor-grab active:cursor-grabbing hover:border-orange-500/50 hover:shadow-xl ${
+                            className={`p-4 rounded-xl bg-[#101524] border transition-colors duration-150 shadow-md flex flex-col gap-3 cursor-grab active:cursor-grabbing hover:border-orange-500/50 hover:shadow-xl ${
                               isDragging
-                                ? 'opacity-30 border-dashed border-orange-500 scale-98'
+                                ? 'opacity-35 border-dashed border-orange-500'
                                 : 'border-slate-800'
                             }`}
                           >

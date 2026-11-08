@@ -223,14 +223,19 @@ export async function syncAllProyectosWithEvents(customSprintTasks = null, targe
     if (!Array.isArray(list) || list.length === 0) return [];
 
     const updated = list.map(p => {
-      if (targetProyectoId && p.id === targetProyectoId && customSprintTasks) {
-        return evaluateProjectMilestones(p, customSprintTasks);
+      if (targetProyectoId) {
+        if (p.id === targetProyectoId) {
+          return evaluateProjectMilestones(p, customSprintTasks);
+        }
+        return p;
       }
       return evaluateProjectMilestones(p, customSprintTasks);
     });
 
     for (const p of updated) {
-      saveProyectoCloud(p).catch(() => {});
+      if (!targetProyectoId || p.id === targetProyectoId) {
+        saveProyectoCloud(p).catch(() => {});
+      }
     }
 
     // Notificar al bus de eventos de la aplicación

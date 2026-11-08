@@ -278,10 +278,9 @@ const DEFAULT_SPRINT_TIMER = {
   taskId: null,
   proyectoId: null,
   startTime: null,
+  accumulatedSeconds: 0,
   targetDurationSeconds: 45 * 60,
   targetMinutes: 45,
-  targetEndTime: null,
-  accumulatedSeconds: 0,
   warned5Min: false
 };
 
@@ -297,24 +296,22 @@ function getSprintTimerFromStorage() {
   return DEFAULT_SPRINT_TIMER;
 }
 
-// Calcula los segundos restantes en cuenta regresiva hacia atrás
-function calculateRemainingSprintSeconds(timer) {
-  if (!timer || !timer.isRunning || !timer.targetEndTime) return 0;
-  const remaining = Math.ceil((timer.targetEndTime - Date.now()) / 1000);
-  return Math.max(0, remaining);
-}
-
-// Calcula los segundos transcurridos reales para facturación (Con tope seguro)
+// Calcula los segundos transcurridos reales para facturación y seguimiento en vivo (sin topes destructivos)
 function calculateElapsedSprintSeconds(timer) {
   if (!timer || !timer.isRunning) return Number(timer?.accumulatedSeconds) || 0;
   let secs = Number(timer.accumulatedSeconds) || 0;
   if (timer.startTime) {
     const delta = Math.floor((Date.now() - timer.startTime) / 1000);
-    // TOPE DE SEGURIDAD: Nunca excede la duración programada para evitar horas irreales
-    const maxSecs = timer.targetDurationSeconds || 45 * 60;
-    secs += Math.min(Math.max(0, delta), maxSecs);
+    secs += Math.max(0, delta);
   }
   return Math.max(0, secs);
+}
+
+// Calcula los segundos restantes si hay una meta opcional configurada
+function calculateRemainingSprintSeconds(timer) {
+  if (!timer || !timer.isRunning || !timer.targetDurationSeconds) return 0;
+  const elapsed = calculateElapsedSprintSeconds(timer);
+  return Math.max(0, timer.targetDurationSeconds - elapsed);
 }
 
 export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
@@ -334,6 +331,7 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   const [sprintTasksByProjMap, setSprintTasksByProjMap] = useState({});
   const [repoVaultByProjMap, setRepoVaultByProjMap] = useState({});
   const [isCloudLoaded, setIsCloudLoaded] = useState(false);
+  const activeLoadedProjRef = useRef(null);
 
   const updatePrdConfig = (updater) => {
     setPrdConfig(prev => {
@@ -351,10 +349,33 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
 
   // Estado del Sprint Kanban (Todas las tareas inician en Backlog ordenadas 1..12 con 0h)
   const [sprintTasks, setSprintTasks] = useState(DEFAULT_SPRINT_TASKS);
+  const sprintTasksRef = useRef(DEFAULT_SPRINT_TASKS);
+  const [draggingSprintTaskId, setDraggingSprintTaskId] = useState(null);
+  const [dragOverSprintCol, setDragOverSprintCol] = useState(null);
 
-  // Tarea en temporizador activo de cuenta regresiva (Timeboxing blindado)
+  useEffect(() => {
+    sprintTasksRef.current = sprintTasks;
+  }, [sprintTasks]);
+
+  // Actualizador atómico de tareas con persistencia en Firestore Cloud (sin efectos secundarios en el updater de React)
+  const updateProjectSprintTasks = (updater) => {
+    const prev = sprintTasksRef.current;
+    const updated = typeof updater === 'function' ? updater(prev) : updater;
+    sprintTasksRef.current = updated;
+    setSprintTasks(updated);
+    if (selectedProyectoId) {
+      setSprintTasksByProjMap(m => {
+        const nextMap = { ...m, [selectedProyectoId]: updated };
+        saveAppStateCloud('sprint_tasks_by_project', 'sprint_tasks', nextMap).catch(() => {});
+        return nextMap;
+      });
+      syncAllProyectosWithEvents(updated, selectedProyectoId).catch(() => {});
+    }
+  };
+
+  // Tarea en temporizador activo progresivo (Seguimiento real de desarrollo)
   const [sprintTimer, setSprintTimer] = useState(() => getSprintTimerFromStorage());
-  const [timerSeconds, setTimerSeconds] = useState(() => calculateRemainingSprintSeconds(getSprintTimerFromStorage()));
+  const [timerSeconds, setTimerSeconds] = useState(() => calculateElapsedSprintSeconds(getSprintTimerFromStorage()));
   const activeTimerTaskId = sprintTimer.isRunning ? sprintTimer.taskId : null;
 
   // Modales de control de tiempo
@@ -362,7 +383,6 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   const [timeboxTargetTaskId, setTimeboxTargetTaskId] = useState(null);
   const [timeboxDurationMinutes, setTimeboxDurationMinutes] = useState(45);
   const [showExpiredModal, setShowExpiredModal] = useState(false);
-  const [expiredAutoCommitSeconds, setExpiredAutoCommitSeconds] = useState(90);
 
   // Modal para agregar nueva tarea
   const [showNewTaskModal, setShowNewTaskModal] = useState(false);
@@ -525,18 +545,22 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
       fetchProyectos();
     };
     window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('goglite_proyectos_synced', handleStorageChange);
     window.addEventListener('goglite_presupuestos_updated', handleStorageChange);
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('goglite_proyectos_synced', handleStorageChange);
       window.removeEventListener('goglite_presupuestos_updated', handleStorageChange);
     };
   }, []);
 
   // Cargar tareas y bóveda específicas cuando cambia el proyecto seleccionado o se carga la nube
   useEffect(() => {
-    if (!selectedProyectoId || !isCloudLoaded) return;
+    if (!selectedProyectoId || !isCloudLoaded || loading) return;
+    if (activeLoadedProjRef.current === selectedProyectoId) {
+      // Ya está hidratado este proyecto en memoria; no pisar las tareas locales ante re-renders
+      return;
+    }
+    activeLoadedProjRef.current = selectedProyectoId;
+
     try {
       const tasks = sprintTasksByProjMap[selectedProyectoId];
       const proj = proyectos.find(p => p.id === selectedProyectoId);
@@ -564,10 +588,14 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
           if (t.horasRegistradas > 0 && t.columna !== 'backlog') return t;
           const matched = registroHoras.filter(r => {
             const f = (r.fase || '').toLowerCase();
+            const phaseNum = (t.id || '').replace('fase-', '');
             return f.includes(t.id) ||
+                   f.includes(`fase ${phaseNum}`) ||
+                   f.includes(`fase-${phaseNum}`) ||
                    (t.id === 'fase-1' && (f.includes('fase 1') || f.includes('infraestructura'))) ||
                    (t.id === 'fase-2' && (f.includes('fase 2') || f.includes('identidad') || f.includes('arquitectura'))) ||
-                   (t.id === 'fase-3' && (f.includes('fase 3') || f.includes('diseño') || f.includes('optimización')));
+                   (t.id === 'fase-3' && (f.includes('fase 3') || f.includes('diseño') || f.includes('optimización'))) ||
+                   (t.id === 'fase-4' && (f.includes('fase 4') || f.includes('landing') || f.includes('cotizador')));
           });
           if (matched.length > 0) {
             const sum = matched.reduce((a, b) => a + (Number(b.horas) || 0), 0);
@@ -637,20 +665,7 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     } catch (e) {
       console.warn('Error en sincronización de proyecto:', e);
     }
-  }, [selectedProyectoId, sprintTasksByProjMap, prdByProjMap, repoVaultByProjMap, proyectos, selectedCountry, isCloudLoaded]);
-
-  // Persistir tareas y bóveda en Firestore Cloud (aislado por proyecto) y sincronizar hitos (solo tras hidratar desde la nube)
-  useEffect(() => {
-    if (!isCloudLoaded || !selectedProyectoId) return;
-    try {
-      setSprintTasksByProjMap(prev => {
-        const updated = { ...prev, [selectedProyectoId]: sprintTasks };
-        saveAppStateCloud('sprint_tasks_by_project', 'sprint_tasks', updated).catch(() => {});
-        return updated;
-      });
-      syncAllProyectosWithEvents(sprintTasks, selectedProyectoId || null);
-    } catch (e) {}
-  }, [sprintTasks, selectedProyectoId, isCloudLoaded]);
+  }, [selectedProyectoId, isCloudLoaded, loading]);
 
 
   // Manejo del temporizador blindado al montar
@@ -663,52 +678,40 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
           ? cloudTimer
           : localTimer;
 
-        if (chosen && chosen.isRunning) {
-          // Si el timer venció en el pasado (mientras el usuario no estaba o la plataforma se cerró):
-          // Asentar automáticamente el bloque pactado y detenerlo limpiamente
-          if (chosen.targetEndTime && Date.now() >= chosen.targetEndTime) {
-            const scheduledSecs = chosen.targetDurationSeconds || (chosen.targetMinutes ? chosen.targetMinutes * 60 : 45 * 60);
-            const horasIncremento = Math.max(0.1, Number((scheduledSecs / 3600).toFixed(2)));
-            setSprintTasks(prev => prev.map(t => {
-              if (t.id === chosen.taskId) {
-                return {
-                  ...t,
-                  horasRegistradas: Number(((t.horasRegistradas || 0) + horasIncremento).toFixed(2))
-                };
-              }
-              return t;
-            }));
-            const stopped = { ...DEFAULT_SPRINT_TIMER };
-            setSprintTimer(stopped);
-            localStorage.removeItem(SPRINT_TIMER_STORAGE_KEY);
-            saveAppStateCloud('sprint_timer_active', 'timer', stopped).catch(() => {});
-            return;
-          }
-
+        if (chosen && chosen.isRunning && chosen.startTime) {
+          // El temporizador sigue vivo y calculamos el tiempo real transcurrido sin pérdida
+          const elapsed = calculateElapsedSprintSeconds(chosen);
           setSprintTimer(chosen);
-          setTimerSeconds(calculateRemainingSprintSeconds(chosen));
+          setTimerSeconds(elapsed);
           localStorage.setItem(SPRINT_TIMER_STORAGE_KEY, JSON.stringify(chosen));
           window.dispatchEvent(new CustomEvent('goglite_timer_heartbeat', { detail: chosen }));
         }
-      } catch {}
+      } catch (err) {
+        console.warn('Error sincronizando temporizador en montaje:', err);
+      }
     })();
   }, []);
 
-  // Ticking continuo de cuenta regresiva (1s) con aviso 5 min antes y alerta a los 0s
+  // Ticking continuo progresivo hacia adelante (1s)
   useEffect(() => {
-    const currentRemaining = calculateRemainingSprintSeconds(sprintTimer);
-    setTimerSeconds(currentRemaining);
-    if (!sprintTimer.isRunning) return;
+    if (!sprintTimer.isRunning) {
+      setTimerSeconds(0);
+      return;
+    }
+
+    // Inicializar de inmediato al segundo transcurrido real
+    setTimerSeconds(calculateElapsedSprintSeconds(sprintTimer));
 
     const interval = setInterval(() => {
-      const remaining = calculateRemainingSprintSeconds(sprintTimer);
-      setTimerSeconds(remaining);
+      const elapsed = calculateElapsedSprintSeconds(sprintTimer);
+      setTimerSeconds(elapsed);
 
       const tareaActual = sprintTasks.find(t => t.id === sprintTimer.taskId);
       const taskTitle = tareaActual ? tareaActual.titulo : 'Tarea de Desarrollo';
 
-      // 1. Alerta preventiva 5 minutos antes (T - 5 min = 300 segundos)
-      if (remaining <= 300 && remaining > 0 && !sprintTimer.warned5Min) {
+      // Aviso suave al alcanzar la meta de tiempo sugerida (ej. 45 min = 2700s)
+      const targetSecs = sprintTimer.targetDurationSeconds || (sprintTimer.targetMinutes ? sprintTimer.targetMinutes * 60 : 45 * 60);
+      if (elapsed >= targetSecs && !sprintTimer.warned5Min) {
         setSprintTimer(prev => {
           const updated = { ...prev, warned5Min: true };
           localStorage.setItem(SPRINT_TIMER_STORAGE_KEY, JSON.stringify(updated));
@@ -716,63 +719,32 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         });
         playTimerChime('warning');
         sendTimerNotification(
-          '⏳ Goglite · Faltan 5 minutos',
-          `Tu bloque en "${taskTitle}" está por concluir. Haz clic para extender el tiempo si lo requieres.`,
-          'timer-5min-warning'
+          '⏰ Goglite · Meta de Tiempo Cumplida',
+          `Has alcanzado los ${sprintTimer.targetMinutes || 45} min sugeridos en "${taskTitle}". El cronómetro continúa registrando tu tiempo exacto.`,
+          'timer-goal-met'
         );
-      }
-
-      // 2. Tiempo Cumplido (T = 0)
-      if (remaining <= 0) {
-        clearInterval(interval);
-        playTimerChime('completed');
-        sendTimerNotification(
-          '⏰ Goglite · ¡Bloque de Tiempo Cumplido!',
-          `Has completado los ${sprintTimer.targetMinutes || 45} min asignados a "${taskTitle}". Confirma si deseas extender o finalizar la tarea.`,
-          'timer-expired-alert'
-        );
-        setShowExpiredModal(true);
-        setExpiredAutoCommitSeconds(90);
       }
     }, 1000);
 
-    // Heartbeat cada 30 segundos
+    // Heartbeat cada 15 segundos: persiste el tiempo transcurrido en local y nube
     const heartbeat = setInterval(() => {
       try {
         const updated = {
           ...sprintTimer,
+          accumulatedSeconds: calculateElapsedSprintSeconds(sprintTimer),
           lastHeartbeat: Date.now()
         };
         localStorage.setItem(SPRINT_TIMER_STORAGE_KEY, JSON.stringify(updated));
         saveAppStateCloud('sprint_timer_active', 'timer', updated).catch(() => {});
         window.dispatchEvent(new CustomEvent('goglite_timer_heartbeat', { detail: updated }));
       } catch {}
-    }, 30000);
+    }, 15000);
 
     return () => {
       clearInterval(interval);
       clearInterval(heartbeat);
     };
   }, [sprintTimer, sprintTasks]);
-
-  // Auto-cierre de seguridad si el modal de tiempo cumplido queda sin respuesta durante 90 segundos
-  useEffect(() => {
-    if (!showExpiredModal || !sprintTimer.isRunning) return;
-
-    const countdown = setInterval(() => {
-      setExpiredAutoCommitSeconds(prev => {
-        if (prev <= 1) {
-          clearInterval(countdown);
-          handleCommitTimer(sprintTimer.taskId, false);
-          setShowExpiredModal(false);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(countdown);
-  }, [showExpiredModal, sprintTimer]);
 
   const fetchProyectos = async () => {
     try {
@@ -903,13 +875,13 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     }
   };
 
-  // Iniciar un nuevo bloque de tiempo (Timeboxing blindado)
+  // Iniciar cronómetro progresivo en una tarea (Seguimiento en vivo sin topes destructivos)
   const handleStartTimeboxTimer = async (taskId, minutes = 45) => {
     requestNotificationPermission().catch(() => {});
 
     // Si ya había otro timer corriendo en otra tarea, acumular sus horas antes de cambiar
     if (sprintTimer.isRunning && sprintTimer.taskId && sprintTimer.taskId !== taskId) {
-      await handleCommitTimer(sprintTimer.taskId, true);
+      await handleCommitTimer(sprintTimer.taskId);
     }
 
     const durationSecs = minutes * 60;
@@ -917,17 +889,17 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     const newTimer = {
       isRunning: true,
       taskId,
-      proyectoId: proyectoActivo?.id || null,
+      proyectoId: selectedProyectoId || proyectoActivo?.id || null,
       startTime: now,
+      accumulatedSeconds: 0,
       targetDurationSeconds: durationSecs,
       targetMinutes: minutes,
-      targetEndTime: now + (durationSecs * 1000),
-      accumulatedSeconds: 0,
-      warned5Min: false
+      warned5Min: false,
+      lastHeartbeat: now
     };
 
     setSprintTimer(newTimer);
-    setTimerSeconds(durationSecs);
+    setTimerSeconds(0);
     setShowTimeboxSelectModal(false);
     setShowExpiredModal(false);
 
@@ -938,28 +910,19 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     } catch {}
   };
 
-  // Extender tiempo de la tarea actual (+15, +30, +60 min)
+  // Extender meta de tiempo de la tarea actual (+15, +30, +60 min)
   const handleExtendTimer = (extraMinutes = 15) => {
     const extraSecs = extraMinutes * 60;
     const now = Date.now();
-    const baseRemaining = calculateRemainingSprintSeconds(sprintTimer);
-    const newRemaining = baseRemaining + extraSecs;
-    const newEndTime = now + (newRemaining * 1000);
-
     const updated = {
       ...sprintTimer,
-      isRunning: true,
       targetDurationSeconds: (sprintTimer.targetDurationSeconds || 0) + extraSecs,
       targetMinutes: (sprintTimer.targetMinutes || 0) + extraMinutes,
-      targetEndTime: newEndTime,
       warned5Min: false,
       lastHeartbeat: now
     };
 
     setSprintTimer(updated);
-    setTimerSeconds(newRemaining);
-    setShowExpiredModal(false);
-
     try {
       localStorage.setItem(SPRINT_TIMER_STORAGE_KEY, JSON.stringify(updated));
       saveAppStateCloud('sprint_timer_active', 'timer', updated).catch(() => {});
@@ -967,30 +930,39 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     } catch {}
   };
 
-  // Asentar y registrar las horas al P&L / Finanzas y a la tarea
-  const handleCommitTimer = async (taskId, isEarlyStop = false) => {
+  // Asentar y registrar las horas al P&L / Finanzas y a la tarea con persistencia blindada
+  const handleCommitTimer = async (taskId) => {
     const targetTaskId = taskId || sprintTimer.taskId;
     if (!targetTaskId) return;
 
-    let totalSecs = 0;
-    if (isEarlyStop) {
-      totalSecs = calculateElapsedSprintSeconds(sprintTimer);
-    } else {
-      totalSecs = sprintTimer.targetDurationSeconds || (sprintTimer.targetMinutes ? sprintTimer.targetMinutes * 60 : 45 * 60);
-    }
+    let totalSecs = calculateElapsedSprintSeconds(sprintTimer);
+    if (totalSecs < 60) totalSecs = 60; // Mínimo de 1 minuto para evitar horas en blanco
 
     const horasIncremento = Math.max(0.1, Number((totalSecs / 3600).toFixed(2)));
 
-    // 1. Actualizar horas en tarea local
-    setSprintTasks(prev => prev.map(t => {
-      if (t.id === targetTaskId) {
-        return {
-          ...t,
-          horasRegistradas: Number(((t.horasRegistradas || 0) + horasIncremento).toFixed(2))
-        };
-      }
-      return t;
-    }));
+    // 1. Actualizar horas en tarea local y guardar de inmediato en Firestore Cloud
+    let updatedTasks = [];
+    setSprintTasks(prev => {
+      updatedTasks = prev.map(t => {
+        if (t.id === targetTaskId) {
+          return {
+            ...t,
+            horasRegistradas: Number(((t.horasRegistradas || 0) + horasIncremento).toFixed(2)),
+            columna: t.columna === 'backlog' ? 'desarrollo' : t.columna
+          };
+        }
+        return t;
+      });
+      return updatedTasks;
+    });
+
+    if (selectedProyectoId && updatedTasks.length > 0) {
+      setSprintTasksByProjMap(prev => {
+        const nextMap = { ...prev, [selectedProyectoId]: updatedTasks };
+        saveAppStateCloud('sprint_tasks_by_project', 'sprint_tasks', nextMap).catch(() => {});
+        return nextMap;
+      });
+    }
 
     // 2. Limpiar timer persistente
     const stoppedTimer = { ...DEFAULT_SPRINT_TIMER };
@@ -1022,7 +994,8 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         horas: horasIncremento,
         costoHora: costoHoraEst,
         costoTotal: Number((horasIncremento * costoHoraEst).toFixed(2)),
-        fecha: fechaHoy
+        fecha: fechaHoy,
+        responsable: 'Víctor Matos'
       };
       parsedFin.timeEntries = [localTimeEntry, ...(parsedFin.timeEntries || [])];
       saveAppStateCloud('finanzas_v1', 'finanzas', parsedFin).catch(() => {});
@@ -1036,16 +1009,51 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         concepto: conceptoTarea,
         tarea: conceptoTarea,
         categoria: 'frontend_astro',
-        descripcion: `Tiempo Timebox registrado desde Sprint (${totalSecs}s / ${horasIncremento}h)`,
+        descripcion: `Tiempo registrado desde Cronómetro (${totalSecs}s / ${horasIncremento}h)`,
         horas: horasIncremento,
         costoHora: costoHoraEst,
         costoPorHora: costoHoraEst,
         moneda: 'USD',
-        fecha: fechaHoy
+        fecha: fechaHoy,
+        responsable: 'Víctor Matos'
       });
     } catch (err) {
       console.warn('Horas guardadas en local/cloud');
     }
+
+    // 4. Actualizar seguimiento.registroHoras en el proyecto
+    try {
+      const updatedProjs = proyectos.map(p => {
+        if (p.id === selectedProyectoId) {
+          const prevReg = Array.isArray(p.seguimiento?.registroHoras) ? p.seguimiento.registroHoras : [];
+          const newReg = [
+            ...prevReg,
+            {
+              fecha: fechaHoy,
+              fase: conceptoTarea,
+              detalle: `Sesión de desarrollo registrada en vivo (${horasIncremento} hrs).`,
+              horas: horasIncremento,
+              responsable: 'Víctor Matos'
+            }
+          ];
+          const newTotal = Number((newReg.reduce((acc, curr) => acc + (Number(curr.horas) || 0), 0)).toFixed(2));
+          return {
+            ...p,
+            seguimiento: {
+              ...(p.seguimiento || {}),
+              registroHoras: newReg,
+              totalHorasRegistradas: newTotal
+            }
+          };
+        }
+        return p;
+      });
+      setProyectos(updatedProjs);
+      const currP = updatedProjs.find(p => p.id === selectedProyectoId);
+      if (currP) {
+        saveProyectoCloud(currP).catch(() => {});
+      }
+    } catch (e) {}
 
     window.dispatchEvent(new CustomEvent('goglite_tasks_updated'));
     window.dispatchEvent(new CustomEvent('goglite_proyectos_synced'));
@@ -1054,19 +1062,17 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
   // Clic en el botón de cronómetro de la tarjeta
   const handleTaskPlayClick = (taskId) => {
     if (activeTimerTaskId === taskId) {
-      // Si ya está corriendo en ESTA tarea, ofrecer finalizar y asentar
-      handleCommitTimer(taskId, true);
+      // Si ya está corriendo en ESTA tarea, detener y registrar tiempo transcurrido
+      handleCommitTimer(taskId);
     } else {
-      // Abrir selector de bloque
-      setTimeboxTargetTaskId(taskId);
-      setTimeboxDurationMinutes(45);
-      setShowTimeboxSelectModal(true);
+      // Iniciar de inmediato el cronómetro en esta tarea
+      handleStartTimeboxTimer(taskId, 45);
     }
   };
 
   // Mover tarea entre columnas de Sprint
   const handleMoveTaskColumn = (taskId, nuevaColumna) => {
-    setSprintTasks(prev => prev.map(t => t.id === taskId ? { ...t, columna: nuevaColumna } : t));
+    updateProjectSprintTasks(prev => prev.map(t => t.id === taskId ? { ...t, columna: nuevaColumna } : t));
   };
 
   // Eliminar tarea
@@ -1081,7 +1087,7 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
         window.dispatchEvent(new CustomEvent('goglite_timer_heartbeat', { detail: stoppedTimer }));
       } catch {}
     }
-    setSprintTasks(prev => prev.filter(t => t.id !== taskId));
+    updateProjectSprintTasks(prev => prev.filter(t => t.id !== taskId));
   };
 
   // Crear nueva tarea en Kanban
@@ -1099,7 +1105,7 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
       prioridad: newTaskForm.prioridad
     };
 
-    setSprintTasks(prev => [newTask, ...prev]);
+    updateProjectSprintTasks(prev => [newTask, ...prev]);
     setNewTaskForm({
       titulo: '',
       descripcion: '',
@@ -1115,16 +1121,7 @@ export default function CentroDesarrolloPrdModule({ selectedCountry = 'SV' }) {
     if (!window.confirm('¿Seguro que deseas reiniciar las 12 fases oficiales? Esto reemplazará las tareas y horas registradas por la plantilla inicial.')) {
       return;
     }
-    setSprintTasks(PLAYBOOK_12_FASES_TASKS);
-    try {
-      if (selectedProyectoId) {
-        setSprintTasksByProjMap(prev => {
-          const updated = { ...prev, [selectedProyectoId]: PLAYBOOK_12_FASES_TASKS };
-          saveAppStateCloud('sprint_tasks_by_project', 'sprint_tasks', updated).catch(() => {});
-          return updated;
-        });
-      }
-    } catch (e) {}
+    updateProjectSprintTasks(PLAYBOOK_12_FASES_TASKS);
     alert('✓ Las 12 Fases Oficiales han sido cargadas en orden cronológico en Por Iniciar (Backlog) con 0 horas registradas.');
   };
 
@@ -1302,29 +1299,33 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
 
         {/* Timer Bar Flotante si hay una tarea en ejecución */}
         {activeTimerTaskId && (
-          <div className="flex items-center gap-3 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-emerald-500/40 text-emerald-300 text-xs font-mono shadow-xl backdrop-blur-sm">
+          <div className="flex items-center gap-3 px-3.5 py-1.5 rounded-xl bg-slate-900/95 border border-emerald-500/50 text-emerald-300 text-xs font-mono shadow-2xl backdrop-blur-md">
             <div className="flex items-center gap-2">
-              <Clock className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
-              <span className="text-[11px] text-slate-400 font-sans hidden sm:inline">Restante:</span>
-              <span className="text-xs font-extrabold text-white bg-black/40 px-2 py-0.5 rounded border border-emerald-500/30">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+              <Clock className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-[11px] text-slate-400 font-sans hidden sm:inline">Tiempo en Vivo:</span>
+              <span className="text-xs font-extrabold text-white bg-black/60 px-2.5 py-0.5 rounded border border-emerald-500/40">
                 {formatSecondsCountdown(timerSeconds)}
               </span>
-              <span className="text-[10px] text-slate-400">({sprintTimer.targetMinutes || 45}m tope)</span>
+              <span className="text-[10px] text-slate-400 font-sans hidden md:inline">
+                ({sprintTasks.find(t => t.id === activeTimerTaskId)?.titulo?.split(':')?.[0] || 'En progreso'})
+              </span>
             </div>
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => handleExtendTimer(15)}
                 className="px-2 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-300 text-[10px] font-sans font-bold transition-colors border border-emerald-500/30"
-                title="Añadir 15 minutos al bloque actual"
+                title="Añadir 15 minutos a la meta sugerida"
               >
                 +15m
               </button>
               <button
-                onClick={() => handleCommitTimer(activeTimerTaskId, true)}
-                className="px-2.5 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-sans font-semibold transition-colors shadow-sm"
-                title="Finalizar tarea anticipadamente con el tiempo real transcurrido"
+                onClick={() => handleCommitTimer(activeTimerTaskId)}
+                className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-sans font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                title="Detener cronómetro y asentar las horas trabajadas en el P&L y en la tarea"
               >
-                Finalizar Ahora
+                <Square className="w-2.5 h-2.5 fill-current" />
+                <span>Detener & Guardar Horas</span>
               </button>
             </div>
           </div>
@@ -1367,7 +1368,7 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
           </div>
 
           {/* Columnas Kanban */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5 select-none">
             {[
               { id: 'backlog', titulo: 'Por Iniciar (Backlog)', color: 'border-slate-800 bg-slate-900/40 text-slate-400' },
               { id: 'desarrollo', titulo: 'En Desarrollo', color: 'border-amber-500/30 bg-amber-500/5 text-amber-300' },
@@ -1375,8 +1376,32 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
               { id: 'completado', titulo: 'Aprobado & Listo', color: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-300' }
             ].map(col => {
               const tasksInCol = sprintTasks.filter(t => t.columna === col.id);
+              const isDropTarget = dragOverSprintCol === col.id;
               return (
-                <div key={col.id} className={`rounded-xl border ${col.color} p-3 flex flex-col justify-between min-h-[480px]`}>
+                <div
+                  key={col.id}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dragOverSprintCol !== col.id) setDragOverSprintCol(col.id);
+                  }}
+                  onDragLeave={(e) => {
+                    if (e.currentTarget.contains(e.relatedTarget)) return;
+                    setDragOverSprintCol(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOverSprintCol(null);
+                    setDraggingSprintTaskId(null);
+                    const droppedTaskId = e.dataTransfer.getData('text/plain');
+                    if (droppedTaskId) {
+                      handleMoveTaskColumn(droppedTaskId, col.id);
+                    }
+                  }}
+                  className={`rounded-xl border p-3 flex flex-col justify-between min-h-[480px] transition-colors ${col.color} ${
+                    isDropTarget ? 'ring-2 ring-orange-500/60 border-orange-500 bg-orange-500/10' : ''
+                  }`}
+                >
                   <div>
                     <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-800/80">
                       <span className="text-xs font-mono font-bold">{col.titulo}</span>
@@ -1389,13 +1414,26 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
                     <div className="space-y-2.5">
                       {tasksInCol.map(task => {
                         const isTimerRunning = activeTimerTaskId === task.id;
+                        const isDraggingTask = draggingSprintTaskId === task.id;
                         return (
                           <div
                             key={task.id}
-                            className={`p-3 rounded-lg border text-xs space-y-2.5 transition-all ${
-                              isTimerRunning
-                                ? 'bg-emerald-950/20 border-emerald-500/60 shadow-lg'
-                                : 'bg-[#0f1422] border-slate-800/80 hover:border-slate-700'
+                            draggable={true}
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('text/plain', task.id);
+                              e.dataTransfer.effectAllowed = 'move';
+                              setTimeout(() => setDraggingSprintTaskId(task.id), 0);
+                            }}
+                            onDragEnd={() => {
+                              setDraggingSprintTaskId(null);
+                              setDragOverSprintCol(null);
+                            }}
+                            className={`p-3 rounded-lg border text-xs space-y-2.5 transition-colors cursor-grab active:cursor-grabbing ${
+                              isDraggingTask
+                                ? 'opacity-40 border-dashed border-orange-500'
+                                : isTimerRunning
+                                  ? 'bg-emerald-950/20 border-emerald-500/60 shadow-lg'
+                                  : 'bg-[#0f1422] border-slate-800/80 hover:border-slate-700'
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2">
@@ -1451,22 +1489,22 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
                               {/* Botón de Iniciar / Pausar Cronómetro */}
                               <button
                                 onClick={() => handleTaskPlayClick(task.id)}
-                                className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
                                   isTimerRunning
-                                    ? 'bg-rose-600 text-white animate-pulse'
+                                    ? 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse shadow-md'
                                     : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30'
                                 }`}
-                                title={isTimerRunning ? 'Finalizar anticipadamente y registrar tiempo transcurrido' : 'Iniciar Temporizador con Bloque Seguro'}
+                                title={isTimerRunning ? 'Detener cronómetro y asentar las horas trabajadas' : 'Iniciar cronómetro de desarrollo en vivo'}
                               >
                                 {isTimerRunning ? (
                                   <>
                                     <Square className="w-2.5 h-2.5 fill-current" />
-                                    <span>{formatSecondsCountdown(timerSeconds)}</span>
+                                    <span>{formatSecondsCountdown(timerSeconds)} · Detener</span>
                                   </>
                                 ) : (
                                   <>
                                     <Play className="w-2.5 h-2.5 fill-current" />
-                                    <span>Iniciar Bloque</span>
+                                    <span>Iniciar Cronómetro</span>
                                   </>
                                 )}
                               </button>
@@ -2225,7 +2263,7 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
               <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/20 flex items-start gap-2 text-[11px] text-emerald-300/90 leading-relaxed">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <p>
-                  <strong>Tope de Seguridad Activo:</strong> El reloj contará hacia atrás. Te avisará 5 minutos antes con alerta auditiva y notificación nativa. Si no estás al finalizar, <strong>se cerrará automáticamente registrando únicamente este bloque</strong>, blindando tus métricas contra horas irreales.
+                  <strong>Cronómetro Progresivo en Vivo:</strong> El tiempo se registra segundo a segundo y se sincroniza en segundo plano. Te notificará al cumplir tu meta pactada sin interrumpir tu flujo de trabajo, y nunca se perderá si refrescas la página.
                 </p>
               </div>
 
@@ -2243,7 +2281,7 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
                   className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Iniciar {timeboxDurationMinutes} min</span>
+                  <span>Iniciar Cronómetro ({timeboxDurationMinutes} min meta)</span>
                 </button>
               </div>
             </div>
@@ -2252,21 +2290,30 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: TIEMPO CUMPLIDO (EXTENSIÓN O FINALIZACIÓN)                          */}
+      {/* MODAL: META DE TIEMPO CUMPLIDA (RECORDATORIO NO DESTRUCTIVO)              */}
       {/* ========================================================================= */}
       {showExpiredModal && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#0f1422] border-2 border-amber-500/40 rounded-2xl p-5 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
-                <Bell className="w-5 h-5 animate-bounce" />
+          <div className="w-full max-w-md bg-[#0f1422] border-2 border-emerald-500/40 rounded-2xl p-5 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                  <Clock className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">¡Meta de Tiempo Alcanzada!</h3>
+                  <p className="text-[11px] text-emerald-400/90 font-mono">
+                    Tiempo en vivo: {formatSecondsCountdown(timerSeconds)}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">¡Bloque de Tiempo Cumplido!</h3>
-                <p className="text-[11px] text-amber-400/90 font-mono">
-                  Completaste los {sprintTimer.targetMinutes || 45} min pactados
-                </p>
-              </div>
+              <button
+                onClick={() => setShowExpiredModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+                title="Cerrar aviso y continuar trabajando"
+              >
+                ✕
+              </button>
             </div>
 
             <div className="space-y-3">
@@ -2278,27 +2325,27 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
               </div>
 
               <p className="text-xs text-slate-300">
-                ¿Ya finalizaste el trabajo de esta tarea o requieres añadir más tiempo de concentración?
+                Has alcanzado tu bloque sugerido. El cronómetro continúa activo registrando tu tiempo exacto. ¿Deseas detener y guardar ahora o seguir trabajando?
               </p>
 
               <div>
-                <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1.5">Añadir más tiempo a esta tarea:</span>
+                <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1.5">Extender meta sugerida:</span>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => handleExtendTimer(15)}
-                    className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 font-bold text-xs border border-emerald-500/30 hover:border-emerald-500/60 transition-all flex items-center justify-center gap-1"
+                    className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 font-bold text-xs border border-emerald-500/30 hover:border-emerald-500/60 transition-all flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <span>+15 min</span>
                   </button>
                   <button
                     onClick={() => handleExtendTimer(30)}
-                    className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 font-bold text-xs border border-emerald-500/30 hover:border-emerald-500/60 transition-all flex items-center justify-center gap-1"
+                    className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 font-bold text-xs border border-emerald-500/30 hover:border-emerald-500/60 transition-all flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <span>+30 min</span>
                   </button>
                   <button
                     onClick={() => handleExtendTimer(60)}
-                    className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 font-bold text-xs border border-emerald-500/30 hover:border-emerald-500/60 transition-all flex items-center justify-center gap-1"
+                    className="py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 font-bold text-xs border border-emerald-500/30 hover:border-emerald-500/60 transition-all flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <span>+60 min</span>
                   </button>
@@ -2308,19 +2355,20 @@ ${(prdConfig.preparacionAgentica?.trustAnchors || []).map(t => `  - **${t.ruta}:
               {/* Botón de Finalización */}
               <button
                 type="button"
-                onClick={() => handleCommitTimer(sprintTimer.taskId, false)}
-                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md flex items-center justify-center gap-2"
+                onClick={() => handleCommitTimer(sprintTimer.taskId)}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Terminar Tarea y Asentar {sprintTimer.targetMinutes || 45} min</span>
+                <span>Detener & Asentar Tiempo ({Number((calculateElapsedSprintSeconds(sprintTimer) / 3600).toFixed(2))} hrs)</span>
               </button>
 
-              {/* Indicador de Auto-asentado por inactividad */}
-              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 text-center">
-                <p className="text-[10px] text-slate-400 font-mono">
-                  Salvaguarda de inactividad: Asentando y cerrando automáticamente en <span className="text-amber-400 font-bold">{expiredAutoCommitSeconds}s</span> si no hay respuesta.
-                </p>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowExpiredModal(false)}
+                className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold text-xs transition-colors border border-slate-800 cursor-pointer"
+              >
+                Continuar Trabajando en Código
+              </button>
             </div>
           </div>
         </div>

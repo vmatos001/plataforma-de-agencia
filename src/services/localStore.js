@@ -4,7 +4,7 @@
  * Los datos de negocio transaccionales ya NO residen en localStorage.
  */
 
-import { isExcludedCrmLead, isExcludedPresupuesto, isExcludedProyecto } from './firestoreSyncService';
+import { isExcludedCrmLead, isExcludedPresupuesto, isExcludedProyecto, deduplicateCrmLeadsList } from './firestoreSyncService';
 
 // ============================================================================
 // PURGA AUTOMÁTICA DE DATOS DE NEGOCIO LEGACY EN LOCALSTORAGE
@@ -130,8 +130,10 @@ export function removeLocalItem(key) {
 export function syncCrmLeadsWithPresupuestos(crmLeads, presupuestosList = []) {
   if (!Array.isArray(crmLeads)) return crmLeads;
   try {
-    const filteredLeads = crmLeads.filter(
-      l => l && !isExcludedCrmLead(l.empresa || l.nombreEmpresa || l.contacto, l.id, l.leadId, l._firestoreDocId)
+    const filteredLeads = deduplicateCrmLeadsList(
+      crmLeads.filter(
+        l => l && !isExcludedCrmLead(l.empresa || l.nombreEmpresa || l.contacto, l.id, l.leadId, l._firestoreDocId)
+      )
     );
     const normalizedLeads = filteredLeads.map(l => ({
       ...l,
@@ -145,14 +147,20 @@ export function syncCrmLeadsWithPresupuestos(crmLeads, presupuestosList = []) {
     return normalizedLeads.map(lead => {
       const lName = (lead.empresa || '').toLowerCase().trim();
       const lPhone = (lead.telefono || '').replace(/\D/g, '');
+      const hadRawStage = Boolean(lead.etapa && lead.etapa !== 'nuevo');
 
       const matchingP = presupuestos.find(p => {
-        const pName = (p.cliente?.empresa || '').toLowerCase().trim();
+        if (p.leadId && (p.leadId === lead.id || p.leadId === lead.leadId)) return true;
+        if (p.cliente?.id && p.cliente.id === lead.id) return true;
         const pPhone = (p.cliente?.telefono || '').replace(/\D/g, '');
-        return (lName && pName && (lName.includes(pName) || pName.includes(lName))) ||
-               (lPhone && pPhone && (lPhone === pPhone || lPhone.endsWith(pPhone) || pPhone.endsWith(lPhone))) ||
-               (p.leadId && p.leadId === lead.id) ||
-               (p.cliente?.id && p.cliente.id === lead.id);
+        if (lPhone.length >= 8 && pPhone.length >= 8 && (lPhone === pPhone || lPhone.slice(-8) === pPhone.slice(-8))) {
+          return true;
+        }
+        const pName = (p.cliente?.empresa || '').toLowerCase().trim();
+        if (lName.length >= 5 && pName.length >= 5 && (lName === pName || (lName.length >= 10 && pName.length >= 10 && (lName.includes(pName) || pName.includes(lName))))) {
+          return true;
+        }
+        return false;
       });
 
       if (matchingP) {
@@ -164,30 +172,26 @@ export function syncCrmLeadsWithPresupuestos(crmLeads, presupuestosList = []) {
           presupuestoMonto: monto,
           valorEstimado: monto,
           presupuestoEstado: matchingP.estado || 'borrador',
-          etapa: (lead.etapa === 'nuevo' || lead.etapa === 'contactado') ? 'propuesta_enviada' : lead.etapa
+          etapa: !hadRawStage ? 'propuesta_enviada' : lead.etapa
         };
       }
 
-      // Si el lead tenía propuesta y la lista de propuestas en la nube ya no la contiene,
-      // limpiar los campos vinculados de propuesta sin tocar el lead ni modificar lead.archivado
+      // Si el lead tenía un presupuestoId ajeno o eliminado que no coincide con matchingP, limpiarlo
       if (presupuestos.length > 0 && Boolean(lead.presupuestoId || lead.presupuestoCodigo)) {
-        const stillExists = presupuestos.some(p => p.id === lead.presupuestoId || p.codigo === lead.presupuestoCodigo);
-        if (!stillExists) {
-          const cleanedLead = { ...lead };
-          cleanedLead.presupuestoId = null;
-          cleanedLead.presupuestoCodigo = null;
-          cleanedLead.presupuestoMonto = null;
-          cleanedLead.presupuestoEstado = null;
-          if (cleanedLead.portalConfig) {
-            cleanedLead.portalConfig = {
-              ...cleanedLead.portalConfig,
-              presupuestoId: null,
-              estadoPropuesta: null,
-              fase1Aprobada: false
-            };
-          }
-          return cleanedLead;
+        const cleanedLead = { ...lead };
+        cleanedLead.presupuestoId = '';
+        cleanedLead.presupuestoCodigo = '';
+        cleanedLead.presupuestoMonto = Number(lead.valorEstimado) || 0;
+        cleanedLead.presupuestoEstado = '';
+        if (cleanedLead.portalConfig) {
+          cleanedLead.portalConfig = {
+            ...cleanedLead.portalConfig,
+            presupuestoId: '',
+            estadoPropuesta: '',
+            fase1Aprobada: false
+          };
         }
+        return cleanedLead;
       }
 
       return lead;
