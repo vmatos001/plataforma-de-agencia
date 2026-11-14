@@ -506,8 +506,8 @@ function computeFinanzasSummary(rawState) {
     };
   });
 
-  const horasRealesTotales = timeEntries.reduce((acc, t) => acc + (Number(t.horas) || 0), 0);
-  const horasTotalesProyectos = proyectosRentabilidad.reduce((acc, p) => acc + p.horasInvertidas, 0);
+  const horasRealesTotales = Number(timeEntries.reduce((acc, t) => acc + (Number(t.horas) || 0), 0).toFixed(2));
+  const horasTotalesProyectos = Number(proyectosRentabilidad.reduce((acc, p) => acc + p.horasInvertidas, 0).toFixed(2));
   const horasTotales = Math.max(horasRealesTotales, horasTotalesProyectos);
   const costeManoObraTotal = horasTotales * costoHora;
 
@@ -4683,9 +4683,9 @@ export default function GestionRentabilidadModule({
                 <Clock className="w-4 h-4 text-emerald-400" />
               </div>
               <div className="text-2xl font-black text-white font-mono mt-2">
-                {kpis.horasTotales} hrs
+                {Number(kpis.horasTotales || 0).toFixed(1)} hrs
               </div>
-              <p className="text-[10px] text-slate-500 mt-0.5">{kpis.horasRealesTotales}h en bitácora activa</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">{Number(kpis.horasRealesTotales || 0).toFixed(1)}h en bitácora activa</p>
             </div>
 
             <div className="p-4 rounded-xl bg-[#0c1017] border border-slate-800 shadow-sm">
