@@ -3719,20 +3719,20 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                     {activeBankTab === 'US' && (
                       <div className="space-y-2">
                         <div className="text-emerald-400 font-bold flex items-center justify-between">
-                          <span>uglyCash / ACH Internacional</span>
-                          <span className="text-[10px] bg-emerald-500/20 px-2 py-0.5 rounded">Zelle / uglyCash Direct</span>
+                          <span>uglyCash · Pago Libre EE.UU.</span>
+                          <span className="text-[10px] bg-emerald-500/20 px-2 py-0.5 rounded">CashApp · Débito · Apple/Google Pay</span>
                         </div>
-                        <div className="text-slate-300">· uglyTag: <strong className="text-white">$goglite</strong></div>
-                        <div className="text-slate-300">· Routing Number (ACH): <strong className="text-white">026014881</strong></div>
-                        <div className="text-slate-300">· Account (Evolve Bank): <strong className="text-white">92817293810</strong></div>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyBank('$goglite', 'US')}
-                          className="w-full mt-2.5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-100 text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 active:scale-[0.99] transition-all min-h-[46px]"
+                        <div className="text-slate-300">· Titular: <strong className="text-white">Victor Alexander Matos</strong></div>
+                        <div className="text-slate-300">· Modalidad: <strong className="text-white">Enlace de pago con monto abierto</strong></div>
+                        <a
+                          href="https://link.ugly.cash/money_link/vmatosv/1"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full mt-2.5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition-all min-h-[46px]"
                         >
-                          {copiedBank === 'US' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-orange-400" />}
-                          <span>{copiedBank === 'US' ? '¡uglyTag Copiado!' : 'Copiar Tag uglyCash ($goglite)'}</span>
-                        </button>
+                          <ExternalLink className="w-4 h-4" />
+                          <span>Pagar con uglyCash (Monto Libre)</span>
+                        </a>
                       </div>
                     )}
                   </div>
