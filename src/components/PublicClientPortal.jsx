@@ -3733,6 +3733,15 @@ export default function PublicClientPortal({ token, onBackToAdmin, agencySetting
                           <ExternalLink className="w-4 h-4" />
                           <span>Pagar con uglyCash (Monto Libre)</span>
                         </a>
+                        <a
+                          href="https://www.paypal.me/Vmatosv"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-3 rounded-xl bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md active:scale-[0.99] transition-all min-h-[46px]"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          <span>Pagar con PayPal (Monto Libre)</span>
+                        </a>
                       </div>
                     )}
                   </div>
